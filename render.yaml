@@ -9,9 +9,4 @@ services:
         value: 3.11.0
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        value: sqlite:////opt/render/project/src/instance/site.db
-    disk:
-      name: data
-      mountPath: /opt/render/project/src/instance
-      sizeGB: 1
+      # DATABASE_URL será adicionada manualmente no dashboard após criar o PostgreSQL

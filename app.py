@@ -48,25 +48,28 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_5f352a14cb7e4b1
 # Garantir que o diretório instance existe
 os.makedirs(app.instance_path, exist_ok=True)
 
-# Configuração do banco SQLite - usar caminho relativo
-# Em produção (Render), usa a variável de ambiente
-# Em desenvolvimento, usa o diretório instance local
+# Configuração do banco de dados - SQLite para dev, PostgreSQL para produção
+# Em produção (Render), usa a variável de ambiente DATABASE_URL
+# Em desenvolvimento, usa SQLite local
 database_url = os.environ.get('DATABASE_URL')
 if not database_url:
-    # Caminho padrão para desenvolvimento
+    # Caminho padrão para desenvolvimento (SQLite)
     database_url = f'sqlite:///{os.path.join(app.instance_path, "site.db")}'
+    print(f"📁 Banco SQLite: {os.path.join(app.instance_path, 'site.db')}")
+else:
+    # Corrigir URL do PostgreSQL se necessário (Render usa postgres://)
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    print(f"🐘 Banco de dados: PostgreSQL")
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Configurações do SQLite
+# Configurações do SQLite (serão ignoradas se for PostgreSQL)
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_timeout': 20,
     'pool_recycle': -1,
     'pool_pre_ping': True,
-    'connect_args': {
-        'timeout': 20,
-        'check_same_thread': False
-    }
 }
 
 # Definição de constantes

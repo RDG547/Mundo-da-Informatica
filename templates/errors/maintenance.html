@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site em Manutenção - {{ site_configs.get('site_name', 'Mundo da Informática') }}</title>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+        }
+
+        .maintenance-container {
+            max-width: 600px;
+            padding: 2rem;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .maintenance-icon {
+            font-size: 6rem;
+            margin-bottom: 2rem;
+            color: rgba(255, 255, 255, 0.9);
+            animation: pulse 2s infinite;
+        }
+
+        .maintenance-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .maintenance-message {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        .maintenance-details {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .maintenance-contact {
+            font-size: 1rem;
+            margin-top: 2rem;
+        }
+
+        .maintenance-contact a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            border-bottom: 2px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        .maintenance-contact a:hover {
+            border-bottom-color: #fff;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .social-links {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .social-link {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-decoration: none;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .social-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+        }
+
+        @media (max-width: 768px) {
+            .maintenance-container {
+                padding: 1rem;
+            }
+
+            .maintenance-icon {
+                font-size: 4rem;
+            }
+
+            .maintenance-title {
+                font-size: 2rem;
+            }
+
+            .maintenance-message {
+                font-size: 1rem;
+            }
+
+            .maintenance-details {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="maintenance-container">
+        <div class="maintenance-icon">
+            <i class="fas fa-tools"></i>
+        </div>
+
+        <h1 class="maintenance-title">Site em Manutenção</h1>
+
+        <p class="maintenance-message">
+            Estamos trabalhando para melhorar sua experiência.
+            O site estará disponível novamente em breve.
+        </p>
+
+        <div class="maintenance-details">
+            <h3><i class="fas fa-clock"></i> Tempo estimado</h3>
+            <p>A manutenção deve ser concluída dentro de algumas horas.</p>
+
+            <h3 style="margin-top: 1rem;"><i class="fas fa-info-circle"></i> O que estamos fazendo?</h3>
+            <p>Implementando melhorias e atualizações para oferecer um serviço ainda melhor.</p>
+        </div>
+
+        <div class="maintenance-contact">
+            <p>
+                <i class="fas fa-envelope"></i>
+                Para urgências, entre em contato:
+                <a href="mailto:{{ site_configs.get('contact_email', 'contato@mundodainformatica.com') }}">
+                    {{ site_configs.get('contact_email', 'contato@mundodainformatica.com') }}
+                </a>
+            </p>
+        </div>
+
+        <div class="social-links">
+            {% if site_configs.get('social_links', {}).get('facebook') %}
+            <a href="{{ site_configs.social_links.facebook }}" class="social-link" target="_blank">
+                <i class="fab fa-facebook-f"></i>
+            </a>
+            {% endif %}
+
+            {% if site_configs.get('social_links', {}).get('instagram') %}
+            <a href="{{ site_configs.social_links.instagram }}" class="social-link" target="_blank">
+                <i class="fab fa-instagram"></i>
+            </a>
+            {% endif %}
+
+            {% if site_configs.get('social_links', {}).get('twitter') %}
+            <a href="{{ site_configs.social_links.twitter }}" class="social-link" target="_blank">
+                <i class="fab fa-twitter"></i>
+            </a>
+            {% endif %}
+
+            {% if site_configs.get('social_links', {}).get('youtube') %}
+            <a href="{{ site_configs.social_links.youtube }}" class="social-link" target="_blank">
+                <i class="fab fa-youtube"></i>
+            </a>
+            {% endif %}
+        </div>
+
+        <a href="{{ url_for('login') }}" class="back-link">
+            <i class="fas fa-user-shield"></i> Acesso Administrativo
+        </a>
+    </div>
+
+    <script>
+        // Auto-refresh da página a cada 5 minutos para verificar se a manutenção terminou
+        setTimeout(function() {
+            window.location.reload();
+        }, 300000); // 5 minutos
+    </script>
+</body>
+</html>

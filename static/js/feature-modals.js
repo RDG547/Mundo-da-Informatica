@@ -1,0 +1,221 @@
+/**
+ * Feature Modals
+ * Gerencia os popups de informações das features
+ */
+
+// Feature Data - Dados dos modals de features
+const featureData = {
+    verified: {
+        icon: 'fas fa-shield-alt',
+        title: 'Conteúdo Verificado',
+        text: 'Todos os arquivos em nossa plataforma passam por uma rigorosa verificação de segurança. Utilizamos múltiplas camadas de análise antivírus e checagem de integridade para garantir que você baixe apenas conteúdo seguro e livre de malware. Nossa equipe técnica revisa manualmente cada upload antes de disponibilizá-lo.'
+    },
+    updated: {
+        icon: 'fas fa-rocket',
+        title: 'Sempre Atualizado',
+        text: 'Nosso acervo é constantemente atualizado com as versões mais recentes de BIOS, drivers, esquemas e softwares. Monitoramos lançamentos oficiais dos fabricantes e atualizamos nosso banco de dados regularmente para garantir que você tenha acesso às versões mais estáveis e compatíveis disponíveis no mercado.'
+    },
+    professional: {
+        icon: 'fas fa-users',
+        title: 'Feito para Profissionais',
+        text: 'Nossa plataforma foi desenvolvida pensando nas necessidades de técnicos profissionais de informática. Organizamos o conteúdo de forma intuitiva, com filtros avançados, descrições detalhadas e informações técnicas precisas. Economize tempo em suas pesquisas e encontre exatamente o que precisa para seu trabalho.'
+    },
+    support: {
+        icon: 'fas fa-headset',
+        title: 'Suporte Dedicado',
+        text: 'Nossa equipe de suporte está pronta para ajudá-lo. Se você não encontrar o arquivo que procura, tiver dúvidas sobre compatibilidade ou precisar de assistência técnica, entre em contato conosco. Respondemos rapidamente e fazemos o possível para atender suas solicitações específicas de recursos.'
+    },
+    // BIOS Features
+    'bios-notebooks': {
+        icon: 'fas fa-laptop',
+        title: 'BIOS para Notebooks',
+        text: 'Arquivos de BIOS específicos para notebooks de todas as marcas principais (Dell, HP, Lenovo, Acer, Asus, etc.). Inclui versões atualizadas e compatíveis com diferentes modelos e gerações. Essencial para reparos de placa-mãe, desbloqueio de senha de BIOS e atualizações de firmware.'
+    },
+    'bios-desktops': {
+        icon: 'fas fa-desktop',
+        title: 'BIOS para Desktops',
+        text: 'BIOS para computadores desktop e placas-mãe de diversos fabricantes. Nossa coleção abrange desde placas antigas até modelos mais recentes, com suporte a múltiplos chipsets (Intel, AMD). Ideal para técnicos que trabalham com manutenção e montagem de PCs.'
+    },
+    'bios-monitores': {
+        icon: 'fas fa-tv',
+        title: 'BIOS para Monitores',
+        text: 'Firmwares e BIOS especializados para monitores LCD, LED e OLED das principais marcas como Samsung, LG, Dell, AOC e BenQ. Inclui arquivos para atualização de firmware, correção de problemas de imagem, ajuste de cores e configurações avançadas. Essencial para técnicos que trabalham com manutenção e reparo de monitores profissionais, permitindo resolver problemas de tela, botões, menus OSD e configurações de fábrica.'
+    },
+    'bios-embarcados': {
+        icon: 'fas fa-microchip',
+        title: 'BIOS para Sistemas Embarcados',
+        text: 'Firmwares para sistemas embarcados, single-board computers (SBC), computadores industriais e dispositivos IoT. Inclui BIOS para Raspberry Pi, BeagleBone, sistemas POS e terminais especializados. Essencial para projetos de automação e dispositivos dedicados.'
+    },
+    // Esquemas Features
+    'esquemas-placas': {
+        icon: 'fas fa-layer-group',
+        title: 'Esquemas de Placas-mãe',
+        text: 'Esquemas elétricos completos (schematics e boardview) para placas-mãe de notebooks e desktops. Documentação técnica essencial para diagnóstico avançado de falhas, identificação de componentes danificados e reparos em nível de circuito. Compatível com softwares de análise de esquemas.'
+    },
+    'esquemas-carregamento': {
+        icon: 'fas fa-bolt',
+        title: 'Circuitos de Carregamento',
+        text: 'Esquemas detalhados dos circuitos de carregamento de bateria para notebooks e tablets. Inclui diagramas de tensão, pontos de medição e componentes críticos do sistema de alimentação. Fundamental para diagnóstico de problemas de carregamento e substituição de componentes do circuito de energia.'
+    },
+    'esquemas-conectores': {
+        icon: 'fas fa-plug',
+        title: 'Esquemas de Conectores',
+        text: 'Pinouts e diagramas de conectores para diversos tipos de interfaces: LVDS (displays), USB-C, Thunderbolt, conectores de bateria, teclado, touchpad e outros. Inclui especificações elétricas, tensões e sinais de cada pino. Essencial para identificar conexões corretas durante reparos.'
+    },
+    'esquemas-fontes': {
+        icon: 'fas fa-battery-full',
+        title: 'Circuitos de Fonte',
+        text: 'Esquemas de fontes de alimentação ATX, SFX e fontes específicas de notebooks. Inclui diagramas de conversores DC-DC, reguladores de tensão e circuitos de proteção. Útil para diagnóstico de problemas de energia, reparo de fontes e identificação de componentes de potência.'
+    },
+    // Drivers Features
+    'drivers-video': {
+        icon: 'fas fa-tv',
+        title: 'Drivers de Placas de Vídeo',
+        text: 'Drivers atualizados para GPUs NVIDIA, AMD e Intel. Inclui versões estáveis (WHQL) e beta, drivers específicos para workstations e suporte a múltiplos monitores. Essencial para resolver problemas gráficos, melhorar performance em jogos e aplicações profissionais.'
+    },
+    'drivers-som': {
+        icon: 'fas fa-volume-up',
+        title: 'Drivers de Placas de Som',
+        text: 'Drivers para chipsets de áudio Realtek, Creative, Conexant e outros. Inclui pacotes completos com painéis de controle, equalização e configurações avançadas. Resolve problemas de ausência de som, microfone não funcional e melhora qualidade de áudio.'
+    },
+    'drivers-rede': {
+        icon: 'fas fa-wifi',
+        title: 'Drivers de Rede/WiFi',
+        text: 'Drivers para placas de rede ethernet (Intel, Realtek, Broadcom) e adaptadores WiFi (Intel, Qualcomm Atheros, MediaTek). Inclui suporte a padrões modernos (WiFi 6/6E) e drivers para redes 10Gbps. Essencial para resolver problemas de conectividade.'
+    },
+    'drivers-usb': {
+        icon: 'fas fa-ellipsis-h',
+        title: 'Outros Drivers',
+        text: 'Drivers diversos para componentes e periféricos não categorizados: controladores USB, adaptadores seriais, chipsets, dispositivos Bluetooth, card readers, webcams, touchpads e outros componentes específicos. Inclui drivers para hardware especializado e dispositivos menos comuns.'
+    },
+    // Softwares Features
+    'softwares-diagnostico': {
+        icon: 'fas fa-stethoscope',
+        title: 'Ferramentas de Diagnóstico',
+        text: 'Software profissional para diagnóstico de hardware: AIDA64, HWiNFO, CPU-Z, GPU-Z, CrystalDiskInfo, MemTest86. Ferramentas essenciais para identificar problemas em processador, memória, disco, temperatura e estabilidade do sistema.'
+    },
+    'softwares-recuperacao': {
+        icon: 'fas fa-redo',
+        title: 'Softwares de Recuperação',
+        text: 'Programas para recuperação de dados: Recuva, TestDisk, PhotoRec, EaseUS Data Recovery. Ferramentas para recuperar arquivos deletados, partições perdidas e dados de discos danificados. Inclui software para clonagem e backup de discos.'
+    },
+    'softwares-limpeza': {
+        icon: 'fas fa-broom',
+        title: 'Ferramentas de Limpeza',
+        text: 'Software para otimização e limpeza: CCleaner, BleachBit, Wise Care 365, ferramentas de remoção de malware e limpeza de registro. Programas para desinstalação completa de aplicativos, limpeza de arquivos temporários e otimização de sistema.'
+    },
+    'softwares-benchmark': {
+        icon: 'fas fa-tachometer-alt',
+        title: 'Software de Benchmark',
+        text: 'Ferramentas para teste de performance: 3DMark, Cinebench, Prime95, FurMark, CrystalDiskMark. Programas para avaliar desempenho de CPU, GPU, RAM e armazenamento. Essencial para validar upgrades e comparar performance de sistemas.'
+    },
+    // Impressoras Features
+    'impressoras-drivers': {
+        icon: 'fas fa-download',
+        title: 'Drivers de Impressoras',
+        text: 'Drivers oficiais e atualizados para impressoras de todas as marcas principais: HP, Canon, Epson, Brother, Samsung, Xerox. Inclui drivers para impressoras laser, jato de tinta, multifuncionais e plotters. Compatível com Windows, Linux e macOS.'
+    },
+    'impressoras-firmwares': {
+        icon: 'fas fa-cog',
+        title: 'Firmwares para Impressoras',
+        text: 'Arquivos de firmware para atualização e reparo de impressoras. Inclui firmwares para resolver problemas de travamento, erros de comunicação e incompatibilidades. Essencial para técnicos especializados em manutenção de impressoras.'
+    },
+    'impressoras-reset': {
+        icon: 'fas fa-sync',
+        title: 'Ferramentas de Reset',
+        text: 'Software para reset de contadores de páginas, almofadas de tinta e chips. Programas como SSC Service Utility, WIC Reset e ferramentas específicas por fabricante. Essencial para manutenção preventiva e economia com cartuchos.'
+    },
+    'impressoras-manuais': {
+        icon: 'fas fa-book',
+        title: 'Manuais Técnicos',
+        text: 'Manuais de serviço completos para impressoras, incluindo diagramas de desmontagem, procedimentos de manutenção, códigos de erro e especificações técnicas. Documentação oficial para técnicos profissionais realizarem reparos qualificados.'
+    },
+    // Cursos Features
+    'cursos-video': {
+        icon: 'fas fa-play-circle',
+        title: 'Vídeo Aulas',
+        text: 'Cursos em vídeo sobre manutenção de computadores, redes, eletrônica e programação. Aulas práticas e teóricas ministradas por profissionais experientes. Inclui cursos de hardware, software, recuperação de dados e empreendedorismo na área técnica.'
+    },
+    'cursos-apostilas': {
+        icon: 'fas fa-file-pdf',
+        title: 'Apostilas e E-books',
+        text: 'Material didático em PDF sobre diversos temas: hardware, redes, programação, eletrônica, segurança da informação. Apostilas técnicas detalhadas com exercícios práticos, diagramas e estudos de caso. Ideal para estudo autodidata.'
+    },
+    'cursos-certificados': {
+        icon: 'fas fa-certificate',
+        title: 'Cursos com Certificados',
+        text: 'Cursos completos que oferecem certificado de conclusão reconhecido. Inclui trilhas de aprendizado estruturadas em manutenção de computadores, redes, Linux, segurança e gestão de TI. Certificações válidas para comprovar conhecimento técnico.'
+    },
+    'cursos-praticos': {
+        icon: 'fas fa-book-open',
+        title: 'Tutoriais em Vídeo',
+        text: 'Tutoriais passo a passo em vídeo para resolver problemas comuns: substituição de componentes, instalação de drivers, configuração de sistemas. Acompanhe procedimentos reais de manutenção e reparo com explicações detalhadas.'
+    }
+};
+
+// Função para inicializar os event listeners dos modals
+function initFeatureModals() {
+    const modal = document.getElementById('feature-modal');
+    if (!modal) return; // Se não há modal na página, não faz nada
+
+    const closeBtn = document.querySelector('.feature-modal-close');
+    const featureItems = document.querySelectorAll('.feature-item[data-feature]');
+
+    // Adiciona event listeners aos itens de feature
+    featureItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const feature = this.dataset.feature;
+            const data = featureData[feature];
+
+            if (data) {
+                const iconElement = modal.querySelector('.feature-modal-icon');
+                const titleElement = modal.querySelector('.feature-modal-title');
+                const textElement = modal.querySelector('.feature-modal-text');
+
+                if (iconElement && titleElement && textElement) {
+                    iconElement.className = 'feature-modal-icon ' + data.icon;
+                    titleElement.textContent = data.title;
+                    textElement.textContent = data.text;
+                    modal.style.display = 'block';
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+        });
+    });
+
+    // Fecha o modal ao clicar no botão de fechar
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        });
+    }
+
+    // Fecha o modal ao clicar fora dele
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    });
+
+    // Fecha o modal com a tecla ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'block') {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    });
+}
+
+// Inicializa quando o DOM estiver pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFeatureModals);
+} else {
+    // DOM já está carregado (navegação entre páginas)
+    initFeatureModals();
+}
+
+// Expõe a função globalmente para ser chamada pelo dynamic-loading
+window.initFeatureModals = initFeatureModals;
+

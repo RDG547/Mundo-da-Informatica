@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/about-page.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="about-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content text-center">
+            <div class="hero-icon animate-bounce">
+                <i class="fas fa-users"></i>
+            </div>
+            <h1 class="hero-title animate-fade-up">Sobre o Mundo da Informática</h1>
+            <p class="hero-subtitle animate-fade-up-delayed">Conheça nossa história, missão e a equipe dedicada que torna possível o maior repositório de recursos técnicos do Brasil</p>
+        </div>
+    </div>
+</div>
+
+<!-- About Section -->
+<div class="about-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+
+                <!-- Mission Section -->
+                <div class="mission-section">
+                    <div class="section-header text-center">
+                        <h2>
+                            <i class="fas fa-rocket"></i>
+                            Nossa Missão
+                        </h2>
+                        <p>Democratizar o acesso à informação técnica e empoderar profissionais da informática</p>
+                    </div>
+
+                    <div class="mission-cards">
+                        <div class="mission-card">
+                            <div class="mission-icon">
+                                <i class="fas fa-globe-americas"></i>
+                            </div>
+                            <div class="mission-content">
+                                <h3>Acesso Universal</h3>
+                                <p>Facilitamos o acesso a recursos técnicos essenciais para profissionais de todo o Brasil, eliminando barreiras geográficas e financeiras.</p>
+                            </div>
+                        </div>
+
+                        <div class="mission-card">
+                            <div class="mission-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="mission-content">
+                                <h3>Confiabilidade</h3>
+                                <p>Todos os recursos são cuidadosamente verificados e testados por nossa equipe antes de serem disponibilizados à comunidade.</p>
+                            </div>
+                        </div>
+
+                        <div class="mission-card">
+                            <div class="mission-icon">
+                                <i class="fas fa-handshake"></i>
+                            </div>
+                            <div class="mission-content">
+                                <h3>Colaboração</h3>
+                                <p>Construímos uma comunidade forte onde profissionais compartilham conhecimento e recursos para o bem comum.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- What We Offer Section -->
+                <div class="services-section">
+                    <div class="services-header text-center">
+                        <h2>
+                            <i class="fas fa-tools"></i>
+                            O que Oferecemos
+                        </h2>
+                        <p class="text-center">Uma ampla gama de recursos técnicos organizados e categorizados para sua conveniência</p>
+                    </div>
+
+                    <div class="services-grid">
+                        <div class="service-card bios-card">
+                            <div class="service-header">
+                                <div class="service-icon">
+                                    <i class="fas fa-microchip"></i>
+                                </div>
+                                <h3>BIOS</h3>
+                            </div>
+                            <div class="service-content">
+                                <p>Arquivos de BIOS para notebooks, desktops e outros dispositivos eletrônicos</p>
+                                <ul class="service-features">
+                                    <li>Notebooks de todas as marcas</li>
+                                    <li>Desktops e All-in-One</li>
+                                    <li>Monitores LCD, LED e OLED</li>
+                                    <li>Dispositivos embarcados</li>
+                                </ul>
+                            </div>
+                            <div class="service-stats">
+                                <span class="stat-number">{{ about_stats.bios_count }}+</span>
+                                <span class="stat-label">Arquivos de BIOS</span>
+                            </div>
+                        </div>
+
+                        <div class="service-card schemas-card">
+                            <div class="service-header">
+                                <div class="service-icon">
+                                    <i class="fas fa-project-diagram"></i>
+                                </div>
+                                <h3>Esquemas</h3>
+                            </div>
+                            <div class="service-content">
+                                <p>Diagramas e esquemas elétricos detalhados para reparo de componentes</p>
+                                <ul class="service-features">
+                                    <li>Placas-mãe de laptops</li>
+                                    <li>Circuitos de carregamento</li>
+                                    <li>Diagramas de conectores</li>
+                                    <li>Esquemas de fontes</li>
+                                </ul>
+                            </div>
+                            <div class="service-stats">
+                                <span class="stat-number">{{ about_stats.esquemas_count }}+</span>
+                                <span class="stat-label">Esquemas Elétricos</span>
+                            </div>
+                        </div>
+
+                        <div class="service-card drivers-card">
+                            <div class="service-header">
+                                <div class="service-icon">
+                                    <i class="fas fa-cogs"></i>
+                                </div>
+                                <h3>Drivers</h3>
+                            </div>
+                            <div class="service-content">
+                                <p>Drivers atualizados para diversos componentes de hardware</p>
+                                <ul class="service-features">
+                                    <li>Placas de vídeo</li>
+                                    <li>Placas de som</li>
+                                    <li>Drivers de rede</li>
+                                    <li>Outros</li>
+                                </ul>
+                            </div>
+                            <div class="service-stats">
+                                <span class="stat-number">{{ about_stats.drivers_count }}+</span>
+                                <span class="stat-label">Drivers</span>
+                            </div>
+                        </div>
+
+                        <div class="service-card software-card">
+                            <div class="service-header">
+                                <div class="service-icon">
+                                    <i class="fas fa-desktop"></i>
+                                </div>
+                                <h3>Softwares</h3>
+                            </div>
+                            <div class="service-content">
+                                <p>Programas especializados para diagnóstico, recuperação e manutenção</p>
+                                <ul class="service-features">
+                                    <li>Ferramentas de diagnóstico</li>
+                                    <li>Software de recuperação</li>
+                                    <li>Utilitários de limpeza</li>
+                                    <li>Programas de benchmark</li>
+                                </ul>
+                            </div>
+                            <div class="service-stats">
+                                <span class="stat-number">{{ about_stats.softwares_count }}+</span>
+                                <span class="stat-label">Softwares</span>
+                            </div>
+                        </div>
+
+                        <div class="service-card printers-card">
+                            <div class="service-header">
+                                <div class="service-icon">
+                                    <i class="fas fa-print"></i>
+                                </div>
+                                <h3>Impressoras</h3>
+                            </div>
+                            <div class="service-content">
+                                <p>Recursos e drivers específicos para impressoras de diversas marcas</p>
+                                <ul class="service-features">
+                                    <li>Drivers de impressoras</li>
+                                    <li>Firmwares atualizados</li>
+                                    <li>Software de reset</li>
+                                    <li>Manuais técnicos</li>
+                                </ul>
+                            </div>
+                            <div class="service-stats">
+                                <span class="stat-number">{{ about_stats.impressoras_count }}+</span>
+                                <span class="stat-label">Recursos para Impressoras</span>
+                            </div>
+                        </div>
+
+                        <div class="service-card courses-card">
+                            <div class="service-header">
+                                <div class="service-icon">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </div>
+                                <h3>Cursos</h3>
+                            </div>
+                            <div class="service-content">
+                                <p>Cursos e tutoriais especializados em manutenção e reparos</p>
+                                <ul class="service-features">
+                                    <li>Tutoriais em vídeo</li>
+                                    <li>Vídeo aulas técnicas</li>
+                                    <li>Apostilas didáticas</li>
+                                    <li>Certificados de conclusão</li>
+                                </ul>
+                            </div>
+                            <div class="service-stats">
+                                <span class="stat-number">{{ about_stats.cursos_count }}+</span>
+                                <span class="stat-label">Cursos</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- How We Work Section -->
+                <div class="workflow-section">
+                    <div class="workflow-header text-center">
+                        <h2>
+                            <i class="fas fa-cog"></i>
+                            Como Funcionamos
+                        </h2>
+                        <p class="text-center process-highlight">Nosso processo garante qualidade e segurança em todos os recursos disponibilizados</p>
+                    </div>
+
+                    <div class="workflow-steps">
+                        <div class="workflow-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h3>Curadoria</h3>
+                                <p>Nossa equipe pesquisa e seleciona recursos de fontes confiáveis, priorizando qualidade e relevância.</p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                        </div>
+
+                        <div class="workflow-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h3>Verificação</h3>
+                                <p>Todos os arquivos passam por rigorosos testes de funcionalidade e segurança antes da publicação.</p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                        </div>
+
+                        <div class="workflow-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h3>Organização</h3>
+                                <p>Categorizamos e indexamos cada recurso com metadados detalhados para facilitar a busca.</p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-layer-group"></i>
+                            </div>
+                        </div>
+
+                        <div class="workflow-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h3>Disponibilização</h3>
+                                <p>Disponibilizamos links seguros para download, sem armazenar os arquivos diretamente.</p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-cloud-download-alt"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Números que Falam por Nós -->
+                {% include 'components/stats.html' %}
+
+                <!-- O que dizem nossos usuários -->
+                {% include 'components/testimonials.html' %}
+
+                <!-- Community Section -->
+                <div class="community-section">
+                    <div class="community-header text-center">
+                        <h2>
+                            <i class="fas fa-heart"></i>
+                            Faça Parte da Nossa Comunidade
+                        </h2>
+                        <p class="text-center">Junte-se a milhares de profissionais que confiam no Mundo da Informática</p>
+                    </div>
+
+                    <div class="community-content">
+                        <div class="community-features">
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-share-alt"></i>
+                                </div>
+                                <div class="feature-content">
+                                    <h4>Compartilhe Recursos</h4>
+                                    <p>Contribua com arquivos úteis e ajude outros profissionais</p>
+                                </div>
+                            </div>
+
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-comments"></i>
+                                </div>
+                                <div class="feature-content">
+                                    <h4>Participe das Discussões</h4>
+                                    <p>Troque experiências e aprenda com outros especialistas</p>
+                                </div>
+                            </div>
+
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-bell"></i>
+                                </div>
+                                <div class="feature-content">
+                                    <h4>Receba Atualizações</h4>
+                                    <p>Seja notificado sobre novos recursos e atualizações</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="community-cta">
+                            <h3>Pronto para contribuir?</h3>
+                            <p>Sua experiência e conhecimento podem ajudar milhares de profissionais</p>
+                            <div class="cta-buttons">
+                                <a href="{{ url_for('contact') }}" class="btn btn-gradient primary">
+                                    <i class="fas fa-handshake"></i> Quero Contribuir
+                                </a>
+                                <a href="{{ url_for('register') }}" class="btn btn-gradient secondary">
+                                    <i class="fas fa-user-plus"></i> Criar Conta
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Final CTA Section -->
+                <div class="about-cta">
+                    <div class="cta-content">
+                        <div class="cta-background-pattern"></div>
+                        <div class="cta-icon pulse-animation">
+                            <i class="fas fa-rocket"></i>
+                        </div>
+                        <h4>Juntos, Construímos o Futuro da Informática</h4>
+                        <p>O Mundo da Informática é mais que um site - é uma comunidade de profissionais dedicados a democratizar o conhecimento técnico.</p>
+                        <div class="cta-highlights">
+                            <div class="highlight-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Recursos sempre atualizados</span>
+                            </div>
+                            <div class="highlight-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Comunidade ativa e colaborativa</span>
+                            </div>
+                            <div class="highlight-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Suporte técnico especializado</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+

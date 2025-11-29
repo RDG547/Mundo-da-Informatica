@@ -1,0 +1,268 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-header slide-in-up">
+    <h1>Limpar Cache do Sistema</h1>
+    <div class="d-flex gap-2">
+        <button class="btn-admin btn-admin-primary" id="clearAllCacheBtn">
+            <i class="fas fa-sync-alt"></i> Limpar Todo o Cache
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Cache de Aplicação</h2>
+            </div>
+            <div class="admin-card-body">
+                <p>O cache da aplicação armazena dados temporários para acelerar o carregamento de páginas e reduzir a carga no banco de dados.</p>
+
+                <div class="cache-stats">
+                    <div class="cache-stat">
+                        <span class="cache-value">24.5 MB</span>
+                        <span class="cache-label">Tamanho Total</span>
+                    </div>
+                    <div class="cache-stat">
+                        <span class="cache-value">532</span>
+                        <span class="cache-label">Itens</span>
+                    </div>
+                    <div class="cache-stat">
+                        <span class="cache-value">2h 15m</span>
+                        <span class="cache-label">Último Reset</span>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn-admin btn-admin-outline" id="clearAppCacheBtn">
+                        <i class="fas fa-broom"></i> Limpar Cache da Aplicação
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Cache de Sessão</h2>
+            </div>
+            <div class="admin-card-body">
+                <p>O cache de sessão armazena dados temporários das sessões de usuários.</p>
+
+                <div class="cache-stats">
+                    <div class="cache-stat">
+                        <span class="cache-value">3.2 MB</span>
+                        <span class="cache-label">Tamanho Total</span>
+                    </div>
+                    <div class="cache-stat">
+                        <span class="cache-value">47</span>
+                        <span class="cache-label">Sessões Ativas</span>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn-admin btn-admin-outline" id="clearSessionCacheBtn">
+                        <i class="fas fa-broom"></i> Limpar Cache de Sessão
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Cache de Imagens</h2>
+            </div>
+            <div class="admin-card-body">
+                <p>O cache de imagens armazena versões otimizadas e miniaturas de imagens para melhorar o desempenho.</p>
+
+                <div class="cache-stats">
+                    <div class="cache-stat">
+                        <span class="cache-value">156.8 MB</span>
+                        <span class="cache-label">Tamanho Total</span>
+                    </div>
+                    <div class="cache-stat">
+                        <span class="cache-value">1,245</span>
+                        <span class="cache-label">Imagens</span>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn-admin btn-admin-outline" id="clearImageCacheBtn">
+                        <i class="fas fa-broom"></i> Limpar Cache de Imagens
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Logs do Sistema</h2>
+            </div>
+            <div class="admin-card-body">
+                <p>Os logs do sistema registram eventos, erros e atividades do sistema.</p>
+
+                <div class="cache-stats">
+                    <div class="cache-stat">
+                        <span class="cache-value">12.4 MB</span>
+                        <span class="cache-label">Tamanho Total</span>
+                    </div>
+                    <div class="cache-stat">
+                        <span class="cache-value">7 dias</span>
+                        <span class="cache-label">Retenção</span>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn-admin btn-admin-outline" id="clearSystemLogsBtn">
+                        <i class="fas fa-broom"></i> Limpar Logs do Sistema
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação -->
+<div class="modal" id="confirmClearModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Limpeza</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja limpar o <span id="cacheTypeText">cache</span>?</p>
+            <p class="text-danger">Esta ação não pode ser desfeita e pode afetar temporariamente o desempenho do sistema.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" id="cancelClearBtn">Cancelar</button>
+            <button class="btn-admin btn-admin-danger" id="confirmClearBtn">Limpar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .cache-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+    }
+
+    .cache-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 1rem;
+    }
+
+    .cache-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+    }
+
+    .cache-label {
+        font-size: 0.9rem;
+        color: var(--admin-text-light);
+        margin-top: 0.5rem;
+    }
+
+    .text-danger {
+        color: var(--admin-danger);
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Elementos do DOM
+        const clearAllCacheBtn = document.getElementById('clearAllCacheBtn');
+        const clearAppCacheBtn = document.getElementById('clearAppCacheBtn');
+        const clearSessionCacheBtn = document.getElementById('clearSessionCacheBtn');
+        const clearImageCacheBtn = document.getElementById('clearImageCacheBtn');
+        const clearSystemLogsBtn = document.getElementById('clearSystemLogsBtn');
+
+        const confirmClearModal = document.getElementById('confirmClearModal');
+        const cancelClearBtn = document.getElementById('cancelClearBtn');
+        const confirmClearBtn = document.getElementById('confirmClearBtn');
+        const cacheTypeText = document.getElementById('cacheTypeText');
+        const closeModalBtn = document.querySelector('.close-modal');
+
+        let currentCacheType = '';
+
+        // Funções para mostrar o modal de confirmação
+        function showConfirmModal(cacheType) {
+            currentCacheType = cacheType;
+            cacheTypeText.textContent = cacheType;
+            confirmClearModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            confirmClearModal.style.display = 'none';
+        }
+
+        // Função para simular a limpeza do cache
+        function clearCache(type) {
+            // Aqui seria implementada a lógica real para limpar o cache
+            console.log(`Limpando cache: ${type}`);
+
+            // Mostrar notificação
+            showNotification(`${type} limpo com sucesso!`, 'success');
+
+            // Atualizar estatísticas (simulado)
+            if (type !== 'todo o cache') {
+                updateStats(type);
+            } else {
+                document.querySelectorAll('.cache-value').forEach(el => {
+                    if (el.textContent.includes('MB')) {
+                        el.textContent = '0 MB';
+                    } else if (!isNaN(parseInt(el.textContent))) {
+                        el.textContent = '0';
+                    }
+                });
+            }
+        }
+
+        // Função para atualizar estatísticas após limpar cache
+        function updateStats(type) {
+            switch(type) {
+                case 'cache da aplicação':
+                    document.querySelectorAll('.cache-stat .cache-value')[0].textContent = '0 MB';
+                    document.querySelectorAll('.cache-stat .cache-value')[1].textContent = '0';
+                    document.querySelectorAll('.cache-stat .cache-value')[2].textContent = 'agora';
+                    break;
+                case 'cache de sessão':
+                    document.querySelectorAll('.cache-stat .cache-value')[3].textContent = '0 MB';
+                    document.querySelectorAll('.cache-stat .cache-value')[4].textContent = '0';
+                    break;
+                case 'cache de imagens':
+                    document.querySelectorAll('.cache-stat .cache-value')[5].textContent = '0 MB';
+                    document.querySelectorAll('.cache-stat .cache-value')[6].textContent = '0';
+                    break;
+                case 'logs do sistema':
+                    document.querySelectorAll('.cache-stat .cache-value')[7].textContent = '0 MB';
+                    break;
+            }
+        }
+
+        // Event listeners para os botões
+        clearAllCacheBtn.addEventListener('click', () => showConfirmModal('todo o cache'));
+        clearAppCacheBtn.addEventListener('click', () => showConfirmModal('cache da aplicação'));
+        clearSessionCacheBtn.addEventListener('click', () => showConfirmModal('cache de sessão'));
+        clearImageCacheBtn.addEventListener('click', () => showConfirmModal('cache de imagens'));
+        clearSystemLogsBtn.addEventListener('click', () => showConfirmModal('logs do sistema'));
+
+        // Event listeners para o modal
+        cancelClearBtn.addEventListener('click', closeModal);
+        closeModalBtn.addEventListener('click', closeModal);
+
+        confirmClearBtn.addEventListener('click', () => {
+            clearCache(currentCacheType);
+            closeModal();
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,27 @@
+<div class="admin-header slide-in-up">
+    <h1>{{ title }}</h1>
+    <div class="d-flex gap-2">
+        {% if show_date|default(false) %}
+        <span id="currentDate" class="current-date"></span>
+        {% endif %}
+
+        {% if primary_button %}
+        <button class="btn-admin btn-admin-primary"
+                {% if primary_button.action %}onclick="{{ primary_button.action }}"{% endif %}
+                {% if primary_button.modal %}data-modal="{{ primary_button.modal }}"{% endif %}
+                {% if primary_button.url %}onclick="location.href='{{ primary_button.url }}'"{% endif %}>
+            {% if primary_button.icon %}<i class="fas fa-{{ primary_button.icon }}"></i> {% endif %}
+            {{ primary_button.text }}
+        </button>
+        {% endif %}
+
+        {% if secondary_button %}
+        <a href="{{ secondary_button.url }}" class="btn-admin btn-admin-outline">
+            {% if secondary_button.icon %}<i class="fas fa-{{ secondary_button.icon }}"></i> {% endif %}
+            {{ secondary_button.text }}
+        </a>
+        {% endif %}
+
+        {% block header_buttons %}{% endblock %}
+    </div>
+</div>

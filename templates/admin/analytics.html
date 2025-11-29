@@ -1,0 +1,651 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-header slide-in-up">
+    <h1>Estatísticas do Site</h1>
+    <div class="d-flex gap-2">
+        <div class="date-range-selector">
+            <select id="dateRangeSelect" class="form-select">
+                <option value="7">Últimos 7 dias</option>
+                <option value="30" selected>Últimos 30 dias</option>
+                <option value="90">Últimos 3 meses</option>
+                <option value="365">Último ano</option>
+                <option value="custom">Período personalizado</option>
+            </select>
+        </div>
+        <button class="btn-admin btn-admin-primary" onclick="window.print()">
+            <i class="fas fa-print"></i> Imprimir Relatório
+        </button>
+    </div>
+</div>
+
+<!-- Período personalizado (inicialmente oculto) -->
+<div id="customDateRange" class="admin-card slide-in-up" style="display: none;">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Selecionar Período</h2>
+    </div>
+    <div class="admin-card-body">
+        <form id="dateRangeForm" class="d-flex gap-2">
+            <div class="form-group">
+                <label for="startDate">Data inicial</label>
+                <input type="date" id="startDate" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="endDate">Data final</label>
+                <input type="date" id="endDate" class="form-control">
+            </div>
+            <div class="form-group d-flex align-end">
+                <button type="submit" class="btn-admin btn-admin-primary">Aplicar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resumo de estatísticas -->
+<div class="stats-grid">
+    <div class="stat-card visits slide-in-up" style="animation-delay: 0.1s">
+        <div class="stat-icon">
+            <i class="fas fa-eye"></i>
+        </div>
+        <div class="stat-info">
+            <h3 id="totalVisits">{{ analytics.total_visits }}</h3>
+            <p>Visitas Totais</p>
+        </div>
+    </div>
+
+    <div class="stat-card downloads slide-in-up" style="animation-delay: 0.2s">
+        <div class="stat-icon">
+            <i class="fas fa-download"></i>
+        </div>
+        <div class="stat-info">
+            <h3 id="totalDownloads">{{ analytics.total_downloads }}</h3>
+            <p>Downloads</p>
+        </div>
+    </div>
+
+    <div class="stat-card users slide-in-up" style="animation-delay: 0.3s">
+        <div class="stat-icon">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-info">
+            <h3 id="newUsers">{{ analytics.new_users }}</h3>
+            <p>Novos Usuários</p>
+        </div>
+    </div>
+
+    <div class="stat-card engagement slide-in-up" style="animation-delay: 0.4s">
+        <div class="stat-icon">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-info">
+            <h3 id="engagementRate">{{ analytics.engagement_rate }}</h3>
+            <p>Taxa de Engajamento</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Visitas Diárias</h2>
+                <div class="card-actions">
+                    <button class="btn-admin btn-admin-outline btn-sm" id="downloadChartBtn">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                </div>
+            </div>
+            <div class="admin-card-body">
+                <div class="chart-container" style="position: relative; height:350px;">
+                    <canvas id="visitChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Distribuição por Categoria</h2>
+            </div>
+            <div class="admin-card-body">
+                <div class="chart-container" style="position: relative; height:350px;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Downloads por Categoria</h2>
+            </div>
+            <div class="admin-card-body">
+                <div class="chart-container" style="position: relative; height:300px;">
+                    <canvas id="downloadChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Origem do Tráfego</h2>
+            </div>
+            <div class="admin-card-body">
+                <div class="chart-container" style="position: relative; height:300px;">
+                    <canvas id="trafficSourcesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Posts Mais Populares</h2>
+    </div>
+    <div class="admin-card-body">
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Categoria</th>
+                        <th>Visualizações</th>
+                        <th>Downloads</th>
+                        <th>Taxa de Conversão</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if analytics.popular_posts %}
+                        {% for post in analytics.popular_posts %}
+                        <tr>
+                            <td>{{ post.title }}</td>
+                            <td>{{ post.category_str or 'N/A' }}</td>
+                            <td>{{ post.views }}</td>
+                            <td>{{ post.downloads }}</td>
+                            <td>{{ "%.1f"|format((post.downloads / post.views * 100) if post.views > 0 else 0) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Nenhum post encontrado</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Dispositivos e Navegadores</h2>
+        <div class="btn-group">
+            <button class="btn-admin btn-admin-outline btn-sm active" data-target="devices">Dispositivos</button>
+            <button class="btn-admin btn-admin-outline btn-sm" data-target="browsers">Navegadores</button>
+        </div>
+    </div>
+    <div class="admin-card-body">
+        <div class="row device-browser-charts">
+            <div class="col-md-6 chart-container" id="devicesChart-container" style="height: 300px;">
+                <canvas id="devicesChart"></canvas>
+            </div>
+            <div class="col-md-6 chart-container" id="browsersChart-container" style="height: 300px; display: none;">
+                <canvas id="browsersChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Dados para os gráficos -->
+<script type="application/json" id="analytics-data">
+{
+    "categoryLabels": [
+        {% if analytics.category_stats %}
+            {% for category in analytics.category_stats %}
+                "{{ category.name|e }}"{% if not loop.last %},{% endif %}
+            {% endfor %}
+        {% else %}
+            "Sem dados"
+        {% endif %}
+    ],
+    "categoryPostCounts": [
+        {% if analytics.category_stats %}
+            {% for category in analytics.category_stats %}
+                {{ category.post_count }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        {% else %}
+            0
+        {% endif %}
+    ],
+    "categoryDownloads": [
+        {% if analytics.category_stats %}
+            {% for category in analytics.category_stats %}
+                {{ category.post_count * 50 }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        {% else %}
+            0
+        {% endif %}
+    ]
+}
+</script>
+
+<script>
+    // Carregar dados do JSON
+    const analyticsData = JSON.parse(document.getElementById('analytics-data').textContent);
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Gerenciar seletor de data
+        const dateRangeSelect = document.getElementById('dateRangeSelect');
+        const customDateRange = document.getElementById('customDateRange');
+
+        dateRangeSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customDateRange.style.display = 'block';
+            } else {
+                customDateRange.style.display = 'none';
+                fetchData(this.value);
+            }
+        });
+
+        // Formulário de data personalizada
+        const dateRangeForm = document.getElementById('dateRangeForm');
+        dateRangeForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (startDate && endDate) {
+                fetchData('custom', startDate, endDate);
+            } else {
+                showNotification('Por favor, selecione as datas inicial e final.', 'warning');
+            }
+        });
+
+        // Definir data atual como data final padrão
+        const today = new Date();
+        const formattedDate = today.toISOString().split('T')[0];
+        document.getElementById('endDate').value = formattedDate;
+
+        // Definir a data inicial para 30 dias atrás
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+
+        // Alternar entre dispositivos e navegadores
+        const chartButtons = document.querySelectorAll('.btn-group .btn-admin');
+        chartButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remover classe active de todos os botões
+                chartButtons.forEach(btn => btn.classList.remove('active'));
+
+                // Adicionar classe active ao botão clicado
+                this.classList.add('active');
+
+                // Mostrar o gráfico correspondente
+                const target = this.getAttribute('data-target');
+
+                if (target === 'devices') {
+                    document.getElementById('devicesChart-container').style.display = 'block';
+                    document.getElementById('browsersChart-container').style.display = 'none';
+                } else {
+                    document.getElementById('devicesChart-container').style.display = 'none';
+                    document.getElementById('browsersChart-container').style.display = 'block';
+                }
+            });
+        });
+
+        // Inicializar dados
+        fetchData(dateRangeSelect.value);
+        initCharts();
+    });
+
+    // Função para buscar dados com base no período selecionado
+    function fetchData(period, startDate, endDate) {
+        // Aqui você adicionaria a lógica para buscar dados do servidor com base no período
+        console.log(`Buscando dados para o período: ${period}`);
+
+        if (period === 'custom') {
+            console.log(`Data inicial: ${startDate}, Data final: ${endDate}`);
+        }
+
+        // Simular a atualização dos dados
+        setTimeout(() => {
+            updateCharts();
+            updateStats();
+
+            showNotification('Dados atualizados com sucesso!', 'success');
+        }, 500);
+    }
+
+    // Função para inicializar os gráficos
+    function initCharts() {
+        // Gráfico de visitas diárias
+        const visitCtx = document.getElementById('visitChart').getContext('2d');
+        window.visitChart = new Chart(visitCtx, {
+            type: 'line',
+            data: {
+                labels: [
+                    {% for visit in analytics.daily_visits %}
+                        '{{ visit.date | replace("-", "/") }}'{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                datasets: [{
+                    label: 'Visitas',
+                    data: [
+                        {% for visit in analytics.daily_visits %}
+                            {{ visit.visits }}{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    borderColor: '#3a86ff',
+                    backgroundColor: 'rgba(58, 134, 255, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return ` Visitas: ${context.raw.toLocaleString('pt-BR')}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            drawBorder: false,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de distribuição por categoria
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        window.categoryChart = new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: analyticsData.categoryLabels,
+                datasets: [{
+                    label: 'Posts por Categoria',
+                    data: analyticsData.categoryPostCounts,
+                    backgroundColor: [
+                        '#3a86ff',
+                        '#06ffa5',
+                        '#ffbe0b',
+                        '#fb5607',
+                        '#8338ec',
+                        '#ff006e',
+                        '#8b5cf6'
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.raw}%`;
+                            }
+                        }
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+
+        // Gráfico de downloads por categoria
+        const downloadCtx = document.getElementById('downloadChart').getContext('2d');
+        window.downloadChart = new Chart(downloadCtx, {
+            type: 'bar',
+            data: {
+                labels: analyticsData.categoryLabels,
+                datasets: [{
+                    label: 'Downloads',
+                    data: analyticsData.categoryDownloads,
+                    backgroundColor: [
+                        'rgba(58, 134, 255, 0.7)',
+                        'rgba(131, 56, 236, 0.7)',
+                        'rgba(255, 0, 110, 0.7)',
+                        'rgba(56, 176, 0, 0.7)',
+                        'rgba(255, 190, 11, 0.7)'
+                    ],
+                    borderWidth: 0,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            drawBorder: false,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de origem do tráfego
+        const trafficCtx = document.getElementById('trafficSourcesChart').getContext('2d');
+        window.trafficChart = new Chart(trafficCtx, {
+            type: 'pie',
+            data: {
+                labels: [
+                    {% for source in analytics.traffic_sources %}
+                        '{{ source.source }}'{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                datasets: [{
+                    data: [
+                        {% for source in analytics.traffic_sources %}
+                            {{ source.count }}{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: [
+                        '#3a86ff',
+                        '#8338ec',
+                        '#ff006e',
+                        '#38b000',
+                        '#ffbe0b',
+                        '#e74c3c',
+                        '#9b59b6',
+                        '#f39c12',
+                        '#2ecc71',
+                        '#1abc9c'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.raw}%`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de dispositivos
+        const devicesCtx = document.getElementById('devicesChart').getContext('2d');
+        window.devicesChart = new Chart(devicesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [
+                    {% for device in analytics.device_stats %}
+                        '{{ device.device }}'{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                datasets: [{
+                    data: [
+                        {% for device in analytics.device_stats %}
+                            {{ device.count }}{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: [
+                        '#3a86ff',
+                        '#ff006e',
+                        '#ffbe0b',
+                        '#38b000',
+                        '#8338ec'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.raw}%`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+
+        // Gráfico de navegadores
+        const browsersCtx = document.getElementById('browsersChart').getContext('2d');
+        window.browsersChart = new Chart(browsersCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Chrome', 'Firefox', 'Safari', 'Edge', 'Outros'],
+                datasets: [{
+                    data: [60, 15, 10, 10, 5],
+                    backgroundColor: [
+                        '#3a86ff',
+                        '#ff006e',
+                        '#38b000',
+                        '#8338ec',
+                        '#ffbe0b'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.raw}%`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    // Dados estáticos carregados do servidor
+    // Não é necessário atualizar com dados aleatórios
+
+    // Função para formatar números
+    function formatNumber(number) {
+        return new Intl.NumberFormat('pt-BR').format(number);
+    }
+
+    // Botão de download do gráfico
+    document.getElementById('downloadChartBtn').addEventListener('click', function() {
+        const canvas = document.getElementById('visitChart');
+        const url = canvas.toDataURL('image/png');
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'visitas-diarias.png';
+        link.click();
+    });
+</script>
+{% endblock %}

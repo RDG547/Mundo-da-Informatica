@@ -1,0 +1,607 @@
+/* Estilos aprimorados para a sidebar do painel administrativo */
+
+.admin-sidebar {
+    background: linear-gradient(145deg, #161923, #1d2028);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+    width: 280px;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 100;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar {
+    width: 3px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+}
+
+.admin-sidebar.collapsed {
+    width: 70px;
+    overflow: visible;
+}
+
+.admin-nav-header {
+    padding: 1.5rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    height: 70px;
+}
+
+.admin-nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.15rem;
+    position: relative;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.admin-nav-logo:hover {
+    transform: translateY(-2px);
+    color: #fff;
+}
+
+.logo-text {
+    background: linear-gradient(90deg, #fff 20%, #e0e0e0);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    transition: opacity 0.3s ease;
+}
+
+.admin-sidebar.collapsed .logo-text {
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+}
+
+.admin-nav-logo .admin-icon {
+    width: 28px;
+    height: 28px;
+    color: var(--admin-primary, #3a86ff);
+    filter: drop-shadow(0 0 8px rgba(58, 134, 255, 0.4));
+    animation: pulse-admin-icon 3s infinite alternate;
+    min-width: 28px;
+    position: relative;
+    z-index: 2;
+}
+
+.admin-nav-logo:hover .admin-icon {
+    transform: rotate(-10deg) scale(1.1);
+    filter: drop-shadow(0 0 12px rgba(58, 134, 255, 0.7));
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pulse-admin-icon {
+    0% {
+        filter: drop-shadow(0 0 3px rgba(58, 134, 255, 0.4));
+    }
+    100% {
+        filter: drop-shadow(0 0 10px rgba(58, 134, 255, 0.7));
+    }
+}
+
+/* Logo texto do mundo da informática na sidebar */
+.admin-sidebar .admin-mundo {
+    color: var(--admin-primary, #3a86ff);
+    font-weight: 800;
+    font-size: 1.1rem;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #3a86ff 30%, #5c9fff 70%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    transform: translateZ(0); /* Correção para o Safari */
+}
+
+.admin-sidebar .admin-informatica {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: -0.3px;
+}
+
+.admin-profile {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    margin: 0 0.5rem 1rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.admin-sidebar.collapsed .admin-profile {
+    flex-direction: column;
+    padding: 1rem 0.5rem;
+    gap: 0.5rem;
+}
+
+.admin-profile-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(58, 134, 255, 0.3);
+    transition: all 0.3s ease;
+    z-index: 1;
+    background: linear-gradient(145deg, #242730, #1f222a);
+}
+
+.admin-profile-img:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(58, 134, 255, 0.5);
+}
+
+.admin-profile-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.admin-profile-info {
+    flex: 1;
+    min-width: 0;
+    transition: opacity 0.3s ease;
+}
+
+.admin-sidebar.collapsed .admin-profile-info {
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+}
+
+.admin-profile-info h4 {
+    color: white;
+    font-size: 1rem;
+    margin: 0 0 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+}
+
+.admin-profile-info p {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.813rem;
+    margin: 0;
+}
+
+.admin-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 0 0.75rem 0.75rem;
+    overflow-y: auto;
+}
+
+.nav-section {
+    margin-bottom: 1.75rem;
+    position: relative;
+}
+
+.nav-section-title {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 0.875rem 1rem;
+    font-weight: 600;
+    transition: opacity 0.3s;
+}
+
+.admin-sidebar.collapsed .nav-section-title {
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+}
+
+.admin-nav-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+    text-decoration: none;
+}
+
+.admin-nav-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--admin-primary, #3a86ff), transparent);
+    opacity: 0;
+    transition: all 0.4s ease;
+    z-index: 0;
+    border-radius: 10px;
+}
+
+.admin-nav-item:hover {
+    color: white;
+    transform: translateX(5px);
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+.admin-nav-item:hover::before {
+    width: 100%;
+    opacity: 0.15;
+}
+
+.admin-nav-item.active {
+    background-color: rgba(58, 134, 255, 0.15);
+    color: white;
+    font-weight: 600;
+}
+
+.admin-nav-item.active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 3px;
+    background: var(--admin-primary, #3a86ff);
+    box-shadow: 0 0 8px rgba(58, 134, 255, 0.8);
+}
+
+.admin-nav-item.active::before {
+    width: 100%;
+    opacity: 0.2;
+}
+
+.admin-nav-item .admin-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 1rem;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.3s ease, margin 0.3s ease;
+    min-width: 20px;
+}
+
+.admin-sidebar.collapsed .admin-nav-item .admin-icon {
+    margin-right: 0;
+}
+
+.admin-nav-item:hover .admin-icon {
+    transform: translateX(3px) scale(1.08);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.admin-nav-text {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+}
+
+.admin-sidebar.collapsed .admin-nav-text {
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+}
+
+.nav-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 9px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0 6px;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s ease;
+    margin-left: 0.5rem;
+}
+
+.admin-sidebar.collapsed .nav-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    margin-left: 0;
+}
+
+.nav-badge-alert {
+    background-color: var(--admin-danger, #e63946);
+    box-shadow: 0 0 0 rgba(230, 57, 70, 0.4);
+    animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+    0% {
+        box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(230, 57, 70, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(230, 57, 70, 0);
+    }
+}
+
+.nav-section-bottom {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    transition: all 0.3s ease;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.admin-sidebar.collapsed .sidebar-footer {
+    display: none;
+}
+
+.system-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--admin-success, #38b000);
+    display: inline-block;
+}
+
+.status-online {
+    position: relative;
+}
+
+.status-online::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--admin-success, #38b000);
+    opacity: 0.3;
+    animation: pulse-status 2s infinite;
+}
+
+@keyframes pulse-status {
+    0% {
+        transform: scale(0.7);
+        opacity: 0.3;
+    }
+    50% {
+        transform: scale(1);
+        opacity: 0.15;
+    }
+    100% {
+        transform: scale(0.7);
+        opacity: 0.3;
+    }
+}
+
+.version-info {
+    font-family: 'Inter', monospace;
+    opacity: 0.7;
+}
+
+/* Tooltip para modo collapsed */
+.admin-sidebar.collapsed .admin-nav-item {
+    position: relative;
+    justify-content: center;
+}
+
+.admin-sidebar.collapsed .admin-nav-item::after {
+    left: 0;
+}
+
+.admin-sidebar.collapsed .admin-nav-item:hover::before {
+    content: attr(data-title);
+    position: absolute;
+    left: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #2c303a;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+}
+
+.admin-sidebar.collapsed .admin-nav-item:hover::after {
+    content: '';
+    position: absolute;
+    left: 65px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: transparent #2c303a transparent transparent;
+    z-index: 1000;
+}
+
+/* Ajustes para o conteúdo principal */
+.admin-content {
+    margin-left: 280px;
+    transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-sidebar.collapsed + .admin-content {
+    margin-left: 70px;
+}
+
+/* Media queries para responsividade */
+@media (max-width: 991px) {
+    .admin-sidebar {
+        transform: translateX(-100%);
+        box-shadow: none;
+    }
+
+    .admin-sidebar.show {
+        transform: translateX(0);
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .admin-content {
+        margin-left: 0;
+    }
+
+    .admin-sidebar.collapsed + .admin-content {
+        margin-left: 0;
+    }
+
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 99;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+/* Hover para botão de tema */
+.admin-nav-item.theme-toggle {
+    overflow: visible;
+}
+
+.theme-icon-dark, .theme-icon-light {
+    transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .theme-icon-dark {
+    display: none;
+}
+
+[data-theme="dark"] .theme-icon-light {
+    display: inline-block !important;
+}
+
+[data-theme="light"] .theme-icon-dark {
+    display: inline-block;
+}
+
+[data-theme="light"] .theme-icon-light {
+    display: none !important;
+}
+
+/* Correções para sidebar de tamanho variável */
+.admin-content-wrapper {
+    padding: 1.5rem;
+    min-height: calc(100vh - 60px);
+}
+
+/* Ajustes para tema escuro na interface admin */
+[data-theme="dark"] .admin-sidebar {
+    background: linear-gradient(145deg, #121317, #1a1c23);
+}
+
+[data-theme="dark"] .admin-profile-img {
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(58, 134, 255, 0.2);
+}
+
+/* Estilo de menu dropdown se necessário */
+.nav-submenu {
+    height: 0;
+    overflow: hidden;
+    transition: height 0.3s ease;
+    padding-left: 1.5rem;
+}
+
+.nav-submenu.expanded {
+    height: auto;
+}
+
+.submenu-toggle {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+}
+
+.submenu-toggle.active {
+    transform: rotate(180deg);
+}
+
+/* Tornar a barra lateral mais escura em dispositivos móveis */
+@media (max-width: 767px) {
+    .admin-sidebar {
+        width: 260px;
+    }
+
+    .admin-sidebar.collapsed + .admin-content {
+        margin-left: 0;
+    }
+
+    .admin-content {
+        width: 100%;
+    }
+}

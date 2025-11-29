@@ -1,0 +1,796 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-header slide-in-up">
+    <h1>Backup e Restauração</h1>
+    <div class="d-flex gap-2">
+        <button class="btn-admin btn-admin-primary" id="createBackupBtn">
+            <i class="fas fa-download"></i> Criar Backup
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Backups Disponíveis</h2>
+                <div class="d-flex gap-2">
+                    <div class="search-bar">
+                        <input type="text" placeholder="Pesquisar backups..." id="searchBackups">
+                        <button><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Nome do Arquivo</th>
+                            <th>Data de Criação</th>
+                            <th>Tamanho</th>
+                            <th>Conteúdo</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupsTableBody">
+                        {% if backups %}
+                            {% for backup in backups %}
+                            <tr data-backup-id="{{ backup.id }}">
+                                <td>{{ backup.filename }}</td>
+                                <td>{{ backup.created_at.strftime('%d/%m/%Y às %H:%M') }}</td>
+                                <td>{{ backup.get_file_size_formatted() }}</td>
+                                <td>
+                                    {% if backup.backup_type == 'database' %}
+                                        <span class="badge badge-info">Banco de Dados</span>
+                                    {% elif backup.backup_type == 'files' %}
+                                        <span class="badge badge-warning">Arquivos</span>
+                                    {% elif backup.backup_type == 'full' %}
+                                        <span class="badge badge-success">Completo</span>
+                                    {% endif %}
+                                    {% if backup.is_automatic %}
+                                        <span class="badge badge-secondary ms-1">Auto</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    <a href="{{ url_for('admin_download_backup', backup_id=backup.id) }}" class="btn-action btn-download" title="Baixar">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <a href="#" class="btn-action btn-delete" title="Excluir" data-backup-id="{{ backup.id }}" data-backup-name="{{ backup.filename }}">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Estado vazio - nenhum backup -->
+                            <tr class="empty-state">
+                                <td colspan="5" style="text-align: center; padding: 2rem; color: #6c757d;">
+                                    <i class="fas fa-database fa-3x" style="margin-bottom: 1rem; opacity: 0.5;"></i>
+                                    <p>Nenhum backup encontrado.</p>
+                                    <p>Clique em "Criar Backup" para fazer seu primeiro backup.</p>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Configurações de Backup</h2>
+            </div>
+            <div class="admin-card-body">
+                <form id="backupSettingsForm">
+                    <div class="form-group">
+                        <label>O que incluir no backup?</label>
+                        <div class="form-check mt-2">
+                            <input type="checkbox" id="includeDatabase" name="includeDatabase" class="form-check-input" checked>
+                            <label for="includeDatabase" class="form-check-label">Banco de dados</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" id="includeUploads" name="includeUploads" class="form-check-input" checked>
+                            <label for="includeUploads" class="form-check-label">Arquivos de upload</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" id="includeConfig" name="includeConfig" class="form-check-input" checked>
+                            <label for="includeConfig" class="form-check-label">Arquivos de configuração</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <label for="backupCompression">Compressão</label>
+                        <select id="backupCompression" name="backupCompression" class="form-select">
+                            <option value="zip" selected>ZIP (padrão)</option>
+                            <option value="tar.gz">TAR.GZ (menor tamanho)</option>
+                            <option value="none">Sem compressão</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <label>Backups automáticos</label>
+                        <div class="form-check mt-2">
+                            <input type="checkbox" id="enableAutoBackup" name="enableAutoBackup" class="form-check-input" checked>
+                            <label for="enableAutoBackup" class="form-check-label">Ativar backups automáticos</label>
+                        </div>
+
+                        <div id="autoBackupOptions" class="mt-3">
+                            <div class="form-group">
+                                <label for="autoBackupFrequency">Frequência</label>
+                                <select id="autoBackupFrequency" name="autoBackupFrequency" class="form-select">
+                                    <option value="daily">Diário</option>
+                                    <option value="weekly" selected>Semanal</option>
+                                    <option value="monthly">Mensal</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="autoBackupRetention">Manter backups por</label>
+                                <select id="autoBackupRetention" name="autoBackupRetention" class="form-select">
+                                    <option value="7">7 dias</option>
+                                    <option value="30" selected>30 dias</option>
+                                    <option value="90">90 dias</option>
+                                    <option value="365">1 ano</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions mt-4">
+                        <button type="button" class="btn-admin btn-admin-primary" id="saveBackupSettings">
+                            <i class="fas fa-save"></i> Salvar Configurações
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Informações</h2>
+            </div>
+            <div class="admin-card-body">
+                <div class="alert alert-primary">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <h4>Backup do Sistema</h4>
+                        <p>É recomendado realizar backups regularmente para garantir a segurança dos seus dados.</p>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <h4>Restauração</h4>
+                        <p>A restauração substituirá os dados atuais. Certifique-se de fazer um backup antes de restaurar.</p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <h4>Estatísticas</h4>
+                    <ul class="list-stats">
+                        <li><strong>Último backup:</strong> 20/05/2023 12:30</li>
+                        <li><strong>Próximo backup automático:</strong> 27/05/2023 03:00</li>
+                        <li><strong>Espaço usado:</strong> 30.4 MB (3 backups)</li>
+                        <li><strong>Espaço disponível:</strong> 985 MB</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação para Restauração -->
+<div class="modal" id="restoreModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Restauração</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <h4>Atenção!</h4>
+                    <p>Restaurar um backup substituirá todos os dados atuais pelos dados contidos no backup.</p>
+                    <p>Esta ação não pode ser desfeita.</p>
+                </div>
+            </div>
+
+            <p>Tem certeza que deseja restaurar o backup <strong id="restoreBackupName">nome_do_backup.zip</strong>?</p>
+
+            <div class="form-check mt-3">
+                <input type="checkbox" id="confirmRestore" class="form-check-input">
+                <label for="confirmRestore" class="form-check-label">Eu entendo que esta ação substituirá os dados atuais e não pode ser desfeita.</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+            <button class="btn-admin btn-admin-danger" id="confirmRestoreBtn" disabled>Restaurar Backup</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação para Exclusão -->
+<div class="modal" id="deleteBackupModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Exclusão</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja excluir este backup? Esta ação não pode ser desfeita.</p>
+
+            <form id="deleteBackupForm">
+                <input type="hidden" id="deleteBackupId">
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+            <button class="btn-admin btn-admin-danger" id="confirmDeleteBackup">Excluir</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação para restauração de backup -->
+<div class="modal" id="restoreBackupModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Restauração</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <h4>Atenção!</h4>
+                    <p>A restauração substituirá todos os dados atuais.</p>
+                    <p>Esta ação não pode ser desfeita.</p>
+                </div>
+            </div>
+            <p>Tem certeza que deseja restaurar o backup <strong id="backupNameToRestore"></strong>?</p>
+            <div class="form-check mt-3">
+                <input type="checkbox" id="confirmRestoreCheckbox" class="form-check-input">
+                <label class="form-check-label" for="confirmRestoreCheckbox">
+                    Eu entendo que esta ação não pode ser desfeita.
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+            <button class="btn-admin btn-admin-danger" id="doRestoreBackup" disabled>Restaurar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de progresso de backup -->
+<div class="modal" id="backupProgressModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Backup em Andamento</h3>
+        </div>
+        <div class="modal-body">
+            <div class="progress-container text-center">
+                <div class="progress">
+                    <div class="progress-bar" id="backupProgressBar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+                <p class="mt-3" id="backupStatusText">Iniciando backup...</p>
+            </div>
+
+            <div class="backup-complete-message text-center" style="display: none;">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h4>Backup Concluído com Sucesso!</h4>
+                <p>O arquivo de backup foi criado e salvo no servidor.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .backup-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .backup-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--admin-border-color);
+        transition: all 0.3s ease;
+    }
+
+    .backup-item:hover {
+        background-color: var(--admin-hover-bg);
+        transform: translateX(5px);
+    }
+
+    .backup-info {
+        display: flex;
+        align-items: center;
+        flex: 1;
+    }
+
+    .backup-icon {
+        font-size: 1.5rem;
+        color: var(--admin-primary);
+        margin-right: 1rem;
+    }
+
+    .backup-details h4 {
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .backup-meta {
+        font-size: 0.8rem;
+        color: var(--admin-text-light);
+        margin-top: 0.25rem;
+    }
+
+    .backup-meta span {
+        margin-right: 1rem;
+    }
+
+    .backup-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .upload-area {
+        border: 2px dashed var(--admin-border-color);
+        border-radius: var(--admin-border-radius);
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .upload-area:hover {
+        border-color: var(--admin-primary);
+        background-color: rgba(58, 134, 255, 0.05);
+    }
+
+    .upload-area i {
+        font-size: 2.5rem;
+        color: var(--admin-primary);
+        margin-bottom: 1rem;
+    }
+
+    .upload-area p {
+        margin: 0;
+    }
+
+    .upload-info {
+        background-color: var(--admin-hover-bg);
+        border-radius: var(--admin-border-radius);
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .upload-file-name {
+        font-weight: 500;
+    }
+
+    .upload-progress {
+        margin: 0.5rem 0;
+        height: 4px;
+        background-color: var(--admin-border-color);
+        border-radius: 2px;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background-color: var(--admin-primary);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+    }
+
+    .upload-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
+    }
+
+    .alert {
+        display: flex;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: var(--admin-border-radius);
+        background-color: var(--admin-hover-bg);
+    }
+
+    .alert-warning {
+        background-color: rgba(255, 190, 11, 0.1);
+        color: var(--admin-warning);
+        border-left: 4px solid var(--admin-warning);
+    }
+
+    .alert h4 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+    }
+
+    .alert p {
+        margin: 0;
+    }
+
+    .alert i {
+        margin-right: 1rem;
+        font-size: 1.5rem;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Controlar opções de backup automático
+        const enableAutoBackup = document.getElementById('enableAutoBackup');
+        const autoBackupOptions = document.getElementById('autoBackupOptions');
+
+        if (enableAutoBackup && autoBackupOptions) {
+            enableAutoBackup.addEventListener('change', function() {
+                autoBackupOptions.style.display = this.checked ? 'block' : 'none';
+            });
+        }
+
+        // Pesquisa em tempo real
+        const searchBackups = document.getElementById('searchBackups');
+        if (searchBackups) {
+            searchBackups.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const rows = document.querySelectorAll('.admin-table tbody tr');
+
+                rows.forEach(row => {
+                    const fileName = row.querySelector('td:first-child').textContent.toLowerCase();
+
+                    if (fileName.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Abrir modal de criação de backup
+        const createBackupBtn = document.getElementById('createBackupBtn');
+        if (createBackupBtn) {
+            createBackupBtn.addEventListener('click', function() {
+                openModal('createBackupModal');
+            });
+        }
+
+        // Processar criação de backup
+        document.getElementById('doCreateBackup')?.addEventListener('click', function() {
+            const backupType = document.querySelector('input[name="backupType"]:checked')?.value || 'database';
+            const description = document.getElementById('backupDescription')?.value || '';
+
+            // Fechar modal de seleção e abrir modal de progresso
+            closeModal('createBackupModal');
+            openModal('backupProgressModal');
+
+            // Iniciar processo real de backup
+            createBackup(backupType, description);
+        });
+
+        // Função para criar backup real
+        function createBackup(backupType, description) {
+            const progressBar = document.getElementById('backupProgressBar');
+            const statusText = document.getElementById('backupStatusText');
+
+            // Inicializar progresso
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            statusText.textContent = 'Iniciando backup...';
+
+            // Fazer requisição para criar backup
+            fetch('/admin/tools/backup/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    backup_type: backupType,
+                    description: description
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Simular progresso até completar
+                    simulateBackupProgress(() => {
+                        // Atualizar tabela com novo backup
+                        addBackupToTable(data.backup);
+                        showNotification('Backup criado com sucesso!', 'success');
+                    });
+                } else {
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = 'Erro';
+                    statusText.textContent = data.message || 'Erro ao criar backup';
+                    showNotification('Erro ao criar backup: ' + (data.message || 'Erro desconhecido'), 'error');
+                }
+            })
+            .catch(error => {
+                progressBar.style.width = '100%';
+                progressBar.textContent = 'Erro';
+                statusText.textContent = 'Erro de conexão';
+                showNotification('Erro de conexão: ' + error.message, 'error');
+            });
+        }
+
+        // Função para adicionar backup à tabela
+        function addBackupToTable(backup) {
+            const tableBody = document.getElementById('backupsTableBody');
+            const emptyState = tableBody.querySelector('.empty-state');
+
+            // Remover estado vazio se existir
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Criar nova linha
+            const newRow = document.createElement('tr');
+            newRow.setAttribute('data-backup-id', backup.id);
+
+            let badgeClass = 'badge-info';
+            let badgeText = 'Banco de Dados';
+
+            if (backup.backup_type === 'files') {
+                badgeClass = 'badge-warning';
+                badgeText = 'Arquivos';
+            } else if (backup.backup_type === 'full') {
+                badgeClass = 'badge-success';
+                badgeText = 'Completo';
+            }
+
+            newRow.innerHTML = `
+                <td>${backup.filename}</td>
+                <td>${backup.created_at}</td>
+                <td>${backup.file_size}</td>
+                <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+                <td class="actions">
+                    <a href="/admin/tools/backup/download/${backup.id}" class="btn-action btn-download" title="Baixar">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    <a href="#" class="btn-action btn-delete" title="Excluir" data-backup-id="${backup.id}" data-backup-name="${backup.filename}">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </td>
+            `;
+
+            // Adicionar no início da tabela
+            tableBody.insertBefore(newRow, tableBody.firstChild);
+
+            // Adicionar eventos à nova linha
+            addBackupRowEvents(newRow);
+        }
+
+        // Função para simular progresso de backup
+        function simulateBackupProgress() {
+            const progressBar = document.getElementById('backupProgressBar');
+            const statusText = document.getElementById('backupStatusText');
+            const progressContainer = document.querySelector('.progress-container');
+            const completeMessage = document.querySelector('.backup-complete-message');
+
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 10;
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    progress = 100;
+
+                    // Atualizar texto e barra de progresso
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.textContent = `${Math.round(progress)}%`;
+                    statusText.textContent = 'Finalizando...';
+
+                    // Mostrar mensagem de conclusão após um breve atraso
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        completeMessage.style.display = 'block';
+
+                        // Fechar modal após 3 segundos
+                        setTimeout(() => {
+                            closeModal('backupProgressModal');
+
+                            // Resetar modal para próximo uso
+                            setTimeout(() => {
+                                progressContainer.style.display = 'block';
+                                completeMessage.style.display = 'none';
+                                progressBar.style.width = '0%';
+                                progressBar.textContent = '0%';
+                                statusText.textContent = 'Iniciando backup...';
+
+                                // Adicionar novo backup à tabela
+                                addNewBackupToTable();
+                            }, 300);
+                        }, 3000);
+                    }, 1000);
+                } else {
+                    // Atualizar texto com base no progresso
+                    if (progress < 30) {
+                        statusText.textContent = 'Preparando arquivos...';
+                    } else if (progress < 60) {
+                        statusText.textContent = 'Compactando arquivos...';
+                    } else if (progress < 90) {
+                        statusText.textContent = 'Salvando backup...';
+                    } else {
+                        statusText.textContent = 'Finalizando...';
+                    }
+
+                    // Atualizar barra de progresso
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.textContent = `${Math.round(progress)}%`;
+                }
+            }, 500);
+        }
+
+        // Função para adicionar novo backup à tabela
+        function addNewBackupToTable() {
+            const now = new Date();
+            const formattedDate = now.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const formattedDateFilename = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+
+            const filename = `backup_completo_${formattedDateFilename}.zip`;
+
+            // Criar nova linha na tabela
+            const tbody = document.querySelector('.admin-table tbody');
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+                <td>${filename}</td>
+                <td>${formattedDate}</td>
+                <td>14.8 MB</td>
+                <td>Completo (DB + Arquivos)</td>
+                <td class="actions">
+                    <a href="#" class="btn-action btn-download" title="Baixar">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    <a href="#" class="btn-action btn-restore" title="Restaurar" data-backup-id="new" data-backup-name="${filename}">
+                        <i class="fas fa-undo"></i>
+                    </a>
+                    <a href="#" class="btn-action btn-delete" title="Excluir" data-backup-id="new">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </td>
+            `;
+
+            // Adicionar à tabela
+            tbody.insertBefore(tr, tbody.firstChild);
+
+            // Adicionar eventos aos novos botões
+            addBackupRowEvents(tr);
+
+            // Mostrar notificação
+            showNotification('Backup criado com sucesso!', 'success');
+        }
+
+        // Adicionar eventos aos botões de cada linha de backup
+        function addBackupRowEvents(row) {
+            // Botão de restaurar backup
+            const restoreBtn = row.querySelector('.btn-restore');
+            if (restoreBtn) {
+                restoreBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    const backupId = this.getAttribute('data-backup-id');
+                    const backupName = this.getAttribute('data-backup-name');
+
+                    document.getElementById('backupNameToRestore').textContent = backupName;
+
+                    openModal('restoreBackupModal');
+                });
+            }
+
+            // Botão de excluir backup
+            const deleteBtn = row.querySelector('.btn-delete');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    const backupId = this.getAttribute('data-backup-id');
+                    document.getElementById('deleteBackupId').value = backupId;
+
+                    openModal('deleteBackupModal');
+                });
+            }
+        }
+
+        // Adicionar eventos aos botões existentes
+        document.querySelectorAll('.admin-table tbody tr').forEach(row => {
+            addBackupRowEvents(row);
+        });
+
+        // Confirmar exclusão de backup
+        document.getElementById('confirmDeleteBackup')?.addEventListener('click', function() {
+            const backupId = document.getElementById('deleteBackupId').value;
+
+            // Fazer requisição para excluir backup
+            fetch(`/admin/tools/backup/delete/${backupId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Encontrar e remover a linha da tabela
+                    const rowToDelete = document.querySelector(`tr[data-backup-id="${backupId}"]`);
+                    if (rowToDelete) {
+                        rowToDelete.remove();
+
+                        // Verificar se não há mais backups e mostrar estado vazio
+                        const tableBody = document.getElementById('backupsTableBody');
+                        if (tableBody.children.length === 0) {
+                            tableBody.innerHTML = `
+                                <tr class="empty-state">
+                                    <td colspan="5" style="text-align: center; padding: 2rem; color: #6c757d;">
+                                        <i class="fas fa-database fa-3x" style="margin-bottom: 1rem; opacity: 0.5;"></i>
+                                        <p>Nenhum backup encontrado.</p>
+                                        <p>Clique em "Criar Backup" para fazer seu primeiro backup.</p>
+                                    </td>
+                                </tr>
+                            `;
+                        }
+                    }
+                    showNotification('Backup excluído com sucesso!', 'success');
+                } else {
+                    showNotification('Erro ao excluir backup: ' + (data.message || 'Erro desconhecido'), 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Erro de conexão: ' + error.message, 'error');
+            })
+            .finally(() => {
+                // Fechar modal
+                closeModal('deleteBackupModal');
+            });
+        });
+
+        // Confirmar restauração de backup
+        const confirmRestoreCheckbox = document.getElementById('confirmRestoreCheckbox');
+        const doRestoreBackup = document.getElementById('doRestoreBackup');
+
+        if (confirmRestoreCheckbox && doRestoreBackup) {
+            confirmRestoreCheckbox.addEventListener('change', function() {
+                doRestoreBackup.disabled = !this.checked;
+            });
+
+            doRestoreBackup.addEventListener('click', function() {
+                // Simular restauração
+                closeModal('restoreBackupModal');
+
+                // Mostrar notificação após breve atraso
+                setTimeout(() => {
+                    showNotification('Backup restaurado com sucesso!', 'success');
+                }, 1000);
+            });
+        }
+
+        // Salvar configurações de backup
+        document.getElementById('saveBackupSettings')?.addEventListener('click', function() {
+            // Simular salvamento
+            showNotification('Configurações de backup salvas com sucesso!', 'success');
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,1828 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<!-- Enhanced Header -->
+<div class="admin-header slide-in-up">
+    <div class="header-content">
+        <div class="header-main">
+            <h1><i class="fas fa-file-alt"></i> Gerenciar Posts</h1>
+            <p class="header-subtitle">Crie, edite e organize todo o conteúdo do seu site</p>
+        </div>
+        <div class="header-actions">
+            <div class="quick-stats">
+                <div class="stat-item">
+                    <span class="stat-number">{{ posts.total }}</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ posts.items | selectattr('featured') | list | length }}</span>
+                    <span class="stat-label">Destaque</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-admin btn-admin-outline" onclick="exportPosts()">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+                <button class="btn-admin btn-admin-primary" data-modal="addPostModal">
+                    <i class="fas fa-plus"></i> Novo Post
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Posts Card -->
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <div class="header-left">
+            <h2 class="admin-card-title">
+                <i class="fas fa-list"></i> Posts Publicados
+                <span class="count-badge">{{ posts.total }}</span>
+            </h2>
+        </div>
+        <div class="header-right">
+            <div class="filter-controls">
+                <div class="search-bar-advanced">
+                    <div class="search-input-container">
+                        <input type="text" placeholder="Pesquisar posts..." id="searchPosts" class="search-input">
+                        <button class="search-btn"><i class="fas fa-search"></i></button>
+                        <button class="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="filter-dropdown">
+                    <select id="filterCategory" class="form-select">
+                        <option value="">Todas as categorias</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-dropdown">
+                    <select id="filterStatus" class="form-select">
+                        <option value="">Todos os Status</option>
+                        <option value="active">Ativos</option>
+                        <option value="featured">Em Destaque</option>
+                        <option value="inactive">Inativos</option>
+                    </select>
+                </div>
+                <div class="sort-dropdown">
+                    <select id="sortBy" class="form-select">
+                        <option value="date">Ordenar por Data</option>
+                        <option value="title">Ordenar por Título</option>
+                        <option value="views">Ordenar por Visualizações</option>
+                        <option value="downloads">Ordenar por Downloads</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="admin-table enhanced">
+            <thead>
+                <tr>
+                    <th style="width: 40px">
+                        <input type="checkbox" id="selectAllPosts" class="form-check-input">
+                    </th>
+                    <th data-sort="title">
+                        <i class="fas fa-heading"></i> Título
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="category">
+                        <i class="fas fa-folder"></i> Categoria
+                    </th>
+                    <th data-sort="date">
+                        <i class="fas fa-calendar"></i> Data
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="views">
+                        <i class="fas fa-eye"></i> Views
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="downloads">
+                        <i class="fas fa-download"></i> Downloads
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts.items %}
+                <tr data-post-id="{{ post.id }}" class="{% if not post.is_active %}inactive-row{% endif %}">
+                    <td>
+                        <input type="checkbox" class="form-check-input post-checkbox" value="{{ post.id }}">
+                    </td>
+                    <td>
+                        <div class="post-title-cell">
+                            <div class="post-title">{{ post.title }}</div>
+                            {% if post.description %}
+                            <small class="post-excerpt text-muted">
+                                {{ post.description[:100] }}{% if post.description|length > 100 %}...{% endif %}
+                            </small>
+                            {% endif %}
+                            {% if post.featured %}
+                            <span class="featured-indicator" title="Post em destaque">
+                                <i class="fas fa-star"></i>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="category-cell">
+                            {% if post.category_rel %}
+                            <!-- CSS validator: ignore next line -->
+                            <span class="category-badge" style="background: {{ post.category_rel.color or '#3a86ff' }}">
+                                <i class="{{ post.category_rel.icon or 'fas fa-folder' }}"></i>
+                                {{ post.category_rel.name }}
+                            </span>
+                            {% else %}
+                            <span class="category-badge">
+                                <i class="fas fa-folder"></i>
+                                {{ post.category_str or 'Sem categoria' }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="date-cell">
+                            <div class="date-primary">{{ post.date_posted.strftime('%d/%m/%Y') }}</div>
+                            <small class="date-time text-muted">{{ post.date_posted.strftime('%H:%M') }}</small>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="metric-cell">
+                            <span class="metric-number">{{ post.views or 0 }}</span>
+                            <div class="metric-trend">
+                                <i class="fas fa-arrow-up text-success"></i>
+                                <span class="trend-percentage">+5%</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="metric-cell">
+                            <span class="metric-number">{{ post.downloads or 0 }}</span>
+                            <div class="metric-trend">
+                                <i class="fas fa-arrow-up text-success"></i>
+                                <span class="trend-percentage">+12%</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="status-cell">
+                            {% if post.featured %}
+                            <span class="badge badge-warning">
+                                <i class="fas fa-star"></i> Destaque
+                            </span>
+                            {% elif post.is_active %}
+                            <span class="badge badge-success">
+                                <i class="fas fa-check-circle"></i> Ativo
+                            </span>
+                            {% else %}
+                            <span class="badge badge-secondary">
+                                <i class="fas fa-pause-circle"></i> Inativo
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="actions">
+                        <div class="action-buttons">
+                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn-action btn-view" title="Visualizar" target="_blank">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="{{ post.id }}">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="{{ post.id }}">
+                                <i class="fas fa-copy"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="{{ post.id }}" data-post-title="{{ post.title }}">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <!-- Estado vazio -->
+                <tr class="empty-state">
+                    <td colspan="8" style="text-align: center; padding: 3rem;">
+                        <div class="empty-state-content">
+                            <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nenhum post encontrado</h4>
+                            <p class="text-muted">Comece criando seu primeiro post para compartilhar conteúdo.</p>
+                            <button class="btn-admin btn-admin-primary" data-modal="addPostModal">
+                                <i class="fas fa-plus"></i> Criar Primeiro Post
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Enhanced Footer -->
+    <div class="admin-card-footer">
+        <div class="bulk-actions">
+            <select id="bulkActionSelect" class="form-select">
+                <option value="">Ações em massa</option>
+                <option value="delete">Excluir selecionados</option>
+                <option value="feature">Marcar como destaque</option>
+                <option value="unfeature">Remover destaque</option>
+                <option value="activate">Ativar</option>
+                <option value="deactivate">Desativar</option>
+            </select>
+            <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+        </div>
+
+        <!-- Enhanced Pagination -->
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Mostrando {{ posts.items|length }} de {{ posts.total }} posts
+            </div>
+            <nav aria-label="Navegação de página">
+                <ul class="pagination">
+                    {% if posts.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.prev_num) }}" aria-label="Anterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="fas fa-chevron-left"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in posts.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            {% if posts.page == page_num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_posts', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if posts.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.next_num) }}" aria-label="Próximo">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="fas fa-chevron-right"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação para Exclusão -->
+<div class="modal" id="deleteModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Exclusão</h3>
+            <button class="close-modal" id="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja excluir este post? Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-footer">
+            <form id="deletePostForm" method="POST" style="display:inline;">
+                <button type="button" class="btn-admin btn-admin-outline" id="cancelDelete">Cancelar</button>
+                <button type="submit" class="btn-admin btn-admin-danger">Excluir</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição de Post -->
+<div class="modal" id="editPostModal">
+    <div class="modal-content modal-xl">
+        <div class="modal-header">
+            <div class="modal-title-container">
+                <h3><i class="fas fa-edit"></i> Editar Post</h3>
+                <p class="modal-subtitle">Atualize as informações do post</p>
+            </div>
+            <button class="close-modal" onclick="closeEditPostModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Progress Steps -->
+            <div class="form-steps">
+                <div class="step active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span class="step-title">Informações Básicas</span>
+                </div>
+                <div class="step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span class="step-title">Detalhes</span>
+                </div>
+                <div class="step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span class="step-title">SEO & Publicação</span>
+                </div>
+            </div>
+
+            <form id="editPostForm" enctype="multipart/form-data" onsubmit="savePost(event)">
+                <input type="hidden" id="editPostId" name="post_id">
+
+                <!-- Step 1: Informações Básicas -->
+                <div class="step-content active" data-step="1">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="editPostTitle" class="form-label">
+                                    <i class="fas fa-heading"></i> Título do Post
+                                    <span class="required">*</span>
+                                </label>
+                                <input type="text" id="editPostTitle" name="title"
+                                       class="form-control modern-input"
+                                       placeholder="Digite um título atrativo para o seu post..."
+                                       required>
+                                <div class="character-count">
+                                    <span id="editTitleCount">0</span>/100 caracteres
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="editPostContent" class="form-label">
+                                    <i class="fas fa-align-left"></i> Descrição Completa
+                                    <span class="required">*</span>
+                                </label>
+                                <div class="editor-toolbar">
+                                    <button type="button" class="toolbar-btn" data-command="bold" title="Negrito" onclick="formatEditText('bold')">
+                                        <i class="fas fa-bold"></i>
+                                    </button>
+                                    <button type="button" class="toolbar-btn" data-command="italic" title="Itálico" onclick="formatEditText('italic')">
+                                        <i class="fas fa-italic"></i>
+                                    </button>
+                                    <button type="button" class="toolbar-btn" data-command="underline" title="Sublinhado" onclick="formatEditText('underline')">
+                                        <i class="fas fa-underline"></i>
+                                    </button>
+                                    <div class="toolbar-separator"></div>
+                                    <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Lista" onclick="formatEditText('insertUnorderedList')">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
+                                    <button type="button" class="toolbar-btn" data-command="insertOrderedList" title="Lista Numerada" onclick="formatEditText('insertOrderedList')">
+                                        <i class="fas fa-list-ol"></i>
+                                    </button>
+                                    <div class="toolbar-separator"></div>
+                                    <button type="button" class="toolbar-btn" data-command="createLink" title="Link" onclick="formatEditText('createLink')">
+                                        <i class="fas fa-link"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-container">
+                                    <div id="editPostContentEditor" class="rich-editor" contenteditable="true"
+                                         placeholder="Descreva detalhadamente o conteúdo do post..."></div>
+                                    <textarea id="editPostContent" name="content" style="display: none;" required></textarea>
+                                </div>
+                                <div class="character-count">
+                                    <span id="editContentCount">0</span> caracteres
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="sidebar-card">
+                                <h5><i class="fas fa-image"></i> Imagem de Destaque</h5>
+                                <div class="image-upload-area" id="editImageUploadArea">
+                                    <div class="upload-placeholder" id="editUploadPlaceholder">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <p>Clique ou arraste uma imagem</p>
+                                        <span class="file-types">JPG, PNG até 5MB</span>
+                                    </div>
+                                    <div class="image-preview-container" id="editImagePreviewContainer" style="display: none;">
+                                        <img id="editImagePreview" src="" alt="Preview">
+                                        <button type="button" class="remove-image" onclick="removeEditImage()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <input type="file" id="editPostImageFile" name="image_file" accept="image/*" style="display: none;">
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label class="form-label">ou URL da Imagem</label>
+                                    <input type="url" id="editPostImageUrl" name="image_url" class="form-control modern-input" placeholder="https://exemplo.com/imagem.jpg">
+                                </div>
+                            </div>
+
+                            <div class="sidebar-card">
+                                <h5><i class="fas fa-info-circle"></i> Status</h5>
+                                <div class="status-options">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="editPostActive" name="is_active" class="form-check-input" checked>
+                                        <label for="editPostActive" class="form-check-label">
+                                            <i class="fas fa-eye"></i> Post Ativo
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" id="editPostFeatured" name="featured" class="form-check-input">
+                                        <label for="editPostFeatured" class="form-check-label">
+                                            <i class="fas fa-star"></i> Post em Destaque
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-navigation">
+                        <button type="button" class="btn-admin btn-admin-outline" onclick="closeEditPostModal()">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button type="button" class="btn-admin btn-admin-primary" onclick="nextEditStep()">
+                            Próximo <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Detalhes -->
+                <div class="step-content" data-step="2">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editPostCategory" class="form-label">
+                                    <i class="fas fa-folder"></i> Categoria
+                                    <span class="required">*</span>
+                                </label>
+                                <select id="editPostCategory" name="category_id" class="form-control modern-select" required>
+                                    <option value="">Selecione uma categoria</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editPostDownloadLink" class="form-label">
+                                    <i class="fas fa-download"></i> Link de Download
+                                </label>
+                                <input type="url" id="editPostDownloadLink" name="download_link"
+                                       class="form-control modern-input"
+                                       placeholder="https://exemplo.com/arquivo.zip">
+                                <small class="form-text">Link para download do arquivo relacionado ao post</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-navigation">
+                        <button type="button" class="btn-admin btn-admin-outline" onclick="prevEditStep()">
+                            <i class="fas fa-arrow-left"></i> Anterior
+                        </button>
+                        <button type="button" class="btn-admin btn-admin-primary" onclick="nextEditStep()">
+                            Próximo <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: SEO & Publicação -->
+                <div class="step-content" data-step="3">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="info-box">
+                                <i class="fas fa-info-circle"></i>
+                                <div>
+                                    <h5>Otimização para Mecanismos de Busca (SEO)</h5>
+                                    <p>Melhore a visibilidade do seu post nos resultados de busca</p>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <i class="fas fa-search"></i> Preview SEO
+                                </label>
+                                <div class="seo-preview">
+                                    <div class="seo-title" id="editSeoPreviewTitle">Título do Post</div>
+                                    <div class="seo-url" id="editSeoPreviewUrl">https://mundodainformatica.com/post/titulo-do-post</div>
+                                    <div class="seo-description" id="editSeoPreviewDesc">Descrição aparecerá aqui...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-navigation">
+                        <button type="button" class="btn-admin btn-admin-outline" onclick="prevEditStep()">
+                            <i class="fas fa-arrow-left"></i> Anterior
+                        </button>
+                        <button type="submit" class="btn-admin btn-admin-success">
+                            <i class="fas fa-save"></i> Salvar Alterações
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<!-- Modal de Novo Post -->
+{% include 'admin/components/modal_post.html' %}
+
+{% block scripts %}
+<script>
+    // ========================================
+    // FUNÇÕES GLOBAIS DO MODAL DE EDIÇÃO
+    // Definidas ANTES do DOMContentLoaded para estarem disponíveis no onclick
+    // ========================================
+
+    // Variável global para controlar o step atual
+    let currentEditStep = 1;
+
+    // Função para avançar para o próximo step
+    window.nextEditStep = function() {
+        console.log('nextEditStep chamado, currentEditStep:', currentEditStep);
+
+        if (currentEditStep < 3) {
+            // Desativar step atual
+            const currentStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
+            const currentContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
+
+            if (currentStepElement) currentStepElement.classList.remove('active');
+            if (currentContentElement) currentContentElement.classList.remove('active');
+
+            // Ativar próximo step
+            currentEditStep++;
+
+            const nextStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
+            const nextContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
+
+            if (nextStepElement) nextStepElement.classList.add('active');
+            if (nextContentElement) nextContentElement.classList.add('active');
+
+            // Marcar steps anteriores como completos
+            for (let i = 1; i < currentEditStep; i++) {
+                const stepToComplete = document.querySelector(`#editPostModal .step[data-step="${i}"]`);
+                if (stepToComplete) stepToComplete.classList.add('completed');
+            }
+
+            console.log('Avançou para step:', currentEditStep);
+        }
+    };
+
+    // Função para voltar ao step anterior
+    window.prevEditStep = function() {
+        if (currentEditStep > 1) {
+            // Desativar step atual
+            const currentStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
+            const currentContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
+
+            if (currentStepElement) currentStepElement.classList.remove('active');
+            if (currentContentElement) currentContentElement.classList.remove('active');
+
+            // Ativar step anterior
+            currentEditStep--;
+
+            const prevStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
+            const prevContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
+
+            if (prevStepElement) prevStepElement.classList.add('active');
+            if (prevContentElement) prevContentElement.classList.add('active');
+
+            // Remover completed do step atual
+            if (prevStepElement) prevStepElement.classList.remove('completed');
+
+            console.log('Voltou para step:', currentEditStep);
+        }
+    };
+
+    // Função para preview de imagem no modal de edição
+    window.previewEditImage = function(file) {
+        if (file && file.type.match('image.*')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('editImagePreview');
+                const previewContainer = document.getElementById('editImagePreviewContainer');
+                const placeholder = document.getElementById('editUploadPlaceholder');
+
+                if (preview && previewContainer && placeholder) {
+                    preview.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    placeholder.style.display = 'none';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Função para remover imagem no modal de edição
+    window.removeEditImage = function() {
+        const fileInput = document.getElementById('editPostImageFile');
+        const urlInput = document.getElementById('editPostImageUrl');
+        const preview = document.getElementById('editImagePreview');
+        const previewContainer = document.getElementById('editImagePreviewContainer');
+        const placeholder = document.getElementById('editUploadPlaceholder');
+
+        if (fileInput) fileInput.value = '';
+        if (urlInput) urlInput.value = '';
+        if (preview) preview.src = '';
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+    };
+
+    // ========================================
+    // FIM DAS FUNÇÕES GLOBAIS
+    // ========================================
+
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM carregado, inicializando JavaScript...'); // Debug
+
+        // ==========================================
+        // WIZARD DO POST - Agora gerenciado por post-wizard.js
+        // ==========================================
+        // Todo o código do wizard foi movido para post-wizard.js para evitar duplicação
+        // e garantir que Dashboard e Posts usem exatamente o mesmo formulário
+
+        // ==========================================
+        // TODO O CÓDIGO DO WIZARD FOI REMOVIDO DAQUI
+        // Agora está em post-wizard.js para evitar duplicação
+        // ==========================================
+
+        // Teste simples para verificar se o modal funciona
+        setTimeout(() => {
+            const modal = document.getElementById('deleteModal');
+            console.log('Teste: Modal deleteModal existe?', !!modal);
+            if (modal) {
+                console.log('Teste: Modal HTML:', modal.outerHTML.substring(0, 200));
+            }
+        }, 1000);
+
+        // Enhanced Posts Management
+
+        // ==========================================
+        // CÓDIGO DO WIZARD REMOVIDO - Agora em post-wizard.js
+        // O formulário de Novo Post é idêntico no Dashboard e aqui!
+        // ==========================================
+
+        // Enhanced Posts Management
+
+        // Search and Filter System
+        const searchInput = document.getElementById('searchPosts');
+        const categoryFilter = document.getElementById('filterCategory');
+        const statusFilter = document.getElementById('filterStatus');
+        const sortBy = document.getElementById('sortBy');
+        const tableRows = document.querySelectorAll('.admin-table tbody tr:not(.empty-state)');
+
+        function filterAndSearchPosts() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedCategory = categoryFilter.value;
+            const selectedStatus = statusFilter.value;
+
+            tableRows.forEach(row => {
+                const titleCell = row.querySelector('.post-title')?.textContent.toLowerCase() || '';
+                const excerptCell = row.querySelector('.post-excerpt')?.textContent.toLowerCase() || '';
+                const categoryCell = row.querySelector('.category-badge')?.textContent.toLowerCase() || '';
+
+                const matchesSearch = titleCell.includes(searchTerm) || excerptCell.includes(searchTerm);
+                const matchesCategory = !selectedCategory || row.querySelector('.category-badge')?.textContent.includes(selectedCategory);
+
+                let matchesStatus = true;
+                if (selectedStatus === 'active') {
+                    matchesStatus = row.querySelector('.badge-success') !== null;
+                } else if (selectedStatus === 'featured') {
+                    matchesStatus = row.querySelector('.badge-warning') !== null;
+                } else if (selectedStatus === 'inactive') {
+                    matchesStatus = row.querySelector('.badge-secondary') !== null;
+                }
+
+                if (matchesSearch && matchesCategory && matchesStatus) {
+                    row.style.display = '';
+                    row.style.animation = 'fadeIn 0.3s ease';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            updateResultsCount();
+        }
+
+        function updateResultsCount() {
+            const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
+            const countElement = document.querySelector('.count-badge');
+            if (countElement) {
+                countElement.textContent = visibleRows.length;
+            }
+        }
+
+        // Event listeners for filters
+        searchInput?.addEventListener('input', filterAndSearchPosts);
+        categoryFilter?.addEventListener('change', filterAndSearchPosts);
+        statusFilter?.addEventListener('change', filterAndSearchPosts);
+
+        // Clear search function
+        window.clearSearch = function() {
+            searchInput.value = '';
+            categoryFilter.value = '';
+            statusFilter.value = '';
+            filterAndSearchPosts();
+        };
+
+        // Export function
+        window.exportPosts = function() {
+            window.location.href = '/admin/posts/export';
+        };
+
+        // Sorting functionality
+        sortBy?.addEventListener('change', function() {
+            const sortType = this.value;
+            const tbody = document.querySelector('.admin-table tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-state)'));
+
+            rows.sort((a, b) => {
+                let aValue, bValue;
+
+                switch(sortType) {
+                    case 'title':
+                        aValue = a.querySelector('.post-title')?.textContent || '';
+                        bValue = b.querySelector('.post-title')?.textContent || '';
+                        return aValue.localeCompare(bValue);
+                    case 'date':
+                        aValue = a.querySelector('.date-primary')?.textContent || '';
+                        bValue = b.querySelector('.date-primary')?.textContent || '';
+                        return new Date(bValue.split('/').reverse().join('-')) - new Date(aValue.split('/').reverse().join('-'));
+                    case 'views':
+                        aValue = parseInt(a.querySelector('.metric-number')?.textContent || 0);
+                        bValue = parseInt(b.querySelector('.metric-number')?.textContent || 0);
+                        return bValue - aValue;
+                    case 'downloads':
+                        aValue = parseInt(a.querySelectorAll('.metric-number')[1]?.textContent || 0);
+                        bValue = parseInt(b.querySelectorAll('.metric-number')[1]?.textContent || 0);
+                        return bValue - aValue;
+                    default:
+                        return 0;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        });
+
+        // Select All functionality
+        const selectAllCheckbox = document.getElementById('selectAllPosts');
+        const postCheckboxes = document.querySelectorAll('.post-checkbox');
+
+        selectAllCheckbox?.addEventListener('change', function() {
+            postCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateBulkActionsVisibility();
+        });
+
+        postCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateBulkActionsVisibility);
+        });
+
+        function updateBulkActionsVisibility() {
+            const checkedBoxes = document.querySelectorAll('.post-checkbox:checked');
+            const bulkActions = document.querySelector('.bulk-actions');
+
+            if (checkedBoxes.length > 0) {
+                bulkActions.style.opacity = '1';
+                bulkActions.style.pointerEvents = 'auto';
+            } else {
+                bulkActions.style.opacity = '0.5';
+                bulkActions.style.pointerEvents = 'none';
+            }
+        }
+
+        // Bulk actions
+        document.getElementById('applyBulkAction')?.addEventListener('click', function() {
+            const action = document.getElementById('bulkActionSelect').value;
+            const checkedBoxes = document.querySelectorAll('.post-checkbox:checked');
+
+            if (!action || checkedBoxes.length === 0) {
+                alert('Selecione uma ação e pelo menos um post.');
+                return;
+            }
+
+            const postIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (confirm(`Tem certeza que deseja ${action} ${postIds.length} posts?`)) {
+                // Here you would make an AJAX call to perform the bulk action
+                console.log('Bulk action:', action, 'Posts:', postIds);
+            }
+        });
+
+        // Modal event listeners (as funções openModal e closeModal estão em admin.js)
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    const modalId = this.id;
+                    closeModal(modalId);
+                }
+            });
+        });
+
+        // Close modal with ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const openModal = document.querySelector('.modal.show');
+                if (openModal) {
+                    closeModal(openModal.id);
+                }
+            }
+        });
+
+        // Specific event listener for cancel button in delete modal
+        const cancelDeleteBtn = document.getElementById('cancelDelete');
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.addEventListener('click', function() {
+                closeModal('deleteModal');
+            });
+        }
+
+        // Delete post functionality
+        const deleteButtons = document.querySelectorAll('.btn-delete');
+        console.log('Botões de deletar encontrados:', deleteButtons.length); // Debug
+
+        deleteButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Botão de deletar clicado!'); // Debug
+
+                const postId = this.getAttribute('data-post-id');
+                const postTitle = this.getAttribute('data-post-title');
+                console.log('Post ID:', postId, 'Title:', postTitle); // Debug
+
+                const modal = document.getElementById('deleteModal');
+                console.log('Modal encontrado:', modal); // Debug
+
+                if (modal) {
+                    // Atualizar texto do modal
+                    const modalBodyP = modal.querySelector('.modal-body p');
+                    if (modalBodyP) {
+                        modalBodyP.innerHTML = `Tem certeza que deseja excluir o post <strong>"${postTitle}"</strong>? Esta ação não pode ser desfeita.`;
+                    }
+
+                    // Atualizar action do form
+                    const form = modal.querySelector('#deletePostForm');
+                    if (form) {
+                        form.action = `/admin/posts/${postId}/delete`;
+                        console.log('Form action atualizado para:', form.action); // Debug
+                    }
+
+                    console.log('Abrindo modal...'); // Debug
+                    openModal('deleteModal');
+                } else {
+                    console.error('Modal deleteModal não encontrado!'); // Debug
+                }
+            });
+        });
+
+        // Duplicate post functionality
+        document.querySelectorAll('.btn-duplicate').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const postId = this.getAttribute('data-post-id');
+
+                if (confirm('Deseja duplicar este post?')) {
+                    // Criar um formulário para enviar via POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/admin/posts/${postId}/duplicate`;
+                    form.style.display = 'none';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+
+        // Edit post functionality
+        document.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const postId = this.getAttribute('data-post-id');
+                console.log('Editando post:', postId); // Debug
+
+                // Verificar se o modal existe
+                const modal = document.getElementById('editPostModal');
+                if (!modal) {
+                    console.error('Modal de edição não encontrado');
+                    showNotification('Modal de edição não encontrado', 'error');
+                    return;
+                }
+
+                // Buscar dados do post
+                fetch(`/admin/posts/${postId}/data`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(post => {
+                        console.log('Dados do post:', post); // Debug
+                        openEditPostModal(post);
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar dados do post:', error);
+                        showNotification('Erro ao carregar dados do post: ' + error.message, 'error');
+                    });
+            });
+        });
+
+        // Atualizar preview SEO no modal de edição
+        function updateEditSeoPreview() {
+            const title = document.getElementById('editPostTitle');
+            const content = document.getElementById('editPostContentEditor');
+            const seoTitle = document.getElementById('editSeoPreviewTitle');
+            const seoDesc = document.getElementById('editSeoPreviewDesc');
+
+            if (title && seoTitle) {
+                seoTitle.textContent = title.value || 'Título do Post';
+            }
+
+            if (content && seoDesc) {
+                const text = content.textContent || content.innerText;
+                seoDesc.textContent = text.substring(0, 160) || 'Descrição aparecerá aqui...';
+            }
+        }
+
+        // Função para abrir modal de edição de post
+        function openEditPostModal(post) {
+            const modal = document.getElementById('editPostModal');
+            if (!modal) {
+                console.error('Modal de edição não encontrado');
+                return;
+            }
+
+            // Resetar para o primeiro step
+            currentEditStep = 1;
+            const steps = modal.querySelectorAll('.step');
+            const stepContents = modal.querySelectorAll('.step-content');
+
+            steps.forEach((step, index) => {
+                step.classList.remove('active', 'completed');
+                if (index === 0) step.classList.add('active');
+            });
+
+            stepContents.forEach((content, index) => {
+                content.classList.remove('active');
+                if (index === 0) content.classList.add('active');
+            });
+
+            // Preencher dados no modal
+            document.getElementById('editPostId').value = post.id;
+            document.getElementById('editPostTitle').value = post.title || '';
+
+            // Atualizar contador de título
+            const editTitleCount = document.getElementById('editTitleCount');
+            if (editTitleCount) {
+                editTitleCount.textContent = (post.title || '').length;
+            }
+
+            // Carregar conteúdo HTML no editor rico
+            const editContentEditor = document.getElementById('editPostContentEditor');
+            const editContentTextarea = document.getElementById('editPostContent');
+
+            if (editContentEditor && editContentTextarea) {
+                editContentEditor.innerHTML = post.content || '';
+                editContentTextarea.value = post.content || '';
+
+                // Atualizar contador de caracteres
+                const editContentCount = document.getElementById('editContentCount');
+                if (editContentCount) {
+                    editContentCount.textContent = (post.content || '').length;
+                }
+            }
+
+            document.getElementById('editPostCategory').value = post.category_id || '';
+            document.getElementById('editPostDownloadLink').value = post.download_link || '';
+
+            // Carregar imagem se existir
+            if (post.image_url) {
+                document.getElementById('editPostImageUrl').value = post.image_url;
+                const preview = document.getElementById('editImagePreview');
+                const previewContainer = document.getElementById('editImagePreviewContainer');
+                const placeholder = document.getElementById('editUploadPlaceholder');
+
+                if (preview && previewContainer && placeholder) {
+                    // Construir caminho completo da imagem
+                    // Se já começa com /, http ou posts/, usa direto, senão adiciona /static/images/
+                    let imageUrl;
+                    if (post.image_url.startsWith('/') || post.image_url.startsWith('http')) {
+                        imageUrl = post.image_url;
+                    } else if (post.image_url.startsWith('posts/')) {
+                        imageUrl = `/static/images/${post.image_url}`;
+                    } else {
+                        imageUrl = `/static/images/posts/${post.image_url}`;
+                    }
+
+                    preview.src = imageUrl;
+                    previewContainer.style.display = 'block';
+                    placeholder.style.display = 'none';
+                }
+            } else {
+                removeEditImage();
+            }
+
+            document.getElementById('editPostFeatured').checked = post.featured || false;
+            document.getElementById('editPostActive').checked = post.is_active !== false; // Default true
+
+            // Atualizar preview SEO
+            updateEditSeoPreview();
+
+            // Mostrar modal usando a função unificada
+            openModal('editPostModal');
+        }
+
+        // Função para fechar modal de edição de post
+        window.closeEditPostModal = function() {
+            closeModal('editPostModal');
+        };
+
+        // Função para salvar post
+        window.savePost = function(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+            const postId = formData.get('post_id');
+
+            // Converter checkboxes para boolean
+            formData.set('featured', document.getElementById('editPostFeatured').checked);
+            formData.set('is_active', document.getElementById('editPostActive').checked);
+
+            fetch(`/admin/posts/${postId}/update`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Post atualizado com sucesso!', 'success');
+                    closeEditPostModal();
+                    // Recarregar a página para mostrar as mudanças
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message || 'Erro ao atualizar post', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao salvar post:', error);
+                showNotification('Erro ao salvar post', 'error');
+            });
+        };
+
+        // Animation delays for table rows
+        tableRows.forEach((row, index) => {
+            row.style.animationDelay = `${index * 0.05}s`;
+            row.classList.add('slide-in-up');
+        });
+
+        // Initialize bulk actions visibility
+        // Função para mostrar notificações
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+                <button class="notification-close">&times;</button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Adicionar evento para fechar
+            notification.querySelector('.notification-close').addEventListener('click', () => {
+                notification.remove();
+            });
+
+            // Auto-fechar após 5 segundos
+            setTimeout(() => {
+                notification.classList.add('fade-out');
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+
+        updateBulkActionsVisibility();
+    });
+</script>
+
+<style>
+    /* Form Steps Navigation */
+    .form-steps {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        padding: 0;
+        position: relative;
+        gap: 0;
+    }
+
+    .form-steps::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 160px);
+        max-width: 600px;
+        height: 2px;
+        background: #e0e0e0;
+        z-index: 0;
+    }
+
+    .form-steps .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        max-width: 200px;
+    }
+
+    .form-steps .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e0e0e0;
+        color: #666;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        border: 3px solid #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background-clip: padding-box;
+    }
+
+    .form-steps .step.active .step-number {
+        background: var(--admin-primary);
+        color: white;
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(58, 134, 255, 0.3);
+    }
+
+    .form-steps .step.completed .step-number {
+        background: #28a745;
+        color: white;
+    }
+
+    .form-steps .step-title {
+        font-size: 0.85rem;
+        color: #666;
+        text-align: center;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .form-steps .step.active .step-title {
+        color: var(--admin-primary);
+        font-weight: 600;
+    }
+
+    .form-steps .step.completed .step-title {
+        color: #28a745;
+    }
+
+    /* Step Content */
+    .step-content {
+        display: none;
+    }
+
+    .step-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    /* Melhorar espaçamento dos campos no modal */
+    .step-content .row {
+        width: 100%;
+        margin: 0;
+    }
+
+    .step-content .col-md-8,
+    .step-content .col-md-4,
+    .step-content .col-md-6 {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    .step-content .form-group {
+        width: 100%;
+        margin-bottom: 1.5rem;
+    }
+
+    .step-content .form-control,
+    .step-content .form-select,
+    .step-content .rich-editor {
+        width: 100% !important;
+        max-width: 100%;
+    }
+
+    /* Melhorar editor rico no modal */
+    #editPostModal .rich-editor {
+        min-height: 250px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 1rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    /* Sidebar cards no modal de edição */
+    #editPostModal .sidebar-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    #editPostModal .sidebar-card h5 {
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+        color: #495057;
+    }
+
+    /* Área de upload de imagem */
+    #editPostModal .image-upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #editPostModal .image-upload-area:hover {
+        border-color: var(--admin-primary);
+        background: #f8f9fa;
+    }
+
+    #editPostModal .upload-placeholder i {
+        font-size: 2.5rem;
+        color: #6c757d;
+        margin-bottom: 0.75rem;
+    }
+
+    #editPostModal .image-preview-container {
+        position: relative;
+        width: 100%;
+    }
+
+    #editPostModal .image-preview-container img {
+        width: 100%;
+        height: auto;
+        max-height: 300px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Enhanced Posts Page Styles */
+    .quick-stats {
+        display: flex;
+        gap: 1rem;
+        margin-right: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 0.5rem;
+        background: rgba(58, 134, 255, 0.1);
+        border-radius: 8px;
+        min-width: 60px;
+    }
+
+    .stat-number {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .post-title-cell {
+        position: relative;
+    }
+
+    .post-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .post-excerpt {
+        font-size: 0.85rem;
+        line-height: 1.4;
+        display: block;
+    }
+
+    .featured-indicator {
+        position: absolute;
+        top: 0;
+        right: 0;
+        color: #ffc107;
+        font-size: 0.9rem;
+    }
+
+    .category-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: white;
+        background: var(--admin-primary);
+    }
+
+    .date-cell .date-primary {
+        font-weight: 500;
+    }
+
+    .date-cell .date-time {
+        font-size: 0.75rem;
+    }
+
+    .metric-cell {
+        text-align: center;
+    }
+
+    .metric-number {
+        font-weight: 600;
+        font-size: 1.1rem;
+        display: block;
+    }
+
+    .metric-trend {
+        font-size: 0.75rem;
+        margin-top: 2px;
+    }
+
+    .trend-percentage {
+        margin-left: 2px;
+    }
+
+    .status-cell .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .badge-warning {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .badge-secondary {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+    }
+
+    .btn-action.btn-view {
+        background-color: var(--admin-info);
+        color: white;
+    }
+
+    .btn-action.btn-duplicate {
+        background-color: #6f42c1;
+        color: white;
+    }
+
+    .inactive-row {
+        opacity: 0.6;
+        background-color: rgba(108, 117, 125, 0.05);
+    }
+
+    .admin-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--admin-border-color);
+        background: rgba(248, 249, 250, 0.5);
+    }
+
+    .bulk-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        opacity: 0.5;
+        pointer-events: none;
+        transition: all 0.3s ease;
+    }
+
+    .pagination-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .pagination-info {
+        font-size: 0.9rem;
+        color: var(--admin-text-light);
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-in-up {
+        animation: slideInUp 0.5s ease forwards;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Notification Styles */
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        padding: 1rem;
+        z-index: 10000;
+        min-width: 300px;
+        animation: slideInRight 0.3s ease;
+    }
+
+    .notification.success {
+        border-left: 4px solid #28a745;
+    }
+
+    .notification.error {
+        border-left: 4px solid #dc3545;
+    }
+
+    .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .notification-close {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: #6c757d;
+    }
+
+    .notification.fade-out {
+        animation: slideOutRight 0.3s ease;
+    }
+
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+
+    /* Modal fixes - Simplified */
+    #deleteModal {
+        display: none !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        z-index: 9999 !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    #deleteModal.show {
+        display: flex !important;
+        opacity: 1 !important;
+    }
+
+    #deleteModal .modal-content {
+        background: white !important;
+        border-radius: 8px !important;
+        padding: 0 !important;
+        max-width: 500px !important;
+        width: 90% !important;
+        z-index: 10000 !important;
+        position: relative !important;
+    }
+</style>
+
+<script>
+// Funções para gerenciar upload de imagem vs URL
+
+// Alternar entre URL e Upload no modal de edição
+document.addEventListener('DOMContentLoaded', function() {
+    const editUrlOption = document.getElementById('editImageUrlOption');
+    const editUploadOption = document.getElementById('editImageUploadOption');
+
+    if (editUrlOption) {
+        editUrlOption.addEventListener('click', function() {
+            document.getElementById('editImageUrlField').style.display = 'block';
+            document.getElementById('editImageUploadField').style.display = 'none';
+            document.getElementById('editPostImageFile').value = '';
+        });
+    }
+
+    if (editUploadOption) {
+        editUploadOption.addEventListener('click', function() {
+            document.getElementById('editImageUrlField').style.display = 'none';
+            document.getElementById('editImageUploadField').style.display = 'block';
+            document.getElementById('editPostImageUrl').value = '';
+        });
+    }
+
+    // Preview de imagem ao selecionar arquivo (modal de edição)
+    const editImageFile = document.getElementById('editPostImageFile');
+    if (editImageFile) {
+        editImageFile.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validar tamanho (máx 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('A imagem é muito grande. Tamanho máximo: 5MB');
+                    e.target.value = '';
+                    return;
+                }
+
+                // Validar tipo
+                if (!file.type.startsWith('image/')) {
+                    alert('Por favor, selecione apenas arquivos de imagem');
+                    e.target.value = '';
+                    return;
+                }
+
+                // Mostrar preview
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    document.getElementById('editPreviewImg').src = event.target.result;
+                    document.getElementById('editImagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Preview de imagem ao digitar URL (modal de edição)
+    const editImageUrl = document.getElementById('editPostImageUrl');
+    if (editImageUrl) {
+        const updatePreview = function() {
+            const url = editImageUrl.value.trim();
+            const previewImg = document.getElementById('editPreviewImg');
+            const previewContainer = document.getElementById('editImagePreview');
+
+            if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                previewImg.src = url;
+                previewContainer.style.display = 'block';
+
+                // Verificar se a imagem carrega
+                previewImg.onerror = function() {
+                    previewContainer.style.display = 'none';
+                };
+
+                previewImg.onload = function() {
+                    previewContainer.style.display = 'block';
+                };
+            } else if (!url) {
+                previewContainer.style.display = 'none';
+            }
+        };
+
+        editImageUrl.addEventListener('input', updatePreview);
+        editImageUrl.addEventListener('change', updatePreview);
+        editImageUrl.addEventListener('paste', function(e) {
+            setTimeout(updatePreview, 100);
+        });
+    }
+});
+
+// Limpar preview de imagem (modal de edição)
+function clearEditImagePreview() {
+    document.getElementById('editPreviewImg').src = '';
+    document.getElementById('editImagePreview').style.display = 'none';
+    document.getElementById('editPostImageFile').value = '';
+    document.getElementById('editPostImageUrl').value = '';
+}
+
+// Atualizar formulário de edição para usar FormData (suporte a upload)
+const editPostForm = document.getElementById('editPostForm');
+if (editPostForm) {
+    editPostForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const postId = document.getElementById('editPostId').value;
+
+        fetch(`/admin/posts/${postId}/update`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Post atualizado com sucesso!', 'success');
+                closeEditPostModal();
+                location.reload();
+            } else {
+                showNotification(data.message || 'Erro ao atualizar post', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showNotification('Erro ao atualizar post', 'error');
+        });
+    });
+}
+
+// Função para formatar texto no editor de edição
+function formatEditText(command) {
+    const editor = document.getElementById('editPostContentEditor');
+    if (!editor) return;
+
+    editor.focus();
+
+    if (command === 'createLink') {
+        const url = prompt('Digite a URL do link:');
+        if (url) {
+            document.execCommand(command, false, url);
+        }
+    } else {
+        document.execCommand(command, false, null);
+    }
+
+    // Sincronizar com textarea
+    syncEditEditorContent();
+}
+
+// Sincronizar conteúdo do editor com textarea
+function syncEditEditorContent() {
+    const editor = document.getElementById('editPostContentEditor');
+    const textarea = document.getElementById('editPostContent');
+    const counter = document.getElementById('editContentCount');
+
+    if (editor && textarea) {
+        textarea.value = editor.innerHTML;
+        if (counter) {
+            counter.textContent = editor.innerHTML.length;
+        }
+    }
+}
+
+// Adicionar evento de input no editor de edição
+document.addEventListener('DOMContentLoaded', function() {
+    const editContentEditor = document.getElementById('editPostContentEditor');
+    if (editContentEditor) {
+        editContentEditor.addEventListener('input', syncEditEditorContent);
+        editContentEditor.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
+        });
+    }
+
+    // Adicionar contador de caracteres no título do modal de edição
+    const editTitleInput = document.getElementById('editPostTitle');
+    if (editTitleInput) {
+        editTitleInput.addEventListener('input', function() {
+            const counter = document.getElementById('editTitleCount');
+            if (counter) {
+                counter.textContent = this.value.length;
+            }
+        });
+    }
+
+    // Setup da área de upload de imagem no modal de edição
+    const editImageUploadArea = document.getElementById('editImageUploadArea');
+    const editImageFileInput = document.getElementById('editPostImageFile');
+
+    if (editImageUploadArea && editImageFileInput) {
+        editImageUploadArea.addEventListener('click', function() {
+            editImageFileInput.click();
+        });
+
+        editImageUploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        editImageUploadArea.addEventListener('dragleave', function() {
+            this.classList.remove('dragover');
+        });
+
+        editImageUploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                editImageFileInput.files = files;
+                previewEditImage(files[0]);
+            }
+        });
+
+        editImageFileInput.addEventListener('change', function(e) {
+            if (this.files && this.files[0]) {
+                previewEditImage(this.files[0]);
+            }
+        });
+    }
+});
+        });
+    }
+});
+
+// Adicionar listeners para atualizar preview SEO
+document.addEventListener('DOMContentLoaded', function() {
+    const editTitle = document.getElementById('editPostTitle');
+    const editContent = document.getElementById('editPostContentEditor');
+
+    if (editTitle) {
+        editTitle.addEventListener('input', updateEditSeoPreview);
+    }
+
+    if (editContent) {
+        editContent.addEventListener('input', updateEditSeoPreview);
+    }
+});
+
+// Atualizar formulário de edição para sincronizar antes do submit
+const editPostForm = document.getElementById('editPostForm');
+if (editPostForm) {
+    const originalSubmitHandler = editPostForm.onsubmit;
+    editPostForm.addEventListener('submit', function(e) {
+        // Sincronizar conteúdo antes de enviar
+        syncEditEditorContent();
+    }, true);
+}
+
+</script>
+
+<!-- Post Wizard Script -->
+<script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
+{% endblock %}
+

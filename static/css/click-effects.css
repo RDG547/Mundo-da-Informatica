@@ -1,0 +1,242 @@
+/* ================================================
+   EFEITOS DE CLIQUE UNIVERSAIS - Mundo da Informática
+   ================================================ */
+
+/* Efeito de clique universal para elementos interativos */
+/* Este arquivo garante que todos os elementos clicáveis tenham feedback visual */
+
+/* Seletores universais para botões e elementos interativos */
+button:active,
+[role="button"]:active,
+.btn:active,
+.button:active,
+input[type="submit"]:active,
+input[type="button"]:active,
+input[type="reset"]:active,
+a.btn:active,
+a[class*="btn"]:active,
+
+/* Botões específicos da plataforma */
+.btn-primary:active,
+.btn-secondary:active,
+.btn-success:active,
+.btn-danger:active,
+.btn-warning:active,
+.btn-info:active,
+.btn-light:active,
+.btn-dark:active,
+.btn-outline:active,
+.btn-outline-primary:active,
+.btn-outline-secondary:active,
+.btn-outline-success:active,
+.btn-outline-danger:active,
+.btn-outline-warning:active,
+.btn-outline-info:active,
+.btn-outline-light:active,
+.btn-outline-dark:active,
+.btn-sm:active,
+.btn-lg:active,
+.btn-block:active,
+.btn-gradient:active,
+.btn-social:active,
+.btn-download:active,
+
+/* Botões administrativos */
+.btn-admin:active,
+.btn-admin-primary:active,
+.btn-admin-secondary:active,
+.btn-admin-success:active,
+.btn-admin-danger:active,
+.btn-admin-warning:active,
+.btn-admin-info:active,
+.btn-admin-outline:active,
+
+/* Botões de perfil */
+.btn-profile:active,
+.btn-profile-action:active,
+.avatar-edit:active,
+
+/* Elementos de FAQ */
+.answer-btn:active,
+.answer-helpful:active,
+.search-clear:active,
+.search-suggestion:active,
+.accordion-toggle:active,
+.question-item:active,
+
+/* Elementos de formulário */
+.form-check:active,
+.form-check-input:active,
+.toolbar-btn:active,
+.remove-image:active,
+.btn-group-item:active,
+.icon-btn:active,
+.color-preset:active,
+.template-option:active,
+.recipient-group:active,
+.step-number:active,
+.tag-remove:active,
+
+/* Elementos de modal e navegação */
+.modal-close:active,
+.close-modal:active,
+.notification-close:active,
+.sidebar-toggle:active,
+.mobile-menu-toggle:active,
+.menu-toggle:active,
+.dropdown-toggle:active,
+
+/* Elementos de tabela e paginação */
+.tab-btn:active,
+.pagination-btn:active,
+.filter-btn:active,
+.action-btn:active,
+.sort-btn:active,
+
+/* Cards e elementos de conteúdo */
+.category-card:active,
+.post-card:active,
+.testimonial-card:active,
+.team-member:active,
+.stat-item:active,
+.admin-card:active,
+.stat-card:active,
+.quick-action:active,
+.activity-item:active,
+.badge-item:active,
+.achievement-item:active,
+
+/* Elementos de navegação */
+.nav-link:active,
+.nav-item:active,
+.breadcrumb-item:active,
+
+/* Botões especiais */
+.cta-btn:active,
+.explore-btn:active,
+.scroll-top:active,
+.dark-mode:active,
+.contact-btn:active,
+.live-chat-btn:active,
+
+/* Elementos de upload e mídia */
+.upload-placeholder:active,
+.image-preview:active,
+.upload-btn:active,
+.remove-btn:active,
+
+/* Elementos diversos */
+.edit-btn:active,
+.save-btn:active,
+.cancel-btn:active,
+.close-btn:active,
+.expand-btn:active,
+.collapse-btn:active,
+
+/* Elementos com data-attributes para clique */
+[data-toggle]:active,
+[data-dismiss]:active,
+[data-target]:active,
+[onclick]:active,
+
+/* Elementos com cursor pointer que devem ter feedback */
+*[style*="cursor: pointer"]:active,
+.cursor-pointer:active,
+.clickable:active,
+.interactive:active {
+    /* Efeito de afundar */
+    transform: translateY(2px) scale(0.98) !important;
+
+    /* Sombra reduzida para simular profundidade */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+
+    /* Transição rápida para feedback instantâneo */
+    transition: all 0.1s ease !important;
+}
+
+/* Exceções para elementos que não devem ter o efeito */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"],
+input[type="week"],
+textarea,
+select,
+.form-control,
+.form-select,
+.modern-input,
+.modern-select {
+    cursor: text !important;
+}
+
+input[type="text"]:active,
+input[type="email"]:active,
+input[type="password"]:active,
+input[type="tel"]:active,
+input[type="url"]:active,
+input[type="search"]:active,
+input[type="number"]:active,
+input[type="date"]:active,
+input[type="datetime-local"]:active,
+input[type="month"]:active,
+input[type="time"]:active,
+input[type="week"]:active,
+textarea:active,
+select:active,
+.form-control:active,
+.form-select:active,
+.modern-input:active,
+.modern-select:active {
+    transform: none !important;
+    box-shadow: 0 0 0 0.2rem rgba(58, 134, 255, 0.25) !important;
+    cursor: text !important;
+}
+
+/* Efeito especial para links que não são botões */
+a:not(.btn):not([class*="btn"]):active {
+    transform: scale(0.98) !important;
+    transition: all 0.1s ease !important;
+}
+
+/* Efeito para elementos de lista clicáveis */
+.list-group-item:active,
+.dropdown-item:active,
+.nav-pills .nav-link:active,
+.nav-tabs .nav-link:active {
+    transform: translateX(2px) scale(0.99) !important;
+    transition: all 0.1s ease !important;
+}
+
+/* Responsividade - reduzir efeito em telas menores */
+@media (max-width: 768px) {
+    button:active,
+    .btn:active,
+    [role="button"]:active {
+        transform: translateY(1px) scale(0.99) !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+    }
+}
+
+/* Estados especiais */
+.disabled:active,
+.btn:disabled:active,
+button:disabled:active,
+[aria-disabled="true"]:active {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Melhorar acessibilidade - manter efeito para navegação por teclado */
+button:focus:active,
+.btn:focus:active,
+[role="button"]:focus:active {
+    outline: 2px solid var(--primary-color, #3a86ff) !important;
+    outline-offset: 2px !important;
+}

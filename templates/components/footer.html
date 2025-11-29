@@ -1,0 +1,375 @@
+<!-- Footer Moderno e Responsivo -->
+<footer class="modern-footer">
+    <div class="footer-content">
+        <div class="container">
+            <div class="row">
+                <!-- Coluna 1: Sobre o Site -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="footer-section">
+                        <div class="footer-logo">
+                            <i class="fas fa-microchip"></i>
+                            <div class="logo-text">
+                                <span class="logo-mundo">Mundo</span>
+                                <span class="logo-da">da</span>
+                                <span class="logo-informatica">Informática</span>
+                            </div>
+                        </div>
+                        <p class="footer-description">
+                            Seu portal completo de recursos para técnicos e entusiastas de informática. Encontre drivers, BIOS, esquemas e softwares de qualidade.
+                        </p>
+                        <div class="social-links">
+                            <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                            <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                            <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                            <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna 2: Links Rápidos -->
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <div class="footer-section">
+                        <h4 class="footer-title">Links Rápidos</h4>
+                        <ul class="footer-links">
+                            <li><a href="{{ url_for('home') }}"><i class="fas fa-chevron-right"></i> Início</a></li>
+                            <li><a href="{{ url_for('all_categories') }}"><i class="fas fa-chevron-right"></i> Categorias</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Coluna 3: Categorias -->
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="footer-section">
+                        <h4 class="footer-title">Categorias</h4>
+                        <ul class="footer-links">
+                            <li><a href="{{ url_for('category', category='BIOS') }}"><i class="fas fa-chevron-right"></i> BIOS</a></li>
+                            <li><a href="{{ url_for('category', category='Drivers') }}"><i class="fas fa-chevron-right"></i> Drivers</a></li>
+                            <li><a href="{{ url_for('category', category='Esquemas') }}"><i class="fas fa-chevron-right"></i> Esquemas</a></li>
+                            <li><a href="{{ url_for('category', category='Softwares') }}"><i class="fas fa-chevron-right"></i> Softwares</a></li>
+                            <li><a href="{{ url_for('category', category='Impressoras') }}"><i class="fas fa-chevron-right"></i> Impressoras</a></li>
+                            <li><a href="{{ url_for('category', category='Cursos') }}"><i class="fas fa-chevron-right"></i> Cursos</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Coluna 4: Ajuda & Suporte -->
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="footer-section">
+                        <h4 class="footer-title">Ajuda & Suporte</h4>
+                        <ul class="footer-links">
+                            <li><a href="{{ url_for('about') }}"><i class="fas fa-chevron-right"></i> Sobre Nós</a></li>
+                            <li><a href="{{ url_for('faq') }}"><i class="fas fa-chevron-right"></i> Perguntas Frequentes (FAQ)</a></li>
+                            <li><a href="{{ url_for('contact') }}"><i class="fas fa-chevron-right"></i> Contato</a></li>
+                            <li><a href="{{ url_for('terms_of_service') }}"><i class="fas fa-chevron-right"></i> Termos de Uso</a></li>
+                            <li><a href="{{ url_for('privacy_policy') }}"><i class="fas fa-chevron-right"></i> Política de Privacidade</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</footer>
+
+<style>
+/* Footer Moderno */
+.modern-footer {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+    margin-top: 0; /* Remove margem superior */
+}
+
+
+
+.footer-content {
+    padding: 2.5rem 0 1.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.footer-section {
+    height: auto;
+    padding-top: 0;
+}
+
+/* Garantir layout horizontal no desktop */
+.footer-content .row {
+    display: grid !important;
+    grid-template-columns: 2fr 1fr 1fr 1fr !important;
+    gap: 2rem;
+    margin: 0;
+    align-items: start;
+}
+
+.footer-content .row > div {
+    display: block !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    flex: none !important;
+}
+
+.footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    margin-top: 0;
+}
+
+.footer-logo i {
+    font-size: 2rem;
+    color: #667eea;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.footer-logo h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.footer-description {
+    color: #b8c5d6;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.footer-title {
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    margin-top: 0;
+    position: relative;
+    padding-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.footer-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 1px;
+}
+
+.footer-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-links li {
+    margin-bottom: 0.6rem;
+}
+
+.footer-links a {
+    color: #b8c5d6;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    padding: 0.3rem 0;
+}
+
+.footer-links a:hover {
+    color: #667eea;
+    transform: translateX(5px);
+}
+
+.footer-links a i {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.footer-links a:hover i {
+    opacity: 1;
+    color: #667eea;
+}
+
+.social-links {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+.social-links a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: #b8c5d6;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.social-links a:hover {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #ffffff;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.contact-info {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    justify-content: center;
+    color: #b8c5d6;
+    font-size: 0.9rem;
+    padding: 0.2rem 0;
+    text-align: center;
+    width: 100%;
+}
+
+.contact-item i {
+    color: #667eea;
+    width: 16px;
+    text-align: center;
+}
+
+/* Email integrado ao footer - sem separação */
+.footer-email-integrated {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: #b8c5d6;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.footer-email-integrated i {
+    color: #667eea;
+    font-size: 1rem;
+}
+
+.footer-email-integrated span {
+    color: #b8c5d6;
+    transition: color 0.3s ease;
+}
+
+.footer-email-integrated:hover span {
+    color: #667eea;
+}
+
+
+
+/* Responsividade - Layout Vertical */
+@media (min-width: 769px) {
+    /* Layout já está definido acima com CSS Grid */
+    .footer-content .row {
+        display: grid !important;
+        grid-template-columns: 2fr 1fr 1fr 1fr !important;
+        gap: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .footer-content {
+        padding: 2rem 0 1.5rem;
+    }
+
+    .footer-content .row {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1.5rem;
+    }
+
+    .col-lg-4, .col-lg-2, .col-lg-3, .col-md-6 {
+        flex: none;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .footer-section {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .footer-logo {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .footer-title {
+        text-align: center;
+    }
+
+    .footer-title::after {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .footer-links {
+        text-align: center;
+    }
+
+    .footer-email-integrated {
+        font-size: 0.85rem;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+
+    .footer-email-integrated i {
+        font-size: 1rem;
+    }
+
+    .footer-links a {
+        justify-content: center;
+    }
+
+    .social-links {
+        justify-content: center;
+    }
+
+    .contact-info {
+        text-align: center;
+    }
+
+    .contact-item {
+        justify-content: center;
+    }
+}@media (max-width: 576px) {
+    .footer-logo h3 {
+        font-size: 1.3rem;
+    }
+
+    .footer-description {
+        font-size: 0.9rem;
+    }
+
+    .social-links a {
+        width: 35px;
+        height: 35px;
+    }
+}
+</style>

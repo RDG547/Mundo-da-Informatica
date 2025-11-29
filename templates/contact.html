@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="contact-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content text-center">
+            <div class="hero-icon animate-bounce">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <h1 class="hero-title animate-fade-up">Entre em Contato</h1>
+            <p class="hero-subtitle animate-fade-up-delayed">Estamos sempre prontos para ajudá-lo! Entre em contato conosco através dos canais disponíveis</p>
+        </div>
+    </div>
+</div>
+
+<!-- Contact Section -->
+<div class="contact-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+
+                <!-- Contact Methods Grid -->
+                <div class="contact-methods-grid">
+                    <h2 class="section-title text-center">
+                        <i class="fas fa-handshake"></i>
+                        Como Podemos Ajudá-lo?
+                    </h2>
+                    <p class="section-subtitle text-center">Escolha a forma mais conveniente para entrar em contato conosco</p>
+
+                    <div class="methods-container">
+                        <div class="contact-method-card">
+                            <div class="method-icon email-icon">
+                                <i class="fas fa-envelope"></i>
+                            </div>
+                            <div class="method-content">
+                                <h3>Email Suporte</h3>
+                                <p>Para dúvidas técnicas, solicitações e suporte geral</p>
+                                <div class="method-info">
+                                    <span class="contact-detail">suporte@mundodainformatica.com</span>
+                                    <div class="response-time">
+                                        <i class="fas fa-clock"></i>
+                                        <span>Resposta rápida</span>
+                                    </div>
+                                </div>
+                                <a href="mailto:suporte@mundodainformatica.com" class="method-action">
+                                    <i class="fas fa-paper-plane"></i> Enviar Email
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="contact-method-card">
+                            <div class="method-icon phone-icon">
+                                <i class="fab fa-whatsapp"></i>
+                            </div>
+                            <div class="method-content">
+                                <h3>WhatsApp</h3>
+                                <p>Para suporte técnico imediato e orientação direta com nossa equipe</p>
+                                <div class="method-info">
+                                    <span class="contact-detail">(21) 97879-4705</span>
+                                    <div class="availability">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        <span>Seg-Sex: 9h às 18h</span>
+                                    </div>
+                                </div>
+                                <a href="https://wa.me/5521978794705" target="_blank" class="method-action">
+                                    <i class="fab fa-whatsapp"></i> Enviar Mensagem
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="contact-method-card">
+                            <div class="method-icon location-icon">
+                                <i class="fas fa-globe-americas"></i>
+                            </div>
+                            <div class="method-content">
+                                <h3>Nossa Localização</h3>
+                                <p>Atendemos todo território nacional via internet</p>
+                                <div class="method-info">
+                                    <span class="contact-detail">Internet - Brasil, BR</span>
+                                    <div class="coverage">
+                                        <i class="fas fa-map-marked-alt"></i>
+                                        <span>Cobertura Nacional</span>
+                                    </div>
+                                </div>
+                                <button class="method-action" onclick="showCoverageMap()">
+                                    <i class="fas fa-map"></i> Ver Cobertura
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Form Section -->
+                <div class="contact-form-section">
+                    <div class="form-header text-center">
+                        <h2>
+                            <i class="fas fa-comments"></i>
+                            Formulário de Contato
+                        </h2>
+                        <p class="text-center">Preencha o formulário abaixo e entraremos em contato o mais breve possível</p>
+                    </div>
+
+                    <div class="form-container">
+                        <div class="form-wrapper">
+                            <form id="contact-form" class="contact-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="name">
+                                            <i class="fas fa-user"></i>
+                                            Nome Completo
+                                        </label>
+                                        <input type="text" id="name" name="name" placeholder="Digite seu nome completo" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="email">
+                                            <i class="fas fa-envelope"></i>
+                                            Email
+                                        </label>
+                                        <input type="email" id="email" name="email" placeholder="seu.email@exemplo.com" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="phone">
+                                            <i class="fas fa-phone"></i>
+                                            Telefone (Opcional)
+                                        </label>
+                                        <input type="tel" id="phone" name="phone" placeholder="(00) 00000-0000">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="category">
+                                            <i class="fas fa-tags"></i>
+                                            Categoria
+                                        </label>
+                                        <select id="category" name="category" required>
+                                            <option value="">Selecione uma categoria</option>
+                                            <option value="suporte">Suporte Técnico</option>
+                                            <option value="solicitacao">Solicitação de Recurso</option>
+                                            <option value="problema">Reportar Problema</option>
+                                            <option value="sugestao">Sugestão</option>
+                                            <option value="parcerias">Parcerias</option>
+                                            <option value="outros">Outros</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="subject">
+                                        <i class="fas fa-heading"></i>
+                                        Assunto
+                                    </label>
+                                    <input type="text" id="subject" name="subject" placeholder="Resuma brevemente o que precisa" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="message">
+                                        <i class="fas fa-comment-alt"></i>
+                                        Mensagem
+                                    </label>
+                                    <textarea id="message" name="message" rows="6" placeholder="Descreva detalhadamente sua solicitação, problema ou dúvida..." required></textarea>
+                                    <div class="char-counter">
+                                        <span id="char-count">0</span>/1000 caracteres
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="reset" class="btn btn-gradient primary">
+                                        <i class="fas fa-eraser"></i> Limpar
+                                    </button>
+                                    <button type="submit" class="btn btn-gradient primary">
+                                        <i class="fas fa-paper-plane"></i> Enviar Mensagem
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="form-info">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <h4>Seus dados estão seguros</h4>
+                                <p>Todas as informações enviadas são criptografadas e tratadas com total confidencialidade.</p>
+                            </div>
+
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h4>Resposta rápida</h4>
+                                <p>Nossa equipe responde rapidamente durante o horário comercial.</p>
+                            </div>
+
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-headset"></i>
+                                </div>
+                                <h4>Suporte especializado</h4>
+                                <p>Profissionais qualificados prontos para resolver suas dúvidas técnicas.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Social Media Section -->
+                <div class="social-section">
+                    <div class="social-header text-center">
+                        <h2>
+                            <i class="fas fa-share-alt"></i>
+                            Siga-nos nas Redes Sociais
+                        </h2>
+                        <p>Acompanhe nossas novidades e receba dicas exclusivas</p>
+                    </div>
+
+                    <div class="social-platforms">
+                        <a href="#" class="social-platform facebook">
+                            <div class="platform-icon">
+                                <i class="fab fa-facebook-f"></i>
+                            </div>
+                            <div class="platform-info">
+                                <h4>Facebook</h4>
+                                <p>Novidades e discussões</p>
+                                <span class="follow-count">1.2K seguidores</span>
+                            </div>
+                            <div class="platform-action">
+                                <i class="fas fa-external-link-alt"></i>
+                            </div>
+                        </a>
+
+                        <a href="#" class="social-platform instagram">
+                            <div class="platform-icon">
+                                <i class="fab fa-instagram"></i>
+                            </div>
+                            <div class="platform-info">
+                                <h4>Instagram</h4>
+                                <p>Conteúdo visual e stories</p>
+                                <span class="follow-count">856 seguidores</span>
+                            </div>
+                            <div class="platform-action">
+                                <i class="fas fa-external-link-alt"></i>
+                            </div>
+                        </a>
+
+                        <a href="#" class="social-platform youtube">
+                            <div class="platform-icon">
+                                <i class="fab fa-youtube"></i>
+                            </div>
+                            <div class="platform-info">
+                                <h4>YouTube</h4>
+                                <p>Tutoriais e vídeos técnicos</p>
+                                <span class="follow-count">2.1K inscritos</span>
+                            </div>
+                            <div class="platform-action">
+                                <i class="fas fa-external-link-alt"></i>
+                            </div>
+                        </a>
+
+                        <a href="#" class="social-platform twitter">
+                            <div class="platform-icon">
+                                <i class="fab fa-twitter"></i>
+                            </div>
+                            <div class="platform-info">
+                                <h4>Twitter</h4>
+                                <p>Atualizações rápidas</p>
+                                <span class="follow-count">743 seguidores</span>
+                            </div>
+                            <div class="platform-action">
+                                <i class="fas fa-external-link-alt"></i>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- FAQ Quick Links -->
+                <div class="quick-help-section">
+                    <div class="help-header text-center">
+                        <h2>
+                            <i class="fas fa-lightbulb"></i>
+                            Precisa de Ajuda Rápida?
+                        </h2>
+                        <p>Confira nossa página de perguntas frequentes antes de entrar em contato</p>
+                    </div>
+
+                    <div class="quick-links">
+                        <a href="{{ url_for('faq') }}" class="quick-link-card">
+                            <div class="link-icon">
+                                <i class="fas fa-question-circle"></i>
+                            </div>
+                            <div class="link-content">
+                                <h4>Perguntas Frequentes</h4>
+                                <p>Respostas para dúvidas comuns</p>
+                            </div>
+                            <div class="link-arrow">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                        </a>
+
+                        <a href="{{ url_for('faq') }}#downloads" class="quick-link-card">
+                            <div class="link-icon">
+                                <i class="fas fa-download"></i>
+                            </div>
+                            <div class="link-content">
+                                <h4>Problemas com Downloads</h4>
+                                <p>Soluções para downloads</p>
+                            </div>
+                            <div class="link-arrow">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                        </a>
+
+                        <a href="{{ url_for('faq') }}#account" class="quick-link-card">
+                            <div class="link-icon">
+                                <i class="fas fa-user-cog"></i>
+                            </div>
+                            <div class="link-content">
+                                <h4>Gerenciar Conta</h4>
+                                <p>Dúvidas sobre cadastro e perfil</p>
+                            </div>
+                            <div class="link-arrow">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- CTA Section -->
+                <div class="contact-cta">
+                    <div class="cta-content">
+                        <div class="cta-background-pattern"></div>
+                        <div class="cta-icon pulse-animation">
+                            <i class="fas fa-heart"></i>
+                        </div>
+                        <h4>Agradecemos seu contato!</h4>
+                        <p>Sua opinião e feedback são muito importantes para nós. Juntos, tornamos o Mundo da Informática ainda melhor!</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

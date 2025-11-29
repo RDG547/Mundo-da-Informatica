@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="category-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content text-center">
+            <div class="hero-icon animate-bounce">
+                <i class="fas fa-folder-open"></i>
+            </div>
+            <h1 class="hero-title animate-fade-up">Todas as Categorias</h1>
+            <p class="hero-subtitle animate-fade-up-delayed">Explore nosso acervo completo organizado por categorias e subcategorias para facilitar sua busca.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Category Info Section -->
+<div class="category-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+
+                <!-- Category Description -->
+                <div class="category-info">
+                    <div class="info-header text-center">
+                        <h2>
+                            <i class="fas fa-info-circle"></i>
+                            Nossas Categorias
+                        </h2>
+                    </div>
+
+                    <div class="category-description">
+                        <p>Organizamos todo nosso conteúdo em categorias especializadas para facilitar sua busca. Cada categoria contém recursos cuidadosamente selecionados e verificados por nossa equipe técnica.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="verified" style="cursor: pointer;">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Verificado</span>
+                            </div>
+                            <div class="feature-item" data-feature="updated" style="cursor: pointer;">
+                                <i class="fas fa-rocket"></i>
+                                <span>Atualizado</span>
+                            </div>
+                            <div class="feature-item" data-feature="professional" style="cursor: pointer;">
+                                <i class="fas fa-users"></i>
+                                <span>Profissional</span>
+                            </div>
+                            <div class="feature-item" data-feature="support" style="cursor: pointer;">
+                                <i class="fas fa-headset"></i>
+                                <span>Suporte</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Posts Grid -->
+                <div class="posts-section">
+                    <div class="posts-header text-center">
+                        <h2>
+                            <i class="fas fa-list"></i>
+                            Categorias Disponíveis
+                        </h2>
+                        <p class="text-center">Encontradas <strong>{{ categories|length if categories else 0 }}</strong> categorias organizadas</p>
+                    </div>
+
+                    <!-- Category Search -->
+                    <div class="category-search-container">
+                        <div class="search-wrapper">
+                            <form action="{{ url_for('search') }}" method="GET" class="category-search-form">
+                                <div class="search-input-wrapper">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <input type="text"
+                                           name="q"
+                                           class="category-search-input"
+                                           placeholder="Pesquisar em todas as categorias..."
+                                           autocomplete="off">
+                                    <div class="search-suggestions-dropdown" style="display: none;"></div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {% if categories %}
+                    <div class="categories-grid">
+                        {% for category in categories %}
+                        <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
+                            <div class="category-icon-container">
+                                <div class="category-icon-wrapper">
+                                    <i class="{{ category.icon if category.icon else 'fas fa-folder' }} category-icon"></i>
+                                </div>
+                            </div>
+                            <div class="category-showcase-content">
+                                <h3>{{ category.name }}</h3>
+                                <p>{{ category.description if category.description else 'Explore conteúdos nesta categoria' }}</p>
+                                <a href="{{ url_for('category', category=category.name) }}" class="explore-btn">
+                                    Explorar <i class="fas fa-arrow-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="no-results">
+                        <div class="no-results-icon">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <h3>Nenhuma categoria encontrada</h3>
+                        <p>Ainda não há categorias disponíveis no momento. Novos conteúdos são adicionados regularmente.</p>
+                        <a href="{{ url_for('home') }}" class="btn btn-gradient primary">
+                            <i class="fas fa-home"></i> Voltar ao Início
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- CTA Section -->
+                <div class="category-cta">
+                    <div class="cta-content">
+                        <div class="cta-icon pulse-animation">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h4>Não encontrou o que procura?</h4>
+                        <p>Use nossa busca avançada para encontrar recursos específicos em todas as categorias disponíveis. Se não encontrar o que precisa, entre em contato conosco para solicitar conteúdo específico. Nossa equipe está sempre trabalhando para adicionar novos recursos!</p>
+                        <div class="cta-buttons">
+                            <button type="button" class="btn btn-gradient primary" id="toggleSearchBtn" onclick="toggleInlineSearch()">
+                                <i class="fas fa-search"></i> Fazer uma Busca
+                            </button>
+                            <a href="{{ url_for('contact') }}" class="btn btn-gradient secondary">
+                                <i class="fas fa-envelope"></i> Solicitar Conteúdo
+                            </a>
+                        </div>
+                        <form action="{{ url_for('search') }}" method="get" class="inline-search-form" id="inlineSearchForm" style="display: none; margin-top: 1.5rem;">
+                            <div class="search-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                <input type="text" name="q" placeholder="Digite sua busca..." autocomplete="off" id="inlineSearchInput" required style="padding: 1rem 150px 1rem 1.5rem; border: 2px solid #ddd; border-radius: 50px; width: 100%; font-size: 1rem; outline: none; transition: all 0.3s;">
+                                <button type="submit" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleInlineSearch() {
+    const form = document.getElementById('inlineSearchForm');
+    const btn = document.getElementById('toggleSearchBtn');
+    const input = document.getElementById('inlineSearchInput');
+
+    if (form.style.display === 'none') {
+        form.style.display = 'block';
+        btn.innerHTML = '<i class="fas fa-times"></i> Fechar Busca';
+        btn.classList.remove('primary');
+        btn.classList.add('secondary');
+        setTimeout(() => input.focus(), 100);
+    } else {
+        form.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-search"></i> Fazer uma Busca';
+        btn.classList.remove('secondary');
+        btn.classList.add('primary');
+    }
+}
+
+// Adicionar efeito hover no input
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('inlineSearchInput');
+    if (input) {
+        input.addEventListener('focus', function() {
+            this.style.borderColor = '#667eea';
+            this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+        });
+        input.addEventListener('blur', function() {
+            this.style.borderColor = '#ddd';
+            this.style.boxShadow = 'none';
+        });
+    }
+});
+</script>
+
+<!-- Modais de Informações das Features -->
+<div id="feature-modal" class="feature-modal">
+    <div class="feature-modal-content">
+        <span class="feature-modal-close">&times;</span>
+        <div class="feature-modal-header">
+            <i class="feature-modal-icon"></i>
+            <h2 class="feature-modal-title"></h2>
+        </div>
+        <div class="feature-modal-body">
+            <p class="feature-modal-text"></p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Script de pesquisa dinâmica para categorias -->
+<script src="{{ url_for('static', filename='js/categories-search.js') }}"></script>
+{% endblock %}

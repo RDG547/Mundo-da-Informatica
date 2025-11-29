@@ -1,0 +1,39 @@
+<!-- ... código existente ... -->
+{% if current_user.is_authenticated %}
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <div class="user-avatar profile-img">
+            <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="{{ current_user.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="profile-placeholder" style="display: none;">
+                {% if current_user.name %}
+                    {% set name_parts = current_user.name.split() %}
+                    {% if name_parts|length >= 2 %}
+                        {{ name_parts[0][0]|upper }}{{ name_parts[-1][0]|upper }}
+                    {% else %}
+                        {{ current_user.name[0]|upper }}
+                    {% endif %}
+                {% else %}
+                    MI
+                {% endif %}
+            </div>
+        </div>
+        <span class="ml-2">{{ current_user.name }}</span>
+    </a>
+    <div class="dropdown-menu" aria-labelledby="userDropdown">
+        <a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Perfil</a>
+        {% if current_user.is_admin %}
+        <a class="dropdown-item" href="{{ url_for('admin.dashboard') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        {% endif %}
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Sair</a>
+    </div>
+</li>
+{% else %}
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('register') }}">Cadastro</a>
+</li>
+{% endif %}
+<!-- ... código existente ... -->

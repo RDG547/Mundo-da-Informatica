@@ -1,0 +1,441 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>{{ title }}</h1>
+</div>
+
+<div class="admin-content-wrapper">
+    <!-- Card de Perfil Principal -->
+    <div class="profile-header-card">
+        <div class="profile-cover-image">
+            <div class="profile-cover-overlay"></div>
+        </div>
+
+        <div class="profile-image-container">
+            <div class="admin-profile-img large-profile-img">
+                <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="{{ current_user.name }}" onerror="this.classList.add('error')">
+                <div class="profile-placeholder">
+                    {% if current_user.name %}
+                        {% set name_parts = current_user.name.split() %}
+                        {% if name_parts|length >= 2 %}
+                            {{ name_parts[0][0]|upper }}{{ name_parts[-1][0]|upper }}
+                        {% else %}
+                            {{ current_user.name[0]|upper }}
+                        {% endif %}
+                    {% else %}
+                        U
+                    {% endif %}
+                </div>
+
+                <!-- Overlay de hover para a imagem -->
+                <div class="profile-image-hover">
+                    <div class="profile-image-actions">
+                        <button type="button" class="btn-profile-action" id="trigger-upload">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                        {% if current_user.profile_image %}
+                        <button type="button" class="btn-profile-action" id="view-image">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button type="button" class="btn-profile-action danger" id="remove-image">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulário de upload com feedback visual -->
+            <div class="profile-upload-container">
+                <form id="profile-image-form" action="{{ url_for('admin_update_profile_image') }}" method="post" enctype="multipart/form-data" class="profile-upload-form">
+                    <input type="file" id="profile-image-input" name="profile_image" accept="image/jpeg,image/png,image/gif" style="display: none;">
+
+                    <div class="upload-progress-container">
+                        <div class="upload-progress-bar"></div>
+                        <div class="upload-progress-text">0%</div>
+                    </div>
+                </form>
+
+                <div class="upload-feedback">
+                    <div class="upload-status">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Enviando imagem...</span>
+                    </div>
+                    <div class="upload-details">
+                        <small class="filename"></small>
+                        <small class="filesize"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-user-info">
+            <h2>{{ current_user.name or current_user.get_full_name() or current_user.username }}</h2>
+            <p class="profile-role">{{ current_user.role }}</p>
+
+            <div class="profile-stats">
+                <div class="profile-stat-item">
+                    <span class="stat-number">{{ post_count }}</span>
+                    <span class="stat-label">Posts</span>
+                </div>
+                <div class="profile-stat-item">
+                    <span class="stat-number">{{ category_count }}</span>
+                    <span class="stat-label">Categorias</span>
+                </div>
+                <div class="profile-stat-item">
+                    <span class="stat-number">{{ unread_comments }}</span>
+                    <span class="stat-label">Comentários</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações Detalhadas do Perfil -->
+    <div class="admin-card mb-3">
+        <div class="admin-card-header">
+            <h3 class="admin-card-title">Detalhes do Perfil</h3>
+        </div>
+        <div class="admin-card-body">
+            <form action="{{ url_for('admin_update_profile') }}" method="post">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="name">Nome Completo</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ current_user.name }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="username">Nome de Usuário</label>
+                            <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="role">Cargo</label>
+                            <input type="text" class="form-control" id="role" name="role" value="{{ current_user.role }}" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <div class="form-group">
+                            <label for="bio">Biografia</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="4">{{ current_user.bio }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-admin btn-admin-primary">
+                        <i class="fas fa-save"></i> Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Segurança -->
+    <div class="admin-card mb-3">
+        <div class="admin-card-header">
+            <h3 class="admin-card-title">Segurança</h3>
+        </div>
+        <div class="admin-card-body">
+            <form action="{{ url_for('update_password') }}" method="post">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="current_password">Senha Atual</label>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="new_password">Nova Senha</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="confirm_password">Confirmar Nova Senha</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-admin btn-admin-primary">
+                        <i class="fas fa-lock"></i> Atualizar Senha
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preferências -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h3 class="admin-card-title">Preferências</h3>
+        </div>
+        <div class="admin-card-body">
+            <form action="{{ url_for('admin_update_preferences') }}" method="post">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="language">Idioma do Sistema</label>
+                            <select class="form-select" id="language" name="language">
+                                <option value="pt-br" selected>Português (Brasil)</option>
+                                <option value="en">English</option>
+                                <option value="es">Español</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label for="timezone">Fuso Horário</label>
+                            <select class="form-select" id="timezone" name="timezone">
+                                <option value="America/Sao_Paulo" selected>Brasília (GMT-3)</option>
+                                <option value="America/New_York">New York (GMT-4)</option>
+                                <option value="Europe/London">London (GMT+1)</option>
+                                <option value="Europe/Lisbon">Lisboa (GMT+0)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label class="d-block mb-2">Notificações</label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="email_notifications" name="email_notifications" checked>
+                                <label class="form-check-label" for="email_notifications">
+                                    Receber notificações por email
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="browser_notifications" name="browser_notifications" checked>
+                                <label class="form-check-label" for="browser_notifications">
+                                    Permitir notificações no navegador
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-admin btn-admin-primary">
+                        <i class="fas fa-cog"></i> Salvar Preferências
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para visualização de imagem -->
+<div class="modal" id="imagePreviewModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Imagem de Perfil</h3>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body text-center">
+            <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="{{ current_user.name }}" class="preview-image">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação para remover imagem -->
+<div class="modal" id="removeImageModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Remover Imagem</h3>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja remover sua imagem de perfil?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+            <form action="{{ url_for('admin_remove_profile_image') }}" method="post">
+                <button type="submit" class="btn-admin btn-admin-danger">Remover</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Elementos da página
+        const fileInput = document.getElementById('profile-image-input');
+        const form = document.getElementById('profile-image-form');
+        const profileImg = document.querySelector('.admin-profile-img img');
+        const progressBar = document.querySelector('.upload-progress-bar');
+        const progressText = document.querySelector('.upload-progress-text');
+        const uploadFeedback = document.querySelector('.upload-feedback');
+        const filename = document.querySelector('.upload-details .filename');
+        const filesize = document.querySelector('.upload-details .filesize');
+        const profileContainer = document.querySelector('.profile-image-container');
+
+        // Gatilhos para os modais e ações
+        const triggerUpload = document.getElementById('trigger-upload');
+        const viewImage = document.getElementById('view-image');
+        const removeImage = document.getElementById('remove-image');
+        const imageModal = document.getElementById('imagePreviewModal');
+        const removeModal = document.getElementById('removeImageModal');
+        const closeButtons = document.querySelectorAll('.close-modal, [data-dismiss="modal"]');
+
+        // Abre o seletor de arquivo quando clicar no botão de upload
+        if (triggerUpload) {
+            triggerUpload.addEventListener('click', function() {
+                fileInput.click();
+            });
+        }
+
+        // Abre o modal de visualização da imagem
+        if (viewImage) {
+            viewImage.addEventListener('click', function() {
+                imageModal.classList.add('show');
+                document.body.classList.add('modal-open');
+            });
+        }
+
+        // Abre o modal de confirmação para remover a imagem
+        if (removeImage) {
+            removeImage.addEventListener('click', function() {
+                removeModal.classList.add('show');
+                document.body.classList.add('modal-open');
+            });
+        }
+
+        // Fecha os modais
+        closeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const modal = this.closest('.modal');
+                modal.classList.remove('show');
+                document.body.classList.remove('modal-open');
+            });
+        });
+
+        // Fechar modal ao clicar fora
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+                document.body.classList.remove('modal-open');
+            }
+        });
+
+        // Upload de imagem
+        if (fileInput && form) {
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const file = this.files[0];
+
+                    // Verificar tipo e tamanho
+                    if (!file.type.match('image/(jpeg|png|gif)')) {
+                        showNotification('Tipo de arquivo inválido. Use JPG, PNG ou GIF.', 'error');
+                        return;
+                    }
+
+                    if (file.size > 5242880) { // 5MB
+                        showNotification('Imagem muito grande. Máximo 5MB permitido.', 'error');
+                        return;
+                    }
+
+                    // Mostrar informações do arquivo
+                    filename.textContent = file.name;
+                    filesize.textContent = formatFileSize(file.size);
+
+                    // Iniciar animação de upload
+                    profileContainer.classList.add('uploading');
+                    uploadFeedback.style.display = 'block';
+
+                    // Simular progresso (em um caso real, usaria o XMLHttpRequest para acompanhar o progresso)
+                    let progress = 0;
+                    const interval = setInterval(function() {
+                        progress += 5;
+                        updateProgress(progress);
+
+                        if (progress >= 100) {
+                            clearInterval(interval);
+                            setTimeout(function() {
+                                form.submit();
+                            }, 500);
+                        }
+                    }, 100);
+
+                    // Preview da imagem selecionada
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        profileImg.src = e.target.result;
+                        profileImg.classList.remove('error');
+                    }
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Função para atualizar barra de progresso
+        function updateProgress(percent) {
+            progressBar.style.width = percent + '%';
+            progressText.textContent = percent + '%';
+        }
+
+        // Formatar tamanho do arquivo
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            else return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        // Mostrar notificações
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = 'notification ' + type;
+
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <div>
+                        <p>${message}</p>
+                    </div>
+                </div>
+                <button class="notification-close">×</button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Animar entrada
+            setTimeout(() => notification.classList.add('show'), 10);
+
+            // Configurar fechamento
+            const closeBtn = notification.querySelector('.notification-close');
+            closeBtn.addEventListener('click', () => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            });
+
+            // Auto-fechar após 5 segundos
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, 5000);
+        }
+    });
+</script>
+{% endblock %}

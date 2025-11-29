@@ -1,0 +1,505 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<!-- Loading Overlay for First Load -->
+<style>
+    .dashboard-loading {
+        opacity: 0;
+        transition: opacity 0.3s ease-in;
+    }
+    .dashboard-loaded {
+        opacity: 1;
+    }
+    /* Prevent FOUC for charts */
+    .chart-card canvas {
+        min-height: 250px;
+    }
+</style>
+
+<div class="dashboard-content dashboard-loading" id="dashboardContent">
+<div class="admin-header slide-in-up">
+    <div class="header-content">
+        <div class="header-left">
+            <h1>Painel de Controle</h1>
+            <p class="header-subtitle">Bem-vindo ao centro de administração</p>
+        </div>
+        <div class="header-right">
+            <div class="date-time">
+                <span id="currentDate"></span>
+                <span id="currentTime"></span>
+            </div>
+            <div class="header-actions">
+                <button class="btn-admin btn-admin-primary" data-modal="addPostModal">
+                    <i class="fas fa-plus"></i> Novo Post
+                </button>
+                <button class="btn-admin btn-admin-secondary" onclick="location.reload()">
+                    <i class="fas fa-sync-alt"></i> Atualizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions Bar -->
+<div class="quick-actions slide-in-up" style="animation-delay: 0.1s">
+    <div class="action-card" onclick="window.location.href='{{ url_for('admin_posts') }}'">
+        <i class="fas fa-file-alt"></i>
+        <span>Gerenciar Posts</span>
+    </div>
+    <div class="action-card" onclick="window.location.href='{{ url_for('admin_categories') }}'">
+        <i class="fas fa-folder"></i>
+        <span>Categorias</span>
+    </div>
+    <div class="action-card" onclick="window.location.href='{{ url_for('admin_users') }}'">
+        <i class="fas fa-users"></i>
+        <span>Usuários</span>
+    </div>
+    <div class="action-card" onclick="window.location.href='{{ url_for('admin_newsletter') }}'">
+        <i class="fas fa-envelope"></i>
+        <span>Newsletter</span>
+    </div>
+    <div class="action-card" onclick="window.location.href='{{ url_for('admin_analytics') }}'">
+        <i class="fas fa-chart-line"></i>
+        <span>Analytics</span>
+    </div>
+    <div class="action-card" onclick="window.location.href='{{ url_for('admin_settings') }}'">
+        <i class="fas fa-cog"></i>
+        <span>Configurações</span>
+    </div>
+</div>
+
+<!-- Enhanced Stats Grid -->
+<div class="stats-grid enhanced">
+    <div class="stat-card posts slide-in-up" style="animation-delay: 0.2s">
+        <div class="stat-header">
+            <div class="stat-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-trend {% if stats.posts_trend > 0 %}positive{% elif stats.posts_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if stats.posts_trend > 0 %}up{% elif stats.posts_trend < 0 %}down{% else %}right{% endif %}"></i>
+                <span>{% if stats.posts_trend > 0 %}+{% endif %}{{ stats.posts_trend }}%</span>
+            </div>
+        </div>
+        <div class="stat-info">
+            <h3 class="stat-number">{{ stats.posts }}</h3>
+            <p class="stat-label">Posts Publicados</p>
+            <div class="stat-details">
+                <span class="detail-item">
+                    <i class="fas fa-star"></i>
+                    {{ stats.featured_posts or 0 }} em destaque
+                </span>
+                <span class="detail-item">
+                    <i class="fas fa-eye"></i>
+                    {{ stats.total_views or 0 }} visualizações
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card categories slide-in-up" style="animation-delay: 0.3s">
+        <div class="stat-header">
+            <div class="stat-icon">
+                <i class="fas fa-folder"></i>
+            </div>
+            <div class="stat-trend {% if stats.categories_trend > 0 %}positive{% elif stats.categories_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if stats.categories_trend > 0 %}up{% elif stats.categories_trend < 0 %}down{% else %}right{% endif %}"></i>
+                <span>{% if stats.categories_trend > 0 %}+{% endif %}{{ stats.categories_trend }}%</span>
+            </div>
+        </div>
+        <div class="stat-info">
+            <h3 class="stat-number">{{ stats.categories }}</h3>
+            <p class="stat-label">Categorias Ativas</p>
+            <div class="stat-details">
+                <span class="detail-item">
+                    <i class="fas fa-chart-bar"></i>
+                    {{ stats.avg_posts_per_category or 0 }} posts/categoria
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card users slide-in-up" style="animation-delay: 0.4s">
+        <div class="stat-header">
+            <div class="stat-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-trend {% if stats.users_trend > 0 %}positive{% elif stats.users_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if stats.users_trend > 0 %}up{% elif stats.users_trend < 0 %}down{% else %}right{% endif %}"></i>
+                <span>{% if stats.users_trend > 0 %}+{% endif %}{{ stats.users_trend }}%</span>
+            </div>
+        </div>
+        <div class="stat-info">
+            <h3 class="stat-number">{{ stats.users }}</h3>
+            <p class="stat-label">Usuários Registrados</p>
+            <div class="stat-details">
+                <span class="detail-item">
+                    <i class="fas fa-user-shield"></i>
+                    {{ stats.admin_users or 0 }} admins
+                </span>
+                <span class="detail-item">
+                    <i class="fas fa-calendar-day"></i>
+                    {{ stats.new_users_today or 0 }} hoje
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card subscribers slide-in-up" style="animation-delay: 0.5s">
+        <div class="stat-header">
+            <div class="stat-icon">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <div class="stat-trend {% if stats.subscribers_trend > 0 %}positive{% elif stats.subscribers_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if stats.subscribers_trend > 0 %}up{% elif stats.subscribers_trend < 0 %}down{% else %}right{% endif %}"></i>
+                <span>{% if stats.subscribers_trend > 0 %}+{% endif %}{{ stats.subscribers_trend }}%</span>
+            </div>
+        </div>
+        <div class="stat-info">
+            <h3 class="stat-number">{{ stats.subscribers }}</h3>
+            <p class="stat-label">Newsletter</p>
+            <div class="stat-details">
+                <span class="detail-item">
+                    <i class="fas fa-paper-plane"></i>
+                    {{ stats.campaigns_sent or 0 }} campanhas enviadas
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card downloads slide-in-up" style="animation-delay: 0.6s">
+        <div class="stat-header">
+            <div class="stat-icon">
+                <i class="fas fa-download"></i>
+            </div>
+            <div class="stat-trend {% if stats.downloads_trend > 0 %}positive{% elif stats.downloads_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if stats.downloads_trend > 0 %}up{% elif stats.downloads_trend < 0 %}down{% else %}right{% endif %}"></i>
+                <span>{% if stats.downloads_trend > 0 %}+{% endif %}{{ stats.downloads_trend }}%</span>
+            </div>
+        </div>
+        <div class="stat-info">
+            <h3 class="stat-number">{{ stats.total_downloads or 0 }}</h3>
+            <p class="stat-label">Downloads Totais</p>
+            <div class="stat-details">
+                <span class="detail-item">
+                    <i class="fas fa-calendar-day"></i>
+                    {{ stats.downloads_today or 0 }} hoje
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card traffic slide-in-up" style="animation-delay: 0.7s">
+        <div class="stat-header">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-trend {% if stats.views_trend > 0 %}positive{% elif stats.views_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if stats.views_trend > 0 %}up{% elif stats.views_trend < 0 %}down{% else %}right{% endif %}"></i>
+                <span>{% if stats.views_trend > 0 %}+{% endif %}{{ stats.views_trend }}%</span>
+            </div>
+        </div>
+        <div class="stat-info">
+            <h3 class="stat-number">{{ stats.page_views or 0 }}</h3>
+            <p class="stat-label">Visualizações</p>
+            <div class="stat-details">
+                <span class="detail-item">
+                    <i class="fas fa-users"></i>
+                    {{ stats.unique_visitors or 0 }} visitantes únicos
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="charts-section slide-in-up" style="animation-delay: 0.8s">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Visualizações dos últimos 7 dias</h3>
+            <div class="chart-controls">
+                <button class="chart-btn active" data-period="7">7 dias</button>
+                <button class="chart-btn" data-period="30">30 dias</button>
+                <button class="chart-btn" data-period="90">3 meses</button>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="viewsChart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Downloads por Categoria</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="downloadsChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="admin-card slide-in-up" style="animation-delay: 0.9s">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Posts Recentes</h2>
+        <a href="{{ url_for('admin_posts') }}" class="btn-admin btn-admin-outline">
+            Ver Todos <i class="fas fa-arrow-right"></i>
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Título</th>
+                    <th>Categoria</th>
+                    <th>Data</th>
+                    <th>Visualizações</th>
+                    <th>Downloads</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in recent_posts %}
+                <tr>
+                    <td>{{ post.title }}</td>
+                    <td>{{ post.category_str or post.category_rel.name if post.category_rel else 'N/A' }}</td>
+                    <td>{{ post.date_posted.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ post.views }}</td>
+                    <td>{{ post.downloads }}</td>
+                    <td>
+                        {% if post.featured %}
+                        <span class="status-badge status-featured">Destaque</span>
+                        {% elif post.is_active %}
+                        <span class="status-badge status-active">Ativo</span>
+                        {% else %}
+                        <span class="status-badge status-inactive">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions">
+                        <form style="display: inline-block;" action="/admin/posts/{{ post.id }}/toggle-featured" method="post">
+                            <button type="submit" class="btn-action btn-star" title="{{ 'Remover destaque' if post.featured else 'Destacar' }}">
+                                <i class="fas fa-star{{ '' if post.featured else '-o' }}"></i>
+                            </button>
+                        </form>
+                        <form style="display: inline-block;" action="/admin/posts/{{ post.id }}/delete" method="post" onsubmit="return confirm('Tem certeza que deseja excluir este post?')">
+                            <button type="submit" class="btn-action btn-delete" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="admin-card slide-in-up" style="animation-delay: 0.6s">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Atividade Recente</h2>
+    </div>
+
+    <div class="timeline">
+        {% if recent_activities %}
+            {% for activity in recent_activities %}
+            <div class="timeline-item">
+                <div class="timeline-icon {{ activity.bg_class }}">
+                    <i class="{{ activity.icon }}"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>{{ activity.title }}</h4>
+                    <p>{{ activity.description }}</p>
+                    <span class="timeline-date">{{ activity.date.strftime('%d/%m/%Y às %H:%M') }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="timeline-item">
+                <div class="timeline-icon bg-secondary">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>Nenhuma atividade recente</h4>
+                    <p>Quando houver atividades no site, elas aparecerão aqui</p>
+                    <span class="timeline-date">Agora</span>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+</div><!-- Fecha dashboard-content -->
+
+<!-- Modal de Novo Post (mesmo usado na página de Posts) -->
+{% include 'admin/components/modal_post.html' %}
+{% endblock %}
+
+{% block scripts %}
+<!-- Post Wizard Script -->
+<script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
+
+<script>
+    // Aguardar carregamento completo da página
+    window.addEventListener('load', function() {
+        console.log('Dashboard: Página completamente carregada');
+        initializeDashboard();
+    });
+
+    function initializeDashboard() {
+        console.log('Inicializando dashboard...');
+
+        // Marcar dashboard como carregado
+        const dashboardContent = document.getElementById('dashboardContent');
+        if (dashboardContent) {
+            dashboardContent.classList.remove('dashboard-loading');
+            dashboardContent.classList.add('dashboard-loaded');
+        }
+
+        // Formatar a data e hora atual
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+
+        // Inicializar gráficos
+        initCharts();
+    }
+
+    // Formatar a data e hora atual
+    function updateDateTime() {
+        const dateElement = document.getElementById('currentDate');
+        const timeElement = document.getElementById('currentTime');
+
+        if (dateElement) {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const today = new Date();
+            dateElement.textContent = today.toLocaleDateString('pt-BR', options);
+        }
+
+        if (timeElement) {
+            const now = new Date();
+            timeElement.textContent = now.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+    }
+
+    // Atualizar hora a cada segundo
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
+    // Configurar gráficos - aguardar Chart.js estar disponível
+    function initCharts() {
+        if (typeof Chart === 'undefined') {
+            console.log('Chart.js ainda não carregado, aguardando...');
+            setTimeout(initCharts, 100);
+            return;
+        }
+
+        console.log('Inicializando gráficos do dashboard...');
+
+        // Dados reais dos gráficos vindos do backend
+        const chartData = {{ chart_data | tojson }};
+
+        // Preparar dados para o gráfico de visualizações
+        const viewsLabels = chartData.views_data.map(item => item.date);
+        const viewsValues = chartData.views_data.map(item => item.views);
+
+        const viewsData = {
+            labels: viewsLabels,
+            datasets: [{
+                label: 'Visualizações',
+                data: viewsValues,
+                borderColor: 'rgb(58, 134, 255)',
+                backgroundColor: 'rgba(58, 134, 255, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        };
+
+        // Preparar dados para o gráfico de downloads por categoria
+        const downloadsLabels = chartData.downloads_by_category.map(item => item.name);
+        const downloadsValues = chartData.downloads_by_category.map(item => item.downloads);
+
+        const downloadsData = {
+            labels: downloadsLabels.length > 0 ? downloadsLabels : ['Nenhum dado'],
+            datasets: [{
+                data: downloadsValues.length > 0 ? downloadsValues : [0],
+                backgroundColor: [
+                    'rgba(58, 134, 255, 0.8)',
+                    'rgba(131, 56, 236, 0.8)',
+                    'rgba(255, 0, 110, 0.8)',
+                    'rgba(56, 176, 0, 0.8)',
+                    'rgba(255, 190, 11, 0.8)'
+                ],
+                borderWidth: 0
+            }]
+        };
+
+        // Gráfico de visualizações
+        const viewsCtx = document.getElementById('viewsChart');
+        if (viewsCtx) {
+            new Chart(viewsCtx, {
+                type: 'line',
+                data: viewsData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Gráfico de downloads
+        const downloadsCtx = document.getElementById('downloadsChart');
+        if (downloadsCtx) {
+            new Chart(downloadsCtx, {
+                type: 'doughnut',
+                data: downloadsData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Controles de período dos gráficos
+        const chartBtns = document.querySelectorAll('.chart-btn');
+        chartBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                chartBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                // Aqui você adicionaria a lógica para atualizar o gráfico
+                const period = this.getAttribute('data-period');
+                console.log('Período selecionado:', period);
+            });
+        });
+    }
+</script>
+{% endblock %}

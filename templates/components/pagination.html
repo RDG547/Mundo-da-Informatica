@@ -1,0 +1,21 @@
+{% if posts.pages > 1 %}
+<div class="pagination-wrapper">
+    <nav class="pagination-nav">
+        {% if posts.has_prev %}
+            <a href="{{ url_for('category', category=category, page=posts.prev_num) }}" class="pagination-btn prev-btn">
+                <i class="fas fa-chevron-left"></i> Anterior
+            </a>
+        {% endif %}
+
+        <div class="pagination-info">
+            Página {{ posts.page }} de {{ posts.pages }}
+        </div>
+
+        {% if posts.has_next %}
+            <a href="{{ url_for('category', category=category, page=posts.next_num) }}" class="pagination-btn next-btn">
+                Próxima <i class="fas fa-chevron-right"></i>
+            </a>
+        {% endif %}
+    </nav>
+</div>
+{% endif %}

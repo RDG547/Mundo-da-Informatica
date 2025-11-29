@@ -1,0 +1,797 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero de Pesquisa -->
+<section class="search-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content">
+            <div class="hero-icon animate-bounce">
+                <i class="fas fa-search"></i>
+            </div>
+            <h1 class="hero-title">Resultados da Pesquisa</h1>
+            {% if query %}
+                <p class="hero-subtitle">Você pesquisou por: <strong>"{{ query }}"</strong></p>
+                <p class="search-count">
+                    {% if results and results|length > 0 %}
+                        Encontramos <strong>{{ results|length }}</strong> {{ 'resultado' if results|length == 1 else 'resultados' }}
+                    {% else %}
+                        Nenhum resultado encontrado
+                    {% endif %}
+                </p>
+            {% endif %}
+
+            <!-- Campo de pesquisa simples (mesmo da home) -->
+            <form action="{{ url_for('search') }}" method="get" class="search-bar" id="search-form-results">
+                <div class="search-input-wrapper">
+                    <input type="text" name="q" value="{{ query }}" placeholder="Refinar sua pesquisa..." autocomplete="off" id="search-input-results">
+                    <div class="search-suggestions-dropdown" id="search-suggestions-results" style="display: none;"></div>
+                    <button type="submit"><i class="fas fa-search"></i> Buscar</button>
+                </div>
+            </form>
+
+            <!-- Filtros movidos para baixo do campo de pesquisa -->
+            {% if query %}
+            <div class="search-filters-hero">
+                <span class="filter-label-hero">
+                    <i class="fas fa-filter"></i>
+                    Filtrar:
+                </span>
+                <div class="filter-buttons">
+                    <a href="{{ url_for('search', q=query, filter='all') }}"
+                       class="filter-btn {% if filter_type == 'all' %}active{% endif %}">
+                        <i class="fas fa-th"></i>
+                        <span>Todos</span>
+                    </a>
+                    <a href="{{ url_for('search', q=query, filter='categories') }}"
+                       class="filter-btn {% if filter_type == 'categories' %}active{% endif %}">
+                        <i class="fas fa-folder"></i>
+                        <span>Categorias</span>
+                    </a>
+                    <a href="{{ url_for('search', q=query, filter='posts') }}"
+                       class="filter-btn {% if filter_type == 'posts' %}active{% endif %}">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Posts</span>
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Resultados -->
+<section class="search-results-section">
+    <div class="container">
+
+        <!-- Sugestão de Correção -->
+        {% if suggestion %}
+        <div class="search-suggestion-wrapper" style="display: flex; justify-content: center; width: 100%;">
+            <a href="{{ url_for('search', q=suggestion) }}" class="search-suggestion" style="display: inline-block;">
+                <i class="fas fa-lightbulb"></i>
+                <span>Você quis dizer: <strong class="suggestion-link">{{ suggestion }}</strong>?</span>
+            </a>
+        </div>
+        {% endif %}
+
+        {% if (categories and categories|length > 0) or (posts and posts|length > 0) %}
+
+            <!-- Categorias Encontradas (estilo da home) -->
+            {% if categories and categories|length > 0 %}
+            <div class="results-section-header">
+                <h2><i class="fas fa-folder"></i> Categorias</h2>
+                <span class="results-count">{{ categories|length }} {{ 'categoria' if categories|length == 1 else 'categorias' }} encontrada(s)</span>
+            </div>
+
+            <div class="categories-grid">
+                {% for category in categories %}
+                <div class="category-showcase-card">
+                    <div class="category-icon-container">
+                        <div class="category-icon-wrapper">
+                            {% if category.name == 'BIOS' %}
+                                <i class="fas fa-microchip category-icon"></i>
+                            {% elif category.name == 'Esquemas' %}
+                                <i class="fas fa-project-diagram category-icon"></i>
+                            {% elif category.name == 'Drivers' %}
+                                <i class="fas fa-cogs category-icon"></i>
+                            {% elif category.name == 'Softwares' %}
+                                <i class="fas fa-laptop-code category-icon"></i>
+                            {% elif category.name == 'Impressoras' %}
+                                <i class="fas fa-print category-icon"></i>
+                            {% elif category.name == 'Cursos' %}
+                                <i class="fas fa-graduation-cap category-icon"></i>
+                            {% else %}
+                                <i class="fas fa-folder category-icon"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="category-showcase-content">
+                        <h3>{{ category.name }}</h3>
+                        <p>{{ category.description[:150] + '...' if category.description and category.description|length > 150 else category.description or 'Explore esta categoria' }}</p>
+                        <a href="{{ url_for('category', category=category.name) }}" class="explore-btn">
+                            Explorar <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Posts Encontrados -->
+            {% if posts and posts|length > 0 %}
+            <div class="results-section-header" {% if categories and categories|length > 0 %}style="margin-top: 3rem;"{% endif %}>
+                <h2><i class="fas fa-file-alt"></i> Posts</h2>
+                <span class="results-count">{{ posts|length }} {{ 'post' if posts|length == 1 else 'posts' }} encontrado(s)</span>
+            </div>
+
+            <div class="posts-grid">
+                {% for post in posts %}
+                <div class="post-card">
+                    <div class="post-image">
+                        {% if post.image_url %}
+                            <img src="{{ url_for('static', filename='images/'+post.image_url) }}" alt="{{ post.title }}">
+                        {% else %}
+                            <img src="{{ url_for('static', filename='images/default.jpg') }}" alt="{{ post.title }}">
+                        {% endif %}
+                    </div>
+                    <div class="post-category">
+                        {% if post.category and post.category.icon %}
+                            <i class="{{ post.category.icon }}"></i>
+                        {% elif post.category_str == 'BIOS' %}
+                            <i class="fas fa-microchip"></i>
+                        {% elif post.category_str == 'Esquemas' %}
+                            <i class="fas fa-project-diagram"></i>
+                        {% elif post.category_str == 'Drivers' %}
+                            <i class="fas fa-cogs"></i>
+                        {% elif post.category_str == 'Softwares' %}
+                            <i class="fas fa-laptop-code"></i>
+                        {% elif post.category_str == 'Impressoras' %}
+                            <i class="fas fa-print"></i>
+                        {% elif post.category_str == 'Cursos' %}
+                            <i class="fas fa-graduation-cap"></i>
+                        {% else %}
+                            <i class="fas fa-folder"></i>
+                        {% endif %}
+                        <span>{{ post.category_str }}</span>
+                    </div>
+                    <div class="post-content">
+                        <h3>{{ post.title }}</h3>
+                        <div class="post-meta">
+                            <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
+                            <span><i class="far fa-eye"></i> {{ post.views }}</span>
+                        </div>
+                        <div class="post-description-section">
+                            <div class="post-description-title">Descrição</div>
+                            <div class="post-description-text">{{ post.description[:150] + '...' if post.description and post.description|length > 150 else post.description or (post.content|striptags)[:150] + '...' }}</div>
+                        </div>
+                        <a href="{{ url_for('post_by_slug', category=post.category_str|lower if post.category_str else 'geral', slug=post.slug) if post.slug else url_for('post', post_id=post.id) }}" class="btn">Ver Detalhes</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        {% else %}
+            <div class="no-results">
+                <div class="no-results-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h2>Nenhum resultado encontrado</h2>
+                <p>Não encontramos nenhuma categoria ou post correspondente à sua pesquisa por <strong>"{{ query }}"</strong></p>
+
+                <div class="no-results-suggestions">
+                    <h3>Sugestões:</h3>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Verifique a ortografia das palavras</li>
+                        <li><i class="fas fa-check"></i> Tente usar termos mais genéricos</li>
+                        <li><i class="fas fa-check"></i> Tente usar menos palavras-chave</li>
+                        <li><i class="fas fa-check"></i> Navegue pelas <a href="{{ url_for('all_categories') }}">categorias</a></li>
+                    </ul>
+                </div>
+
+                <div class="no-results-actions">
+                    <a href="{{ url_for('home') }}" class="btn-primary">
+                        <i class="fas fa-home"></i> Voltar ao Início
+                    </a>
+                    <a href="{{ url_for('contact') }}" class="btn-secondary">
+                        <i class="fas fa-envelope"></i> Entre em Contato
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<style>
+/* Search Hero - Mesmo estilo da página de categorias */
+.search-hero {
+    background: linear-gradient(135deg, rgba(58, 134, 255, 0.95), rgba(131, 56, 236, 0.95)),
+                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    min-height: 40vh;
+    padding: 5rem 0 3rem;
+    padding-bottom: 6rem; /* Espaço extra para dropdown */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    color: white;
+    overflow: visible; /* Permitir dropdown aparecer completo */
+    z-index: 10; /* Ficar acima da seção de resultados */
+}
+
+.search-hero .hero-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    /* Quadradinhos estáticos sem animação */
+}
+
+.search-hero .hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.search-hero .hero-content {
+    position: relative;
+    z-index: 100; /* Muito acima para garantir que dropdown apareça */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.search-hero .hero-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 2rem;
+    font-size: 3rem;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.search-hero .hero-icon.animate-bounce {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-15px);
+    }
+    60% {
+        transform: translateY(-10px);
+    }
+}
+
+.search-hero .hero-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.search-hero .hero-subtitle {
+    font-size: 1.3rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+}
+
+.search-hero .search-count {
+    font-size: 1.1rem;
+    opacity: 0.85;
+    margin-bottom: 2rem;
+}
+
+/* Campo de pesquisa - Mesmo da home */
+.search-hero .search-bar {
+    max-width: 700px;
+    width: 100%;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1000; /* Z-index muito alto para dropdown */
+}
+
+.search-hero .search-bar .search-input-wrapper {
+    position: relative;
+    width: 100%;
+    z-index: 1001; /* Ainda mais alto */
+}
+
+/* Garantir que dropdown apareça completo */
+.search-hero .search-bar .search-suggestions-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    z-index: 10000 !important; /* Máxima prioridade */
+    max-height: 400px;
+    overflow-y: auto;
+    background: white; /* Garantir fundo */
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important; /* Sombra mais forte */
+}
+
+.search-hero .search-bar input {
+    width: 100%;
+    padding: 15px 20px;
+    padding-right: 130px; /* Espaço para o botão */
+    border: none;
+    border-radius: 50px;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.search-hero .search-bar input:focus {
+    outline: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    background: white;
+}
+
+.search-hero .search-bar button {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    height: calc(100% - 10px);
+    padding: 0 1.5rem;
+    background-color: #667eea;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    z-index: 10; /* Acima do input mas abaixo do dropdown */
+}
+
+.search-hero .search-bar button:hover {
+    background-color: #764ba2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* Search Results Section */
+.search-results-section {
+    padding: 60px 0;
+    background: #f8fafc;
+    transition: opacity 0.3s ease;
+    position: relative;
+    z-index: 1; /* Abaixo do hero e dropdown */
+    margin-top: -3rem; /* Compensar padding extra do hero */
+}
+
+/* Results Section Header */
+.results-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.results-section-header h2 {
+    font-size: 1.8rem;
+    color: #2d3748;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.results-section-header h2 i {
+    color: #667eea;
+}
+
+.results-section-header .results-count {
+    font-size: 0.95rem;
+    color: #666;
+    background: #e8eaf6;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* Categories Grid */
+.categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 2rem;
+}
+
+.category-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border: 2px solid transparent;
+}
+
+.category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-color: #667eea;
+}
+
+.category-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.category-info {
+    flex: 1;
+}
+
+.category-info h3 {
+    font-size: 1.3rem;
+    color: #2d3748;
+    margin: 0 0 0.5rem 0;
+}
+
+.category-info p {
+    font-size: 0.95rem;
+    color: #666;
+    margin: 0 0 0.8rem 0;
+    line-height: 1.5;
+}
+
+.category-stats {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: #999;
+}
+
+.category-stats span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.category-stats i {
+    color: #667eea;
+}
+
+.category-arrow {
+    font-size: 1.2rem;
+    color: #ccc;
+    transition: all 0.3s ease;
+}
+
+.category-card:hover .category-arrow {
+    color: #667eea;
+    transform: translateX(5px);
+}
+
+/* Os estilos de .posts-grid e .post-card são herdados do style.css */
+
+/* No Results */
+.no-results {
+    text-align: center;
+    padding: 80px 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.no-results-icon {
+    font-size: 80px;
+    color: #e0e0e0;
+    margin-bottom: 30px;
+}
+
+.no-results h2 {
+    font-size: 2rem;
+    color: #2d3748;
+    margin-bottom: 15px;
+}
+
+.no-results p {
+    font-size: 1.1rem;
+    color: #666;
+    margin-bottom: 40px;
+}
+
+.no-results-suggestions {
+    max-width: 500px;
+    margin: 0 auto 40px;
+    text-align: left;
+}
+
+.no-results-suggestions h3 {
+    font-size: 1.25rem;
+    margin-bottom: 20px;
+    color: #2d3748;
+    text-align: center;
+}
+
+.no-results-suggestions ul {
+    list-style: none;
+    padding: 0;
+}
+
+.no-results-suggestions li {
+    padding: 10px 0;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.no-results-suggestions li i {
+    color: #48bb78;
+}
+
+.no-results-suggestions a {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.no-results-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 30px;
+    border-radius: 50px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102,126,234,0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-secondary:hover {
+    background: #667eea;
+    color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .search-hero .hero-title {
+        font-size: 2rem;
+    }
+
+    .search-hero .hero-subtitle {
+        font-size: 1rem;
+    }
+
+    .search-hero .hero-icon {
+        width: 80px;
+        height: 80px;
+        font-size: 2rem;
+    }
+
+    .no-results {
+        padding: 40px 20px;
+    }
+}
+
+/* Loading state */
+.search-results-section.loading {
+    position: relative;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.search-results-section.loading::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1000;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Carregamento dinâmico de resultados sem recarregar página inteira
+document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('search-form-results');
+
+    if (!searchForm) {
+        console.error('Formulário de pesquisa não encontrado');
+        return;
+    }
+
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevenir reload padrão
+        e.stopPropagation(); // Prevenir propagação
+
+        console.log('Form submit interceptado - carregamento dinâmico ativo');
+
+        const input = document.getElementById('search-input-results');
+        const query = input.value.trim();
+
+        // Validar campo vazio
+        if (!query) {
+            input.focus();
+            return false;
+        }
+
+        // Buscar nova query via AJAX
+        performDynamicSearch(query);
+        return false;
+    });
+
+    // Event listener para botões de filtro
+    document.addEventListener('click', function(e) {
+        const filterBtn = e.target.closest('.filter-btn');
+        if (filterBtn && filterBtn.href) {
+            e.preventDefault();
+            const url = new URL(filterBtn.href);
+            const query = url.searchParams.get('q');
+            const filter = url.searchParams.get('filter') || 'all';
+
+            performDynamicSearch(query, filter);
+        }
+    });
+});
+
+function performDynamicSearch(query, filter = 'all') {
+    console.log('Iniciando busca dinâmica para:', query, 'com filtro:', filter);
+
+    const resultsSection = document.querySelector('.search-results-section');
+    const heroSubtitle = document.querySelector('.hero-subtitle strong');
+    const searchCount = document.querySelector('.search-count');
+
+    if (!resultsSection) {
+        console.error('Seção de resultados não encontrada');
+        return;
+    }
+
+    // Adicionar estado de loading
+    resultsSection.classList.add('loading');
+
+    // Fazer requisição AJAX
+    fetch(`/pesquisa?q=${encodeURIComponent(query)}&filter=${filter}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro na resposta: ' + response.status);
+            }
+            return response.text();
+        })
+        .then(html => {
+            console.log('HTML recebido, parseando...');
+
+            // Criar elemento temporário para parsear HTML
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Extrair novos resultados
+            const newResults = doc.querySelector('.search-results-section');
+            const newSubtitle = doc.querySelector('.hero-subtitle strong');
+            const newCount = doc.querySelector('.search-count');
+            const newFilters = doc.querySelector('.search-filters-hero');
+
+            // Atualizar hero com nova query
+            if (heroSubtitle && newSubtitle) {
+                heroSubtitle.textContent = newSubtitle.textContent;
+            }
+
+            // Atualizar contagem
+            if (searchCount && newCount) {
+                searchCount.innerHTML = newCount.innerHTML;
+            }
+
+            // Atualizar filtros
+            const currentFilters = document.querySelector('.search-filters-hero');
+            if (currentFilters && newFilters) {
+                currentFilters.innerHTML = newFilters.innerHTML;
+            }
+
+            // Atualizar resultados com animação suave
+            if (newResults) {
+                resultsSection.style.opacity = '0';
+
+                setTimeout(() => {
+                    resultsSection.innerHTML = newResults.innerHTML;
+                    resultsSection.classList.remove('loading');
+                    resultsSection.style.opacity = '1';
+
+                    // Atualizar URL sem reload
+                    const newUrl = `/pesquisa?q=${encodeURIComponent(query)}&filter=${filter}`;
+                    window.history.pushState({query: query, filter: filter}, '', newUrl);
+
+                    // Scroll suave até os resultados
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                    console.log('Resultados atualizados com sucesso!');
+                }, 300);
+            } else {
+                console.error('Nova seção de resultados não encontrada no HTML');
+                resultsSection.classList.remove('loading');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar resultados:', error);
+            resultsSection.classList.remove('loading');
+            alert('Erro ao carregar resultados. Tente novamente.');
+        });
+}
+
+// Suporte ao botão voltar do navegador
+window.addEventListener('popstate', function(event) {
+    if (event.state && event.state.query) {
+        document.getElementById('search-input-results').value = event.state.query;
+        performDynamicSearch(event.state.query);
+    }
+});
+</script>
+
+<script src="{{ url_for('static', filename='js/search-suggestions.js') }}"></script>
+<script>
+// Inicializar sugestões de pesquisa no campo de resultados
+if (typeof SearchSuggestions !== 'undefined') {
+    new SearchSuggestions('search-input-results', 'search-suggestions-results');
+}
+</script>
+{% endblock %}

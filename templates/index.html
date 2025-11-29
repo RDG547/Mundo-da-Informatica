@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero" id="hero-particles" data-page="home">
+    <div class="container">
+        <h1 class="hero-title-3d">
+            <span class="welcome-text">Bem-vindo</span> <span class="ao-text">ao</span> <span class="brand-text">Mundo da Informática</span>
+        </h1>
+        <p>{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
+        <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
+            <div class="search-input-wrapper">
+                <input type="text" name="q" id="home-search-input" placeholder="Pesquisar BIOS, drivers, esquemas..." autocomplete="off">
+                <div class="search-suggestions-dropdown" id="home-search-suggestions" style="display: none;"></div>
+            </div>
+            <button type="submit"><i class="fas fa-search"></i> Buscar</button>
+        </form>
+    </div>
+</section>
+
+<!-- Categories Section -->
+{% include 'components/categories.html' %}
+
+<!-- Recent Posts -->
+<section class="recent-posts" data-page="home">
+    <div class="container">
+        <div class="section-header">
+            <h2>Adições Recentes</h2>
+            <p>Nosso acervo é constantemente atualizado com novos recursos</p>
+        </div>
+
+        <div class="posts-grid">
+            {% for post in posts %}
+            <div class="post-card">
+                <div class="post-image">
+                    <img src="{{ url_for('static', filename='images/'+post.image_url) }}" alt="{{ post.title }}">
+                </div>
+                <div class="post-category">
+                    {% if post.category and post.category.icon %}
+                        <i class="{{ post.category.icon }}"></i>
+                    {% elif post.category_str == 'BIOS' %}
+                        <i class="fas fa-microchip"></i>
+                    {% elif post.category_str == 'Esquemas' %}
+                        <i class="fas fa-project-diagram"></i>
+                    {% elif post.category_str == 'Drivers' %}
+                        <i class="fas fa-cogs"></i>
+                    {% elif post.category_str == 'Softwares' %}
+                        <i class="fas fa-laptop-code"></i>
+                    {% elif post.category_str == 'Impressoras' %}
+                        <i class="fas fa-print"></i>
+                    {% elif post.category_str == 'Cursos' %}
+                        <i class="fas fa-graduation-cap"></i>
+                    {% else %}
+                        <i class="fas fa-folder"></i>
+                    {% endif %}
+                    <span>{{ post.category_str }}</span>
+                </div>
+                <div class="post-content">
+                    <h3>{{ post.title }}</h3>
+                    <div class="post-meta">
+                        <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
+                        <span><i class="far fa-eye"></i> {{ post.views }}</span>
+                    </div>
+                    <div class="post-description-section">
+                        <div class="post-description-title">Descrição</div>
+                        <div class="post-description-text">{{ (post.content|striptags)[:150] }}{% if (post.content|striptags)|length > 150 %}...{% endif %}</div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
+                        {% if post.download_link %}
+                        <a href="{{ post.download_link }}" class="btn btn-download" target="_blank" style="flex: 1; min-width: 120px;">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                        {% endif %}
+                        <a href="{{ post_url(post) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap;">Ver Detalhes</a>
+                        {% if current_user.is_authenticated %}
+                        <button data-post-id="{{ post.id }}" onclick="toggleFavorite({{ post.id }})" class="favorite-btn-card {% if post.id in favorite_post_ids %}favorited{% endif %}" title="{% if post.id in favorite_post_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}">
+                            <i class="{% if post.id in favorite_post_ids %}fas{% else %}far{% endif %} fa-star"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Help CTA Section -->
+{% include 'components/help-cta.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/home-search.js') }}"></script>
+<script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+{% endblock %}

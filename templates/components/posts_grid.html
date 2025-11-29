@@ -1,0 +1,66 @@
+{% if posts and posts.items %}
+<div class="modern-posts-grid">
+    {% for post in posts.items %}
+    <div class="modern-post-card">
+        <div class="post-image-container">
+            <img src="{{ url_for('static', filename='images/' + (post.image_url or 'default.jpg')) }}" alt="{{ post.title }}" loading="lazy">
+            <div class="post-overlay">
+                <div class="post-actions">
+                    <a href="{{ url_for('post', post_id=post.id) }}" class="action-btn view-btn">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    {% if post.download_link %}
+                    <a href="{{ url_for('download_post', post_id=post.id) }}" class="action-btn download-btn">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+<div class="post-content">
+    <div class="post-meta">
+                <span class="post-date">
+                    <i class="fas fa-calendar"></i>
+                    {{ post.date_posted.strftime('%d/%m/%Y') }}
+                </span>
+                <div class="post-stats">
+                    <span class="post-stat-item">
+                        <i class="fas fa-eye"></i> {{ post.views or 0 }}
+                    </span>
+                    <span class="post-stat-item">
+                        <i class="fas fa-download"></i> {{ post.downloads or 0 }}
+                    </span>
+                </div>
+            </div>
+
+            <h3 class="post-title">
+                <a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a>
+            </h3>
+
+            <p class="post-excerpt">{{ post.content|striptags|truncate(120) }}</p>
+
+            <div class="post-footer">
+                <a href="{{ url_for('post', post_id=post.id) }}" class="read-more-btn">
+                    <i class="fas fa-arrow-right"></i> Ver Detalhes
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+
+
+{% else %}
+<div class="no-results">
+    <div class="no-results-icon">
+        <i class="fas fa-search"></i>
+    </div>
+    <h3>Nenhum recurso encontrado</h3>
+    <p>Ainda não há recursos disponíveis nesta categoria. Novos conteúdos são adicionados regularmente.</p>
+    <a href="{{ url_for('home') }}" class="btn btn-gradient primary">
+        <i class="fas fa-home"></i> Voltar ao Início
+    </a>
+</div>
+{% endif %}

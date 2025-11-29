@@ -1,0 +1,107 @@
+<section class="categories-showcase" id="categorias">
+    <div class="container">
+        <div class="section-header">
+            <h2>Nossas Categorias</h2>
+            <p>Explore nosso acervo de recursos organizado por categorias para facilitar sua busca e otimizar seu trabalho técnico</p>
+        </div>
+
+        <div class="categories-grid">
+            <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="100">
+                <div class="category-icon-container">
+                    <div class="category-icon-wrapper">
+                        <i class="fas fa-microchip category-icon"></i>
+                    </div>
+                </div>
+                <div class="category-showcase-content">
+                    <h3>BIOS</h3>
+                    <p>Arquivos de BIOS atualizados para diversos modelos de notebooks e desktops, facilitando reparos e atualizações de hardware.</p>
+                    <a href="{{ url_for('category', category='BIOS') }}" class="explore-btn">
+                        Explorar <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="200">
+                <div class="category-icon-container">
+                    <div class="category-icon-wrapper">
+                        <i class="fas fa-project-diagram category-icon"></i>
+                    </div>
+                </div>
+                <div class="category-showcase-content">
+                    <h3>Esquemas</h3>
+                    <p>Esquemas elétricos detalhados de placas-mãe e outros componentes eletrônicos, essenciais para manutenção e reparo avançado.</p>
+                    <a href="{{ url_for('category', category='Esquemas') }}" class="explore-btn">
+                        Explorar <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="300">
+                <div class="category-icon-container">
+                    <div class="category-icon-wrapper">
+                        <i class="fas fa-cogs category-icon"></i>
+                    </div>
+                </div>
+                <div class="category-showcase-content">
+                    <h3>Drivers</h3>
+                    <p>Drivers atualizados para diversos componentes de hardware, incluindo placas de rede, áudio, vídeo e periféricos específicos.</p>
+                    <a href="{{ url_for('category', category='Drivers') }}" class="explore-btn">
+                        Explorar <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="400">
+                <div class="category-icon-container">
+                    <div class="category-icon-wrapper">
+                        <i class="fas fa-laptop-code category-icon"></i>
+                    </div>
+                </div>
+                <div class="category-showcase-content">
+                    <h3>Softwares</h3>
+                    <p>Programas essenciais para técnicos de informática, incluindo ferramentas de diagnóstico, otimização e recuperação de dados.</p>
+                    <a href="{{ url_for('category', category='Softwares') }}" class="explore-btn">
+                        Explorar <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="500">
+                <div class="category-icon-container">
+                    <div class="category-icon-wrapper">
+                        <i class="fas fa-print category-icon"></i>
+                    </div>
+                </div>
+                <div class="category-showcase-content">
+                    <h3>Impressoras</h3>
+                    <p>Drivers, firmwares e recursos especializados para impressoras de diversas marcas e modelos, facilitando manutenção e configuração.</p>
+                    <a href="{{ url_for('category', category='Impressoras') }}" class="explore-btn">
+                        Explorar <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="category-showcase-card" data-aos="fade-up" data-aos-delay="600">
+                <div class="category-icon-container">
+                    <div class="category-icon-wrapper">
+                        <i class="fas fa-graduation-cap category-icon"></i>
+                    </div>
+                </div>
+                <div class="category-showcase-content">
+                    <h3>Cursos</h3>
+                    <p>Materiais educativos e cursos técnicos para aprimoramento profissional em informática, eletrônica e tecnologia.</p>
+                    <a href="{{ url_for('category', category='Cursos') }}" class="explore-btn">
+                        Explorar <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botão Ver Mais centralizado -->
+        <div class="categories-view-more">
+            <a href="{{ url_for('all_categories') }}" class="btn-view-more">
+                <i class="fas fa-th"></i> Ver Mais
+            </a>
+        </div>
+    </div>
+</section>

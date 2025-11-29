@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}" id="plans-css">
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="plans-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content text-center">
+            <div class="hero-icon animate-bounce">
+                <i class="fas fa-crown"></i>
+            </div>
+            <h1 class="hero-title animate-fade-up">Escolha Seu Plano</h1>
+            <p class="hero-subtitle animate-fade-up-delayed">Acesse recursos exclusivos e tenha uma experiência completa
+                no Mundo da Informática. Escolha o plano que melhor atende suas necessidades profissionais.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Plans Section -->
+<section class="plans-section">
+    <div class="container">
+        <div class="plans-grid">
+            <!-- Free Plan -->
+            <div class="plan-card free">
+                <div class="plan-header">
+                    <div class="plan-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h3 class="plan-name">Grátis</h3>
+                    <div class="plan-price">
+                        <span class="currency">R$</span>
+                        <span class="amount">0</span>
+                        <span class="period">/mês</span>
+                    </div>
+                </div>
+
+                <div class="plan-features">
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">1 Download por dia</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Suporte em até 48H</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Lista de Favoritos (Max 10)</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Acesso a 1 dispositivo</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Histórico de Downloads</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Comentários em Posts</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Pedir Conteúdo Específico</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Área VIP Exclusiva</div>
+                    </div>
+                </div>
+
+                <div class="plan-cta">
+                    <a href="{{ url_for('register') }}" class="plan-btn">Começar Gratuitamente</a>
+                </div>
+            </div>
+
+            <!-- Premium Plan -->
+            <div class="plan-card premium">
+                <div class="popular-badge">Popular</div>
+                <div class="plan-header">
+                    <div class="plan-icon">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <h3 class="plan-name">Premium</h3>
+                    <div class="plan-price">
+                        <span class="currency">R$</span>
+                        <span class="amount">29,90</span>
+                        <span class="period">/mês</span>
+                    </div>
+                </div>
+
+                <div class="plan-features">
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">15 Downloads Semanais</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Suporte em até 24H</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Favoritos Ilimitados</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Acesso a 2 dispositivos</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Histórico (Últimos 5)</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">2 Comentários Diários</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Pedir Conteúdo Específico</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Área VIP Exclusiva</div>
+                    </div>
+                </div>
+
+                <div class="plan-cta">
+                    <a href="{{ url_for('register') }}" class="plan-btn">Assinar Premium</a>
+                </div>
+            </div>
+
+            <!-- VIP Plan -->
+            <div class="plan-card vip">
+                <div class="plan-header">
+                    <div class="plan-icon">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <h3 class="plan-name">VIP</h3>
+                    <div class="plan-price">
+                        <span class="currency">R$</span>
+                        <span class="amount">49,90</span>
+                        <span class="period">/mês</span>
+                    </div>
+                </div>
+
+                <div class="plan-features">
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Downloads Ilimitados</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Suporte Prioritário</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Favoritos Ilimitados</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Acesso a 5 dispositivos</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Histórico Completo</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Comentários Ilimitados</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Pedir Conteúdo Específico</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Área VIP Exclusiva</div>
+                    </div>
+                </div>
+
+                <div class="plan-cta">
+                    <a href="{{ url_for('register') }}" class="plan-btn">Assinar VIP</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+<!-- FAQ Section -->
+<section class="plans-faq-section">
+    <div class="container">
+        <h2 class="section-title"><i class="fas fa-question-circle"></i> Perguntas Frequentes</h2>
+        <div class="faq-container">
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <h4>Posso cancelar minha assinatura a qualquer momento?</h4>
+                    <i class="fas fa-chevron-down faq-icon"></i>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Sim! Você pode cancelar sua assinatura a qualquer momento. Após o cancelamento, você continuará
+                        tendo acesso aos benefícios do plano até o final do período já pago.
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <h4>Como funciona o limite de downloads?</h4>
+                    <i class="fas fa-chevron-down faq-icon"></i>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        No plano Grátis, você pode fazer 1 download por dia. No Premium, são 15 downloads por semana. No
+                        VIP, os downloads são totalmente ilimitados sem restrições.
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <h4>Posso fazer upgrade do meu plano?</h4>
+                    <i class="fas fa-chevron-down faq-icon"></i>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Sim! Você pode fazer upgrade para um plano superior a qualquer momento. O valor será ajustado
+                        proporcionalmente ao tempo restante da sua assinatura atual.
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <h4>O que inclui na Área VIP?</h4>
+                    <i class="fas fa-chevron-down faq-icon"></i>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        A Área VIP oferece conteúdos exclusivos, tutoriais avançados, ferramentas especiais e acesso
+                        antecipado a novos recursos. É uma área dedicada para profissionais que buscam o máximo de
+                        recursos.
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <h4>Como funciona o suporte prioritário?</h4>
+                    <i class="fas fa-chevron-down faq-icon"></i>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Assinantes VIP têm suas solicitações de suporte priorizadas e atendidas primeiro. Além disso,
+                        você terá acesso a um canal de suporte dedicado com tempo de resposta ainda mais rápido.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+{% include 'components/help-cta.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleFAQ(element) {
+        const faqItem = element.parentElement;
+        const isActive = faqItem.classList.contains('active');
+
+        // Close all FAQ items
+        document.querySelectorAll('.faq-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // Toggle current item
+        if (!isActive) {
+            faqItem.classList.add('active');
+        }
+    }
+</script>
+{% endblock %}

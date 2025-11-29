@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="category-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content text-center">
+            <div class="hero-icon animate-bounce">
+                {% if category == 'BIOS' %}
+                <i class="fas fa-microchip"></i>
+                {% elif category == 'Drivers' %}
+                <i class="fas fa-cogs"></i>
+                {% elif category == 'Esquemas' %}
+                <i class="fas fa-project-diagram"></i>
+                {% elif category == 'Softwares' %}
+                <i class="fas fa-desktop"></i>
+                {% elif category == 'Impressoras' %}
+                <i class="fas fa-print"></i>
+                {% elif category == 'Cursos' %}
+                <i class="fas fa-graduation-cap"></i>
+                {% else %}
+                <i class="fas fa-folder"></i>
+                {% endif %}
+            </div>
+            <h1 class="hero-title animate-fade-up">{{ category }}</h1>
+            <p class="hero-subtitle animate-fade-up-delayed">
+                {% if category == 'BIOS' %}
+                Encontre firmwares e atualizações de BIOS para notebooks, desktops, all-in-ones e monitores, organizados
+                por fabricante.
+                {% elif category == 'Drivers' %}
+                Drivers originais e atualizados para todos os componentes do seu equipamento, organizados por fabricante
+                e modelo.
+                {% elif category == 'Esquemas' %}
+                Esquemas elétricos completos e diagramas técnicos para manutenção e reparo de equipamentos eletrônicos.
+                {% elif category == 'Softwares' %}
+                Ferramentas, utilitários e programas essenciais para manutenção, diagnóstico e otimização de sistemas.
+                {% elif category == 'Impressoras' %}
+                Firmwares, reset counters e ferramentas de manutenção para impressoras das principais marcas do mercado.
+                {% elif category == 'Cursos' %}
+                Cursos especializados em manutenção de hardware, eletrônica e reparação de equipamentos para
+                profissionais.
+                {% else %}
+                Encontre todos os recursos especializados em {{ category }} organizados por subcategorias para sua
+                conveniência.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Category Info Section -->
+<div class="category-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+
+                <!-- Category Description -->
+                <div class="category-info">
+                    <div class="info-header text-center">
+                        <h2>
+                            {% if category == 'BIOS' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre BIOS
+                            {% elif category == 'Drivers' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre Drivers
+                            {% elif category == 'Esquemas' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre Esquemas
+                            {% elif category == 'Softwares' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre Softwares
+                            {% elif category == 'Impressoras' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre Impressoras
+                            {% elif category == 'Cursos' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre Cursos
+                            {% else %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre {{ category }}
+                            {% endif %}
+                        </h2>
+                    </div>
+
+                    <div class="category-description">
+                        {% if category == 'BIOS' %}
+                        <p>Nossa coleção de BIOS inclui arquivos verificados e testados para notebooks, desktops e
+                            dispositivos eletrônicos de todas as principais marcas.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="bios-notebooks" style="cursor: pointer;">
+                                <i class="fas fa-laptop"></i>
+                                <span>Notebooks</span>
+                            </div>
+                            <div class="feature-item" data-feature="bios-desktops" style="cursor: pointer;">
+                                <i class="fas fa-desktop"></i>
+                                <span>Desktops</span>
+                            </div>
+                            <div class="feature-item" data-feature="bios-monitores" style="cursor: pointer;">
+                                <i class="fas fa-tv"></i>
+                                <span>Monitores</span>
+                            </div>
+                            <div class="feature-item" data-feature="bios-embarcados" style="cursor: pointer;">
+                                <i class="fas fa-microchip"></i>
+                                <span>Embarcados</span>
+                            </div>
+                        </div>
+                        {% elif category == 'Drivers' %}
+                        <p>Drivers atualizados e compatíveis para diversos componentes de hardware. Mantemos uma
+                            biblioteca extensa com drivers para placas de vídeo, som, rede e outros dispositivos.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="drivers-video" style="cursor: pointer;">
+                                <i class="fas fa-tv"></i>
+                                <span>Placas de Vídeo</span>
+                            </div>
+                            <div class="feature-item" data-feature="drivers-som" style="cursor: pointer;">
+                                <i class="fas fa-volume-up"></i>
+                                <span>Placas de Som</span>
+                            </div>
+                            <div class="feature-item" data-feature="drivers-rede" style="cursor: pointer;">
+                                <i class="fas fa-wifi"></i>
+                                <span>Rede/WiFi</span>
+                            </div>
+                            <div class="feature-item" data-feature="drivers-usb" style="cursor: pointer;">
+                                <i class="fas fa-usb"></i>
+                                <span>Outros</span>
+                            </div>
+                        </div>
+                        {% elif category == 'Esquemas' %}
+                        <p>Diagramas elétricos e esquemas técnicos detalhados para reparo de componentes. Incluindo
+                            placas-mãe, circuitos de carregamento e diagramas de conectores.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="esquemas-placas" style="cursor: pointer;">
+                                <i class="fas fa-memory"></i>
+                                <span>Placas-mãe</span>
+                            </div>
+                            <div class="feature-item" data-feature="esquemas-carregamento" style="cursor: pointer;">
+                                <i class="fas fa-battery-half"></i>
+                                <span>Carregamento</span>
+                            </div>
+                            <div class="feature-item" data-feature="esquemas-conectores" style="cursor: pointer;">
+                                <i class="fas fa-plug"></i>
+                                <span>Conectores</span>
+                            </div>
+                            <div class="feature-item" data-feature="esquemas-fontes" style="cursor: pointer;">
+                                <i class="fas fa-bolt"></i>
+                                <span>Fontes</span>
+                            </div>
+                        </div>
+                        {% elif category == 'Softwares' %}
+                        <p>Programas especializados para diagnóstico, recuperação e manutenção de sistemas. Ferramentas
+                            essenciais para técnicos de informática.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="softwares-diagnostico" style="cursor: pointer;">
+                                <i class="fas fa-stethoscope"></i>
+                                <span>Diagnóstico</span>
+                            </div>
+                            <div class="feature-item" data-feature="softwares-recuperacao" style="cursor: pointer;">
+                                <i class="fas fa-undo"></i>
+                                <span>Recuperação</span>
+                            </div>
+                            <div class="feature-item" data-feature="softwares-limpeza" style="cursor: pointer;">
+                                <i class="fas fa-broom"></i>
+                                <span>Limpeza</span>
+                            </div>
+                            <div class="feature-item" data-feature="softwares-benchmark" style="cursor: pointer;">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span>Benchmark</span>
+                            </div>
+                        </div>
+                        {% elif category == 'Impressoras' %}
+                        <p>Recursos especializados para impressoras incluindo drivers, firmwares, software de reset e
+                            manuais técnicos para diversas marcas e modelos.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="impressoras-drivers" style="cursor: pointer;">
+                                <i class="fas fa-download"></i>
+                                <span>Drivers</span>
+                            </div>
+                            <div class="feature-item" data-feature="impressoras-firmwares" style="cursor: pointer;">
+                                <i class="fas fa-microchip"></i>
+                                <span>Firmwares</span>
+                            </div>
+                            <div class="feature-item" data-feature="impressoras-reset" style="cursor: pointer;">
+                                <i class="fas fa-redo"></i>
+                                <span>Reset</span>
+                            </div>
+                            <div class="feature-item" data-feature="impressoras-manuais" style="cursor: pointer;">
+                                <i class="fas fa-book"></i>
+                                <span>Manuais</span>
+                            </div>
+                        </div>
+                        {% elif category == 'Cursos' %}
+                        <p>Cursos especializados e tutoriais técnicos para capacitação profissional. Vídeo aulas,
+                            apostilas e certificados de conclusão disponíveis.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="cursos-video" style="cursor: pointer;">
+                                <i class="fas fa-video"></i>
+                                <span>Vídeo Aulas</span>
+                            </div>
+                            <div class="feature-item" data-feature="cursos-apostilas" style="cursor: pointer;">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>Apostilas</span>
+                            </div>
+                            <div class="feature-item" data-feature="cursos-certificados" style="cursor: pointer;">
+                                <i class="fas fa-certificate"></i>
+                                <span>Certificados</span>
+                            </div>
+                            <div class="feature-item" data-feature="cursos-praticos" style="cursor: pointer;">
+                                <i class="fas fa-book-open"></i>
+                                <span>Tutoriais</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Posts Grid -->
+                <div class="posts-section">
+                    <div class="posts-header text-center">
+                        <h2>
+                            <i class="fas fa-list"></i>
+                            Recursos Disponíveis
+                        </h2>
+                        <p class="text-center">Encontrados <strong>{{ posts.total if posts and posts.total else 0
+                                }}</strong> recursos nesta categoria</p>
+                    </div>
+
+                    <!-- Category Search -->
+                    <div class="category-search-container">
+                        <div class="search-wrapper">
+                            <form action="{{ url_for('search') }}" method="GET" class="category-search-form">
+                                <div class="search-input-wrapper">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <input type="text" name="q" class="category-search-input"
+                                        placeholder="Pesquisar em {{ category }}..." autocomplete="off"
+                                        data-category="{{ category }}">
+                                    <div class="search-suggestions-dropdown" style="display: none;"></div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {% if posts and posts.items %}
+                    <div class="posts-grid">
+                        {% for post in posts.items %}
+                        <div class="post-card">
+                            <div class="post-image">
+                                <img src="{{ url_for('static', filename='images/' + (post.image_url or 'default.jpg')) }}"
+                                    alt="{{ post.title }}">
+                            </div>
+                            <div class="post-category">
+                                {% if post.category and post.category.icon %}
+                                <i class="{{ post.category.icon }}"></i>
+                                {% elif post.category_str == 'BIOS' %}
+                                <i class="fas fa-microchip"></i>
+                                {% elif post.category_str == 'Esquemas' %}
+                                <i class="fas fa-project-diagram"></i>
+                                {% elif post.category_str == 'Drivers' %}
+                                <i class="fas fa-cogs"></i>
+                                {% elif post.category_str == 'Softwares' %}
+                                <i class="fas fa-laptop-code"></i>
+                                {% elif post.category_str == 'Impressoras' %}
+                                <i class="fas fa-print"></i>
+                                {% elif post.category_str == 'Cursos' %}
+                                <i class="fas fa-graduation-cap"></i>
+                                {% else %}
+                                <i class="fas fa-folder"></i>
+                                {% endif %}
+                                <span>{{ post.category_str }}</span>
+                            </div>
+                            <div class="post-content">
+                                <h3>{{ post.title }}</h3>
+                                <div class="post-meta">
+                                    <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y')
+                                        }}</span>
+                                    <span><i class="far fa-eye"></i> {{ post.views }}</span>
+                                </div>
+                                <div class="post-description-section">
+                                    <div class="post-description-title">Descrição</div>
+                                    <div class="post-description-text">{{ ((post.short_description or
+                                        post.content)|striptags)[:150] }}{% if ((post.short_description or
+                                        post.content)|striptags)|length > 150 %}...{% endif %}</div>
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
+                                    {% if post.download_link %}
+                                    <a href="{{ post.download_link }}" class="btn btn-download" target="_blank"
+                                        style="flex: 1; min-width: 120px;">
+                                        <i class="fas fa-download"></i> Download
+                                    </a>
+                                    {% endif %}
+                                    <a href="{{ post_url(post) }}" class="btn"
+                                        style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap;">Ver
+                                        Detalhes</a>
+                                    {% if current_user.is_authenticated %}
+                                    <button data-post-id="{{ post.id }}" onclick="toggleFavorite({{ post.id }})"
+                                        class="favorite-btn-card {% if post.id in favorite_post_ids %}favorited{% endif %}"
+                                        title="{% if post.id in favorite_post_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}">
+                                        <i
+                                            class="{% if post.id in favorite_post_ids %}fas{% else %}far{% endif %} fa-star"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if posts.pages > 1 %}
+                    <div class="pagination-wrapper">
+                        <nav class="pagination-nav">
+                            {% if posts.has_prev %}
+                            <a href="{{ url_for('category', category=category, page=posts.prev_num) }}"
+                                class="pagination-btn prev-btn">
+                                <i class="fas fa-chevron-left"></i> Anterior
+                            </a>
+                            {% endif %}
+
+                            <div class="pagination-info">
+                                Página {{ posts.page }} de {{ posts.pages }}
+                            </div>
+
+                            {% if posts.has_next %}
+                            <a href="{{ url_for('category', category=category, page=posts.next_num) }}"
+                                class="pagination-btn next-btn">
+                                Próxima <i class="fas fa-chevron-right"></i>
+                            </a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="no-results">
+                        <div class="no-results-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h3>Nenhum recurso encontrado</h3>
+                        <p>Ainda não há recursos disponíveis nesta categoria. Novos conteúdos são adicionados
+                            regularmente.</p>
+                        <a href="{{ url_for('home') }}" class="btn btn-gradient primary">
+                            <i class="fas fa-home"></i> Voltar ao Início
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- CTA Section -->
+                <div class="category-cta">
+                    <div class="cta-content">
+                        <div class="cta-icon pulse-animation">
+                            <i class="fas fa-heart"></i>
+                        </div>
+                        <h4>Não encontrou o que procura?</h4>
+                        <p>Entre em contato conosco para solicitar conteúdo específico! Nossa equipe está sempre pronta
+                            para ajudar e pode localizar recursos específicos para suas necessidades. Estamos
+                            constantemente adicionando novos materiais e suas sugestões são muito importantes.</p>
+                        <div class="cta-buttons">
+                            <button type="button" class="btn btn-gradient primary" id="toggleSearchBtnCat"
+                                onclick="toggleInlineSearchCat()">
+                                <i class="fas fa-search"></i> Fazer uma Busca
+                            </button>
+                            <a href="{{ url_for('contact') }}" class="btn btn-gradient secondary">
+                                <i class="fas fa-envelope"></i> Solicitar Conteúdo
+                            </a>
+                        </div>
+                        <form action="{{ url_for('search') }}" method="get" class="inline-search-form"
+                            id="inlineSearchFormCat" style="display: none; margin-top: 1.5rem;">
+                            <div class="search-input-wrapper"
+                                style="position: relative; display: flex; align-items: center;">
+                                <input type="text" name="q" placeholder="Digite sua busca..." autocomplete="off"
+                                    id="inlineSearchInputCat" required
+                                    style="padding: 1rem 150px 1rem 1.5rem; border: 2px solid #ddd; border-radius: 50px; width: 100%; font-size: 1rem; outline: none; transition: all 0.3s;">
+                                <button type="submit"
+                                    style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Informações das Features -->
+<div id="feature-modal" class="feature-modal">
+    <div class="feature-modal-content">
+        <span class="feature-modal-close">&times;</span>
+        <div class="feature-modal-header">
+            <i class="feature-modal-icon"></i>
+            <h2 class="feature-modal-title"></h2>
+        </div>
+        <div class="feature-modal-body">
+            <p class="feature-modal-text"></p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleInlineSearchCat() {
+        const form = document.getElementById('inlineSearchFormCat');
+        const btn = document.getElementById('toggleSearchBtnCat');
+        const input = document.getElementById('inlineSearchInputCat');
+
+        if (form.style.display === 'none') {
+            form.style.display = 'block';
+            btn.innerHTML = '<i class="fas fa-times"></i> Fechar Busca';
+            btn.classList.remove('primary');
+            btn.classList.add('secondary');
+            setTimeout(() => input.focus(), 100);
+        } else {
+            form.style.display = 'none';
+            btn.innerHTML = '<i class="fas fa-search"></i> Fazer uma Busca';
+            btn.classList.remove('secondary');
+            btn.classList.add('primary');
+        }
+    }
+
+    // Adicionar efeito hover no input
+    document.addEventListener('DOMContentLoaded', function () {
+        const input = document.getElementById('inlineSearchInputCat');
+        if (input) {
+            input.addEventListener('focus', function () {
+                this.style.borderColor = '#667eea';
+                this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+            });
+            input.addEventListener('blur', function () {
+                this.style.borderColor = '#ddd';
+                this.style.boxShadow = 'none';
+            });
+        }
+    });
+
+    console.log('Script de features carregado!');
+
+    // Adiciona dados específicos de monitores ao featureData existente (declarado em feature-modals.js)
+    if (typeof featureData !== 'undefined') {
+        // Substitui bios-servidores por bios-monitores
+        featureData['bios-monitores'] = {
+            icon: 'fas fa-tv',
+            title: 'BIOS para Monitores',
+            text: 'Firmwares e BIOS especializados para monitores LCD, LED e OLED das principais marcas como Samsung, LG, Dell, AOC e BenQ. Inclui arquivos para atualização de firmware, correção de problemas de imagem, ajuste de cores e configurações avançadas. Essencial para técnicos que trabalham com manutenção e reparo de monitores profissionais, permitindo resolver problemas de tela, botões, menus OSD e configurações de fábrica.'
+        };
+
+        console.log('Dados de monitores adicionados:', featureData['bios-monitores']);
+    }
+
+
+
+    // Os modals já são inicializados automaticamente por feature-modals.js
+    console.log('Página de categoria carregada. Modals gerenciados por feature-modals.js');
+    console.log('Dados disponíveis:', Object.keys(featureData));
+</script>
+<script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+{% endblock %}

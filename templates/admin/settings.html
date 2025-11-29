@@ -1,0 +1,526 @@
+{% extends "admin/base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-settings.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Enhanced Header -->
+<div class="admin-header slide-in-up">
+    <div class="header-content">
+        <div class="header-main">
+            <h1><i class="fas fa-cog"></i> Configurações do Site</h1>
+            <p class="header-subtitle">Personalize e configure todos os aspectos do seu site</p>
+        </div>
+        <div class="header-actions">
+            <div class="quick-stats">
+                <div class="stat-item">
+                    <span class="stat-number">{{ site_configs|length }}</span>
+                    <span class="stat-label">Configurações</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">5</span>
+                    <span class="stat-label">Seções</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-admin btn-admin-outline" onclick="resetToDefaults()">
+                    <i class="fas fa-undo"></i> Restaurar Padrões
+                </button>
+                <button class="btn-admin btn-admin-success" onclick="previewChanges()">
+                    <i class="fas fa-eye"></i> Visualizar
+                </button>
+                <button class="btn-admin btn-admin-primary" onclick="saveAllSettings()">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Settings Layout -->
+<div class="row">
+    <div class="col-md-3">
+        <!-- Settings Navigation -->
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-list"></i> Seções
+                </h2>
+            </div>
+            <div class="settings-nav">
+                <button class="nav-item active" data-tab="general">
+                    <i class="fas fa-home"></i>
+                    <div>
+                        <span>Configurações Gerais</span>
+                        <small>Nome, descrição, textos</small>
+                    </div>
+                </button>
+                <button class="nav-item" data-tab="appearance">
+                    <i class="fas fa-palette"></i>
+                    <div>
+                        <span>Aparência</span>
+                        <small>Cores, tema, visual</small>
+                    </div>
+                </button>
+                <button class="nav-item" data-tab="contact">
+                    <i class="fas fa-envelope"></i>
+                    <div>
+                        <span>Contato</span>
+                        <small>Email, telefone, endereço</small>
+                    </div>
+                </button>
+                <button class="nav-item" data-tab="social">
+                    <i class="fas fa-share-alt"></i>
+                    <div>
+                        <span>Redes Sociais</span>
+                        <small>Links das redes sociais</small>
+                    </div>
+                </button>
+                <button class="nav-item" data-tab="advanced">
+                    <i class="fas fa-cogs"></i>
+                    <div>
+                        <span>Avançado</span>
+                        <small>Analytics, CSS, manutenção</small>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Settings Status -->
+        <div class="admin-card slide-in-up">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-info-circle"></i> Status
+                </h2>
+            </div>
+            <div class="admin-card-body">
+                <div class="status-item">
+                    <div class="status-indicator success"></div>
+                    <div class="status-info">
+                        <span class="status-label">Site Online</span>
+                        <small class="status-desc">Funcionando normalmente</small>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator {% if site_configs.get('maintenance_mode') %}warning{% else %}success{% endif %}"></div>
+                    <div class="status-info">
+                        <span class="status-label">Manutenção</span>
+                        <small class="status-desc">{% if site_configs.get('maintenance_mode') %}Ativo{% else %}Inativo{% endif %}</small>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator {% if site_configs.get('google_analytics') %}success{% else %}warning{% endif %}"></div>
+                    <div class="status-info">
+                        <span class="status-label">Analytics</span>
+                        <small class="status-desc">{% if site_configs.get('google_analytics') %}Configurado{% else %}Não configurado{% endif %}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        <div class="settings-content slide-in-up">
+
+    <div class="admin-card tab-content active" id="general">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Configurações Gerais</h2>
+        </div>
+
+        <div class="settings-form">
+            <div class="form-group">
+                <label for="site_name">Nome do Site</label>
+                <input type="text" id="site_name" class="form-control"
+                       value="{{ site_configs.get('site_name', 'Mundo da Informática') }}"
+                       data-key="site_name" data-type="string">
+                <small class="form-text">Nome exibido no título das páginas e no cabeçalho</small>
+            </div>
+
+            <div class="form-group">
+                <label for="site_description">Descrição do Site</label>
+                <textarea id="site_description" class="form-control" rows="2"
+                          data-key="site_description" data-type="string">{{ site_configs.get('site_description', 'Seu portal de recursos para técnicos de informática') }}</textarea>
+                <small class="form-text">Breve descrição do site, usada em meta tags e páginas de busca</small>
+            </div>
+
+            <div class="form-group">
+                <label for="logo_text">Texto do Logo</label>
+                <input type="text" id="logo_text" class="form-control"
+                       value="{{ site_configs.get('logo_text', 'Mundo da Informática') }}"
+                       data-key="logo_text" data-type="string">
+            </div>
+
+            <div class="form-group">
+                <label for="footer_text">Texto do Rodapé</label>
+                <input type="text" id="footer_text" class="form-control"
+                       value="{{ site_configs.get('footer_text', 'Mundo da Informática - Todos os direitos reservados') }}"
+                       data-key="footer_text" data-type="string">
+            </div>
+
+            <div class="form-group">
+                <label for="home_hero_title">Título da Seção Principal (Home)</label>
+                <input type="text" id="home_hero_title" class="form-control"
+                       value="{{ site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') }}"
+                       data-key="home_hero_title" data-type="string">
+            </div>
+
+            <div class="form-group">
+                <label for="home_hero_subtitle">Subtítulo da Seção Principal (Home)</label>
+                <input type="text" id="home_hero_subtitle" class="form-control"
+                       value="{{ site_configs.get('home_hero_subtitle', 'Seu portal completo com recursos essenciais para técnicos de informática') }}"
+                       data-key="home_hero_subtitle" data-type="string">
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-card tab-content" id="appearance">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Aparência e Tema</h2>
+        </div>
+
+        <div class="settings-form">
+            <div class="form-group">
+                <label for="enable_dark_mode">Habilitar Modo Escuro</label>
+                <div class="form-check">
+                    <input type="checkbox" id="enable_dark_mode" class="form-check-input"
+                           {{ 'checked' if site_configs.get('enable_dark_mode', True) else '' }}
+                           data-key="enable_dark_mode" data-type="bool">
+                    <label class="form-check-label" for="enable_dark_mode">Permitir que os usuários alternem para o modo escuro</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="primary_color">Cor Primária</label>
+                <div class="color-picker-container">
+                    <input type="color" id="primary_color" class="color-picker"
+                           value="{{ site_configs.get('primary_color', '#3a86ff') }}"
+                           data-key="primary_color" data-type="string">
+                    <input type="text" id="primary_color_text" class="color-text"
+                           value="{{ site_configs.get('primary_color', '#3a86ff') }}">
+                </div>
+                <small class="form-text">Cor principal usada em botões, links e elementos destacados</small>
+            </div>
+
+            <div class="form-group">
+                <label for="secondary_color">Cor Secundária</label>
+                <div class="color-picker-container">
+                    <input type="color" id="secondary_color" class="color-picker"
+                           value="{{ site_configs.get('secondary_color', '#8338ec') }}"
+                           data-key="secondary_color" data-type="string">
+                    <input type="text" id="secondary_color_text" class="color-text"
+                           value="{{ site_configs.get('secondary_color', '#8338ec') }}">
+                </div>
+                <small class="form-text">Cor secundária usada em gradientes, elementos alternativos</small>
+            </div>
+
+            <div class="form-group">
+                <label>Visualização do Tema</label>
+                <div class="theme-preview">
+                    <div class="theme-preview-box" id="themePreview">
+                        <div class="preview-header"></div>
+                        <div class="preview-content">
+                            <div class="preview-btn primary"></div>
+                            <div class="preview-btn secondary"></div>
+                            <div class="preview-text"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-card tab-content" id="contact">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Informações de Contato</h2>
+        </div>
+
+        <div class="settings-form">
+            <div class="form-group">
+                <label for="contact_email">Email de Contato</label>
+                <input type="email" id="contact_email" class="form-control"
+                       value="{{ site_configs.get('contact_email', 'contato@mundodainformatica.com') }}"
+                       data-key="contact_email" data-type="string">
+            </div>
+
+            <div class="form-group">
+                <label for="contact_phone">Telefone de Contato</label>
+                <input type="text" id="contact_phone" class="form-control"
+                       value="{{ site_configs.get('contact_phone', '(00) 1234-5678') }}"
+                       data-key="contact_phone" data-type="string">
+            </div>
+
+            <div class="form-group">
+                <label for="contact_address">Endereço Físico</label>
+                <textarea id="contact_address" class="form-control" rows="2"
+                          data-key="contact_address" data-type="string">{{ site_configs.get('contact_address', 'Av. Tecnologia, 123, São Paulo - SP') }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-card tab-content" id="social">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Redes Sociais</h2>
+        </div>
+
+        <div class="settings-form" id="socialLinksForm">
+            <div class="form-group">
+                <label for="facebook_url">Facebook</label>
+                <div class="input-with-icon">
+                    <i class="fab fa-facebook-f"></i>
+                    <input type="url" id="facebook_url" class="form-control"
+                           value="{{ site_configs.get('social_links', {}).get('facebook', '') }}"
+                           data-social="facebook">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="instagram_url">Instagram</label>
+                <div class="input-with-icon">
+                    <i class="fab fa-instagram"></i>
+                    <input type="url" id="instagram_url" class="form-control"
+                           value="{{ site_configs.get('social_links', {}).get('instagram', '') }}"
+                           data-social="instagram">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="twitter_url">Twitter</label>
+                <div class="input-with-icon">
+                    <i class="fab fa-twitter"></i>
+                    <input type="url" id="twitter_url" class="form-control"
+                           value="{{ site_configs.get('social_links', {}).get('twitter', '') }}"
+                           data-social="twitter">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="youtube_url">YouTube</label>
+                <div class="input-with-icon">
+                    <i class="fab fa-youtube"></i>
+                    <input type="url" id="youtube_url" class="form-control"
+                           value="{{ site_configs.get('social_links', {}).get('youtube', '') }}"
+                           data-social="youtube">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="linkedin_url">LinkedIn</label>
+                <div class="input-with-icon">
+                    <i class="fab fa-linkedin-in"></i>
+                    <input type="url" id="linkedin_url" class="form-control"
+                           value="{{ site_configs.get('social_links', {}).get('linkedin', '') }}"
+                           data-social="linkedin">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-card tab-content" id="advanced">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Configurações Avançadas</h2>
+        </div>
+
+        <div class="settings-form">
+            <div class="form-group">
+                <label for="items_per_page">Itens por Página</label>
+                <input type="number" id="items_per_page" class="form-control" min="4" max="50"
+                       value="{{ site_configs.get('items_per_page', 12) }}"
+                       data-key="items_per_page" data-type="int">
+                <small class="form-text">Número de posts exibidos por página nas listagens de categoria</small>
+            </div>
+
+            <div class="form-group">
+                <label for="google_analytics">Código do Google Analytics</label>
+                <input type="text" id="google_analytics" class="form-control"
+                       value="{{ site_configs.get('google_analytics', '') }}"
+                       data-key="google_analytics" data-type="string">
+                <small class="form-text">ID de rastreamento do Google Analytics (ex: UA-XXXXX-Y ou G-XXXXXXXX)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="custom_css">CSS Personalizado</label>
+                <textarea id="custom_css" class="form-control code-editor" rows="6"
+                          data-key="custom_css" data-type="string">{{ site_configs.get('custom_css', '') }}</textarea>
+                <small class="form-text">CSS adicional para personalizar a aparência do site</small>
+            </div>
+
+            <div class="form-group">
+                <label for="maintenance_mode">Modo de Manutenção</label>
+                <div class="form-check">
+                    <input type="checkbox" id="maintenance_mode" class="form-check-input"
+                           {{ 'checked' if site_configs.get('maintenance_mode', False) else '' }}
+                           data-key="maintenance_mode" data-type="bool">
+                    <label class="form-check-label" for="maintenance_mode">Ativar modo de manutenção (o site ficará temporariamente indisponível para visitantes)</label>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Enhanced navigation system
+        const navItems = document.querySelectorAll('.nav-item');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const tabId = item.getAttribute('data-tab');
+
+                // Ativar item de navegação
+                navItems.forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+
+                // Mostrar conteúdo com animação
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === tabId) {
+                        content.classList.add('active');
+                        content.style.animation = 'slideInRight 0.3s ease';
+                    }
+                });
+            });
+        });
+
+        // Preview changes function
+        window.previewChanges = function() {
+            const previewWindow = window.open('/', '_blank');
+            showNotification('Abrindo preview do site em nova aba...', 'info');
+        };
+
+        // Reset to defaults function
+        window.resetToDefaults = function() {
+            if (confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão? Esta ação não pode ser desfeita.')) {
+                // Reset form values to defaults
+                document.getElementById('site_name').value = 'Mundo da Informática';
+                document.getElementById('site_description').value = 'Seu portal de recursos para técnicos de informática';
+                document.getElementById('primary_color').value = '#3a86ff';
+                document.getElementById('secondary_color').value = '#8338ec';
+                // ... reset other fields
+                showNotification('Configurações restauradas para os valores padrão. Clique em "Salvar" para aplicar.', 'warning');
+            }
+        };
+
+        // Sincronizar inputs de cor texto/picker
+        const colorInputs = document.querySelectorAll('.color-picker');
+        colorInputs.forEach(input => {
+            const textInput = document.getElementById(`${input.id}_text`);
+
+            input.addEventListener('input', () => {
+                textInput.value = input.value;
+                updateThemePreview();
+            });
+
+            textInput.addEventListener('change', () => {
+                // Validar se é um valor hexadecimal válido
+                const isValidHex = /^#[0-9A-F]{6}$/i.test(textInput.value);
+                if (isValidHex) {
+                    input.value = textInput.value;
+                    updateThemePreview();
+                } else {
+                    textInput.value = input.value;
+                }
+            });
+        });
+
+        // Atualizar preview do tema
+        function updateThemePreview() {
+            const primaryColor = document.getElementById('primary_color').value;
+            const secondaryColor = document.getElementById('secondary_color').value;
+
+            const preview = document.getElementById('themePreview');
+            preview.style.setProperty('--preview-primary', primaryColor);
+            preview.style.setProperty('--preview-secondary', secondaryColor);
+        }
+
+        // Inicializar preview
+        updateThemePreview();
+
+        // Função para salvar configurações
+        window.saveAllSettings = function() {
+            const settings = {};
+
+            // Coletar valores dos inputs simples
+            document.querySelectorAll('[data-key]').forEach(input => {
+                const key = input.getAttribute('data-key');
+                const type = input.getAttribute('data-type');
+
+                let value;
+                if (input.type === 'checkbox') {
+                    value = input.checked;
+                } else {
+                    value = input.value;
+                }
+
+                settings[key] = {
+                    value: value,
+                    type: type
+                };
+            });
+
+            // Coletar valores das redes sociais
+            const socialLinks = {};
+            document.querySelectorAll('[data-social]').forEach(input => {
+                const network = input.getAttribute('data-social');
+                socialLinks[network] = input.value;
+            });
+
+            settings['social_links'] = {
+                value: socialLinks,
+                type: 'json'
+            };
+
+            // Enviar para o servidor via fetch API
+            fetch('/admin/save_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Configurações salvas com sucesso!', 'success');
+                } else {
+                    showNotification('Erro ao salvar configurações.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Erro ao salvar configurações.', 'error');
+            });
+        };
+
+        // Função para mostrar notificações
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+                <button class="notification-close">&times;</button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Adicionar evento para fechar
+            notification.querySelector('.notification-close').addEventListener('click', () => {
+                notification.remove();
+            });
+
+            // Auto-fechar após 5 segundos
+            setTimeout(() => {
+                notification.classList.add('fade-out');
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+    });
+</script>
+{% endblock %}

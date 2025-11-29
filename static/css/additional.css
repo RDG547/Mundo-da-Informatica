@@ -1,0 +1,251 @@
+/* Estilos adicionais para os novos componentes e seções */
+
+/* Página de erro */
+.error-page {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+}
+
+.error-content {
+    text-align: center;
+    max-width: 700px;
+    padding: 3rem;
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.error-number {
+    font-size: 8rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.error-content h1 {
+    margin-bottom: 1.5rem;
+    color: var(--dark-color);
+}
+
+.error-content p {
+    margin-bottom: 2rem;
+    color: var(--gray-color);
+}
+
+/* Estatísticas */
+.stats {
+    padding: 3rem 0;
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 2rem;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 1.5rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    transition: var(--transition-normal);
+}
+
+.stat-card:hover {
+    transform: translateY(-10px);
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.stat-card i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+}
+
+.stat-card h3 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.stat-card p {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* No Posts Section */
+.no-posts {
+    padding: 5rem 0;
+    background-color: #f8f9fa;
+}
+
+.no-posts-content {
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem;
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.no-posts-content i {
+    font-size: 4rem;
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    opacity: 0.7;
+}
+
+.no-posts-content h2 {
+    margin-bottom: 1rem;
+    color: var(--dark-color);
+}
+
+.no-posts-content p {
+    margin-bottom: 2rem;
+    color: var(--gray-color);
+}
+
+.no-posts-content code {
+    background-color: #f1f2f6;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    color: var(--primary-color);
+}
+
+/* Tratamento universal para fotos de perfil */
+.profile-img,
+.user-avatar {
+    position: relative;
+    overflow: hidden;
+    background-color: #f0f0f0;
+}
+
+.profile-img img,
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: relative;
+    z-index: 2;
+}
+
+.profile-img img.error,
+.user-avatar img.error {
+    opacity: 0;
+}
+
+.profile-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-weight: 600;
+    font-size: calc(100% * 0.4);
+    z-index: 1;
+}
+
+.profile-img.loading::after,
+.user-avatar.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: loading-profile-shine 1.5s infinite;
+    z-index: 3;
+}
+
+@keyframes loading-profile-shine {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Variações de tamanho para imagens de perfil */
+.large-profile-img {
+    width: 150px;
+    height: 150px;
+    margin: 0 auto 1.5rem;
+}
+
+.medium-profile-img {
+    width: 100px;
+    height: 100px;
+}
+
+.small-profile-img {
+    width: 50px;
+    height: 50px;
+}
+
+.profile-img-container {
+    position: relative;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.profile-img-edit {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+/* Animação de transição ao trocar a imagem */
+.profile-img img,
+.user-avatar img,
+.admin-profile-img img {
+    transition: opacity 0.3s ease;
+}
+
+.profile-img img.error,
+.user-avatar img.error,
+.admin-profile-img img.error {
+    opacity: 0;
+}
+
+/* Mensagem de erro para upload de imagem */
+.profile-image-error {
+    color: #e63946;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+/* Ajustes específicos para a navbar */
+.navbar .user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 0.5rem;
+}
+
+/* Ajustes específicos para comentários */
+.comment-avatar {
+    width: 40px;
+    height: 40px;
+}

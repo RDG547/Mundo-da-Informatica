@@ -1,0 +1,8 @@
+{
+    "reportCallIssue": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportAttributeAccessIssue": "warning",
+    "reportArgumentType": "warning",
+    "reportUnknownParameterType": "none",
+    "reportUnknownMemberType": "none"
+}

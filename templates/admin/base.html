@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Painel Administrativo | Mundo da Informática</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/x-icon">
+
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome - Implementação Otimizada -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Estilos Inline para Prevenir FOUC (Flash of Unstyled Content) -->
+    <style>
+        /* Carregamento otimizado */
+        body {
+            opacity: 1;
+        }
+
+
+
+        /* Prevenir ícones quebrados durante o carregamento */
+        .fas, .far, .fab, .fa {
+            font-family: 'Font Awesome 5 Free', 'Font Awesome 5 Brands' !important;
+            display: inline-block;
+            font-style: normal;
+            font-variant: normal;
+            text-rendering: auto;
+            line-height: 1;
+        }
+        .fas, .fa {
+            font-weight: 900 !important;
+        }
+        .far {
+            font-weight: 400 !important;
+        }
+        .fab {
+            font-family: 'Font Awesome 5 Brands' !important;
+            font-weight: 400 !important;
+        }
+    </style>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin-extras.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin-sidebar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin-profile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-responsive.css') }}">
+
+    <!-- Adicionar tema atual -->
+    <script>
+        // Carregar tema salvo
+        const savedTheme = localStorage.getItem('admin_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+    <div class="admin-container">
+        <!-- Sidebar -->
+        {% include 'admin/partials/sidebar.html' %}
+
+        <!-- Conteúdo Principal -->
+        <div class="admin-content" id="adminContent">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="notification {{ category }} slide-in-right">
+                            <div class="notification-content">
+                                <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'danger' or category == 'error' %}exclamation-circle{% elif category == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                            <button class="notification-close">&times;</button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="admin-content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modern-forms.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>
+    {% block scripts %}{% endblock %}
+
+    <script>
+        // Inicializar notificações flash
+        document.addEventListener('DOMContentLoaded', function() {
+            // Adicionar evento de clique para fechar notificações
+            document.querySelectorAll('.notification-close').forEach(button => {
+                button.addEventListener('click', function() {
+                    const notification = this.closest('.notification');
+                    notification.classList.add('slide-out-right');
+                    setTimeout(() => notification.remove(), 300);
+                });
+            });
+
+            // Auto-fechar notificações após 8 segundos
+            setTimeout(() => {
+                document.querySelectorAll('.notification').forEach(notification => {
+                    notification.classList.add('slide-out-right');
+                    setTimeout(() => notification.remove(), 300);
+                });
+            }, 8000);
+        });
+
+        // Função global para mostrar notificações
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type} slide-in-right`;
+
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+                <button class="notification-close">&times;</button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Adicionar evento para fechar notificação
+            notification.querySelector('.notification-close').addEventListener('click', () => {
+                notification.classList.add('slide-out-right');
+                setTimeout(() => notification.remove(), 300);
+            });
+
+            // Auto-fechar após 8 segundos
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    notification.classList.add('slide-out-right');
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, 8000);
+        }
+
+        // Funções openModal e closeModal estão em admin.js (window.openModal e window.closeModal)
+
+        // Carregamento otimizado - sem delays desnecessários
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Painel admin carregado com sucesso');
+        });
+    </script>
+</body>
+</html>

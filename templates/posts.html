@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="category-hero">
+    <div class="hero-particles"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+        <div class="hero-content text-center">
+            <div class="hero-icon animate-bounce">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h1 class="hero-title animate-fade-up">Todos os Posts</h1>
+            <p class="hero-subtitle animate-fade-up-delayed">Explore todos os recursos disponíveis em nosso portal organizados por categorias e subcategorias.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Posts Section -->
+<div class="category-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+
+                <!-- Posts Grid -->
+                {% if posts.items %}
+                <div class="posts-grid">
+                    <div class="row">
+                        {% for post in posts.items %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="post-card">
+                                <div class="post-image">
+                                    {% if post.image_url %}
+                                        <img src="{{ post.image_url }}" alt="{{ post.title }}" class="img-fluid">
+                                    {% else %}
+                                        <div class="post-placeholder">
+                                            <i class="fas fa-file-alt"></i>
+                                        </div>
+                                    {% endif %}
+                                    {% if post.featured %}
+                                        <div class="featured-badge">
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="post-content">
+                                    <h3 class="post-title">
+                                        <a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a>
+                                    </h3>
+                                    <p class="post-excerpt">{{ post.content[:150] }}{% if post.content|length > 150 %}...{% endif %}</p>
+                                    <div class="post-meta">
+                                        <span class="post-date">
+                                            <i class="fas fa-calendar"></i>
+                                            {{ post.date_posted.strftime('%d/%m/%Y') }}
+                                        </span>
+                                        <span class="post-views">
+                                            <i class="fas fa-eye"></i>
+                                            {{ post.views }}
+                                        </span>
+                                        {% if post.downloads %}
+                                        <span class="post-downloads">
+                                            <i class="fas fa-download"></i>
+                                            {{ post.downloads }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="post-actions">
+                                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-primary">
+                                            <i class="fas fa-eye"></i> Ver Post
+                                        </a>
+                                        {% if post.download_link %}
+                                        <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-outline-primary">
+                                            <i class="fas fa-download"></i> Download
+                                        </a>
+                                        {% endif %}
+                                        {% if current_user.is_authenticated %}
+                                        <button data-post-id="{{ post.id }}" onclick="toggleFavorite({{ post.id }})" class="btn btn-outline-primary favorite-btn-card {% if post.id in favorite_post_ids %}favorited{% endif %}" title="{% if post.id in favorite_post_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}">
+                                            <i class="{% if post.id in favorite_post_ids %}fas{% else %}far{% endif %} fa-star"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                {% if posts.pages > 1 %}
+                <div class="pagination-wrapper">
+                    <nav aria-label="Navegação de posts">
+                        <ul class="pagination justify-content-center">
+                            {% if posts.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('posts', page=posts.prev_num) }}">
+                                        <i class="fas fa-chevron-left"></i> Anterior
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for page_num in posts.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != posts.page %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('posts', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                    {% endif %}
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if posts.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('posts', page=posts.next_num) }}">
+                                        Próximo <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <!-- Empty State -->
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3>Nenhum post encontrado</h3>
+                    <p>Não há posts disponíveis no momento.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.posts-grid {
+    margin-top: 2rem;
+}
+
+.post-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    height: 100%;
+}
+
+.post-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.post-image {
+    position: relative;
+    height: 200px;
+    overflow: hidden;
+}
+
+.post-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.post-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 3rem;
+}
+
+.featured-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ffc107;
+    color: white;
+    padding: 5px 8px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.post-content {
+    padding: 1.5rem;
+}
+
+.post-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.post-title a {
+    color: #333;
+    text-decoration: none;
+}
+
+.post-title a:hover {
+    color: var(--primary-color);
+}
+
+.post-excerpt {
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+
+.post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.post-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.post-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.post-actions .btn {
+    flex: 1;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+}
+
+.favorite-btn-card {
+    background: transparent !important;
+    border: 2px solid var(--accent-color) !important;
+    color: var(--accent-color) !important;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex: 0 0 auto !important;
+    width: auto !important;
+}
+
+.favorite-btn-card:hover {
+    background: var(--accent-color) !important;
+    color: white !important;
+    transform: scale(1.05);
+}
+
+.favorite-btn-card.favorited {
+    background: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+.favorite-btn-card.favorited:hover {
+    background: #c82333 !important;
+    border-color: #c82333 !important;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #6c757d;
+}
+
+.pagination-wrapper {
+    margin-top: 3rem;
+}
+
+.pagination .page-link {
+    color: var(--primary-color);
+    border-color: #dee2e6;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.pagination .page-link:hover {
+    color: var(--secondary-color);
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+{% endblock %}

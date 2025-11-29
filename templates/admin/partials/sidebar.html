@@ -1,0 +1,170 @@
+<aside class="admin-sidebar" id="adminSidebar">
+    <div class="admin-nav-header">
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-logo">
+            <i class="fas fa-laptop-code admin-icon"></i>
+            <span class="logo-text">
+                <span class="admin-mundo">Mundo</span>
+                <span class="admin-informatica">da Informática</span>
+            </span>
+        </a>
+        <button id="sidebarToggle" class="sidebar-toggle">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <div class="admin-profile">
+        <div class="admin-profile-img">
+            <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="Admin profile" onerror="this.classList.add('error')">
+            <div class="profile-placeholder">
+                {% if current_user.name %}
+                    {% set name_parts = current_user.name.split() %}
+                    {% if name_parts|length >= 2 %}
+                        {{ name_parts[0][0]|upper }}{{ name_parts[-1][0]|upper }}
+                    {% else %}
+                        {{ current_user.name[0]|upper }}
+                    {% endif %}
+                {% else %}
+                    MI
+                {% endif %}
+            </div>
+        </div>
+        <div class="admin-profile-info">
+            <h4>{{ current_user.name or current_user.get_full_name() or current_user.username }}</h4>
+            <p>{{ current_user.role }}</p>
+        </div>
+    </div>
+
+    <div class="admin-nav">
+        <div class="nav-section">
+            <h5 class="nav-section-title">Principal</h5>
+
+            <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-item {% if request.path == url_for('admin_dashboard') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 576 512">
+                    <path fill="currentColor" d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1V472c0 22.1-17.9 40-40 40H456c-1.1 0-2.2 0-3.3-.1c-1.4 .1-2.8 .1-4.2 .1H416 392c-22.1 0-40-17.9-40-40V448 384c0-17.7-14.3-32-32-32H256c-17.7 0-32 14.3-32 32v64 24c0 22.1-17.9 40-40 40H160 128.1c-1.5 0-3-.1-4.5-.2c-1.2 .1-2.4 .2-3.6 .2H104c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9 .1-2.8V287.6H32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7L564.8 231.5c8 7 12 15 11 24z"/>
+                </svg>
+                <span class="admin-nav-text">Dashboard</span>
+            </a>
+
+            <a href="{{ url_for('admin_analytics') }}" class="admin-nav-item {% if request.path == url_for('admin_analytics') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M64 64c0-17.7-14.3-32-32-32S0 46.3 0 64V400c0 44.2 35.8 80 80 80H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H80c-8.8 0-16-7.2-16-16V64zm406.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L320 210.7l-57.4-57.4c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L240 221.3l57.4 57.4c12.5 12.5 32.8 12.5 45.3 0l128-128z"/>
+                </svg>
+                <span class="admin-nav-text">Estatísticas</span>
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <h5 class="nav-section-title">Gerenciamento</h5>
+
+            <a href="{{ url_for('admin_posts') }}" class="admin-nav-item {% if request.path == url_for('admin_posts') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 384 512">
+                    <path fill="currentColor" d="M0 64C0 28.7 28.7 0 64 0H224V128c0 17.7 14.3 32 32 32H384V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64zm384 64H256V0L384 128z"/>
+                </svg>
+                <span class="admin-nav-text">Posts</span>
+                <span class="nav-badge">{{ post_count if post_count is not none else '' }}</span>
+            </a>
+
+            <a href="{{ url_for('admin_categories') }}" class="admin-nav-item {% if request.path == url_for('admin_categories') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M512 416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96C0 60.7 28.7 32 64 32H192c20.1 0 39.1 9.5 51.2 25.6l19.2 25.6c6 8.1 15.5 12.8 25.6 12.8H448c35.3 0 64 28.7 64 64V416zM232 376c0-13.3-10.7-24-24-24s-24 10.7-24 24s10.7 24 24 24s24-10.7 24-24zm96 0c0-13.3-10.7-24-24-24s-24 10.7-24 24s10.7 24 24 24s24-10.7 24-24zm96 0c0-13.3-10.7-24-24-24s-24 10.7-24 24s10.7 24 24 24s24-10.7 24-24z"/>
+                </svg>
+                <span class="admin-nav-text">Categorias</span>
+                <span class="nav-badge">{{ category_count if category_count is not none else '' }}</span>
+            </a>
+
+            <a href="{{ url_for('admin_comments') }}" class="admin-nav-item {% if request.path == url_for('admin_comments') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M512 240c0 114.9-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6C73.6 471.1 44.7 480 16 480c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4l0 0 0 0 0 0 0 0 .3-.3c.3-.3 .7-.7 1.3-1.4c1.1-1.2 2.8-3.1 4.9-5.7c4.1-5 9.6-12.4 15.2-21.6c10-16.6 19.5-38.4 21.4-62.9C17.7 326.8 0 285.1 0 240C0 125.1 114.6 32 256 32s256 93.1 256 208z"/>
+                </svg>
+                <span class="admin-nav-text">Comentários</span>
+                <span class="nav-badge">{{ comment_count if comment_count is not none else '' }}</span>
+            </a>
+
+            <a href="{{ url_for('admin_users') }}" class="admin-nav-item {% if request.path == url_for('admin_users') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 640 512">
+                    <path fill="currentColor" d="M144 0a80 80 0 1 1 0 160A80 80 0 1 1 144 0zM512 0a80 80 0 1 1 0 160A80 80 0 1 1 512 0zM0 298.7C0 239.8 47.8 192 106.7 192h42.7c15.9 0 31 3.5 44.6 9.7c-1.3 7.2-1.9 14.7-1.9 22.3c0 38.2 16.8 72.5 43.3 96c-.2 0-.4 0-.7 0H21.3C9.6 320 0 310.4 0 298.7zM405.3 320c-.2 0-.4 0-.7 0c26.6-23.5 43.3-57.8 43.3-96c0-7.6-.7-15-1.9-22.3c13.6-6.3 28.7-9.7 44.6-9.7h42.7C592.2 192 640 239.8 640 298.7c0 11.8-9.6 21.3-21.3 21.3H405.3zM224 224a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zM128 485.3C128 411.7 187.7 352 261.3 352h117.4C452.3 352 512 411.7 512 485.3c0 14.7-11.9 26.7-26.7 26.7H154.7c-14.7 0-26.7-11.9-26.7-26.7z"/>
+                </svg>
+                <span class="admin-nav-text">Usuários</span>
+                <span class="nav-badge">{{ user_count if user_count is not none else '' }}</span>
+            </a>
+
+            <a href="{{ url_for('admin_newsletter') }}" class="admin-nav-item {% if request.path == url_for('admin_newsletter') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M64 112c-8.8 0-16 7.2-16 16v22.1L220.5 291.7c20.7 17 50.4 17 71.1 0L464 150.1V128c0-8.8-7.2-16-16-16H64zM48 212.2V384c0 8.8 7.2 16 16 16H448c8.8 0 16-7.2 16-16V212.2L322 328.8c-38.4 31.5-93.7 31.5-132 0L48 212.2zM0 128C0 92.7 28.7 64 64 64H448c35.3 0 64 28.7 64 64V384c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128z"/>
+                </svg>
+                <span class="admin-nav-text">Newsletter</span>
+                <span class="nav-badge">{{ subscriber_count if subscriber_count is not none else '' }}</span>
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <h5 class="nav-section-title">Ferramentas</h5>
+
+            <a href="{{ url_for('admin_tools_backup') }}" class="admin-nav-item {% if request.path == url_for('admin_tools_backup') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 448 512">
+                    <path fill="currentColor" d="M448 80v48c0 44.2-100.3 80-224 80S0 172.2 0 128V80C0 35.8 100.3 0 224 0S448 35.8 448 80zM393.2 214.7c20.8-7.4 39.9-16.9 54.8-28.6V288c0 44.2-100.3 80-224 80S0 332.2 0 288V186.1c14.9 11.8 34 21.2 54.8 28.6C99.7 230.7 159.5 240 224 240s124.3-9.3 169.2-25.3zM0 346.1c14.9 11.8 34 21.2 54.8 28.6C99.7 390.7 159.5 400 224 400s124.3-9.3 169.2-25.3c20.8-7.4 39.9-16.9 54.8-28.6V432c0 44.2-100.3 80-224 80S0 476.2 0 432V346.1z"/>
+                </svg>
+                <span class="admin-nav-text">Backup</span>
+            </a>
+
+            <a href="{{ url_for('admin_tools_import') }}" class="admin-nav-item {% if request.path == url_for('admin_tools_import') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M128 64c0-35.3 28.7-64 64-64H352V128c0 17.7 14.3 32 32 32H512V448c0 35.3-28.7 64-64 64H192c-35.3 0-64-28.7-64-64V336H302.1l-39 39c-9.4 9.4-9.4 24.6 0 33.9s24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9l-80-80c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l39 39H128V160 128 64zm0 256V416c0 17.7 14.3 32 32 32c0 17.7-14.3 32-32 32s-32-14.3-32-32V320c0-17.7 14.3-32 32-32s32 14.3 32 32z"/>
+                </svg>
+                <span class="admin-nav-text">Importar</span>
+            </a>
+
+            <a href="#" class="admin-nav-item" id="clearCacheBtn">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H336c-17.7 0-32 14.3-32 32s14.3 32 32 32H463.5c0 0 0 0 0 0h.4c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v51.2L414.4 97.6c-87.5-87.5-229.3-87.5-316.8 0C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5zM39 289.3c-5 1.5-9.8 4.2-13.7 8.2c-4 4-6.7 8.8-8.1 14c-.3 1.2-.6 2.5-.8 3.8c-.3 1.7-.4 3.4-.4 5.1V448c0 17.7 14.3 32 32 32s32-14.3 32-32V396.9l17.6 17.5 0 0c87.5 87.4 229.3 87.4 316.7 0c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0l-.1-.1L125.6 352H176c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.4c-1.6 0-3.2 .1-4.8 .3s-3.1 .5-4.6 1z"/>
+                </svg>
+                <span class="admin-nav-text">Limpar Cache</span>
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <h5 class="nav-section-title">Configurações</h5>
+
+            <a href="{{ url_for('admin_settings') }}" class="admin-nav-item {% if request.path == url_for('admin_settings') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/>
+                </svg>
+                <span class="admin-nav-text">Configurações</span>
+            </a>
+
+            <a href="{{ url_for('admin_profile') }}" class="admin-nav-item {% if request.path == url_for('admin_profile') %}active{% endif %}">
+                <svg class="admin-icon" viewBox="0 0 448 512">
+                    <path fill="currentColor" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512H418.3c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304H178.3z"/>
+                </svg>
+                <span class="admin-nav-text">Meu Perfil</span>
+            </a>
+        </div>
+
+        <div class="nav-section nav-section-bottom">
+            <a href="{{ url_for('home') }}" class="admin-nav-item" target="_blank">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M320 0c-17.7 0-32 14.3-32 32s14.3 32 32 32h82.7L201.4 265.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L448 109.3V192c0 17.7 14.3 32 32 32s32-14.3 32-32V32c0-17.7-14.3-32-32-32H320zM80 32C35.8 32 0 67.8 0 112V432c0 44.2 35.8 80 80 80H400c44.2 0 80-35.8 80-80V320c0-17.7-14.3-32-32-32s-32 14.3-32 32V432c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16V112c0-8.8 7.2-16 16-16H192c17.7 0 32-14.3 32-32s-14.3-32-32-32H80z"/>
+                </svg>
+                <span class="admin-nav-text">Ver Site</span>
+            </a>
+
+            <a href="#" class="admin-nav-item theme-toggle" id="themeToggle">
+                <svg class="admin-icon theme-icon-dark" viewBox="0 0 384 512">
+                    <path fill="currentColor" d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/>
+                </svg>
+                <svg class="admin-icon theme-icon-light" viewBox="0 0 512 512" style="display: none;">
+                    <path fill="currentColor" d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/>
+                </svg>
+                <span class="admin-nav-text">Alternar Tema</span>
+            </a>
+
+            <a href="{{ url_for('logout') }}" class="admin-nav-item">
+                <svg class="admin-icon" viewBox="0 0 512 512">
+                    <path fill="currentColor" d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"/>
+                </svg>
+                <span class="admin-nav-text">Sair</span>
+            </a>
+        </div>
+    </div>
+</aside>
+

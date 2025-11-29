@@ -1,0 +1,2314 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<!-- Enhanced Header -->
+<div class="admin-header slide-in-up">
+    <div class="header-content">
+        <div class="header-main">
+            <h1><i class="fas fa-newspaper"></i> Gerenciar Newsletter</h1>
+            <p class="header-subtitle">Crie campanhas, gerencie assinantes e acompanhe métricas de email marketing</p>
+        </div>
+        <div class="header-actions">
+            <div class="quick-stats">
+                <div class="stat-item subscribers">
+                    <span class="stat-number">{{ total_subscribers or 0 }}</span>
+                    <span class="stat-label">Assinantes</span>
+                </div>
+                <div class="stat-item active">
+                    <span class="stat-number">{{ active_subscribers or 0 }}</span>
+                    <span class="stat-label">Ativos</span>
+                </div>
+                <div class="stat-item campaigns">
+                    <span class="stat-number">{{ total_campaigns or 0 }}</span>
+                    <span class="stat-label">Campanhas</span>
+                </div>
+                <div class="stat-item rate">
+                    <span class="stat-number">{{ open_rate or 0 }}%</span>
+                    <span class="stat-label">Taxa Abertura</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-admin btn-admin-outline" onclick="exportSubscribers()">
+                    <i class="fas fa-download"></i> Exportar Lista
+                </button>
+                <button class="btn-admin btn-admin-success" onclick="sendTestEmail()">
+                    <i class="fas fa-flask"></i> Email Teste
+                </button>
+                <button class="btn-admin btn-admin-primary" data-modal="composeModal">
+                    <i class="fas fa-paper-plane"></i> Nova Campanha
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="admin-tabs slide-in-up">
+    <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="subscribers">Assinantes</button>
+        <button class="tab-btn" data-tab="campaigns">Campanhas</button>
+        <button class="tab-btn" data-tab="templates">Templates</button>
+        <button class="tab-btn" data-tab="settings">Configurações</button>
+    </div>
+
+    <!-- Enhanced Tab Assinantes -->
+    <div class="admin-card tab-content active" id="subscribers">
+        <div class="admin-card-header">
+            <div class="header-left">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-users"></i> Assinantes da Newsletter
+                    <span class="count-badge">{{ total_subscribers or 0 }}</span>
+                </h2>
+            </div>
+            <div class="header-right">
+                <div class="filter-controls">
+                    <div class="search-bar-advanced">
+                        <div class="search-input-container">
+                            <input type="text" placeholder="Pesquisar assinantes..." id="searchSubscribers" class="search-input">
+                            <button class="search-btn"><i class="fas fa-search"></i></button>
+                            <button class="search-clear" onclick="clearSubscriberSearch()"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="filter-dropdown">
+                        <select id="filterSubscriberStatus" class="form-select">
+                            <option value="">Todos os Status</option>
+                            <option value="active">Ativos</option>
+                            <option value="inactive">Inativos</option>
+                        </select>
+                    </div>
+                    <div class="filter-dropdown">
+                        <select id="filterSubscriberGroup" class="form-select">
+                            <option value="">Todos os Grupos</option>
+                            {% if newsletter_groups %}
+                                {% for group in newsletter_groups %}
+                                <option value="{{ group.name }}">{{ group.name }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn-admin btn-admin-outline" data-modal="importSubscribersModal">
+                            <i class="fas fa-file-import"></i> Importar
+                        </button>
+                        <button class="btn-admin btn-admin-outline" onclick="exportSubscribers()">
+                            <i class="fas fa-file-export"></i> Exportar
+                        </button>
+                        <button class="btn-admin btn-admin-primary" data-modal="addSubscriberModal">
+                            <i class="fas fa-user-plus"></i> Adicionar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table enhanced">
+                <thead>
+                    <tr>
+                        <th style="width: 40px">
+                            <input type="checkbox" id="selectAllSubscribers" class="form-check-input">
+                        </th>
+                        <th data-sort="email">
+                            <i class="fas fa-envelope"></i> Email
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th data-sort="name">
+                            <i class="fas fa-user"></i> Nome
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th data-sort="date">
+                            <i class="fas fa-calendar"></i> Inscrição
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th data-sort="status">
+                            <i class="fas fa-toggle-on"></i> Status
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th>
+                            <i class="fas fa-layer-group"></i> Grupos
+                        </th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if subscribers and subscribers.items %}
+                        {% for subscriber in subscribers.items %}
+                        <tr data-id="{{ subscriber.id }}" data-status="{{ 'active' if subscriber.is_active else 'inactive' }}" class="subscriber-row {% if not subscriber.is_active %}inactive-row{% endif %}">
+                            <td>
+                                <input type="checkbox" class="form-check-input subscriber-checkbox" value="{{ subscriber.id }}">
+                            </td>
+                            <td>
+                                <div class="email-cell">
+                                    <div class="email-address">{{ subscriber.email }}</div>
+                                    <small class="email-domain text-muted">
+                                        <i class="fas fa-at"></i> {{ subscriber.email.split('@')[1] }}
+                                    </small>
+                                    {% if subscriber.source %}
+                                    <small class="email-source text-muted">
+                                        <i class="fas fa-link"></i> Via {{ subscriber.source }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="name-cell">
+                                    <div class="subscriber-name">{{ subscriber.name or 'Nome não informado' }}</div>
+                                    {% if subscriber.location %}
+                                    <small class="subscriber-location text-muted">
+                                        <i class="fas fa-map-marker-alt"></i> {{ subscriber.location }}
+                                    </small>
+                                    {% endif %}
+                                    {% if subscriber.preferences %}
+                                    <small class="subscriber-preferences text-muted">
+                                        <i class="fas fa-cog"></i> {{ subscriber.preferences | length }} preferências
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="date-cell">
+                                    <div class="subscription-date">{{ subscriber.subscribed_date.strftime('%d/%m/%Y') }}</div>
+                                    <small class="subscription-time text-muted">{{ subscriber.subscribed_date.strftime('%H:%M') }}</small>
+                                    <small class="date-relative text-muted">
+                                        {% set days_ago = (moment.utcnow() - subscriber.subscribed_date).days %}
+                                        {% if days_ago == 0 %}Hoje
+                                        {% elif days_ago == 1 %}Ontem
+                                        {% elif days_ago < 30 %}{{ days_ago }} dias atrás
+                                        {% else %}{{ (days_ago / 30) | round | int }} meses atrás
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-cell">
+                                    {% if subscriber.is_active %}
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-check-circle"></i> Ativo
+                                    </span>
+                                    {% else %}
+                                    <span class="badge badge-danger">
+                                        <i class="fas fa-ban"></i> Inativo
+                                    </span>
+                                    {% endif %}
+                                    {% if subscriber.confirmed_at %}
+                                    <small class="confirmation-status text-success">
+                                        <i class="fas fa-shield-check"></i> Confirmado
+                                    </small>
+                                    {% else %}
+                                    <small class="confirmation-status text-warning">
+                                        <i class="fas fa-hourglass-half"></i> Pendente
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="groups-cell">
+                                    {% set groups = subscriber.get_groups_names() %}
+                                    {% if groups and groups != 'Geral' %}
+                                        {% for group_name in groups.split(', ') %}
+                                        <span class="group-badge">
+                                            <i class="fas fa-tag"></i> {{ group_name }}
+                                        </span>
+                                        {% endfor %}
+                                    {% else %}
+                                    <span class="group-badge default">
+                                        <i class="fas fa-users"></i> Geral
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <div class="action-buttons">
+                                    <a href="#" class="btn-action btn-view" title="Ver Detalhes" data-subscriber-id="{{ subscriber.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="#" class="btn-action btn-edit" title="Editar" data-subscriber-id="{{ subscriber.id }}">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" class="btn-action btn-email" title="Enviar Email" data-subscriber-id="{{ subscriber.id }}">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </a>
+                                    <a href="#" class="btn-action btn-delete" title="Excluir" data-subscriber-id="{{ subscriber.id }}" data-subscriber-email="{{ subscriber.email }}">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Enhanced Empty State -->
+                        <tr class="empty-state">
+                            <td colspan="7" style="text-align: center; padding: 3rem;">
+                                <div class="empty-state-content">
+                                    <i class="fas fa-user-plus fa-3x text-muted mb-3"></i>
+                                    <h4 class="text-muted">Nenhum assinante encontrado</h4>
+                                    <p class="text-muted">Comece adicionando assinantes ou configurando formulários de inscrição.</p>
+                                    <div class="empty-state-actions">
+                                        <button class="btn-admin btn-admin-primary" data-modal="addSubscriberModal">
+                                            <i class="fas fa-user-plus"></i> Adicionar Assinante
+                                        </button>
+                                        <button class="btn-admin btn-admin-outline" data-modal="importSubscribersModal">
+                                            <i class="fas fa-file-import"></i> Importar Lista
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Enhanced Footer -->
+        <div class="admin-card-footer">
+            <div class="bulk-actions">
+                <select id="bulkSubscriberAction" class="form-select">
+                    <option value="">Ações em massa</option>
+                    <option value="activate">Ativar selecionados</option>
+                    <option value="deactivate">Desativar selecionados</option>
+                    <option value="move_group">Mover para grupo</option>
+                    <option value="send_email">Enviar email</option>
+                    <option value="export_selected">Exportar selecionados</option>
+                    <option value="delete">Excluir selecionados</option>
+                </select>
+                <button id="applySubscriberBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+            </div>
+
+            <div class="stats-summary">
+                <div class="stats-item">
+                    <span class="stats-value">{{ total_subscribers or 0 }}</span>
+                    <span class="stats-label">Total</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-value">{{ active_subscribers or 0 }}</span>
+                    <span class="stats-label">Ativos</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-value">{{ (total_subscribers or 0) - (active_subscribers or 0) }}</span>
+                    <span class="stats-label">Inativos</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-value">{{ recent_subscribers or 0 }}</span>
+                    <span class="stats-label">Novos (7d)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paginação -->
+        <div class="pagination-container">
+            <nav aria-label="Navegação de página">
+                <ul class="pagination">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_newsletter', page=pagination.prev_num) }}" aria-label="Anterior">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link" aria-hidden="true">&laquo;</span>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num == pagination.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_newsletter', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_newsletter', page=pagination.next_num) }}" aria-label="Próximo">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link" aria-hidden="true">&raquo;</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Enhanced Tab Campanhas -->
+    <div class="admin-card tab-content" id="campaigns">
+        <div class="admin-card-header">
+            <div class="header-left">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-paper-plane"></i> Campanhas de Email
+                    <span class="count-badge">{{ total_campaigns or 0 }}</span>
+                </h2>
+            </div>
+            <div class="header-right">
+                <div class="filter-controls">
+                    <div class="search-bar-advanced">
+                        <div class="search-input-container">
+                            <input type="text" placeholder="Pesquisar campanhas..." id="searchCampaigns" class="search-input">
+                            <button class="search-btn"><i class="fas fa-search"></i></button>
+                            <button class="search-clear" onclick="clearCampaignSearch()"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="filter-dropdown">
+                        <select id="filterCampaignStatus" class="form-select">
+                            <option value="">Todos os Status</option>
+                            <option value="draft">Rascunho</option>
+                            <option value="scheduled">Agendado</option>
+                            <option value="sent">Enviado</option>
+                            <option value="paused">Pausado</option>
+                        </select>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn-admin btn-admin-outline" onclick="exportCampaignStats()">
+                            <i class="fas fa-chart-line"></i> Relatórios
+                        </button>
+                        <button class="btn-admin btn-admin-primary" data-modal="composeModal">
+                            <i class="fas fa-plus"></i> Nova Campanha
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table enhanced">
+                <thead>
+                    <tr>
+                        <th style="width: 40px">
+                            <input type="checkbox" id="selectAllCampaigns" class="form-check-input">
+                        </th>
+                        <th data-sort="name">
+                            <i class="fas fa-heading"></i> Título
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th data-sort="date">
+                            <i class="fas fa-calendar"></i> Data de Envio
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th data-sort="status">
+                            <i class="fas fa-flag"></i> Status
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th>
+                            <i class="fas fa-users"></i> Destinatários
+                        </th>
+                        <th>
+                            <i class="fas fa-envelope-open"></i> Aberturas
+                        </th>
+                        <th>
+                            <i class="fas fa-mouse-pointer"></i> Cliques
+                        </th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if campaigns %}
+                        {% for campaign in campaigns %}
+                        <tr data-id="{{ campaign.id }}" data-status="{{ campaign.status }}" class="campaign-row">
+                            <td>
+                                <input type="checkbox" class="form-check-input campaign-checkbox" value="{{ campaign.id }}">
+                            </td>
+                            <td>
+                                <div class="campaign-title-cell">
+                                    <div class="campaign-title">{{ campaign.title }}</div>
+                                    <small class="campaign-subject text-muted">
+                                        <i class="fas fa-tag"></i> {{ campaign.subject }}
+                                    </small>
+                                    {% if campaign.template %}
+                                    <small class="campaign-template text-muted">
+                                        <i class="fas fa-layer-group"></i> Template: {{ campaign.template.name }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="date-cell">
+                                    {% if campaign.sent_at %}
+                                    <div class="sent-date">{{ campaign.sent_at.strftime('%d/%m/%Y') }}</div>
+                                    <small class="sent-time text-muted">{{ campaign.sent_at.strftime('%H:%M') }}</small>
+                                    {% elif campaign.scheduled_for %}
+                                    <div class="scheduled-date text-info">{{ campaign.scheduled_for.strftime('%d/%m/%Y') }}</div>
+                                    <small class="scheduled-time text-info">Agendado para {{ campaign.scheduled_for.strftime('%H:%M') }}</small>
+                                    {% else %}
+                                    <span class="text-muted">Não enviado</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-cell">
+                                    {% if campaign.status == 'draft' %}
+                                    <span class="badge badge-secondary">
+                                        <i class="fas fa-edit"></i> Rascunho
+                                    </span>
+                                    {% elif campaign.status == 'scheduled' %}
+                                    <span class="badge badge-info">
+                                        <i class="fas fa-clock"></i> Agendado
+                                    </span>
+                                    {% elif campaign.status == 'sent' %}
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-check"></i> Enviado
+                                    </span>
+                                    {% elif campaign.status == 'paused' %}
+                                    <span class="badge badge-warning">
+                                        <i class="fas fa-pause"></i> Pausado
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="recipients-cell">
+                                    <span class="recipient-count">{{ campaign.total_recipients or 0 }}</span>
+                                    {% if campaign.target_groups %}
+                                    <small class="target-groups text-muted">
+                                        <i class="fas fa-bullseye"></i> {{ campaign.target_groups | length }} grupos
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="metric-cell">
+                                    <span class="metric-number">{{ campaign.opens or 0 }}</span>
+                                    <small class="metric-percentage text-muted">
+                                        {{ ((campaign.opens or 0) / (campaign.total_recipients or 1) * 100) | round(1) }}%
+                                    </small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="metric-cell">
+                                    <span class="metric-number">{{ campaign.clicks or 0 }}</span>
+                                    <small class="metric-percentage text-muted">
+                                        {{ ((campaign.clicks or 0) / (campaign.total_recipients or 1) * 100) | round(1) }}%
+                                    </small>
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <div class="action-buttons">
+                                    <a href="#" class="btn-action btn-view" title="Ver Relatório" data-campaign-id="{{ campaign.id }}">
+                                        <i class="fas fa-chart-bar"></i>
+                                    </a>
+                                    {% if campaign.status == 'draft' %}
+                                    <a href="#" class="btn-action btn-edit" title="Editar" data-campaign-id="{{ campaign.id }}">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" class="btn-action btn-send" title="Enviar" data-campaign-id="{{ campaign.id }}">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </a>
+                                    {% endif %}
+                                    <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-campaign-id="{{ campaign.id }}">
+                                        <i class="fas fa-copy"></i>
+                                    </a>
+                                    <a href="#" class="btn-action btn-delete" title="Excluir" data-campaign-id="{{ campaign.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Enhanced Empty State -->
+                        <tr class="empty-state">
+                            <td colspan="8" style="text-align: center; padding: 3rem;">
+                                <div class="empty-state-content">
+                                    <i class="fas fa-paper-plane fa-3x text-muted mb-3"></i>
+                                    <h4 class="text-muted">Nenhuma campanha criada ainda</h4>
+                                    <p class="text-muted">Crie sua primeira campanha de email marketing para engajar seus assinantes.</p>
+                                    <div class="empty-state-actions">
+                                        <button class="btn-admin btn-admin-primary" data-modal="composeModal">
+                                            <i class="fas fa-plus"></i> Criar Primeira Campanha
+                                        </button>
+                                        <button class="btn-admin btn-admin-outline" onclick="openTemplateGallery()">
+                                            <i class="fas fa-layer-group"></i> Ver Templates
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="admin-card-footer">
+            <div class="bulk-actions">
+                <select id="bulkCampaignAction" class="form-select">
+                    <option value="">Ações em massa</option>
+                    <option value="send">Enviar selecionadas</option>
+                    <option value="schedule">Agendar selecionadas</option>
+                    <option value="pause">Pausar selecionadas</option>
+                    <option value="duplicate">Duplicar selecionadas</option>
+                    <option value="delete">Excluir selecionadas</option>
+                </select>
+                <button id="applyCampaignBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+            </div>
+
+            <div class="campaign-stats">
+                <div class="stats-item">
+                    <span class="stats-value">{{ campaigns_sent or 0 }}</span>
+                    <span class="stats-label">Enviadas</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-value">{{ campaigns_scheduled or 0 }}</span>
+                    <span class="stats-label">Agendadas</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-value">{{ average_open_rate or 0 }}%</span>
+                    <span class="stats-label">Taxa Média</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Templates -->
+    <div class="admin-card tab-content" id="templates">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Templates de Email</h2>
+            <button class="btn-admin btn-admin-primary" data-modal="newTemplateModal">
+                <i class="fas fa-plus"></i> Novo Template
+            </button>
+        </div>
+
+        <div class="templates-grid">
+            <div class="template-card" data-id="1">
+                <div class="template-preview">
+                    <img src="{{ url_for('static', filename='images/admin/template1.jpg') }}" alt="Template Padrão">
+                </div>
+                <div class="template-info">
+                    <h3>Template Padrão</h3>
+                    <p>Template básico para newsletters gerais</p>
+                </div>
+                <div class="template-actions">
+                    <button class="btn-admin btn-admin-sm btn-admin-outline">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn-admin btn-admin-sm btn-admin-primary">
+                        <i class="fas fa-paper-plane"></i> Usar
+                    </button>
+                </div>
+            </div>
+
+            <div class="template-card" data-id="2">
+                <div class="template-preview">
+                    <img src="{{ url_for('static', filename='images/admin/template2.jpg') }}" alt="Template Promocional">
+                </div>
+                <div class="template-info">
+                    <h3>Template Promocional</h3>
+                    <p>Template para divulgação de novidades</p>
+                </div>
+                <div class="template-actions">
+                    <button class="btn-admin btn-admin-sm btn-admin-outline">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn-admin btn-admin-sm btn-admin-primary">
+                        <i class="fas fa-paper-plane"></i> Usar
+                    </button>
+                </div>
+            </div>
+
+            <div class="template-card" data-id="3">
+                <div class="template-preview">
+                    <img src="{{ url_for('static', filename='images/admin/template3.jpg') }}" alt="Template Minimalista">
+                </div>
+                <div class="template-info">
+                    <h3>Template Minimalista</h3>
+                    <p>Template simples para notificações rápidas</p>
+                </div>
+                <div class="template-actions">
+                    <button class="btn-admin btn-admin-sm btn-admin-outline">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn-admin btn-admin-sm btn-admin-primary">
+                        <i class="fas fa-paper-plane"></i> Usar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Configurações -->
+    <div class="admin-card tab-content" id="settings">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Configurações da Newsletter</h2>
+        </div>
+
+        <div class="admin-card-body">
+            <form id="newsletterSettingsForm">
+                <div class="form-section">
+                    <h3 class="section-title">Configurações de Email</h3>
+
+                    <div class="form-group">
+                        <label for="senderName">Nome do Remetente</label>
+                        <input type="text" id="senderName" class="form-control" value="Mundo da Informática">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="senderEmail">Email do Remetente</label>
+                        <input type="email" id="senderEmail" class="form-control" value="newsletter@mundodainformatica.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="replyToEmail">Email de Resposta</label>
+                        <input type="email" id="replyToEmail" class="form-control" value="contato@mundodainformatica.com">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title">Configurações de Inscrição</h3>
+
+                    <div class="form-check">
+                        <input type="checkbox" id="doubleOptIn" class="form-check-input" checked>
+                        <label for="doubleOptIn" class="form-check-label">Usar confirmação dupla (Double Opt-in)</label>
+                    </div>
+
+                    <div class="form-check">
+                        <input type="checkbox" id="welcomeEmail" class="form-check-input" checked>
+                        <label for="welcomeEmail" class="form-check-label">Enviar email de boas-vindas</label>
+                    </div>
+
+                    <div class="form-check">
+                        <input type="checkbox" id="unsubscribeFooter" class="form-check-input" checked>
+                        <label for="unsubscribeFooter" class="form-check-label">Incluir link para cancelar inscrição no rodapé</label>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title">Grupos de Assinantes</h3>
+
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome do Grupo</th>
+                                    <th>Descrição</th>
+                                    <th>Assinantes</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Geral</td>
+                                    <td>Todos os assinantes</td>
+                                    <td>450</td>
+                                    <td class="actions">
+                                        <a href="#" class="btn-action btn-edit" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Técnicos</td>
+                                    <td>Técnicos de informática</td>
+                                    <td>280</td>
+                                    <td class="actions">
+                                        <a href="#" class="btn-action btn-edit" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="#" class="btn-action btn-delete" title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Entusiastas</td>
+                                    <td>Entusiastas de tecnologia</td>
+                                    <td>170</td>
+                                    <td class="actions">
+                                        <a href="#" class="btn-action btn-edit" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="#" class="btn-action btn-delete" title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <button type="button" class="btn-admin btn-admin-outline mt-3" data-modal="newGroupModal">
+                        <i class="fas fa-plus"></i> Novo Grupo
+                    </button>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-admin btn-admin-primary" id="saveNewsletterSettings">
+                        <i class="fas fa-save"></i> Salvar Configurações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Compor Newsletter -->
+<div class="modal" id="composeModal">
+    <div class="modal-content modal-xl">
+        <div class="modal-header">
+            <div class="modal-title-container">
+                <h3><i class="fas fa-paper-plane"></i> Nova Campanha de Email</h3>
+                <p class="modal-subtitle">Crie e configure uma campanha de newsletter personalizada</p>
+            </div>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="composeForm" action="{{ url_for('admin_newsletter') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-8">
+                        <!-- Campaign Details -->
+                        <div class="form-group">
+                            <label for="campaignName" class="form-label">
+                                <i class="fas fa-tag"></i> Título da Campanha
+                                <span class="required">*</span>
+                            </label>
+                            <input type="text" id="campaignName" name="campaign_name"
+                                   class="form-control modern-input"
+                                   placeholder="Ex: Newsletter de Dezembro 2023 - Novos Drivers e BIOS"
+                                   required>
+                            <div class="character-count">
+                                <span id="campaignNameCount">0</span>/100 caracteres
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="emailSubject" class="form-label">
+                                <i class="fas fa-envelope"></i> Assunto do Email
+                                <span class="required">*</span>
+                            </label>
+                            <input type="text" id="emailSubject" name="email_subject"
+                                   class="form-control modern-input"
+                                   placeholder="Ex: 🔥 Novidades em BIOS e Drivers - Dezembro 2023"
+                                   required>
+                            <div class="character-count">
+                                <span id="subjectCount">0</span>/78 caracteres recomendados
+                            </div>
+                            <div class="form-text">Máximo 78 caracteres para melhor visualização em clientes de email</div>
+                        </div>
+
+                        <!-- Template Selection -->
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-palette"></i> Selecione um Template
+                            </label>
+                            <div class="template-selector">
+                                <div class="template-option" data-template="1">
+                                    <div class="template-preview template-1">
+                                        <div class="template-header"></div>
+                                        <div class="template-content"></div>
+                                        <div class="template-footer"></div>
+                                    </div>
+                                    <div class="template-info">
+                                        <h4>Template Padrão</h4>
+                                        <p>Layout clássico com cabeçalho, conteúdo e rodapé</p>
+                                    </div>
+                                    <input type="radio" name="template" value="1" checked style="display: none;">
+                                </div>
+
+                                <div class="template-option" data-template="2">
+                                    <div class="template-preview template-2">
+                                        <div class="template-hero"></div>
+                                        <div class="template-grid"></div>
+                                        <div class="template-cta"></div>
+                                    </div>
+                                    <div class="template-info">
+                                        <h4>Template Promocional</h4>
+                                        <p>Design chamativo para promoções e ofertas especiais</p>
+                                    </div>
+                                    <input type="radio" name="template" value="2" style="display: none;">
+                                </div>
+
+                                <div class="template-option" data-template="3">
+                                    <div class="template-preview template-3">
+                                        <div class="template-simple"></div>
+                                        <div class="template-text"></div>
+                                    </div>
+                                    <div class="template-info">
+                                        <h4>Template Minimalista</h4>
+                                        <p>Design limpo e focado no conteúdo textual</p>
+                                    </div>
+                                    <input type="radio" name="template" value="3" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content Editor -->
+                        <div class="form-group">
+                            <label for="emailContent" class="form-label">
+                                <i class="fas fa-edit"></i> Conteúdo da Newsletter
+                                <span class="required">*</span>
+                            </label>
+                            <div class="editor-toolbar">
+                                <button type="button" class="toolbar-btn" data-command="bold" title="Negrito">
+                                    <i class="fas fa-bold"></i>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-command="italic" title="Itálico">
+                                    <i class="fas fa-italic"></i>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-command="underline" title="Sublinhado">
+                                    <i class="fas fa-underline"></i>
+                                </button>
+                                <div class="toolbar-separator"></div>
+                                <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Lista">
+                                    <i class="fas fa-list-ul"></i>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-command="insertOrderedList" title="Lista Numerada">
+                                    <i class="fas fa-list-ol"></i>
+                                </button>
+                                <div class="toolbar-separator"></div>
+                                <button type="button" class="toolbar-btn" data-command="createLink" title="Link">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-command="fontSize" title="Tamanho">
+                                    <i class="fas fa-text-height"></i>
+                                </button>
+                                <button type="button" class="toolbar-btn" data-command="foreColor" title="Cor do Texto">
+                                    <i class="fas fa-palette"></i>
+                                </button>
+                            </div>
+                            <div class="editor-container">
+                                <div id="newsletterContentEditor" class="rich-editor" contenteditable="true"
+                                     placeholder="Digite o conteúdo da sua newsletter aqui..."></div>
+                                <textarea id="emailContent" name="email_content" style="display: none;" required></textarea>
+                            </div>
+                            <div class="character-count">
+                                <span id="contentCount">0</span> caracteres
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <!-- Recipients -->
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-users"></i> Destinatários</h5>
+                            <div class="recipient-groups">
+                                <div class="recipient-group" data-group="all">
+                                    <div class="group-info">
+                                        <div class="group-icon">
+                                            <i class="fas fa-globe"></i>
+                                        </div>
+                                        <div class="group-details">
+                                            <h4>Todos os Assinantes</h4>
+                                            <p>Lista completa de newsletter</p>
+                                        </div>
+                                    </div>
+                                    <div class="subscriber-count">450</div>
+                                    <input type="checkbox" name="recipients[]" value="all" checked style="display: none;">
+                                </div>
+
+                                <div class="recipient-group" data-group="technicians">
+                                    <div class="group-info">
+                                        <div class="group-icon">
+                                            <i class="fas fa-wrench"></i>
+                                        </div>
+                                        <div class="group-details">
+                                            <h4>Técnicos</h4>
+                                            <p>Profissionais de TI</p>
+                                        </div>
+                                    </div>
+                                    <div class="subscriber-count">280</div>
+                                    <input type="checkbox" name="recipients[]" value="technicians" style="display: none;">
+                                </div>
+
+                                <div class="recipient-group" data-group="enthusiasts">
+                                    <div class="group-info">
+                                        <div class="group-icon">
+                                            <i class="fas fa-heart"></i>
+                                        </div>
+                                        <div class="group-details">
+                                            <h4>Entusiastas</h4>
+                                            <p>Usuários avançados</p>
+                                        </div>
+                                    </div>
+                                    <div class="subscriber-count">170</div>
+                                    <input type="checkbox" name="recipients[]" value="enthusiasts" style="display: none;">
+                                </div>
+                            </div>
+                            <div class="selected-recipients">
+                                <strong>Total: <span id="totalRecipients">450</span> destinatários</strong>
+                            </div>
+                        </div>
+
+                        <!-- Scheduling -->
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-clock"></i> Programação</h5>
+                            <div class="radio-group modern-radios">
+                                <div class="form-check">
+                                    <input type="radio" id="sendNow" name="schedule_option" value="now" class="form-check-input" checked>
+                                    <label for="sendNow" class="form-check-label">
+                                        <i class="fas fa-rocket"></i> Enviar Agora
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" id="sendLater" name="schedule_option" value="later" class="form-check-input">
+                                    <label for="sendLater" class="form-check-label">
+                                        <i class="fas fa-calendar-alt"></i> Programar Envio
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" id="saveDraft" name="schedule_option" value="draft" class="form-check-input">
+                                    <label for="saveDraft" class="form-check-label">
+                                        <i class="fas fa-save"></i> Salvar como Rascunho
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="scheduleDateContainer" style="display: none; margin-top: 1rem;">
+                                <div class="form-group">
+                                    <label for="scheduleDate" class="form-label">Data</label>
+                                    <input type="date" id="scheduleDate" name="schedule_date" class="form-control modern-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="scheduleTime" class="form-label">Hora</label>
+                                    <input type="time" id="scheduleTime" name="schedule_time" class="form-control modern-input">
+                                </div>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle"></i> Fuso horário: GMT-3 (Brasília)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Settings -->
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-cog"></i> Configurações</h5>
+                            <div class="checkbox-group modern-checkboxes">
+                                <div class="form-check">
+                                    <input type="checkbox" id="trackOpens" name="track_opens" class="form-check-input" checked>
+                                    <label for="trackOpens" class="form-check-label">
+                                        <i class="fas fa-eye"></i> Rastrear Aberturas
+                                    </label>
+                                    <small>Monitorar quando emails são abertos</small>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="trackClicks" name="track_clicks" class="form-check-input" checked>
+                                    <label for="trackClicks" class="form-check-label">
+                                        <i class="fas fa-mouse-pointer"></i> Rastrear Cliques
+                                    </label>
+                                    <small>Monitorar cliques em links</small>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="testEmail" name="send_test" class="form-check-input">
+                                    <label for="testEmail" class="form-check-label">
+                                        <i class="fas fa-flask"></i> Enviar Email de Teste
+                                    </label>
+                                    <small>Enviar para você antes da campanha</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview -->
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-eye"></i> Preview</h5>
+                            <div class="email-preview">
+                                <div class="preview-header">
+                                    <div class="preview-subject" id="previewSubject">Assunto do Email</div>
+                                    <div class="preview-from">De: newsletter@mundodainformatica.com</div>
+                                </div>
+                                <div class="preview-content" id="previewContent">
+                                    Conteúdo aparecerá aqui...
+                                </div>
+                                <div class="preview-footer">
+                                    <small>👥 <span id="previewRecipients">450</span> destinatários</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div class="footer-left">
+                <button type="button" class="btn-admin btn-admin-outline" id="previewCampaign">
+                    <i class="fas fa-eye"></i> Visualizar
+                </button>
+            </div>
+            <div class="footer-right">
+                <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn-admin btn-admin-secondary" id="saveAsDraft">
+                    <i class="fas fa-save"></i> Salvar Rascunho
+                </button>
+                <button type="button" class="btn-admin btn-admin-primary" id="sendCampaign">
+                    <i class="fas fa-paper-plane"></i> Enviar Campanha
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Estilos específicos para a página de newsletter */
+    .admin-tabs {
+        margin-top: 1.5rem;
+    }
+
+    .tabs-nav {
+        display: flex;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+        padding-bottom: 1px;
+    }
+
+    .tab-btn {
+        padding: 0.75rem 1.5rem;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--gray-color);
+        white-space: nowrap;
+    }
+
+    .tab-btn.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .stats-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        margin-top: 1.5rem;
+    }
+
+    .stats-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .stats-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .stats-label {
+        font-size: 0.9rem;
+        color: var(--gray-color);
+    }
+
+    .templates-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 2rem;
+        padding: 1.5rem;
+    }
+
+    .template-card {
+        background-color: white;
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+        transition: var(--transition-normal);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .template-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .template-preview {
+        height: 180px;
+        overflow: hidden;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .template-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .template-info {
+        padding: 1.5rem;
+    }
+
+    .template-info h3 {
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .template-info p {
+        color: var(--gray-color);
+        font-size: 0.9rem;
+    }
+
+    .template-actions {
+        padding: 0 1.5rem 1.5rem;
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .btn-admin-sm {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .form-section {
+        margin-bottom: 2.5rem;
+    }
+
+    .form-actions {
+        margin-top: 2rem;
+        text-align: right;
+    }
+
+    .checkbox-group, .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    /* Editor styles */
+    .editor-toolbar {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0.5rem;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-bottom: none;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        background-color: #f8f9fa;
+    }
+
+    .toolbar-btn {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: none;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        color: var(--dark-color);
+        transition: var(--transition-fast);
+    }
+
+    .toolbar-btn:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+        color: var(--primary-color);
+    }
+
+    .editor-content {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+        resize: vertical;
+        min-height: 200px;
+    }
+
+    .modal-lg {
+        max-width: 800px;
+        width: 100%;
+    }
+
+    .justify-center {
+        justify-content: center;
+    }
+
+    .flex-1 {
+        flex: 1;
+    }
+
+    /* Status badges */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-full);
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-active {
+        background-color: rgba(56, 176, 0, 0.1);
+        color: var(--success-color);
+    }
+
+    .status-inactive {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: var(--gray-color);
+    }
+
+    .status-sent {
+        background-color: rgba(58, 134, 255, 0.1);
+        color: var(--primary-color);
+    }
+
+    .status-draft {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: var(--gray-color);
+    }
+
+    .status-scheduled {
+        background-color: rgba(131, 56, 236, 0.1);
+        color: var(--secondary-color);
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sistema de tabs
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tab');
+
+                // Remover classe ativa de todos os botões
+                tabBtns.forEach(b => b.classList.remove('active'));
+
+                // Adicionar classe ativa ao botão atual
+                this.classList.add('active');
+
+                // Esconder todos os conteúdos
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+
+                // Mostrar o conteúdo atual
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Pesquisa de assinantes
+        const searchSubscribers = document.getElementById('searchSubscribers');
+        if (searchSubscribers) {
+            searchSubscribers.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+
+                document.querySelectorAll('#subscribers tbody tr').forEach(row => {
+                    const email = row.cells[0].textContent.toLowerCase();
+                    const name = row.cells[1].textContent.toLowerCase();
+
+                    if (email.includes(searchTerm) || name.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Pesquisa de campanhas
+        const searchCampaigns = document.getElementById('searchCampaigns');
+        if (searchCampaigns) {
+            searchCampaigns.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+
+                document.querySelectorAll('#campaigns tbody tr').forEach(row => {
+                    const title = row.cells[0].textContent.toLowerCase();
+
+                    if (title.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Programação de envio de newsletter
+        const sendLaterRadio = document.getElementById('sendLater');
+        const sendNowRadio = document.getElementById('sendNow');
+        const scheduleDateContainer = document.getElementById('scheduleDateContainer');
+
+        if (sendLaterRadio && sendNowRadio && scheduleDateContainer) {
+            sendLaterRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    scheduleDateContainer.style.display = 'block';
+                }
+            });
+
+            sendNowRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    scheduleDateContainer.style.display = 'none';
+                }
+            });
+        }
+
+        // Definir data e hora padrão para agendamento
+        const scheduleDate = document.getElementById('scheduleDate');
+        const scheduleTime = document.getElementById('scheduleTime');
+
+        if (scheduleDate && scheduleTime) {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(now.getDate() + 1);
+
+            scheduleDate.value = tomorrow.toISOString().split('T')[0];
+            scheduleTime.value = '09:00';
+        }
+
+        // Botão para salvar como rascunho
+        const saveAsDraftBtn = document.getElementById('saveAsDraft');
+        if (saveAsDraftBtn) {
+            saveAsDraftBtn.addEventListener('click', function() {
+                const campaignName = document.getElementById('campaignName').value;
+                const emailSubject = document.getElementById('emailSubject').value;
+
+                if (!campaignName || !emailSubject) {
+                    showNotification('Por favor, preencha pelo menos o título e o assunto.', 'warning');
+                    return;
+                }
+
+                // Simular salvamento
+                console.log('Salvando rascunho:', {
+                    campaignName,
+                    emailSubject,
+                    template: document.getElementById('templateSelect').value,
+                    content: document.getElementById('emailContent').value
+                });
+
+                // Feedback
+                showNotification('Rascunho salvo com sucesso!', 'success');
+
+                // Fechar modal
+                closeModal('composeModal');
+            });
+        }
+
+        // Botão para enviar campanha
+        const sendCampaignBtn = document.getElementById('sendCampaign');
+        if (sendCampaignBtn) {
+            sendCampaignBtn.addEventListener('click', function() {
+                const form = document.getElementById('composeForm');
+
+                // Verificar campos obrigatórios
+                if (!form.checkValidity()) {
+                    form.reportValidity();
+                    return;
+                }
+
+                // Verificar programação
+                const isScheduled = document.getElementById('sendLater').checked;
+                let scheduledDateTime = null;
+
+                if (isScheduled) {
+                    const scheduleDate = document.getElementById('scheduleDate').value;
+                    const scheduleTime = document.getElementById('scheduleTime').value;
+
+                    if (!scheduleDate || !scheduleTime) {
+                        showNotification('Por favor, defina a data e hora de envio.', 'warning');
+                        return;
+                    }
+
+                    scheduledDateTime = `${scheduleDate} ${scheduleTime}`;
+                }
+
+                // Obter destinatários
+                const recipients = [];
+
+                if (document.getElementById('groupAll').checked) {
+                    recipients.push('all');
+                } else {
+                    if (document.getElementById('groupTechnicians').checked) recipients.push('technicians');
+                    if (document.getElementById('groupEnthusiasts').checked) recipients.push('enthusiasts');
+                }
+
+                if (recipients.length === 0) {
+                    showNotification('Por favor, selecione pelo menos um grupo de destinatários.', 'warning');
+                    return;
+                }
+
+                // Simular envio
+                console.log('Enviando campanha:', {
+                    campaignName: document.getElementById('campaignName').value,
+                    emailSubject: document.getElementById('emailSubject').value,
+                    template: document.getElementById('templateSelect').value,
+                    content: document.getElementById('emailContent').value,
+                    recipients,
+                    isScheduled,
+                    scheduledDateTime
+                });
+
+                // Feedback
+                if (isScheduled) {
+                    showNotification('Campanha agendada com sucesso!', 'success');
+                } else {
+                    showNotification('Campanha enviada com sucesso!', 'success');
+                }
+
+                // Fechar modal
+                closeModal('composeModal');
+            });
+        }
+
+        // Salvar configurações da newsletter
+        const saveNewsletterSettings = document.getElementById('saveNewsletterSettings');
+        if (saveNewsletterSettings) {
+            saveNewsletterSettings.addEventListener('click', function() {
+                // Simular salvamento
+                console.log('Salvando configurações da newsletter:', {
+                    senderName: document.getElementById('senderName').value,
+                    senderEmail: document.getElementById('senderEmail').value,
+                    replyToEmail: document.getElementById('replyToEmail').value,
+                    doubleOptIn: document.getElementById('doubleOptIn').checked,
+                    welcomeEmail: document.getElementById('welcomeEmail').checked,
+                    unsubscribeFooter: document.getElementById('unsubscribeFooter').checked
+                });
+
+                // Feedback
+                showNotification('Configurações salvas com sucesso!', 'success');
+            });
+        }
+
+        // Editar assinante
+        const editButtons = document.querySelectorAll('.btn-edit[data-subscriber-id]');
+        if (editButtons.length > 0) {
+            editButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const subscriberId = this.getAttribute('data-subscriber-id');
+                    const row = document.querySelector(`tr[data-id="${subscriberId}"]`);
+
+                    if (!row) return;
+
+                    // Obter dados do assinante da linha da tabela
+                    const email = row.cells[0].textContent;
+                    const name = row.cells[1].textContent;
+                    const status = row.querySelector('.status-badge').textContent.trim().toLowerCase() === 'ativo';
+                    const group = row.cells[4].textContent;
+
+                    // Criar modal dinâmico para edição
+                    const modalHtml = `
+                    <div class="modal" id="editSubscriberModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Editar Assinante</h3>
+                                <button class="close-modal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="editSubscriberForm">
+                                    <input type="hidden" id="editSubscriberId" value="${subscriberId}">
+
+                                    <div class="form-group">
+                                        <label for="editSubscriberEmail">Email</label>
+                                        <input type="email" id="editSubscriberEmail" class="form-control" value="${email}" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="editSubscriberName">Nome</label>
+                                        <input type="text" id="editSubscriberName" class="form-control" value="${name}">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="editSubscriberGroup">Grupo</label>
+                                        <select id="editSubscriberGroup" class="form-control">
+                                            <option value="Geral" ${group === 'Geral' ? 'selected' : ''}>Geral</option>
+                                            <option value="Técnicos" ${group === 'Técnicos' ? 'selected' : ''}>Técnicos</option>
+                                            <option value="Entusiastas" ${group === 'Entusiastas' ? 'selected' : ''}>Entusiastas</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Status</label>
+                                        <div class="form-check">
+                                            <input type="checkbox" id="editSubscriberStatus" class="form-check-input" ${status ? 'checked' : ''}>
+                                            <label for="editSubscriberStatus" class="form-check-label">Ativo</label>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+                                <button class="btn-admin btn-admin-primary" id="saveSubscriberChanges">Salvar</button>
+                            </div>
+                        </div>
+                    </div>`;
+
+                    // Adicionar modal ao DOM
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                    // Abrir modal
+                    openModal('editSubscriberModal');
+
+                    // Adicionar evento para salvar alterações
+                    document.getElementById('saveSubscriberChanges').addEventListener('click', function() {
+                        // Obter valores do formulário
+                        const newEmail = document.getElementById('editSubscriberEmail').value;
+                        const newName = document.getElementById('editSubscriberName').value;
+                        const newGroup = document.getElementById('editSubscriberGroup').value;
+                        const newStatus = document.getElementById('editSubscriberStatus').checked;
+
+                        // Validar formulário
+                        if (!newEmail) {
+                            showNotification('O email é obrigatório.', 'warning');
+                            return;
+                        }
+
+                        // Atualizar dados na linha
+                        row.cells[0].textContent = newEmail;
+                        row.cells[1].textContent = newName;
+                        row.cells[4].textContent = newGroup;
+
+                        // Atualizar badge de status
+                        const statusBadge = row.querySelector('.status-badge');
+                        statusBadge.textContent = newStatus ? 'Ativo' : 'Inativo';
+                        statusBadge.className = `status-badge ${newStatus ? 'status-active' : 'status-inactive'}`;
+
+                        // Simular salvamento no servidor
+                        console.log('Atualizando assinante:', {
+                            id: subscriberId,
+                            email: newEmail,
+                            name: newName,
+                            group: newGroup,
+                            active: newStatus
+                        });
+
+                        // Fechar modal e mostrar notificação
+                        closeModal('editSubscriberModal');
+                        showNotification('Assinante atualizado com sucesso!', 'success');
+
+                        // Remover modal do DOM após fechar
+                        setTimeout(() => {
+                            const modalElement = document.getElementById('editSubscriberModal');
+                            if (modalElement) {
+                                modalElement.remove();
+                            }
+                        }, 300);
+                    });
+
+                    // Adicionar evento para fechar modal
+                    document.querySelector('#editSubscriberModal .close-modal').addEventListener('click', function() {
+                        closeModal('editSubscriberModal');
+
+                        // Remover modal do DOM após fechar
+                        setTimeout(() => {
+                            const modalElement = document.getElementById('editSubscriberModal');
+                            if (modalElement) {
+                                modalElement.remove();
+                            }
+                        }, 300);
+                    });
+
+                    // Adicionar evento para cancelar
+                    document.querySelector('#editSubscriberModal [data-dismiss="modal"]').addEventListener('click', function() {
+                        closeModal('editSubscriberModal');
+
+                        // Remover modal do DOM após fechar
+                        setTimeout(() => {
+                            const modalElement = document.getElementById('editSubscriberModal');
+                            if (modalElement) {
+                                modalElement.remove();
+                            }
+                        }, 300);
+                    });
+                });
+            });
+        }
+
+        // Funcionalidade de excluir assinante
+        const deleteButtons = document.querySelectorAll('.btn-delete[data-subscriber-id]');
+        if (deleteButtons.length > 0) {
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const subscriberId = this.getAttribute('data-subscriber-id');
+
+                    // Criar e mostrar um modal de confirmação
+                    const modalHtml = `
+                    <div class="modal" id="deleteSubscriberModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Confirmar Exclusão</h3>
+                                <button class="close-modal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Tem certeza que deseja remover este assinante da sua lista? Esta ação não pode ser desfeita.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+                                <button class="btn-admin btn-admin-danger" id="confirmDeleteSubscriber">Excluir</button>
+                            </div>
+                        </div>
+                    </div>`;
+
+                    // Adicionar modal ao DOM
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                    // Abrir modal
+                    openModal('deleteSubscriberModal');
+
+                    // Adicionar evento para confirmar exclusão
+                    document.getElementById('confirmDeleteSubscriber').addEventListener('click', function() {
+                        // Remover linha da tabela
+                        const row = document.querySelector(`tr[data-id="${subscriberId}"]`);
+                        if (row) {
+                            row.remove();
+                        }
+
+                        // Simular exclusão no servidor
+                        console.log('Excluindo assinante:', subscriberId);
+
+                        // Atualizar contadores de estatísticas
+                        updateSubscriberStats();
+
+                        // Fechar modal e mostrar notificação
+                        closeModal('deleteSubscriberModal');
+                        showNotification('Assinante removido com sucesso!', 'success');
+
+                        // Remover modal do DOM após fechar
+                        setTimeout(() => {
+                            const modalElement = document.getElementById('deleteSubscriberModal');
+                            if (modalElement) {
+                                modalElement.remove();
+                            }
+                        }, 300);
+                    });
+
+                    // Adicionar eventos para fechar/cancelar
+                    document.querySelector('#deleteSubscriberModal .close-modal').addEventListener('click', function() {
+                        closeModal('deleteSubscriberModal');
+                        setTimeout(() => document.getElementById('deleteSubscriberModal').remove(), 300);
+                    });
+
+                    document.querySelector('#deleteSubscriberModal [data-dismiss="modal"]').addEventListener('click', function() {
+                        closeModal('deleteSubscriberModal');
+                        setTimeout(() => document.getElementById('deleteSubscriberModal').remove(), 300);
+                    });
+                });
+            });
+        }
+
+        // Função para atualizar estatísticas de assinantes
+        function updateSubscriberStats() {
+            const totalRows = document.querySelectorAll('#subscribers tbody tr').length;
+            const activeRows = document.querySelectorAll('#subscribers tbody tr .status-active').length;
+            const inactiveRows = totalRows - activeRows;
+
+            // Atualizar valores nas estatísticas
+            const statsItems = document.querySelectorAll('.stats-summary .stats-item .stats-value');
+            if (statsItems.length >= 3) {
+                statsItems[0].textContent = totalRows;
+                statsItems[1].textContent = activeRows;
+                statsItems[2].textContent = inactiveRows;
+            }
+        }
+
+        // Botão de importar assinantes
+        const importButton = document.querySelector('[data-modal="importSubscribersModal"]');
+        if (importButton) {
+            importButton.addEventListener('click', function() {
+                // Criar modal dinamicamente
+                const modalHtml = `
+                <div class="modal" id="importSubscribersModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Importar Assinantes</h3>
+                            <button class="close-modal">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Importe assinantes a partir de um arquivo CSV ou Excel.</p>
+
+                            <form id="importSubscribersForm">
+                                <div class="form-group">
+                                    <label for="importFile">Selecione o arquivo</label>
+                                    <input type="file" id="importFile" class="form-control" accept=".csv,.xlsx,.xls">
+                                    <div class="form-text">Formatos suportados: CSV, Excel (.xlsx, .xls)</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="importGroup">Adicionar ao grupo</label>
+                                    <select id="importGroup" class="form-control">
+                                        <option value="Geral">Geral</option>
+                                        <option value="Técnicos">Técnicos</option>
+                                        <option value="Entusiastas">Entusiastas</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="sendWelcomeEmail" class="form-check-input" checked>
+                                    <label for="sendWelcomeEmail" class="form-check-label">Enviar email de boas-vindas</label>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="skipDuplicates" class="form-check-input" checked>
+                                    <label for="skipDuplicates" class="form-check-label">Pular emails duplicados</label>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+                            <button class="btn-admin btn-admin-primary" id="startImport">Importar</button>
+                        </div>
+                    </div>
+                </div>`;
+
+                // Adicionar modal ao DOM
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                // Abrir modal
+                openModal('importSubscribersModal');
+
+                // Adicionar evento para iniciar importação
+                document.getElementById('startImport').addEventListener('click', function() {
+                    const importFile = document.getElementById('importFile');
+
+                    if (!importFile.files || importFile.files.length === 0) {
+                        showNotification('Por favor, selecione um arquivo para importar.', 'warning');
+                        return;
+                    }
+
+                    // Obter valores do formulário
+                    const group = document.getElementById('importGroup').value;
+                    const sendWelcome = document.getElementById('sendWelcomeEmail').checked;
+                    const skipDuplicates = document.getElementById('skipDuplicates').checked;
+                    const fileName = importFile.files[0].name;
+
+                    // Simular importação
+                    console.log('Importando assinantes:', {
+                        file: fileName,
+                        group,
+                        sendWelcome,
+                        skipDuplicates
+                    });
+
+                    // Fechar modal
+                    closeModal('importSubscribersModal');
+
+                    // Mostrar notificação de progresso
+                    showNotification('Importação iniciada. Isso pode levar alguns instantes...', 'info');
+
+                    // Simular conclusão da importação após 2 segundos
+                    setTimeout(() => {
+                        showNotification('Importação concluída! 32 assinantes foram adicionados.', 'success');
+
+                        // Atualizar a tabela (simulação)
+                        updateSubscriberStats();
+                    }, 2000);
+
+                    // Remover modal do DOM após fechar
+                    setTimeout(() => {
+                        const modalElement = document.getElementById('importSubscribersModal');
+                        if (modalElement) {
+                            modalElement.remove();
+                        }
+                    }, 300);
+                });
+
+                // Adicionar eventos para fechar/cancelar
+                document.querySelector('#importSubscribersModal .close-modal').addEventListener('click', function() {
+                    closeModal('importSubscribersModal');
+                    setTimeout(() => document.getElementById('importSubscribersModal').remove(), 300);
+                });
+
+                document.querySelector('#importSubscribersModal [data-dismiss="modal"]').addEventListener('click', function() {
+                    closeModal('importSubscribersModal');
+                    setTimeout(() => document.getElementById('importSubscribersModal').remove(), 300);
+                });
+            });
+        }
+
+        // Implementar funcionalidades básicas do editor de conteúdo
+        const toolbarButtons = document.querySelectorAll('.toolbar-btn');
+        const emailContent = document.getElementById('emailContent');
+
+        if (toolbarButtons.length > 0 && emailContent) {
+            toolbarButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const command = this.title.toLowerCase();
+                    let tag = '';
+
+                    // Obter seleção atual
+                    const startPos = emailContent.selectionStart;
+                    const endPos = emailContent.selectionEnd;
+                    const selectedText = emailContent.value.substring(startPos, endPos);
+
+                    switch (command) {
+                        case 'negrito':
+                            tag = '**' + selectedText + '**';
+                            break;
+                        case 'itálico':
+                            tag = '*' + selectedText + '*';
+                            break;
+                        case 'link':
+                            const url = prompt('Insira a URL:', 'https://');
+                            if (url) {
+                                tag = '[' + (selectedText || 'link') + '](' + url + ')';
+                            } else {
+                                return;
+                            }
+                            break;
+                        case 'imagem':
+                            const imgUrl = prompt('Insira a URL da imagem:', 'https://');
+                            if (imgUrl) {
+                                tag = '![' + (selectedText || 'imagem') + '](' + imgUrl + ')';
+                            } else {
+                                return;
+                            }
+                            break;
+                        case 'lista':
+                            tag = '\n- ' + selectedText.replace(/\n/g, '\n- ');
+                            break;
+                        case 'título':
+                            tag = '## ' + selectedText;
+                            break;
+                        case 'código':
+                            tag = '`' + selectedText + '`';
+                            break;
+                        default:
+                            return;
+                    }
+
+                    // Inserir tag no textarea
+                    emailContent.focus();
+
+                    // Alguns navegadores não suportam execCommand
+                    try {
+                        document.execCommand('insertText', false, tag);
+                    } catch (e) {
+                        // Fallback para navegadores que não suportam execCommand
+                        const currentValue = emailContent.value;
+                        emailContent.value = currentValue.substring(0, startPos) + tag + currentValue.substring(endPos);
+                    }
+                });
+            });
+        }
+
+        // Enhanced Newsletter Management Functions
+
+        // Global Functions
+        window.clearSubscriberSearch = function() {
+            document.getElementById('searchSubscribers').value = '';
+            document.getElementById('filterSubscriberStatus').value = '';
+            document.getElementById('filterSubscriberGroup').value = '';
+            filterSubscribers();
+        };
+
+        window.clearCampaignSearch = function() {
+            document.getElementById('searchCampaigns').value = '';
+            document.getElementById('filterCampaignStatus').value = '';
+            filterCampaigns();
+        };
+
+        window.exportSubscribers = function() {
+            window.location.href = '/admin/newsletter/export/subscribers';
+        };
+
+        window.exportCampaignStats = function() {
+            window.location.href = '/admin/newsletter/export/campaign-stats';
+        };
+
+        window.sendTestEmail = function() {
+            const email = prompt('Digite o email para teste:');
+            if (email) {
+                showNotification('Email de teste enviado para ' + email, 'success');
+            }
+        };
+
+        window.openTemplateGallery = function() {
+            // Switch to templates tab
+            document.querySelector('[data-tab="templates"]').click();
+        };
+
+        // Enhanced filtering functions
+        function filterSubscribers() {
+            const searchTerm = document.getElementById('searchSubscribers').value.toLowerCase();
+            const statusFilter = document.getElementById('filterSubscriberStatus').value;
+            const groupFilter = document.getElementById('filterSubscriberGroup').value;
+            const rows = document.querySelectorAll('.subscriber-row');
+
+            rows.forEach(row => {
+                const email = row.querySelector('.email-address')?.textContent.toLowerCase() || '';
+                const name = row.querySelector('.subscriber-name')?.textContent.toLowerCase() || '';
+                const status = row.getAttribute('data-status');
+                const groups = row.querySelector('.groups-cell')?.textContent.toLowerCase() || '';
+
+                const matchesSearch = email.includes(searchTerm) || name.includes(searchTerm);
+                const matchesStatus = !statusFilter || status === statusFilter;
+                const matchesGroup = !groupFilter || groups.includes(groupFilter.toLowerCase());
+
+                if (matchesSearch && matchesStatus && matchesGroup) {
+                    row.style.display = '';
+                    row.style.animation = 'fadeIn 0.3s ease';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            updateSubscriberCount();
+        }
+
+        function filterCampaigns() {
+            const searchTerm = document.getElementById('searchCampaigns').value.toLowerCase();
+            const statusFilter = document.getElementById('filterCampaignStatus').value;
+            const rows = document.querySelectorAll('.campaign-row');
+
+            rows.forEach(row => {
+                const title = row.querySelector('.campaign-title')?.textContent.toLowerCase() || '';
+                const subject = row.querySelector('.campaign-subject')?.textContent.toLowerCase() || '';
+                const status = row.getAttribute('data-status');
+
+                const matchesSearch = title.includes(searchTerm) || subject.includes(searchTerm);
+                const matchesStatus = !statusFilter || status === statusFilter;
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                    row.style.animation = 'fadeIn 0.3s ease';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function updateSubscriberCount() {
+            const visibleRows = document.querySelectorAll('.subscriber-row[style=""], .subscriber-row:not([style])');
+            const countBadge = document.querySelector('#subscribers .count-badge');
+            if (countBadge) {
+                countBadge.textContent = visibleRows.length;
+            }
+        }
+
+        // Event listeners for enhanced filtering
+        document.getElementById('searchSubscribers')?.addEventListener('input', filterSubscribers);
+        document.getElementById('filterSubscriberStatus')?.addEventListener('change', filterSubscribers);
+        document.getElementById('filterSubscriberGroup')?.addEventListener('change', filterSubscribers);
+        document.getElementById('searchCampaigns')?.addEventListener('input', filterCampaigns);
+        document.getElementById('filterCampaignStatus')?.addEventListener('change', filterCampaigns);
+
+        // Bulk actions for subscribers
+        document.getElementById('applySubscriberBulkAction')?.addEventListener('click', function() {
+            const action = document.getElementById('bulkSubscriberAction').value;
+            const selectedSubscribers = Array.from(document.querySelectorAll('.subscriber-checkbox:checked'));
+
+            if (!action || selectedSubscribers.length === 0) {
+                alert('Selecione uma ação e pelo menos um assinante.');
+                return;
+            }
+
+            if (confirm(`Aplicar "${action}" para ${selectedSubscribers.length} assinantes?`)) {
+                showNotification(`Ação "${action}" aplicada com sucesso!`, 'success');
+            }
+        });
+
+        // Bulk actions for campaigns
+        document.getElementById('applyCampaignBulkAction')?.addEventListener('click', function() {
+            const action = document.getElementById('bulkCampaignAction').value;
+            const selectedCampaigns = Array.from(document.querySelectorAll('.campaign-checkbox:checked'));
+
+            if (!action || selectedCampaigns.length === 0) {
+                alert('Selecione uma ação e pelo menos uma campanha.');
+                return;
+            }
+
+            if (confirm(`Aplicar "${action}" para ${selectedCampaigns.length} campanhas?`)) {
+                showNotification(`Ação "${action}" aplicada com sucesso!`, 'success');
+            }
+        });
+
+        // Animation delays
+        document.querySelectorAll('.subscriber-row, .campaign-row').forEach((row, index) => {
+            row.style.animationDelay = `${index * 0.05}s`;
+            row.classList.add('slide-in-up');
+        });
+    });
+</script>
+
+<style>
+    /* Enhanced Newsletter Page Styles */
+    .quick-stats {
+        display: flex;
+        gap: 1rem;
+        margin-right: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 0.5rem;
+        border-radius: 8px;
+        min-width: 60px;
+    }
+
+    .stat-item.subscribers {
+        background: rgba(58, 134, 255, 0.1);
+        border: 1px solid rgba(58, 134, 255, 0.3);
+    }
+
+    .stat-item.active {
+        background: rgba(40, 167, 69, 0.1);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .stat-item.campaigns {
+        background: rgba(131, 56, 236, 0.1);
+        border: 1px solid rgba(131, 56, 236, 0.3);
+    }
+
+    .stat-item.rate {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .stat-number {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Enhanced Table Styles */
+    .subscriber-row, .campaign-row {
+        transition: all 0.3s ease;
+    }
+
+    .inactive-row {
+        opacity: 0.6;
+        background: rgba(220, 53, 69, 0.02);
+    }
+
+    .email-cell .email-address {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .email-domain, .email-source {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .name-cell .subscriber-name {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .subscriber-location, .subscriber-preferences {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .date-cell .subscription-date {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .subscription-time, .date-relative {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .status-cell .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .confirmation-status {
+        font-size: 0.7rem;
+        display: block;
+    }
+
+    .group-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        background: rgba(58, 134, 255, 0.1);
+        color: var(--admin-primary);
+        margin-right: 4px;
+        margin-bottom: 2px;
+    }
+
+    .group-badge.default {
+        background: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+
+    /* Campaign Styles */
+    .campaign-title-cell .campaign-title {
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .campaign-subject, .campaign-template {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .sent-date, .scheduled-date {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .sent-time, .scheduled-time {
+        font-size: 0.75rem;
+        display: block;
+    }
+
+    .recipients-cell .recipient-count {
+        font-weight: 600;
+        font-size: 1.1rem;
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    .target-groups {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+    }
+
+    .metric-cell {
+        text-align: center;
+    }
+
+    .metric-number {
+        font-weight: 600;
+        font-size: 1.1rem;
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    .metric-percentage {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+    }
+
+    .btn-action.btn-send {
+        background-color: var(--admin-success);
+        color: white;
+    }
+
+    .btn-action.btn-email {
+        background-color: var(--admin-info);
+        color: white;
+    }
+
+    /* Footer Styles */
+    .admin-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--admin-border-color);
+        background: rgba(248, 249, 250, 0.5);
+    }
+
+    .bulk-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        opacity: 0.5;
+        pointer-events: none;
+        transition: all 0.3s ease;
+    }
+
+    .stats-summary, .campaign-stats {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .stats-summary .stats-item, .campaign-stats .stats-item {
+        text-align: center;
+        padding: 0.5rem;
+        background: rgba(58, 134, 255, 0.05);
+        border-radius: 8px;
+        min-width: 60px;
+    }
+
+    .stats-value {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+        margin-bottom: 2px;
+    }
+
+    .stats-label {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Animation */
+    .slide-in-up {
+        animation: slideInUp 0.5s ease forwards;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .empty-state-actions {
+        margin-top: 1rem;
+    }
+
+    .empty-state-actions .btn-admin {
+        margin: 0 0.5rem;
+    }
+</style>
+{% endblock %}

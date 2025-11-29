@@ -1,0 +1,518 @@
+/* eslint-env browser */
+/* global window, document, console, performance, requestAnimationFrame, IntersectionObserver, setTimeout */
+// Profile Page Functions - Must be in global scope for onclick handlers
+
+// Modal functions - GLOBAL
+window.openEditModal = function () {
+    console.log('openEditModal chamada');
+    const modal = document.getElementById('editModal');
+    console.log('Modal encontrado:', modal);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        console.log('Modal aberto com sucesso');
+    } else {
+        console.error('Modal não encontrado!');
+    }
+};
+
+window.closeEditModal = function () {
+    console.log('closeEditModal chamada');
+    const modal = document.getElementById('editModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        console.log('Modal fechado com sucesso');
+    }
+};
+
+// Password Modal functions - GLOBAL
+window.openPasswordModal = function () {
+    console.log('openPasswordModal chamada');
+    const modal = document.getElementById('passwordModal');
+    console.log('Password Modal encontrado:', modal);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        console.log('Password Modal aberto com sucesso');
+    } else {
+        console.error('Password Modal não encontrado!');
+    }
+};
+
+window.closePasswordModal = function () {
+    console.log('closePasswordModal chamada');
+    const modal = document.getElementById('passwordModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        // Limpar campos do formulário
+        const form = document.getElementById('changePasswordForm');
+        if (form) form.reset();
+        console.log('Password Modal fechado com sucesso');
+    }
+};
+
+// Favorite functions - GLOBAL
+window.removeFavorite = async function (postId) {
+    // Usa o modal de confirmação do FavoriteManager
+    if (!window.favoriteManager) {
+        alert('Sistema de favoritos não carregado');
+        return;
+    }
+
+    const removed = await window.favoriteManager.remove(postId);
+
+    if (removed) {
+        // Recarrega apenas a seção de favoritos dinamicamente
+        await reloadFavoritesSection();
+    }
+};
+
+// Função para recarregar apenas a seção de favoritos
+async function reloadFavoritesSection() {
+    try {
+        const response = await fetch('/api/user-favorites');
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.message || 'Erro ao carregar favoritos');
+        }
+
+        const favoritesSection = document.getElementById('favorites-section');
+        if (!favoritesSection) return;
+
+        // Se não há mais favoritos, mostra a mensagem vazia
+        if (data.posts.length === 0) {
+            favoritesSection.innerHTML = `
+                <div class="profile-card-header">
+                    <div class="profile-card-icon">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div>
+                        <h2 class="profile-card-title">Posts Favoritos</h2>
+                        <p class="profile-card-subtitle">Posts que você salvou para ler depois</p>
+                    </div>
+                </div>
+                <div class="empty-state">
+                    <i class="fas fa-star" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem;"></i>
+                    <p>Você ainda não tem posts favoritos.</p>
+                    <p class="text-muted">Clique no ícone de estrela nos posts para adicioná-los aos favoritos!</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Reconstrói o HTML dos favoritos
+        let postsHTML = '';
+        data.posts.forEach(post => {
+            const excerpt = post.content.replace(/<[^>]*>/g, '').substring(0, 150);
+            const excerptText = excerpt.length > 150 ? excerpt + '...' : excerpt;
+
+            postsHTML += `
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="post-card" style="position: relative;">
+                        <button onclick="removeFavorite(${post.id})" class="favorite-remove-badge" title="Remover dos favoritos">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <div class="category-badge-left">
+                            <i class="fas fa-tag"></i> ${post.category_str}
+                        </div>
+                        <div class="post-image">
+                            ${post.image_url ?
+                    `<img src="/static/images/${post.image_url}" alt="${post.title}" class="img-fluid">` :
+                    `<div class="post-placeholder"><i class="fas fa-file-alt"></i></div>`
+                }
+                            ${post.featured ? '<div class="featured-badge"><i class="fas fa-star"></i></div>' : ''}
+                        </div>
+                        <div class="post-content">
+                            <h3 class="post-title">
+                                <a href="/post/${post.id}">${post.title}</a>
+                            </h3>
+                            <p class="post-excerpt">${excerptText}</p>
+                            <div class="post-meta">
+                                <span class="post-date">
+                                    <i class="fas fa-calendar"></i>
+                                    ${post.date_posted}
+                                </span>
+                                <span class="post-views">
+                                    <i class="fas fa-eye"></i>
+                                    ${post.views}
+                                </span>
+                                ${post.downloads ? `
+                                    <span class="post-downloads">
+                                        <i class="fas fa-download"></i>
+                                        ${post.downloads}
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <div class="post-actions">
+                                <a href="/post/${post.id}" class="btn btn-primary">
+                                    <i class="fas fa-eye"></i> Ver Post
+                                </a>
+                                ${post.download_link ? `
+                                    <a href="/download/${post.id}" class="btn btn-success">
+                                        <i class="fas fa-download"></i> Download
+                                    </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Atualiza o HTML da seção
+        favoritesSection.innerHTML = `
+            <div class="profile-card-header">
+                <div class="profile-card-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div>
+                    <h2 class="profile-card-title">Posts Favoritos</h2>
+                    <p class="profile-card-subtitle">Posts que você salvou para ler depois</p>
+                </div>
+            </div>
+            <div class="posts-grid" style="margin-top: 1.5rem;">
+                <div class="row">
+                    ${postsHTML}
+                </div>
+            </div>
+            ${data.total > 6 ? `
+                <div class="profile-card-footer">
+                    <p class="text-muted">E mais ${data.total - 6} favorito(s)</p>
+                </div>
+            ` : ''}
+        `;
+
+        // Animação suave
+        favoritesSection.style.opacity = '0';
+        setTimeout(() => {
+            favoritesSection.style.transition = 'opacity 0.3s ease';
+            favoritesSection.style.opacity = '1';
+        }, 10);
+
+    } catch (error) {
+        console.error('Erro ao recarregar favoritos:', error);
+        if (window.favoriteManager) {
+            window.favoriteManager.showToast('Erro ao atualizar favoritos', 'error');
+        }
+    }
+}
+
+// Update profile header with new data
+function updateProfileHeader(userData) {
+    console.log('Atualizando header do perfil com:', userData);
+
+    // Update name in profile title
+    const profileTitle = document.querySelector('.profile-title');
+    if (profileTitle && userData.name) {
+        profileTitle.textContent = userData.name;
+    }
+
+    // Update username in subtitle
+    const profileSubtitle = document.querySelector('.profile-subtitle');
+    if (profileSubtitle && userData.username) {
+        profileSubtitle.textContent = '@' + userData.username;
+    }
+
+    // Update bio
+    const profileBio = document.querySelector('.profile-bio');
+    if (userData.bio) {
+        if (profileBio) {
+            profileBio.textContent = userData.bio;
+            profileBio.style.display = 'block';
+            profileBio.style.fontStyle = 'normal';
+            profileBio.style.color = '';
+        } else {
+            // Create bio element if it doesn't exist
+            const profileSubtitle = document.querySelector('.profile-subtitle');
+            if (profileSubtitle) {
+                const newBio = document.createElement('p');
+                newBio.className = 'profile-bio';
+                newBio.textContent = userData.bio;
+                profileSubtitle.parentNode.insertBefore(newBio, profileSubtitle.nextSibling);
+            }
+        }
+    } else if (profileBio) {
+        // Hide bio if empty
+        profileBio.style.display = 'none';
+    }
+
+    // Update profile image if changed
+    if (userData.profile_image) {
+        const profileImg = document.querySelector('.profile-avatar-large img');
+        if (profileImg) {
+            const newSrc = `/static/uploads/profiles/${userData.profile_image}`;
+            // Adiciona timestamp para evitar cache
+            const newSrcWithCache = `${newSrc}?t=${new Date().getTime()}`;
+            profileImg.src = newSrcWithCache;
+        }
+
+        // Update navbar dropdown image too
+        const navbarToggle = document.querySelector('.navbar .user-dropdown .dropdown-toggle');
+        if (navbarToggle) {
+            const navbarImg = navbarToggle.querySelector('img');
+            const navSrc = `/static/uploads/profiles/${userData.profile_image}`;
+            const navSrcWithCache = `${navSrc}?t=${new Date().getTime()}`;
+
+            if (navbarImg) {
+                // Update existing image
+                navbarImg.src = navSrcWithCache;
+            } else {
+                // Replace icon with image
+                const icon = navbarToggle.querySelector('i');
+                if (icon) {
+                    const newImg = document.createElement('img');
+                    newImg.src = navSrcWithCache;
+                    newImg.alt = userData.username || 'User';
+                    newImg.style.width = '30px';
+                    newImg.style.height = '30px';
+                    newImg.style.borderRadius = '50%';
+                    newImg.style.objectFit = 'cover';
+                    newImg.style.marginRight = '5px'; // Espaçamento
+
+                    // Inserir antes do texto (que é um nó de texto)
+                    // O ícone geralmente é o primeiro filho
+                    navbarToggle.insertBefore(newImg, icon);
+                    icon.remove();
+                }
+            }
+        }
+    }
+}
+
+// Show toast notification
+function showToast(message, type = 'success') {
+    // Check if favoriteManager toast exists
+    if (window.favoriteManager && window.favoriteManager.showToast) {
+        window.favoriteManager.showToast(message, type);
+        return;
+    }
+
+    // Fallback: create simple toast
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: ${type === 'success' ? '#28a745' : '#dc3545'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+    `;
+    toast.textContent = message;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Initialize profile page functionality
+function initializeProfilePage() {
+    console.log('Inicializando página de perfil...');
+
+    // Image upload functionality
+    const imageInput = document.getElementById('profile-image-input');
+    const imageForm = document.getElementById('profile-image-form');
+
+    if (imageInput && imageForm) {
+        imageInput.addEventListener('change', function () {
+            if (this.files && this.files[0]) {
+                imageForm.submit();
+            }
+        });
+    }
+
+    // Biography character counter
+    const bioInput = document.getElementById('bio');
+    const bioCount = document.getElementById('bioCount');
+
+    if (bioInput && bioCount) {
+        bioInput.addEventListener('input', function () {
+            const length = this.value.length;
+            bioCount.textContent = length;
+
+            // Mudar cor baseado no uso
+            if (length > 300) {
+                bioCount.style.color = '#ff006e';
+                bioCount.style.fontWeight = '700';
+            } else if (length > 250) {
+                bioCount.style.color = '#ff8500';
+                bioCount.style.fontWeight = '600';
+            } else {
+                bioCount.style.color = '#6c757d';
+                bioCount.style.fontWeight = '500';
+            }
+        });
+    }
+
+    // Validação de senha em tempo real
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+
+    if (newPasswordInput && confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', function () {
+            if (this.value !== newPasswordInput.value) {
+                this.setCustomValidity('As senhas não coincidem');
+                this.style.borderColor = '#dc3545';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '#28a745';
+            }
+        });
+
+        newPasswordInput.addEventListener('input', function () {
+            if (confirmPasswordInput.value && confirmPasswordInput.value !== this.value) {
+                confirmPasswordInput.style.borderColor = '#dc3545';
+            } else if (confirmPasswordInput.value) {
+                confirmPasswordInput.style.borderColor = '#28a745';
+            }
+        });
+    }
+
+    // Validação de username em tempo real
+    const usernameInput = document.getElementById('username');
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function () {
+            const pattern = /^[a-zA-Z0-9_]{3,20}$/;
+            if (!pattern.test(this.value)) {
+                this.setCustomValidity('Use apenas letras, números e _ (3-20 caracteres)');
+                this.style.borderColor = '#dc3545';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '#28a745';
+            }
+        });
+    }
+
+    // Edit Profile Form Handler
+    const editProfileForm = document.getElementById('editProfileForm');
+    if (editProfileForm) {
+        editProfileForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            e.stopPropagation(); // Previne que o DynamicLoader intercepte
+
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+
+            try {
+                const formData = new FormData(this);
+
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Close modal
+                    window.closeEditModal();
+
+                    // Update profile header with new data
+                    updateProfileHeader(data.user);
+
+                    // Show success message
+                    showToast('Perfil atualizado com sucesso!', 'success');
+                } else {
+                    showToast(data.message || 'Erro ao atualizar perfil', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar perfil:', error);
+                showToast('Erro ao atualizar perfil. Tente novamente.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
+    }
+
+    // Stats animation
+    const statNumbers = document.querySelectorAll('.count');
+
+    // Função melhorada para animar números
+    function animateNumber(element) {
+        const target = parseInt(element.getAttribute('data-count'));
+        if (isNaN(target)) return;
+
+        const duration = 2000; // 2 segundos
+        const start = 0;
+        const startTime = performance.now();
+
+        function updateNumber(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing function para suavizar a animação
+            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+            const current = Math.floor(start + (target - start) * easeOutQuart);
+
+            element.textContent = current;
+
+            if (progress < 1) {
+                requestAnimationFrame(updateNumber);
+            } else {
+                element.textContent = target; // Garantir valor final exato
+            }
+        }
+
+        requestAnimationFrame(updateNumber);
+    }
+
+    // Observer para detectar quando os números entram na viewport
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Pequeno delay para melhor efeito visual
+                setTimeout(() => {
+                    animateNumber(entry.target);
+                }, 100);
+                observer.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    });
+
+    statNumbers.forEach(number => {
+        observer.observe(number);
+    });
+
+    // Close modal on outside click
+    const modal = document.getElementById('editModal');
+    if (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) {
+                window.closeEditModal();
+            }
+        });
+    }
+
+    console.log('Página de perfil inicializada com sucesso');
+}
+
+// Inicializar quando a página carregar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeProfilePage);
+} else {
+    initializeProfilePage();
+}
+
+// Re-inicializar quando carregado dinamicamente
+document.addEventListener('contentLoaded', initializeProfilePage);

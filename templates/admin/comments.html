@@ -1,0 +1,934 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<!-- Enhanced Header -->
+<div class="admin-header slide-in-up">
+    <div class="header-content">
+        <div class="header-main">
+            <h1><i class="fas fa-comments"></i> Gerenciar Comentários</h1>
+            <p class="header-subtitle">Modere e gerencie todos os comentários do seu site</p>
+        </div>
+        <div class="header-actions">
+            <div class="quick-stats">
+                <div class="stat-item pending">
+                    <span class="stat-number">{{ comments | selectattr('status', 'equalto', 'pending') | list | length if comments else 0 }}</span>
+                    <span class="stat-label">Pendentes</span>
+                </div>
+                <div class="stat-item approved">
+                    <span class="stat-number">{{ comments | selectattr('status', 'equalto', 'approved') | list | length if comments else 0 }}</span>
+                    <span class="stat-label">Aprovados</span>
+                </div>
+                <div class="stat-item rejected">
+                    <span class="stat-number">{{ comments | selectattr('status', 'equalto', 'rejected') | list | length if comments else 0 }}</span>
+                    <span class="stat-label">Rejeitados</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-admin btn-admin-outline" onclick="exportComments()">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+                <button class="btn-admin btn-admin-success" onclick="approveAllPending()">
+                    <i class="fas fa-check-double"></i> Aprovar Pendentes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Comments Card -->
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <div class="header-left">
+            <h2 class="admin-card-title">
+                <i class="fas fa-list"></i> Comentários
+                <span class="count-badge">{{ pagination.total if pagination else 0 }}</span>
+            </h2>
+        </div>
+        <div class="header-right">
+            <div class="filter-controls">
+                <div class="search-bar-advanced">
+                    <div class="search-input-container">
+                        <input type="text" placeholder="Pesquisar comentários..." id="searchComments" class="search-input">
+                        <button class="search-btn"><i class="fas fa-search"></i></button>
+                        <button class="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="filter-dropdown">
+                    <select id="commentFilterSelect" class="form-select">
+                        <option value="all" selected>Todos os Status</option>
+                        <option value="pending">Pendentes</option>
+                        <option value="approved">Aprovados</option>
+                        <option value="rejected">Rejeitados</option>
+                    </select>
+                </div>
+                <div class="sort-dropdown">
+                    <select id="sortBy" class="form-select">
+                        <option value="date">Ordenar por Data</option>
+                        <option value="author">Ordenar por Autor</option>
+                        <option value="post">Ordenar por Post</option>
+                        <option value="status">Ordenar por Status</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="admin-table enhanced">
+            <thead>
+                <tr>
+                    <th style="width: 40px">
+                        <input type="checkbox" id="selectAllComments" class="form-check-input">
+                    </th>
+                    <th data-sort="author">
+                        <i class="fas fa-user"></i> Autor
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th>
+                        <i class="fas fa-comment"></i> Comentário
+                    </th>
+                    <th data-sort="post">
+                        <i class="fas fa-file-alt"></i> Post
+                    </th>
+                    <th data-sort="date">
+                        <i class="fas fa-calendar"></i> Data
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="status">
+                        <i class="fas fa-flag"></i> Status
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if comments %}
+                    {% for comment in comments %}
+                    <tr data-id="{{ comment.id }}" data-status="{{ comment.status }}" class="comment-row {% if comment.status == 'pending' %}pending-row{% elif comment.status == 'rejected' %}rejected-row{% endif %}">
+                        <td>
+                            <input type="checkbox" class="form-check-input comment-checkbox" value="{{ comment.id }}">
+                        </td>
+                        <td>
+                            <div class="comment-author-cell">
+                                <div class="author-avatar">
+                                    <i class="fas fa-user-circle"></i>
+                                </div>
+                                <div class="author-info">
+                                    <div class="author-name">{{ comment.author_name }}</div>
+                                    <small class="author-email text-muted">{{ comment.author_email }}</small>
+                                    <small class="author-meta text-muted">
+                                        <i class="fas fa-map-marker-alt"></i> IP: 192.168.1.{{ comment.id }}
+                                    </small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="comment-content-cell">
+                                <div class="comment-preview">{{ comment.content|truncate(100) }}</div>
+                                {% if comment.content|length > 100 %}
+                                <button class="btn-expand" onclick="expandComment({{ comment.id }})">
+                                    <i class="fas fa-expand-alt"></i> Ver mais
+                                </button>
+                                {% endif %}
+                                <div class="comment-meta">
+                                    <span class="word-count">{{ comment.content.split()|length }} palavras</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="post-cell">
+                                <a href="{{ url_for('post', post_id=comment.post_id) }}" target="_blank" class="post-link">
+                                    <div class="post-title">{{ comment.post.title|truncate(40) }}</div>
+                                    <small class="post-category text-muted">
+                                        <i class="fas fa-folder"></i> {{ comment.post.category_rel.name if comment.post.category_rel else 'Sem categoria' }}
+                                    </small>
+                                </a>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="date-cell">
+                                <div class="date-primary">{{ comment.created_at.strftime('%d/%m/%Y') }}</div>
+                                <small class="date-time text-muted">{{ comment.created_at.strftime('%H:%M') }}</small>
+                                <small class="date-relative text-muted">
+                                    {% set days_ago = (datetime.utcnow() - comment.created_at).days %}
+                                    {% if days_ago == 0 %}Hoje
+                                    {% elif days_ago == 1 %}Ontem
+                                    {% else %}{{ days_ago }} dias atrás{% endif %}
+                                </small>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="status-cell">
+                                {% if comment.status == 'pending' %}
+                                <span class="badge badge-warning">
+                                    <i class="fas fa-clock"></i> Pendente
+                                </span>
+                                {% elif comment.status == 'approved' %}
+                                <span class="badge badge-success">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                                {% elif comment.status == 'rejected' %}
+                                <span class="badge badge-danger">
+                                    <i class="fas fa-times-circle"></i> Rejeitado
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="actions">
+                            <div class="action-buttons">
+                                <a href="#" class="btn-action btn-view" title="Visualizar" data-comment-id="{{ comment.id }}">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if comment.status != 'approved' %}
+                                <a href="#" class="btn-action btn-approve" title="Aprovar" data-comment-id="{{ comment.id }}">
+                                    <i class="fas fa-check"></i>
+                                </a>
+                                {% endif %}
+                                {% if comment.status != 'rejected' %}
+                                <a href="#" class="btn-action btn-reject" title="Rejeitar" data-comment-id="{{ comment.id }}">
+                                    <i class="fas fa-ban"></i>
+                                </a>
+                                {% endif %}
+                                <a href="#" class="btn-action btn-reply" title="Responder" data-comment-id="{{ comment.id }}">
+                                    <i class="fas fa-reply"></i>
+                                </a>
+                                <a href="#" class="btn-action btn-delete" title="Excluir" data-comment-id="{{ comment.id }}" data-comment-author="{{ comment.author_name }}">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <!-- Estado vazio - nenhum comentário -->
+                    <tr class="empty-state">
+                        <td colspan="7" style="text-align: center; padding: 3rem;">
+                            <div class="empty-state-content">
+                                <i class="fas fa-comments fa-3x text-muted mb-3"></i>
+                                <h4 class="text-muted">Nenhum comentário encontrado</h4>
+                                <p class="text-muted">Os comentários aparecerão aqui quando forem publicados nos posts.</p>
+                                <div class="empty-state-actions">
+                                    <a href="{{ url_for('admin_settings') }}" class="btn-admin btn-admin-outline">
+                                        <i class="fas fa-cog"></i> Configurar Comentários
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Enhanced Footer -->
+    <div class="admin-card-footer">
+        <div class="bulk-actions">
+            <select id="bulkActionSelect" class="form-select">
+                <option value="">Ações em massa</option>
+                <option value="approve">Aprovar selecionados</option>
+                <option value="reject">Rejeitar selecionados</option>
+                <option value="delete">Excluir selecionados</option>
+                <option value="spam">Marcar como spam</option>
+            </select>
+            <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+        </div>
+
+        <!-- Enhanced Pagination -->
+        <div class="pagination-container">
+            <div class="pagination-info">
+                {% if pagination %}
+                Mostrando {{ comments|length }} de {{ pagination.total }} comentários
+                {% else %}
+                Nenhum comentário encontrado
+                {% endif %}
+            </div>
+            <nav aria-label="Navegação de página">
+                <ul class="pagination">
+                    {% if pagination and pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_comments', page=pagination.prev_num) }}" aria-label="Anterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="fas fa-chevron-left"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+
+                    {% if pagination %}
+                        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                            {% if page_num %}
+                                {% if pagination.page == page_num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('admin_comments', page=page_num) }}">{{ page_num }}</a>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">1</span>
+                        </li>
+                    {% endif %}
+
+                    {% if pagination and pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_comments', page=pagination.next_num) }}" aria-label="Próximo">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="fas fa-chevron-right"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Visualização de Comentário -->
+<div class="modal" id="commentViewModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Visualizar Comentário</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="comment-details">
+                <div class="comment-author-details">
+                    <h4>Autor</h4>
+                    <p id="viewCommentAuthor">Nome do Autor</p>
+                    <p id="viewCommentEmail">email@exemplo.com</p>
+                    <p class="text-muted">IP: <span id="viewCommentIp">192.168.1.1</span></p>
+                </div>
+
+                <div class="comment-post-details">
+                    <h4>Post</h4>
+                    <p id="viewCommentPost">Título do Post</p>
+                    <p class="text-muted">Data: <span id="viewCommentDate">01/01/2023</span></p>
+                </div>
+
+                <div class="comment-content-details">
+                    <h4>Conteúdo</h4>
+                    <div class="comment-box" id="viewCommentContent">
+                        Conteúdo do comentário aqui...
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Fechar</button>
+            <button class="btn-admin btn-admin-success" id="modalApproveBtn">Aprovar</button>
+            <button class="btn-admin btn-admin-warning" id="modalRejectBtn">Rejeitar</button>
+            <button class="btn-admin btn-admin-danger" id="modalDeleteBtn">Excluir</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação para Exclusão -->
+<div class="modal" id="deleteCommentModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Exclusão</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja excluir este comentário?</p>
+            <p class="text-danger">Esta ação não pode ser desfeita.</p>
+
+            <form id="deleteCommentForm">
+                <input type="hidden" id="deleteCommentId">
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+            <button class="btn-admin btn-admin-danger" id="confirmDeleteComment">Excluir</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Enhanced Comments Page Styles */
+    .quick-stats {
+        display: flex;
+        gap: 1rem;
+        margin-right: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 0.5rem;
+        border-radius: 8px;
+        min-width: 60px;
+    }
+
+    .stat-item.pending {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .stat-item.approved {
+        background: rgba(40, 167, 69, 0.1);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .stat-item.rejected {
+        background: rgba(220, 53, 69, 0.1);
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+
+    .stat-number {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Comment Row Styles */
+    .comment-row {
+        transition: all 0.3s ease;
+    }
+
+    .pending-row {
+        border-left: 3px solid #ffc107;
+        background: rgba(255, 193, 7, 0.02);
+    }
+
+    .rejected-row {
+        opacity: 0.7;
+        background: rgba(220, 53, 69, 0.02);
+    }
+
+    .comment-author-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .author-avatar {
+        font-size: 2rem;
+        color: var(--admin-primary);
+        opacity: 0.7;
+    }
+
+    .author-info {
+        flex: 1;
+    }
+
+    .author-name {
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .author-email {
+        font-size: 0.8rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    .author-meta {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+    }
+
+    .comment-content-cell {
+        max-width: 300px;
+    }
+
+    .comment-preview {
+        font-size: 0.9rem;
+        line-height: 1.4;
+        margin-bottom: 0.5rem;
+        color: var(--admin-text);
+    }
+
+    .btn-expand {
+        background: none;
+        border: none;
+        color: var(--admin-primary);
+        font-size: 0.8rem;
+        cursor: pointer;
+        padding: 0;
+        margin-bottom: 0.5rem;
+    }
+
+    .btn-expand:hover {
+        text-decoration: underline;
+    }
+
+    .comment-meta {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .word-count {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        background: rgba(58, 134, 255, 0.1);
+        padding: 2px 6px;
+        border-radius: 10px;
+    }
+
+    .post-cell {
+        max-width: 200px;
+    }
+
+    .post-link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .post-link:hover {
+        color: var(--admin-primary);
+    }
+
+    .post-title {
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .post-category {
+        font-size: 0.75rem;
+    }
+
+    .date-cell .date-primary {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .date-cell .date-time {
+        font-size: 0.75rem;
+        margin-bottom: 2px;
+    }
+
+    .date-cell .date-relative {
+        font-size: 0.7rem;
+        font-style: italic;
+    }
+
+    .status-cell .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .badge-warning {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .badge-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+    }
+
+    .btn-action.btn-approve {
+        background-color: var(--admin-success);
+        color: white;
+    }
+
+    .btn-action.btn-reject {
+        background-color: var(--admin-warning);
+        color: white;
+    }
+
+    .btn-action.btn-reply {
+        background-color: var(--admin-info);
+        color: white;
+    }
+
+    .admin-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--admin-border-color);
+        background: rgba(248, 249, 250, 0.5);
+    }
+
+    .bulk-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        opacity: 0.5;
+        pointer-events: none;
+        transition: all 0.3s ease;
+    }
+
+    .pagination-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .pagination-info {
+        font-size: 0.9rem;
+        color: var(--admin-text-light);
+    }
+
+    /* Modal Enhancements */
+    .comment-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+
+    .comment-content-details {
+        grid-column: span 2;
+    }
+
+    .comment-box {
+        padding: 1rem;
+        border: 1px solid var(--admin-border-color);
+        border-radius: var(--admin-border-radius);
+        background-color: var(--admin-hover-bg);
+        min-height: 100px;
+        margin-top: 0.5rem;
+        white-space: pre-wrap;
+        line-height: 1.6;
+    }
+
+    .empty-state-actions {
+        margin-top: 1rem;
+    }
+
+    /* Animation */
+    .slide-in-up {
+        animation: slideInUp 0.5s ease forwards;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Enhanced Comments Management
+
+        // Global Functions
+        window.clearSearch = function() {
+            document.getElementById('searchComments').value = '';
+            document.getElementById('commentFilterSelect').value = 'all';
+            filterComments();
+        };
+
+        window.exportComments = function() {
+            window.location.href = '/admin/comments/export';
+        };
+
+        window.approveAllPending = function() {
+            const pendingComments = document.querySelectorAll('[data-status="pending"]');
+            if (pendingComments.length === 0) {
+                showNotification('Não há comentários pendentes.', 'info');
+                return;
+            }
+
+            if (confirm(`Aprovar todos os ${pendingComments.length} comentários pendentes?`)) {
+                pendingComments.forEach(row => {
+                    row.setAttribute('data-status', 'approved');
+                    row.querySelector('.badge').innerHTML = '<i class="fas fa-check-circle"></i> Aprovado';
+                    row.querySelector('.badge').className = 'badge badge-success';
+                    row.classList.remove('pending-row');
+                });
+                showNotification(`${pendingComments.length} comentários aprovados!`, 'success');
+                updateStats();
+            }
+        };
+
+        window.expandComment = function(commentId) {
+            const row = document.querySelector(`[data-id="${commentId}"]`);
+            const contentCell = row.querySelector('.comment-content-cell');
+            const preview = contentCell.querySelector('.comment-preview');
+            const expandBtn = contentCell.querySelector('.btn-expand');
+
+            if (expandBtn.innerHTML.includes('Ver mais')) {
+                // Expand - simulate full content
+                preview.innerHTML = preview.innerHTML + ' Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
+                expandBtn.innerHTML = '<i class="fas fa-compress-alt"></i> Ver menos';
+            } else {
+                // Collapse
+                preview.innerHTML = preview.innerHTML.substring(0, 100) + '...';
+                expandBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Ver mais';
+            }
+        };
+
+        // Filter and Search System
+        const searchInput = document.getElementById('searchComments');
+        const commentFilterSelect = document.getElementById('commentFilterSelect');
+        const sortBy = document.getElementById('sortBy');
+        const tableRows = document.querySelectorAll('.comment-row');
+
+        function filterComments() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedStatus = commentFilterSelect.value;
+
+            tableRows.forEach(row => {
+                const authorName = row.querySelector('.author-name')?.textContent.toLowerCase() || '';
+                const authorEmail = row.querySelector('.author-email')?.textContent.toLowerCase() || '';
+                const commentText = row.querySelector('.comment-preview')?.textContent.toLowerCase() || '';
+                const postTitle = row.querySelector('.post-title')?.textContent.toLowerCase() || '';
+
+                const matchesSearch = authorName.includes(searchTerm) ||
+                                    authorEmail.includes(searchTerm) ||
+                                    commentText.includes(searchTerm) ||
+                                    postTitle.includes(searchTerm);
+
+                const matchesStatus = selectedStatus === 'all' || row.getAttribute('data-status') === selectedStatus;
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                    row.style.animation = 'fadeIn 0.3s ease';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            updateResultsCount();
+        }
+
+        function updateResultsCount() {
+            const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
+            const countElement = document.querySelector('.count-badge');
+            if (countElement) {
+                countElement.textContent = visibleRows.length;
+            }
+        }
+
+        function updateStats() {
+            const pendingCount = document.querySelectorAll('[data-status="pending"]').length;
+            const approvedCount = document.querySelectorAll('[data-status="approved"]').length;
+            const rejectedCount = document.querySelectorAll('[data-status="rejected"]').length;
+
+            document.querySelector('.stat-item.pending .stat-number').textContent = pendingCount;
+            document.querySelector('.stat-item.approved .stat-number').textContent = approvedCount;
+            document.querySelector('.stat-item.rejected .stat-number').textContent = rejectedCount;
+        }
+
+        // Event listeners
+        searchInput?.addEventListener('input', filterComments);
+        commentFilterSelect?.addEventListener('change', filterComments);
+
+        // Sorting functionality
+        sortBy?.addEventListener('change', function() {
+            const sortType = this.value;
+            const tbody = document.querySelector('.admin-table tbody');
+            const rows = Array.from(tbody.querySelectorAll('.comment-row'));
+
+            rows.sort((a, b) => {
+                let aValue, bValue;
+
+                switch(sortType) {
+                    case 'author':
+                        aValue = a.querySelector('.author-name')?.textContent || '';
+                        bValue = b.querySelector('.author-name')?.textContent || '';
+                        return aValue.localeCompare(bValue);
+                    case 'date':
+                        aValue = a.querySelector('.date-primary')?.textContent || '';
+                        bValue = b.querySelector('.date-primary')?.textContent || '';
+                        return new Date(bValue.split('/').reverse().join('-')) - new Date(aValue.split('/').reverse().join('-'));
+                    case 'post':
+                        aValue = a.querySelector('.post-title')?.textContent || '';
+                        bValue = b.querySelector('.post-title')?.textContent || '';
+                        return aValue.localeCompare(bValue);
+                    case 'status':
+                        aValue = a.getAttribute('data-status') || '';
+                        bValue = b.getAttribute('data-status') || '';
+                        return aValue.localeCompare(bValue);
+                    default:
+                        return 0;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        });
+
+        // Select All functionality
+        const selectAllCheckbox = document.getElementById('selectAllComments');
+        const commentCheckboxes = document.querySelectorAll('.comment-checkbox');
+
+        selectAllCheckbox?.addEventListener('change', function() {
+            commentCheckboxes.forEach(checkbox => {
+                if (checkbox.closest('tr').style.display !== 'none') {
+                    checkbox.checked = this.checked;
+                }
+            });
+            updateBulkActionsVisibility();
+        });
+
+        commentCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateBulkActionsVisibility);
+        });
+
+        function updateBulkActionsVisibility() {
+            const checkedBoxes = document.querySelectorAll('.comment-checkbox:checked');
+            const bulkActions = document.querySelector('.bulk-actions');
+
+            if (checkedBoxes.length > 0) {
+                bulkActions.style.opacity = '1';
+                bulkActions.style.pointerEvents = 'auto';
+            } else {
+                bulkActions.style.opacity = '0.5';
+                bulkActions.style.pointerEvents = 'none';
+            }
+        }
+
+        // Bulk actions
+        document.getElementById('applyBulkAction')?.addEventListener('click', function() {
+            const action = document.getElementById('bulkActionSelect').value;
+            const checkedBoxes = document.querySelectorAll('.comment-checkbox:checked');
+
+            if (!action || checkedBoxes.length === 0) {
+                alert('Selecione uma ação e pelo menos um comentário.');
+                return;
+            }
+
+            const commentIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (confirm(`Tem certeza que deseja ${action} ${commentIds.length} comentários?`)) {
+                commentIds.forEach(id => {
+                    const row = document.querySelector(`[data-id="${id}"]`);
+
+                    if (action === 'approve') {
+                        row.setAttribute('data-status', 'approved');
+                        row.querySelector('.badge').innerHTML = '<i class="fas fa-check-circle"></i> Aprovado';
+                        row.querySelector('.badge').className = 'badge badge-success';
+                        row.classList.remove('pending-row', 'rejected-row');
+                    } else if (action === 'reject') {
+                        row.setAttribute('data-status', 'rejected');
+                        row.querySelector('.badge').innerHTML = '<i class="fas fa-times-circle"></i> Rejeitado';
+                        row.querySelector('.badge').className = 'badge badge-danger';
+                        row.classList.remove('pending-row');
+                        row.classList.add('rejected-row');
+                    } else if (action === 'delete') {
+                        row.remove();
+                    }
+                });
+
+                showNotification(`${commentIds.length} comentários processados!`, 'success');
+                updateStats();
+
+                // Clear selections
+                selectAllCheckbox.checked = false;
+                commentCheckboxes.forEach(cb => cb.checked = false);
+                updateBulkActionsVisibility();
+                document.getElementById('bulkActionSelect').value = '';
+            }
+        });
+
+        // Quick action buttons
+        document.querySelectorAll('.btn-approve').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const commentId = this.getAttribute('data-comment-id');
+
+                if (confirm('Aprovar este comentário?')) {
+                    // Criar um formulário para enviar via POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/admin/comments/${commentId}/approve`;
+                    form.style.display = 'none';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+
+        document.querySelectorAll('.btn-reject').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const commentId = this.getAttribute('data-comment-id');
+
+                if (confirm('Rejeitar este comentário?')) {
+                    // Criar um formulário para enviar via POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/admin/comments/${commentId}/reject`;
+                    form.style.display = 'none';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+
+        document.querySelectorAll('.btn-delete').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const commentId = this.getAttribute('data-comment-id');
+                const authorName = this.getAttribute('data-comment-author');
+
+                if (confirm(`Excluir comentário de ${authorName}? Esta ação não pode ser desfeita.`)) {
+                    // Criar um formulário para enviar via POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/admin/comments/${commentId}/delete`;
+                    form.style.display = 'none';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+
+        // Animation delays for table rows
+        tableRows.forEach((row, index) => {
+            row.style.animationDelay = `${index * 0.05}s`;
+            row.classList.add('slide-in-up');
+        });
+
+        // Initialize
+        updateBulkActionsVisibility();
+    });
+</script>
+{% endblock %}

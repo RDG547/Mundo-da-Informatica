@@ -1,0 +1,1816 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<!-- Enhanced Header -->
+<div class="admin-header slide-in-up">
+    <div class="header-content">
+        <div class="header-main">
+            <h1><i class="fas fa-users"></i> Gerenciar Usuários</h1>
+            <p class="header-subtitle">Administre contas de usuário, permissões e configurações de acesso</p>
+        </div>
+        <div class="header-actions">
+            <div class="quick-stats">
+                <div class="stat-item admins">
+                    <span class="stat-number">{{ users | selectattr('role', 'equalto', 'admin') | list | length
+                        }}</span>
+                    <span class="stat-label">Admins</span>
+                </div>
+                <div class="stat-item editors">
+                    <span class="stat-number">{{ users | selectattr('role', 'equalto', 'editor') | list | length
+                        }}</span>
+                    <span class="stat-label">Editores</span>
+                </div>
+                <div class="stat-item users">
+                    <span class="stat-number">{{ users | selectattr('role', 'equalto', 'user') | list | length }}</span>
+                    <span class="stat-label">Usuários</span>
+                </div>
+                <div class="stat-item active">
+                    <span class="stat-number">{{ users | selectattr('is_active') | list | length }}</span>
+                    <span class="stat-label">Ativos</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-admin btn-admin-outline" onclick="exportUsers()">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+                <button class="btn-admin btn-admin-success" onclick="sendWelcomeEmails()">
+                    <i class="fas fa-envelope"></i> Email Boas-vindas
+                </button>
+                <button class="btn-admin btn-admin-primary" data-modal="addUserModal">
+                    <i class="fas fa-user-plus"></i> Novo Usuário
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Users Card -->
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <div class="header-left">
+            <h2 class="admin-card-title">
+                <i class="fas fa-list"></i> Usuários Cadastrados
+                <span class="count-badge">{{ users | length }}</span>
+            </h2>
+        </div>
+        <div class="header-right">
+            <div class="filter-controls">
+                <div class="search-bar-advanced">
+                    <div class="search-input-container">
+                        <input type="text" placeholder="Pesquisar usuários..." id="searchUsers" class="search-input">
+                        <button class="search-btn"><i class="fas fa-search"></i></button>
+                        <button class="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="filter-dropdown">
+                    <select id="filterRole" class="form-select">
+                        <option value="">Todos os Papéis</option>
+                        <option value="admin">Administradores</option>
+                        <option value="editor">Editores</option>
+                        <option value="user">Usuários</option>
+                    </select>
+                </div>
+                <div class="filter-dropdown">
+                    <select id="filterStatus" class="form-select">
+                        <option value="">Todos os Status</option>
+                        <option value="active">Ativos</option>
+                        <option value="inactive">Inativos</option>
+                    </select>
+                </div>
+                <div class="sort-dropdown">
+                    <select id="sortBy" class="form-select">
+                        <option value="name">Ordenar por Nome</option>
+                        <option value="email">Ordenar por Email</option>
+                        <option value="role">Ordenar por Papel</option>
+                        <option value="date">Ordenar por Data</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="admin-table enhanced">
+            <thead>
+                <tr>
+                    <th style="width: 40px">
+                        <input type="checkbox" id="selectAllUsers" class="form-check-input">
+                    </th>
+                    <th data-sort="username">
+                        Usuário
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="name">
+                        Nome Completo
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="email">
+                        Email
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="role">
+                        Papel
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="date_joined">
+                        Cadastro
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="status">
+                        Status
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="tracking">
+                        <i class="fas fa-chart-line"></i> Rastreamento
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th data-sort="actions">
+                        Ações
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr data-id="{{ user.id }}" data-role="{{ user.role }}"
+                    data-status="{{ 'active' if user.is_active else 'inactive' }}"
+                    class="user-row {% if not user.is_active %}inactive-row{% endif %}">
+                    <td>
+                        <input type="checkbox" class="form-check-input user-checkbox" value="{{ user.id }}">
+                    </td>
+                    <td>
+                        <div class="user-cell">
+                            <div class="user-avatar">
+                                {% if user.avatar %}
+                                <img src="{{ user.avatar }}" alt="{{ user.username }}" class="avatar-img">
+                                {% else %}
+                                <div class="avatar-placeholder">
+                                    {{ user.username[0].upper() if user.username else 'U' }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="user-info">
+                                <div class="username">{{ user.username }}</div>
+                                <small class="user-meta text-muted">
+                                    <i class="fas fa-calendar-plus"></i>
+                                    Membro desde {% set meses = [
+                                    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                                    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'] %}
+                                    {% if user.date_joined %}
+                                    {{ meses[user.date_joined.month - 1] }} de {{ user.date_joined.year }}
+                                    {% else %}
+                                    N/A
+                                    {% endif %}
+                                </small>
+                                {% if user.last_login %}
+                                <small class="last-login text-muted">
+                                    <i class="fas fa-clock"></i>
+                                    Último acesso: {{ user.last_login.strftime('%d/%m/%Y') }}
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="name-cell">
+                            <div class="full-name">{{ user.name or user.first_name + ' ' + user.last_name if
+                                user.first_name else user.username }}</div>
+                            {% if user.bio %}
+                            <small class="user-bio text-muted">{{ user.bio[:50] }}{% if user.bio|length > 50 %}...{%
+                                endif %}</small>
+                            {% endif %}
+                            {% if user.location %}
+                            <small class="user-location text-muted">
+                                <i class="fas fa-map-marker-alt"></i> {{ user.location }}
+                            </small>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="email-cell">
+                            <div class="email-address">{{ user.email }}</div>
+                            <div class="email-status">
+                                {% if user.is_verified %}
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i> Verificado
+                                </span>
+                                {% else %}
+                                <span class="verification-badge unverified">
+                                    <i class="fas fa-exclamation-circle"></i> Não verificado
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="role-cell">
+                            {% if user.role == 'admin' %}
+                            <span class="role-badge role-admin">
+                                <i class="fas fa-crown"></i> Administrador
+                            </span>
+                            {% elif user.role == 'editor' %}
+                            <span class="role-badge role-editor">
+                                <i class="fas fa-edit"></i> Editor
+                            </span>
+                            {% else %}
+                            <span class="role-badge role-user">
+                                <i class="fas fa-user"></i> Usuário
+                            </span>
+                            {% endif %}
+                            <div class="permissions-info">
+                                <small class="text-muted">
+                                    {% if user.role == 'admin' %}
+                                    Acesso total ao sistema
+                                    {% elif user.role == 'editor' %}
+                                    Pode criar e editar posts
+                                    {% else %}
+                                    Acesso básico
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="date-cell">
+                            {% if user.date_joined %}
+                            <div class="join-date">{{ user.date_joined.strftime('%d/%m/%Y') }}</div>
+                            <small class="join-time text-muted">{{ user.date_joined.strftime('%H:%M') }}</small>
+                            <small class="date-relative text-muted">
+                                {% set meses = [
+                                'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'] %}
+                                Membro desde {% if user.date_joined %}
+                                {{ meses[user.date_joined.month - 1] }} de {{ user.date_joined.year }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </small>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="status-cell">
+                            {% if user.is_active %}
+                            <span class="badge badge-success">
+                                <i class="fas fa-check-circle"></i> Ativo
+                            </span>
+                            {% else %}
+                            <span class="badge badge-danger">
+                                <i class="fas fa-ban"></i> Inativo
+                            </span>
+                            {% endif %}
+                            {% if user.email_notifications %}
+                            <small class="notification-badge">
+                                <i class="fas fa-bell"></i> Notificações
+                            </small>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="tracking-cell">
+                            <div class="tracking-info">
+                                {% if user.ip_address %}
+                                <small class="tracking-item">
+                                    <i class="fas fa-network-wired"></i> IP: {{ user.ip_address }}
+                                </small>
+                                {% endif %}
+                                {% if user.browser %}
+                                <small class="tracking-item">
+                                    <i class="fas fa-globe"></i> {{ user.browser }}
+                                </small>
+                                {% endif %}
+                                {% if user.operating_system %}
+                                <small class="tracking-item">
+                                    <i class="fas fa-desktop"></i> {{ user.operating_system }}
+                                </small>
+                                {% endif %}
+                                {% if user.referrer %}
+                                <small class="tracking-item">
+                                    <i class="fas fa-external-link-alt"></i> De: {{ user.referrer[:30] }}{% if
+                                    user.referrer|length > 30 %}...{% endif %}
+                                </small>
+                                {% endif %}
+                                {% if not user.ip_address and not user.browser and not user.operating_system %}
+                                <small class="text-muted">Sem dados</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="actions">
+                        <div class="action-buttons">
+                            <a href="{{ url_for('profile', user_id=user.id) }}" class="btn-action btn-view"
+                                title="Ver Perfil" target="_blank">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-edit" title="Editar" data-user-id="{{ user.id }}"
+                                onclick="editUser({{ user.id }})">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            {% if user.role != 'admin' or (users | selectattr('role', 'equalto', 'admin') | list |
+                            length) > 1 %}
+                            <a href="#" class="btn-action btn-permissions" title="Permissões"
+                                data-user-id="{{ user.id }}">
+                                <i class="fas fa-key"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-delete" title="Excluir" data-user-id="{{ user.id }}"
+                                data-user-name="{{ user.username }}">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                            {% endif %}
+                            <div class="action-dropdown">
+                                <button class="btn-action btn-more" title="Mais opções">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu">
+                                    <a href="#" class="dropdown-item"
+                                        onclick="resetUserPassword('{{ user.id }}', '{{ user.username }}')">
+                                        <i class="fas fa-key"></i> Redefinir Senha
+                                    </a>
+                                    <a href="#" class="dropdown-item" onclick="sendWelcomeEmail('{{ user.id }}')">
+                                        <i class="fas fa-envelope"></i> Enviar Boas-vindas
+                                    </a>
+                                    <a href="#" class="dropdown-item" onclick="toggleUserStatus('{{ user.id }}')">
+                                        <i class="fas fa-toggle-{{ 'off' if user.is_active else 'on' }}"></i>
+                                        {{ 'Desativar' if user.is_active else 'Ativar' }}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <!-- Estado vazio -->
+                <tr class="empty-state">
+                    <td colspan="8" style="text-align: center; padding: 3rem;">
+                        <div class="empty-state-content">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nenhum usuário encontrado</h4>
+                            <p class="text-muted">Comece criando o primeiro usuário do sistema.</p>
+                            <button class="btn-admin btn-admin-primary" data-modal="addUserModal">
+                                <i class="fas fa-user-plus"></i> Criar Primeiro Usuário
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Enhanced Footer -->
+    <div class="admin-card-footer">
+        <div class="bulk-actions">
+            <select id="bulkActionSelect" class="form-select">
+                <option value="">Ações em massa</option>
+                <option value="activate">Ativar selecionados</option>
+                <option value="deactivate">Desativar selecionados</option>
+                <option value="promote_editor">Promover a Editor</option>
+                <option value="demote_user">Rebaixar a Usuário</option>
+                <option value="send_welcome">Enviar Boas-vindas</option>
+                <option value="delete">Excluir selecionados</option>
+            </select>
+            <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+        </div>
+
+        <!-- Enhanced Pagination -->
+        <div class="pagination-container">
+            <div class="pagination-info">
+                {% if pagination %}
+                Mostrando {{ users | length }} de {{ pagination.total }} usuários
+                {% else %}
+                {{ users | length }} usuários encontrados
+                {% endif %}
+            </div>
+            <nav aria-label="Navegação de página">
+                <ul class="pagination">
+                    {% if pagination and pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_users', page=pagination.prev_num) }}"
+                            aria-label="Anterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="fas fa-chevron-left"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+
+                    {% if pagination %}
+                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
+                    %}
+                    {% if page_num %}
+                    {% if page_num == pagination.page %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_users', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">…</span>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    {% else %}
+                    <li class="page-item active">
+                        <span class="page-link">1</span>
+                    </li>
+                    {% endif %}
+
+                    {% if pagination and pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_users', page=pagination.next_num) }}"
+                            aria-label="Próximo">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="fas fa-chevron-right"></i>
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para adicionar/editar usuário -->
+<div class="modal" id="addUserModal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <div class="modal-title-container">
+                <h3 id="userModalTitle"><i class="fas fa-user-plus"></i> Adicionar Usuário</h3>
+                <p class="modal-subtitle">Crie uma nova conta de usuário para o sistema</p>
+            </div>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="userForm" action="{{ url_for('admin_create_user') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" id="userId" name="user_id" value="">
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="user-avatar-upload">
+                            <div class="avatar-preview" id="avatarPreview">
+                                <i class="fas fa-user"></i>
+                                <div class="avatar-overlay">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+                            </div>
+                            <input type="file" id="avatarUpload" name="avatar" accept="image/*" style="display: none;">
+                            <p class="text-center">Clique para alterar foto</p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="username" class="form-label">
+                                        <i class="fas fa-at"></i> Nome de Usuário
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="username" name="username" class="form-control modern-input"
+                                        placeholder="usuario123" required>
+                                    <div class="form-text">Apenas letras, números e underscore</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="email" class="form-label">
+                                        <i class="fas fa-envelope"></i> Email
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="email" id="email" name="email" class="form-control modern-input"
+                                        placeholder="usuario@exemplo.com" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="firstName" class="form-label">
+                                        <i class="fas fa-user"></i> Primeiro Nome
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="firstName" name="first_name"
+                                        class="form-control modern-input" placeholder="João" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="lastName" class="form-label">
+                                        <i class="fas fa-user"></i> Sobrenome
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="lastName" name="last_name" class="form-control modern-input"
+                                        placeholder="Silva" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label for="password" class="form-label">
+                                        <i class="fas fa-lock"></i> Senha
+                                        <span class="required" id="passwordRequired">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="password" id="password" name="password"
+                                            class="form-control modern-input" placeholder="Digite uma senha segura">
+                                        <button type="button" class="btn-group-item" id="togglePassword"
+                                            title="Mostrar/Ocultar Senha">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                    <div class="password-strength" id="passwordStrength"></div>
+                                    <small class="form-text" id="passwordHelp">Deixe em branco para manter a senha atual
+                                        (ao editar)</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn-admin btn-admin-outline w-100"
+                                        id="generatePassword">
+                                        <i class="fas fa-key"></i> Gerar Senha
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-cog"></i> Configurações da Conta</h5>
+
+                        <div class="form-group">
+                            <label for="role" class="form-label">
+                                <i class="fas fa-shield-alt"></i> Nível de Acesso
+                            </label>
+                            <select id="role" name="role" class="form-select modern-select">
+                                <option value="user">👤 Usuário - Acesso básico</option>
+                                <option value="editor">✏️ Editor - Criar e editar posts</option>
+                                <option value="admin">👑 Administrador - Acesso total</option>
+                            </select>
+                            <div class="form-text">Define as permissões do usuário no sistema</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="plan" class="form-label">
+                                <i class="fas fa-gem"></i> Plano
+                            </label>
+                            <select id="plan" name="plan" class="form-select modern-select">
+                                <option value="free">🆓 Grátis</option>
+                                <option value="premium">⭐ Premium</option>
+                                <option value="vip">👑 VIP</option>
+                            </select>
+                            <div class="form-text">Define o plano de assinatura do usuário</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userStatus" class="form-label">
+                                <i class="fas fa-toggle-on"></i> Status da Conta
+                            </label>
+                            <select id="userStatus" name="is_active" class="form-select modern-select">
+                                <option value="1">✅ Ativo - Pode fazer login</option>
+                                <option value="0">❌ Inativo - Bloqueado</option>
+                            </select>
+                        </div>
+
+                        <div class="checkbox-group modern-checkboxes">
+                            <div class="form-check">
+                                <input type="checkbox" id="emailVerified" name="is_verified" class="form-check-input">
+                                <label for="emailVerified" class="form-check-label">
+                                    <i class="fas fa-check-circle"></i> Email Verificado
+                                </label>
+                                <small>Marcar como email já verificado</small>
+                            </div>
+
+                            <div class="form-check">
+                                <input type="checkbox" id="emailNotifications" name="email_notifications"
+                                    class="form-check-input" checked>
+                                <label for="emailNotifications" class="form-check-label">
+                                    <i class="fas fa-bell"></i> Notificações por Email
+                                </label>
+                                <small>Receber updates e notificações</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-user-circle"></i> Informações do Perfil</h5>
+
+                        <div class="form-group">
+                            <label for="userBio" class="form-label">
+                                <i class="fas fa-quote-left"></i> Biografia
+                            </label>
+                            <textarea id="userBio" name="bio" class="form-control modern-input" rows="3"
+                                placeholder="Conte um pouco sobre este usuário..."></textarea>
+                            <div class="character-count">
+                                <span id="bioCount">0</span>/150 caracteres
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userLocation" class="form-label">
+                                <i class="fas fa-map-marker-alt"></i> Localização
+                            </label>
+                            <input type="text" id="userLocation" name="location" class="form-control modern-input"
+                                placeholder="Cidade, Estado">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userPhone" class="form-label">
+                                <i class="fas fa-phone"></i> Telefone
+                            </label>
+                            <input type="tel" id="userPhone" name="phone" class="form-control modern-input"
+                                placeholder="(11) 99999-9999">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userWebsite" class="form-label">
+                                <i class="fas fa-globe"></i> Website
+                            </label>
+                            <input type="url" id="userWebsite" name="website" class="form-control modern-input"
+                                placeholder="https://exemplo.com">
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row">
+                    <div class="col-12">
+                        <h5><i class="fas fa-share-alt"></i> Redes Sociais (Opcional)</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="userFacebook" class="form-label">
+                                        <i class="fab fa-facebook" style="color: #1877f2;"></i> Facebook
+                                    </label>
+                                    <input type="url" id="userFacebook" name="facebook"
+                                        class="form-control modern-input" placeholder="facebook.com/usuario">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="userTwitter" class="form-label">
+                                        <i class="fab fa-twitter" style="color: #1da1f2;"></i> Twitter
+                                    </label>
+                                    <input type="url" id="userTwitter" name="twitter" class="form-control modern-input"
+                                        placeholder="twitter.com/usuario">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="userLinkedin" class="form-label">
+                                        <i class="fab fa-linkedin" style="color: #0077b5;"></i> LinkedIn
+                                    </label>
+                                    <input type="url" id="userLinkedin" name="linkedin"
+                                        class="form-control modern-input" placeholder="linkedin.com/in/usuario">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="userGithub" class="form-label">
+                                        <i class="fab fa-github" style="color: #333;"></i> GitHub
+                                    </label>
+                                    <input type="url" id="userGithub" name="github" class="form-control modern-input"
+                                        placeholder="github.com/usuario">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div class="footer-left">
+                <button type="button" class="btn-admin btn-admin-outline" id="resetUserForm">
+                    <i class="fas fa-undo"></i> Limpar
+                </button>
+            </div>
+            <div class="footer-right">
+                <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn-admin btn-admin-primary" id="saveUser">
+                    <i class="fas fa-save"></i> Salvar Usuário
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação para exclusão -->
+<div class="modal" id="deleteModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmar Exclusão</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
+            <button class="btn-admin btn-admin-danger" id="confirmDelete">Excluir</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Enhanced Users Page Styles */
+    .quick-stats {
+        display: flex;
+        gap: 1rem;
+        margin-right: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 0.5rem;
+        border-radius: 8px;
+        min-width: 60px;
+    }
+
+    .stat-item.admins {
+        background: rgba(131, 56, 236, 0.1);
+        border: 1px solid rgba(131, 56, 236, 0.3);
+    }
+
+    .stat-item.editors {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .stat-item.users {
+        background: rgba(58, 134, 255, 0.1);
+        border: 1px solid rgba(58, 134, 255, 0.3);
+    }
+
+    .stat-item.active {
+        background: rgba(40, 167, 69, 0.1);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .stat-number {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* User Table Styles */
+    .user-row {
+        transition: all 0.3s ease;
+    }
+
+    .inactive-row {
+        opacity: 0.6;
+        background: rgba(220, 53, 69, 0.02);
+    }
+
+    .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--admin-primary), var(--admin-secondary));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .user-info {
+        flex: 1;
+    }
+
+    .username {
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .user-meta,
+    .last-login {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .name-cell .full-name {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .user-bio,
+    .user-location {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .email-cell .email-address {
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .verification-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .verification-badge.verified {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+
+    .verification-badge.unverified {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+
+    .role-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .role-badge.role-admin {
+        background: rgba(131, 56, 236, 0.1);
+        color: #8338ec;
+    }
+
+    .role-badge.role-editor {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+
+    .role-badge.role-user {
+        background: rgba(58, 134, 255, 0.1);
+        color: #3a86ff;
+    }
+
+    .permissions-info {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+    }
+
+    .date-cell .join-date {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .join-time,
+    .date-relative {
+        font-size: 0.75rem;
+        color: var(--admin-text-light);
+        display: block;
+        margin-bottom: 1px;
+    }
+
+    .status-cell .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+
+    .notification-badge {
+        font-size: 0.7rem;
+        color: var(--admin-info);
+        display: block;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        position: relative;
+    }
+
+    .btn-action.btn-permissions {
+        background-color: var(--admin-warning);
+        color: white;
+    }
+
+    .action-dropdown {
+        position: relative;
+    }
+
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: white;
+        border: 1px solid var(--admin-border-color);
+        border-radius: 8px;
+        box-shadow: var(--admin-shadow);
+        min-width: 180px;
+        z-index: 1000;
+        display: none;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        color: #495057;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+    }
+
+    .dropdown-item:hover {
+        background: #f8f9fa;
+        color: var(--admin-primary);
+        text-decoration: none;
+    }
+
+    .dropdown-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    /* Modal Styles for Edit User */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .close-modal {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+    }
+
+    .close-modal:hover {
+        background: #f8f9fa;
+        color: #495057;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        padding: 1.5rem;
+        border-top: 1px solid #e9ecef;
+    }
+
+    /* Bulk Actions Styles */
+    .bulk-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-admin.disabled,
+    .btn-admin:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .bulk-actions.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    /* Notification Styles */
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        padding: 1rem;
+        z-index: 10000;
+        min-width: 300px;
+        animation: slideInRight 0.3s ease;
+    }
+
+    .notification.success {
+        border-left: 4px solid #28a745;
+    }
+
+    .notification.error {
+        border-left: 4px solid #dc3545;
+    }
+
+    .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .notification-close {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: #6c757d;
+    }
+
+    .notification.fade-out {
+        animation: slideOutRight 0.3s ease;
+    }
+
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    /* Modal fixes for Users - Simplified */
+    #editUserModal {
+        display: none !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        z-index: 9999 !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    #editUserModal.show {
+        display: flex !important;
+        opacity: 1 !important;
+    }
+
+    #editUserModal .modal-content {
+        background: white !important;
+        border-radius: 8px !important;
+        padding: 0 !important;
+        max-width: 500px !important;
+        width: 90% !important;
+        z-index: 10000 !important;
+        position: relative !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOM carregado, inicializando JavaScript de usuários...'); // Debug
+
+        // Teste simples para verificar se os elementos existem
+        setTimeout(() => {
+            const editButtons = document.querySelectorAll('.btn-edit');
+            const deleteButtons = document.querySelectorAll('.btn-delete');
+            console.log('Teste: Botões de editar encontrados:', editButtons.length);
+            console.log('Teste: Botões de deletar encontrados:', deleteButtons.length);
+        }, 1000);
+
+        // Enhanced Users Management
+
+        // Global Functions
+        window.clearSearch = function () {
+            document.getElementById('searchUsers').value = '';
+            document.getElementById('filterRole').value = '';
+            document.getElementById('filterStatus').value = '';
+            filterUsers();
+        };
+
+        window.exportUsers = function () {
+            window.location.href = '/admin/users/export';
+        };
+
+        window.sendWelcomeEmails = function () {
+            const newUsers = document.querySelectorAll('[data-status="active"]');
+            if (confirm(`Enviar email de boas-vindas para ${newUsers.length} usuários ativos?`)) {
+                showNotification('Emails enviados com sucesso!', 'success');
+            }
+        };
+
+        // Função para redefinir senha do usuário (pelo admin)
+        window.resetUserPassword = function (userId, username) {
+            const newPassword = prompt(`Digite a nova senha para o usuário "${username}":`);
+            if (newPassword && newPassword.length >= 6) {
+                if (confirm(`Confirma a redefinição da senha para o usuário "${username}"?`)) {
+                    fetch(`/admin/users/${userId}/reset-password`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            new_password: newPassword
+                        })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                showNotification('Senha redefinida com sucesso!', 'success');
+                            } else {
+                                showNotification(data.message || 'Erro ao redefinir senha', 'error');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erro:', error);
+                            showNotification('Erro ao redefinir senha', 'error');
+                        });
+                }
+            } else if (newPassword !== null) {
+                alert('A senha deve ter pelo menos 6 caracteres.');
+            }
+        };
+
+        window.sendWelcomeEmail = function (userId) {
+            if (confirm('Enviar email de boas-vindas?')) {
+                showNotification('Email de boas-vindas enviado!', 'success');
+            }
+        };
+
+        window.toggleUserStatus = function (userId) {
+            const row = document.querySelector(`[data-id="${userId}"]`);
+            const currentStatus = row.getAttribute('data-status');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+
+            row.setAttribute('data-status', newStatus);
+
+            const badge = row.querySelector('.status-cell .badge');
+            if (newStatus === 'active') {
+                badge.innerHTML = '<i class="fas fa-check-circle"></i> Ativo';
+                badge.className = 'badge badge-success';
+                row.classList.remove('inactive-row');
+            } else {
+                badge.innerHTML = '<i class="fas fa-ban"></i> Inativo';
+                badge.className = 'badge badge-danger';
+                row.classList.add('inactive-row');
+            }
+
+            showNotification(`Usuário ${newStatus === 'active' ? 'ativado' : 'desativado'}!`, 'success');
+            updateStats();
+        };
+
+        // Função para editar usuário
+        window.editUser = function (userId) {
+            console.log('Editando usuário:', userId); // Debug
+
+            // Verificar se o modal existe
+            let modal = document.getElementById('editUserModal');
+            if (!modal) {
+                console.log('Modal não existe, criando...'); // Debug
+                createEditUserModal();
+                modal = document.getElementById('editUserModal');
+            }
+
+            if (!modal) {
+                console.error('Erro ao criar modal de edição');
+                showNotification('Erro ao criar modal de edição', 'error');
+                return;
+            }
+
+            // Buscar dados do usuário
+            fetch(`/admin/users/${userId}/data`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(user => {
+                    console.log('Dados do usuário:', user); // Debug
+                    openEditUserModal(user);
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar dados do usuário:', error);
+                    showNotification('Erro ao carregar dados do usuário: ' + error.message, 'error');
+                });
+        };
+
+        // Função para abrir modal de edição
+        function openEditUserModal(user) {
+            console.log('Abrindo modal de edição para usuário:', user); // Debug
+
+            // Criar modal dinamicamente se não existir
+            let modal = document.getElementById('editUserModal');
+            if (!modal) {
+                console.log('Modal não existe, criando...'); // Debug
+                createEditUserModal();
+                modal = document.getElementById('editUserModal');
+            }
+
+            if (!modal) {
+                console.error('Erro: Modal não foi criado');
+                showNotification('Erro ao criar modal de edição', 'error');
+                return;
+            }
+
+            console.log('Modal encontrado:', modal); // Debug
+
+            // Preencher dados no modal
+            try {
+                document.getElementById('editUserId').value = user.id;
+                document.getElementById('editUsername').value = user.username;
+                document.getElementById('editName').value = user.name || '';
+                document.getElementById('editEmail').value = user.email;
+                document.getElementById('editRole').value = user.role;
+                document.getElementById('editPlan').value = user.plan || 'free';
+                document.getElementById('editIsActive').checked = user.is_active;
+                console.log('Dados preenchidos no modal'); // Debug
+            } catch (error) {
+                console.error('Erro ao preencher dados:', error);
+                showNotification('Erro ao preencher dados do usuário', 'error');
+                return;
+            }
+
+            // Mostrar modal usando função unificada
+            openUserModal('editUserModal');
+        }
+
+        // Função unificada para abrir modais de usuário
+        function openUserModal(modalId) {
+            console.log('Tentando abrir modal de usuário:', modalId); // Debug
+            const modal = document.getElementById(modalId);
+            console.log('Modal encontrado na função openUserModal:', modal); // Debug
+
+            if (modal) {
+                console.log('Aplicando estilos ao modal de usuário...'); // Debug
+                modal.style.display = 'flex';
+                modal.style.visibility = 'visible';
+                modal.style.opacity = '1';
+                modal.classList.add('show');
+                document.body.style.overflow = 'hidden';
+
+                // Força o reflow para garantir que a animação funcione
+                modal.offsetHeight;
+                console.log('Modal de usuário aberto com sucesso!'); // Debug
+            } else {
+                console.error('Modal não encontrado:', modalId); // Debug
+            }
+        }
+
+        // Função unificada para fechar modais de usuário
+        function closeUserModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('show');
+                document.body.style.overflow = '';
+                // Aguarda a animação antes de esconder
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        // Função para criar modal de edição
+        function createEditUserModal() {
+            const modalHTML = `
+                <div class="modal" id="editUserModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-user-edit"></i> Editar Usuário</h3>
+                            <button class="close-modal" onclick="closeEditUserModal()">&times;</button>
+                        </div>
+                        <form id="editUserForm" onsubmit="saveUser(event)">
+                            <div class="modal-body">
+                                <input type="hidden" id="editUserId" name="user_id">
+
+                                <div class="form-group">
+                                    <label for="editUsername">Nome de Usuário</label>
+                                    <input type="text" id="editUsername" name="username" class="form-control" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editName">Nome Completo</label>
+                                    <input type="text" id="editName" name="name" class="form-control">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editEmail">Email</label>
+                                    <input type="email" id="editEmail" name="email" class="form-control" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editRole">Função</label>
+                                    <select id="editRole" name="role" class="form-control">
+                                        <option value="user">Usuário</option>
+                                        <option value="editor">Editor</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editPlan">Plano</label>
+                                    <select id="editPlan" name="plan" class="form-control">
+                                        <option value="free">Grátis</option>
+                                        <option value="premium">Premium</option>
+                                        <option value="vip">VIP</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="editIsActive" name="is_active" class="form-check-input">
+                                        <label for="editIsActive" class="form-check-label">Usuário Ativo</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn-admin btn-admin-outline" onclick="closeEditUserModal()">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </button>
+                                <button type="submit" class="btn-admin btn-admin-primary">
+                                    <i class="fas fa-save"></i> Salvar Alterações
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        // Função para fechar modal de edição
+        window.closeEditUserModal = function () {
+            closeUserModal('editUserModal');
+        };
+
+        // Função para salvar usuário
+        window.saveUser = function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+            const userId = formData.get('user_id');
+
+            // Converter checkbox para boolean
+            formData.set('is_active', document.getElementById('editIsActive').checked);
+
+            fetch(`/admin/users/${userId}/update`, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Usuário atualizado com sucesso!', 'success');
+                        closeEditUserModal();
+                        // Recarregar a página para mostrar as mudanças
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification(data.message || 'Erro ao atualizar usuário', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao salvar usuário:', error);
+                    showNotification('Erro ao salvar usuário', 'error');
+                });
+        };
+
+        // Dropdown "Mais opções" functionality
+        document.addEventListener('click', function (e) {
+            // Fechar todos os dropdowns quando clicar fora
+            if (!e.target.closest('.action-dropdown')) {
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.style.display = 'none';
+                });
+            }
+        });
+
+        // Adicionar event listeners para botões "Mais opções"
+        document.querySelectorAll('.btn-more').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const dropdown = this.nextElementSibling;
+                const isVisible = dropdown.style.display === 'block';
+
+                // Fechar todos os outros dropdowns
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.style.display = 'none';
+                });
+
+                // Toggle do dropdown atual
+                dropdown.style.display = isVisible ? 'none' : 'block';
+            });
+        });
+
+        // Debug para botões de visualizar perfil
+        document.querySelectorAll('.btn-view').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                console.log('Clique no botão Ver Perfil:', this.href);
+            });
+        });
+
+        // Debug para botões de editar
+        document.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                console.log('Clique no botão Editar');
+                const userId = this.getAttribute('data-user-id');
+                console.log('User ID:', userId);
+            });
+        });
+
+        // Search and Filter System
+        const searchInput = document.getElementById('searchUsers');
+        const roleFilter = document.getElementById('filterRole');
+        const statusFilter = document.getElementById('filterStatus');
+        const sortBy = document.getElementById('sortBy');
+        const tableRows = document.querySelectorAll('.user-row');
+
+        function filterUsers() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedRole = roleFilter.value;
+            const selectedStatus = statusFilter.value;
+
+            tableRows.forEach(row => {
+                const username = row.querySelector('.username')?.textContent.toLowerCase() || '';
+                const fullName = row.querySelector('.full-name')?.textContent.toLowerCase() || '';
+                const email = row.querySelector('.email-address')?.textContent.toLowerCase() || '';
+
+                const matchesSearch = username.includes(searchTerm) ||
+                    fullName.includes(searchTerm) ||
+                    email.includes(searchTerm);
+
+                const matchesRole = !selectedRole || row.getAttribute('data-role') === selectedRole;
+                const matchesStatus = !selectedStatus || row.getAttribute('data-status') === selectedStatus;
+
+                if (matchesSearch && matchesRole && matchesStatus) {
+                    row.style.display = '';
+                    row.style.animation = 'fadeIn 0.3s ease';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            updateResultsCount();
+        }
+
+        function updateResultsCount() {
+            const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
+            const countElement = document.querySelector('.count-badge');
+            if (countElement) {
+                countElement.textContent = visibleRows.length;
+            }
+        }
+
+        function updateStats() {
+            const activeCount = document.querySelectorAll('[data-status="active"]').length;
+            const adminCount = document.querySelectorAll('[data-role="admin"]').length;
+            const editorCount = document.querySelectorAll('[data-role="editor"]').length;
+            const userCount = document.querySelectorAll('[data-role="user"]').length;
+
+            document.querySelector('.stat-item.active .stat-number').textContent = activeCount;
+            document.querySelector('.stat-item.admins .stat-number').textContent = adminCount;
+            document.querySelector('.stat-item.editors .stat-number').textContent = editorCount;
+            document.querySelector('.stat-item.users .stat-number').textContent = userCount;
+        }
+
+        // Event listeners
+        searchInput?.addEventListener('input', filterUsers);
+        roleFilter?.addEventListener('change', filterUsers);
+        statusFilter?.addEventListener('change', filterUsers);
+
+        // Sorting functionality
+        sortBy?.addEventListener('change', function () {
+            const sortType = this.value;
+            const tbody = document.querySelector('.admin-table tbody');
+            const rows = Array.from(tbody.querySelectorAll('.user-row'));
+
+            rows.sort((a, b) => {
+                let aValue, bValue;
+
+                switch (sortType) {
+                    case 'name':
+                        aValue = a.querySelector('.full-name')?.textContent || '';
+                        bValue = b.querySelector('.full-name')?.textContent || '';
+                        return aValue.localeCompare(bValue);
+                    case 'email':
+                        aValue = a.querySelector('.email-address')?.textContent || '';
+                        bValue = b.querySelector('.email-address')?.textContent || '';
+                        return aValue.localeCompare(bValue);
+                    case 'role':
+                        aValue = a.getAttribute('data-role') || '';
+                        bValue = b.getAttribute('data-role') || '';
+                        return aValue.localeCompare(bValue);
+                    case 'date':
+                        aValue = a.querySelector('.join-date')?.textContent || '';
+                        bValue = b.querySelector('.join-date')?.textContent || '';
+                        return new Date(bValue.split('/').reverse().join('-')) - new Date(aValue.split('/').reverse().join('-'));
+                    default:
+                        return 0;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        });
+
+        // Select All functionality
+        const selectAllCheckbox = document.getElementById('selectAllUsers');
+        const userCheckboxes = document.querySelectorAll('.user-checkbox');
+
+        selectAllCheckbox?.addEventListener('change', function () {
+            userCheckboxes.forEach(checkbox => {
+                if (checkbox.closest('tr').style.display !== 'none') {
+                    checkbox.checked = this.checked;
+                }
+            });
+            updateBulkActionsVisibility();
+        });
+
+        userCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateBulkActionsVisibility);
+        });
+
+        function updateBulkActionsVisibility() {
+            const checkedBoxes = document.querySelectorAll('.user-checkbox:checked');
+            const bulkActions = document.querySelector('.bulk-actions');
+            const applyButton = document.getElementById('applyBulkAction');
+
+            if (checkedBoxes.length > 0) {
+                if (bulkActions) {
+                    bulkActions.style.opacity = '1';
+                    bulkActions.style.pointerEvents = 'auto';
+                }
+                if (applyButton) {
+                    applyButton.disabled = false;
+                    applyButton.classList.remove('disabled');
+                }
+            } else {
+                if (bulkActions) {
+                    bulkActions.style.opacity = '0.5';
+                    bulkActions.style.pointerEvents = 'none';
+                }
+                if (applyButton) {
+                    applyButton.disabled = true;
+                    applyButton.classList.add('disabled');
+                }
+            }
+        }
+
+        // Bulk actions
+        document.getElementById('applyBulkAction')?.addEventListener('click', function () {
+            const action = document.getElementById('bulkActionSelect').value;
+            const checkedBoxes = document.querySelectorAll('.user-checkbox:checked');
+
+            if (!action || checkedBoxes.length === 0) {
+                alert('Selecione uma ação e pelo menos um usuário.');
+                return;
+            }
+
+            const userIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (confirm(`Tem certeza que deseja ${action} ${userIds.length} usuários?`)) {
+                userIds.forEach(id => {
+                    const row = document.querySelector(`[data-id="${id}"]`);
+
+                    switch (action) {
+                        case 'activate':
+                            row.setAttribute('data-status', 'active');
+                            row.querySelector('.status-cell .badge').innerHTML = '<i class="fas fa-check-circle"></i> Ativo';
+                            row.querySelector('.status-cell .badge').className = 'badge badge-success';
+                            row.classList.remove('inactive-row');
+                            break;
+                        case 'deactivate':
+                            row.setAttribute('data-status', 'inactive');
+                            row.querySelector('.status-cell .badge').innerHTML = '<i class="fas fa-ban"></i> Inativo';
+                            row.querySelector('.status-cell .badge').className = 'badge badge-danger';
+                            row.classList.add('inactive-row');
+                            break;
+                        case 'delete':
+                            row.remove();
+                            break;
+                    }
+                });
+
+                showNotification(`${userIds.length} usuários processados!`, 'success');
+                updateStats();
+
+                // Clear selections
+                selectAllCheckbox.checked = false;
+                userCheckboxes.forEach(cb => cb.checked = false);
+                updateBulkActionsVisibility();
+                document.getElementById('bulkActionSelect').value = '';
+            }
+        });
+
+        // Animation delays for table rows
+        tableRows.forEach((row, index) => {
+            row.style.animationDelay = `${index * 0.05}s`;
+            row.classList.add('slide-in-up');
+        });
+
+        // Função para mostrar notificações
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+                <button class="notification-close">&times;</button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Adicionar evento para fechar
+            notification.querySelector('.notification-close').addEventListener('click', () => {
+                notification.remove();
+            });
+
+            // Auto-fechar após 5 segundos
+            setTimeout(() => {
+                notification.classList.add('fade-out');
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+
+        // Delete user functionality
+        const deleteUserButtons = document.querySelectorAll('.btn-delete');
+        console.log('Botões de deletar usuário encontrados:', deleteUserButtons.length); // Debug
+
+        deleteUserButtons.forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                console.log('Botão de deletar usuário clicado!'); // Debug
+
+                const userId = this.getAttribute('data-user-id');
+                const userName = this.getAttribute('data-user-name');
+                console.log('User ID:', userId, 'Username:', userName); // Debug
+
+                if (confirm(`Tem certeza que deseja excluir o usuário "${userName}"? Esta ação não pode ser desfeita.`)) {
+                    // Criar um formulário para enviar via POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/admin/users/${userId}/delete`;
+                    form.style.display = 'none';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+
+        // Permissions button functionality
+        const permissionsButtons = document.querySelectorAll('.btn-permissions');
+        console.log('Botões de permissões encontrados:', permissionsButtons.length); // Debug
+
+        permissionsButtons.forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                console.log('Botão de permissões clicado!'); // Debug
+
+                const userId = this.getAttribute('data-user-id');
+                console.log('User ID para permissões:', userId); // Debug
+
+                showNotification('Funcionalidade de permissões em desenvolvimento', 'info');
+            });
+        });
+
+
+        // Initialize
+        updateBulkActionsVisibility();
+
+        // Inicializar estado desabilitado das ações em massa
+        const applyButton = document.getElementById('applyBulkAction');
+        if (applyButton) {
+            applyButton.disabled = true;
+            applyButton.classList.add('disabled');
+        }
+    });
+</script>
+{% endblock %}

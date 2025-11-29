@@ -1,0 +1,1091 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-header slide-in-up">
+    <h1>Importação de Dados</h1>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin_tools_backup') }}" class="btn-admin btn-admin-outline">
+            <i class="fas fa-database"></i> Backup do Sistema
+        </a>
+    </div>
+</div>
+
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Importar Dados</h2>
+        <div class="info-badge">
+            <i class="fas fa-info-circle"></i> Importe dados a partir de arquivos CSV, Excel, ou JSON
+        </div>
+    </div>
+
+    <div class="admin-card-body">
+        <div class="import-steps">
+            <div class="import-step active" id="step1">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <h3>Selecione o tipo de dados</h3>
+                </div>
+                <div class="step-content">
+                    <div class="form-group">
+                        <label for="importType">O que você deseja importar?</label>
+                        <select id="importType" class="form-control">
+                            <option value="">Selecione um tipo de dados...</option>
+                            <option value="posts">Posts</option>
+                            <option value="categories">Categorias</option>
+                            <option value="users">Usuários</option>
+                            <option value="files">Arquivos</option>
+                            <option value="subscribers">Assinantes da Newsletter</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="importFile">Upload do arquivo</label>
+                        <div class="file-upload-container">
+                            <input type="file" id="importFile" class="file-upload-input" accept=".csv,.xlsx,.json">
+                            <label for="importFile" class="file-upload-label">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span class="file-upload-text">Arraste ou clique para selecionar um arquivo</span>
+                            </label>
+                        </div>
+                        <div class="upload-info" id="uploadInfo" style="display:none">
+                            <div class="file-name" id="fileName"></div>
+                            <div class="file-size" id="fileSize"></div>
+                            <button class="btn-remove-file" id="removeFile">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Formatos suportados: CSV, Excel (.xlsx), JSON. Tamanho máximo: 10MB
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn-admin btn-admin-primary" id="continueToStep2" disabled>
+                            Continuar <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="import-step" id="step2">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <h3>Mapeamento de dados</h3>
+                </div>
+                <div class="step-content">
+                    <div class="mapping-container">
+                        <div class="mapping-info">
+                            <p>Mapeie as colunas do seu arquivo para os campos do sistema</p>
+                        </div>
+
+                        <div class="mapping-table-container">
+                            <table class="admin-table mapping-table">
+                                <thead>
+                                    <tr>
+                                        <th>Campo do Sistema</th>
+                                        <th>Coluna do Arquivo</th>
+                                        <th>Valor Padrão (opcional)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mappingFields">
+                                    <!-- Os campos serão gerados dinamicamente baseados no tipo selecionado -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="preview-section" id="previewSection" style="display:none">
+                            <h4>Visualização dos Dados</h4>
+                            <div class="preview-table-container">
+                                <table class="admin-table preview-table" id="previewTable">
+                                    <!-- Visualização dos dados será gerada aqui -->
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn-admin btn-admin-outline" id="backToStep1">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </button>
+                        <button class="btn-admin btn-admin-primary" id="continueToStep3">
+                            Continuar <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="import-step" id="step3">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <h3>Configurar importação</h3>
+                </div>
+                <div class="step-content">
+                    <div class="config-options">
+                        <div class="form-group">
+                            <label>Comportamento para duplicatas</label>
+                            <div class="radio-group">
+                                <div class="form-check">
+                                    <input type="radio" id="skipDuplicates" name="duplicateAction" class="form-check-input" checked>
+                                    <label for="skipDuplicates" class="form-check-label">Pular registros duplicados</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" id="overwriteDuplicates" name="duplicateAction" class="form-check-input">
+                                    <label for="overwriteDuplicates" class="form-check-label">Sobrescrever registros duplicados</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" id="keepBoth" name="duplicateAction" class="form-check-input">
+                                    <label for="keepBoth" class="form-check-label">Manter ambos (pode criar duplicatas)</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Opções adicionais</label>
+                            <div class="checkbox-group">
+                                <div class="form-check">
+                                    <input type="checkbox" id="ignoreErrors" class="form-check-input">
+                                    <label for="ignoreErrors" class="form-check-label">Ignorar erros e continuar importação</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="sendNotification" class="form-check-input" checked>
+                                    <label for="sendNotification" class="form-check-label">Enviar notificação quando finalizar</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="createBackup" class="form-check-input" checked>
+                                    <label for="createBackup" class="form-check-label">Criar backup antes de importar</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="import-summary">
+                            <h4>Resumo da Importação</h4>
+                            <div class="summary-item">
+                                <span class="summary-label">Tipo de dados:</span>
+                                <span class="summary-value" id="summaryType">Usuários</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Arquivo:</span>
+                                <span class="summary-value" id="summaryFile">usuarios.csv</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Registros identificados:</span>
+                                <span class="summary-value" id="summaryRecords">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn-admin btn-admin-outline" id="backToStep2">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </button>
+                        <button class="btn-admin btn-admin-success" id="startImport">
+                            <i class="fas fa-upload"></i> Iniciar Importação
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="import-step" id="step4">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <h3>Processando importação</h3>
+                </div>
+                <div class="step-content">
+                    <div class="processing-container" id="processingContainer">
+                        <div class="progress-section">
+                            <div class="progress-status">
+                                <div class="status-icon processing">
+                                    <i class="fas fa-sync-alt fa-spin"></i>
+                                </div>
+                                <h4>Importação em andamento</h4>
+                                <p class="status-message">Processando seus dados...</p>
+                            </div>
+
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-outer">
+                                    <div class="progress-bar-inner" id="importProgressBar" style="width: 0%"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span id="importProgressText">0%</span>
+                                    <span id="importCountText">0 de 0 registros processados</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="log-section">
+                            <h4>Log de Importação</h4>
+                            <div class="log-container" id="importLog">
+                                <div class="log-entry info">
+                                    <span class="log-time">00:00:00</span>
+                                    <span class="log-message">Iniciando processo de importação...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="complete-container" id="completeContainer" style="display:none">
+                        <div class="success-section">
+                            <div class="success-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <h3>Importação Concluída!</h3>
+                            <p>Todos os dados foram processados com sucesso.</p>
+
+                            <div class="import-stats">
+                                <div class="stat-item">
+                                    <div class="stat-value" id="statTotal">0</div>
+                                    <div class="stat-label">Total Processado</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value success" id="statSuccess">0</div>
+                                    <div class="stat-label">Importados</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value warning" id="statSkipped">0</div>
+                                    <div class="stat-label">Pulados</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value danger" id="statError">0</div>
+                                    <div class="stat-label">Erros</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <a href="{{ url_for('admin_tools_import') }}" class="btn-admin btn-admin-outline">
+                                <i class="fas fa-redo"></i> Nova Importação
+                            </a>
+                            <a href="#" class="btn-admin btn-admin-primary" id="viewImportedData">
+                                <i class="fas fa-eye"></i> Ver Dados Importados
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="admin-card slide-in-up">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Histórico de Importação</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Data/Hora</th>
+                    <th>Tipo</th>
+                    <th>Arquivo</th>
+                    <th>Usuário</th>
+                    <th>Registros</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>20/05/2023 15:42</td>
+                    <td>Usuários</td>
+                    <td>usuarios_maio.csv</td>
+                    <td>admin</td>
+                    <td>125</td>
+                    <td><span class="status-badge status-success">Concluído</span></td>
+                    <td class="actions">
+                        <a href="#" class="btn-action btn-view" title="Ver Detalhes">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="#" class="btn-action btn-download" title="Baixar Log">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>15/05/2023 10:15</td>
+                    <td>Posts</td>
+                    <td>artigos_novos.xlsx</td>
+                    <td>admin</td>
+                    <td>47</td>
+                    <td><span class="status-badge status-success">Concluído</span></td>
+                    <td class="actions">
+                        <a href="#" class="btn-action btn-view" title="Ver Detalhes">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="#" class="btn-action btn-download" title="Baixar Log">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>10/05/2023 09:30</td>
+                    <td>Categorias</td>
+                    <td>categorias.json</td>
+                    <td>editor</td>
+                    <td>15</td>
+                    <td><span class="status-badge status-warning">Parcial</span></td>
+                    <td class="actions">
+                        <a href="#" class="btn-action btn-view" title="Ver Detalhes">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="#" class="btn-action btn-download" title="Baixar Log">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Estilos para o processo de importação */
+    .import-steps {
+        position: relative;
+    }
+
+    .import-step {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background-color: white;
+        margin-bottom: 1.5rem;
+        display: none;
+    }
+
+    .import-step.active {
+        display: block;
+    }
+
+    .step-header {
+        padding: 1.5rem;
+        background-color: rgba(0, 0, 0, 0.02);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .step-number {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+
+    .step-header h3 {
+        margin: 0;
+        font-size: 1.2rem;
+    }
+
+    .step-content {
+        padding: 2rem;
+    }
+
+    /* File Upload */
+    .file-upload-container {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    .file-upload-input {
+        position: absolute;
+        opacity: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+        cursor: pointer;
+    }
+
+    .file-upload-label {
+        border: 2px dashed rgba(0, 0, 0, 0.1);
+        border-radius: var(--radius-md);
+        padding: 2.5rem 1rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        cursor: pointer;
+        transition: var(--transition-normal);
+    }
+
+    .file-upload-label i {
+        font-size: 2.5rem;
+        color: var(--primary-color);
+    }
+
+    .file-upload-label:hover {
+        border-color: var(--primary-color);
+        background-color: rgba(58, 134, 255, 0.05);
+    }
+
+    .upload-info {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: rgba(58, 134, 255, 0.1);
+        border-radius: var(--radius-md);
+        padding: 0.75rem 1rem;
+    }
+
+    .file-name {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .file-size {
+        font-size: 0.9rem;
+        color: var(--gray-color);
+    }
+
+    .btn-remove-file {
+        background: none;
+        border: none;
+        color: var(--gray-color);
+        cursor: pointer;
+    }
+
+    .btn-remove-file:hover {
+        color: var(--accent-color);
+    }
+
+    /* Mapping Table */
+    .mapping-table-container {
+        margin-bottom: 2rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .mapping-table select {
+        width: 100%;
+    }
+
+    /* Preview Table */
+    .preview-section {
+        margin-top: 2rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+        padding-top: 2rem;
+    }
+
+    .preview-section h4 {
+        margin-bottom: 1rem;
+    }
+
+    .preview-table-container {
+        max-height: 300px;
+        overflow-y: auto;
+        margin-bottom: 1rem;
+    }
+
+    /* Processing Status */
+    .progress-section {
+        margin-bottom: 2rem;
+        text-align: center;
+        padding: 2rem;
+        background-color: rgba(0, 0, 0, 0.02);
+        border-radius: var(--radius-md);
+    }
+
+    .progress-status {
+        margin-bottom: 2rem;
+    }
+
+    .status-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .status-icon.processing {
+        color: var(--primary-color);
+    }
+
+    .status-icon.success {
+        color: var(--success-color);
+    }
+
+    .status-message {
+        color: var(--gray-color);
+    }
+
+    .progress-bar-container {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .progress-bar-outer {
+        height: 10px;
+        background-color: rgba(0, 0, 0, 0.1);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-inner {
+        height: 100%;
+        background-color: var(--primary-color);
+        border-radius: var(--radius-full);
+        transition: width 0.3s ease;
+    }
+
+    .progress-text {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        color: var(--gray-color);
+    }
+
+    /* Log Section */
+    .log-section {
+        margin-bottom: 2rem;
+    }
+
+    .log-section h4 {
+        margin-bottom: 1rem;
+    }
+
+    .log-container {
+        height: 200px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
+
+    .log-entry {
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+    }
+
+    .log-time {
+        color: var(--gray-color);
+        margin-right: 0.5rem;
+    }
+
+    .log-entry.info .log-message {
+        color: var(--primary-color);
+    }
+
+    .log-entry.success .log-message {
+        color: var(--success-color);
+    }
+
+    .log-entry.warning .log-message {
+        color: var(--warning-color);
+    }
+
+    .log-entry.error .log-message {
+        color: var(--accent-color);
+    }
+
+    /* Complete Section */
+    .success-section {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .success-icon {
+        font-size: 5rem;
+        color: var(--success-color);
+        margin-bottom: 1.5rem;
+    }
+
+    .import-stats {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-value.success {
+        color: var(--success-color);
+    }
+
+    .stat-value.warning {
+        color: var(--warning-color);
+    }
+
+    .stat-value.danger {
+        color: var(--accent-color);
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: var(--gray-color);
+    }
+
+    /* Import Summary */
+    .import-summary {
+        background-color: rgba(0, 0, 0, 0.02);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        margin-top: 2rem;
+    }
+
+    .import-summary h4 {
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .summary-label {
+        font-weight: 600;
+    }
+
+    /* Status badges */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-full);
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-success {
+        background-color: rgba(56, 176, 0, 0.1);
+        color: var(--success-color);
+    }
+
+    .status-warning {
+        background-color: rgba(255, 190, 11, 0.1);
+        color: var(--warning-color);
+    }
+
+    .status-danger {
+        background-color: rgba(255, 0, 110, 0.1);
+        color: var(--accent-color);
+    }
+
+    /* Info Badge */
+    .info-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background-color: rgba(58, 134, 255, 0.1);
+        color: var(--primary-color);
+        border-radius: var(--radius-md);
+        font-size: 0.9rem;
+    }
+
+    .info-badge i {
+        margin-right: 0.5rem;
+    }
+
+    /* Form Actions */
+    .form-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+        gap: 1rem;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Simulação de dados para os campos de mapeamento baseados no tipo selecionado
+        const fieldMappings = {
+            posts: [
+                { field: 'title', label: 'Título', required: true },
+                { field: 'content', label: 'Conteúdo', required: true },
+                { field: 'slug', label: 'Slug', required: false },
+                { field: 'category', label: 'Categoria', required: true },
+                { field: 'tags', label: 'Tags', required: false },
+                { field: 'status', label: 'Status', required: false },
+                { field: 'author', label: 'Autor', required: false },
+                { field: 'date_posted', label: 'Data de Publicação', required: false },
+                { field: 'featured_image', label: 'Imagem Destacada', required: false }
+            ],
+            categories: [
+                { field: 'name', label: 'Nome', required: true },
+                { field: 'slug', label: 'Slug', required: false },
+                { field: 'description', label: 'Descrição', required: false },
+                { field: 'parent', label: 'Categoria Pai', required: false }
+            ],
+            users: [
+                { field: 'username', label: 'Nome de Usuário', required: true },
+                { field: 'email', label: 'Email', required: true },
+                { field: 'password', label: 'Senha', required: true },
+                { field: 'name', label: 'Nome Completo', required: false },
+                { field: 'role', label: 'Papel', required: false }
+            ],
+            files: [
+                { field: 'filename', label: 'Nome do Arquivo', required: true },
+                { field: 'path', label: 'Caminho', required: true },
+                { field: 'type', label: 'Tipo', required: true },
+                { field: 'size', label: 'Tamanho', required: false },
+                { field: 'description', label: 'Descrição', required: false },
+                { field: 'category', label: 'Categoria', required: false }
+            ],
+            subscribers: [
+                { field: 'email', label: 'Email', required: true },
+                { field: 'name', label: 'Nome', required: false },
+                { field: 'status', label: 'Status', required: false },
+                { field: 'group', label: 'Grupo', required: false },
+                { field: 'date_subscribed', label: 'Data de Inscrição', required: false }
+            ]
+        };
+
+        // Simulação de colunas do arquivo
+        const fileColumns = ['email', 'full_name', 'date', 'status', 'group', 'notes'];
+
+        // Elementos DOM
+        const importType = document.getElementById('importType');
+        const importFile = document.getElementById('importFile');
+        const uploadInfo = document.getElementById('uploadInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFile = document.getElementById('removeFile');
+        const continueToStep2 = document.getElementById('continueToStep2');
+        const backToStep1 = document.getElementById('backToStep1');
+        const continueToStep3 = document.getElementById('continueToStep3');
+        const backToStep2 = document.getElementById('backToStep2');
+        const startImport = document.getElementById('startImport');
+        const mappingFields = document.getElementById('mappingFields');
+        const previewSection = document.getElementById('previewSection');
+        const previewTable = document.getElementById('previewTable');
+        const importProgressBar = document.getElementById('importProgressBar');
+        const importProgressText = document.getElementById('importProgressText');
+        const importCountText = document.getElementById('importCountText');
+        const importLog = document.getElementById('importLog');
+        const processingContainer = document.getElementById('processingContainer');
+        const completeContainer = document.getElementById('completeContainer');
+        const summaryType = document.getElementById('summaryType');
+        const summaryFile = document.getElementById('summaryFile');
+        const summaryRecords = document.getElementById('summaryRecords');
+        const statTotal = document.getElementById('statTotal');
+        const statSuccess = document.getElementById('statSuccess');
+        const statSkipped = document.getElementById('statSkipped');
+        const statError = document.getElementById('statError');
+
+        // Evento para upload de arquivo
+        importFile.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                const file = this.files[0];
+
+                // Verificar tamanho do arquivo (máximo 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    showNotification('O arquivo é muito grande. Tamanho máximo: 10MB', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                // Verificar tipo do arquivo
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                if (!['csv', 'xlsx', 'json'].includes(fileExt)) {
+                    showNotification('Formato de arquivo não suportado. Use CSV, XLSX ou JSON.', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                // Mostrar informações do arquivo
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                uploadInfo.style.display = 'flex';
+
+                // Atualizar botão Continuar
+                if (importType.value) {
+                    continueToStep2.disabled = false;
+                }
+
+                // Atualizar resumo
+                summaryFile.textContent = file.name;
+                summaryRecords.textContent = '215'; // Valor simulado
+            }
+        });
+
+        // Remover arquivo
+        removeFile.addEventListener('click', function() {
+            importFile.value = '';
+            uploadInfo.style.display = 'none';
+            continueToStep2.disabled = true;
+        });
+
+        // Evento para selecionar tipo de importação
+        importType.addEventListener('change', function() {
+            if (this.value) {
+                // Habilitar botão Continuar se um arquivo já foi selecionado
+                if (importFile.files.length > 0) {
+                    continueToStep2.disabled = false;
+                }
+
+                // Atualizar resumo
+                summaryType.textContent = this.options[this.selectedIndex].text;
+            } else {
+                continueToStep2.disabled = true;
+            }
+        });
+
+        // Navegar para o Passo 2
+        continueToStep2.addEventListener('click', function() {
+            // Verificar se tipo e arquivo foram selecionados
+            if (!importType.value || importFile.files.length === 0) {
+                showNotification('Por favor, selecione o tipo de dados e o arquivo.', 'warning');
+                return;
+            }
+
+            // Avançar para o passo 2
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+
+            // Preencher campos de mapeamento
+            populateMappingFields();
+
+            // Mostrar visualização (simulada)
+            showPreview();
+        });
+
+        // Voltar para o Passo 1
+        backToStep1.addEventListener('click', function() {
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step1').classList.add('active');
+        });
+
+        // Navegar para o Passo 3
+        continueToStep3.addEventListener('click', function() {
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step3').classList.add('active');
+        });
+
+        // Voltar para o Passo 2
+        backToStep2.addEventListener('click', function() {
+            document.getElementById('step3').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+        });
+
+        // Iniciar Importação
+        startImport.addEventListener('click', function() {
+            document.getElementById('step3').classList.remove('active');
+            document.getElementById('step4').classList.add('active');
+
+            // Simular importação
+            simulateImport();
+        });
+
+        // Função para preencher campos de mapeamento
+        function populateMappingFields() {
+            const selectedType = importType.value;
+            const fields = fieldMappings[selectedType] || [];
+
+            mappingFields.innerHTML = '';
+
+            fields.forEach(field => {
+                const row = document.createElement('tr');
+
+                // Coluna 1: Campo do sistema
+                const tdField = document.createElement('td');
+                tdField.innerHTML = `${field.label} ${field.required ? '<span class="required">*</span>' : ''}`;
+                row.appendChild(tdField);
+
+                // Coluna 2: Mapeamento para coluna do arquivo
+                const tdMapping = document.createElement('td');
+                const select = document.createElement('select');
+                select.className = 'form-control';
+                select.name = `mapping_${field.field}`;
+
+                // Opção para não mapear
+                const optionNone = document.createElement('option');
+                optionNone.value = '';
+                optionNone.textContent = 'Não mapear';
+                select.appendChild(optionNone);
+
+                // Opções baseadas nas colunas do arquivo
+                fileColumns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column;
+                    option.textContent = column;
+
+                    // Auto-selecionar se os nomes coincidirem
+                    if (field.field === column || field.field === column.replace('_', '') || field.field === column.toLowerCase()) {
+                        option.selected = true;
+                    }
+
+                    select.appendChild(option);
+                });
+
+                tdMapping.appendChild(select);
+                row.appendChild(tdMapping);
+
+                // Coluna 3: Valor padrão
+                const tdDefault = document.createElement('td');
+                const inputDefault = document.createElement('input');
+                inputDefault.type = 'text';
+                inputDefault.className = 'form-control';
+                inputDefault.name = `default_${field.field}`;
+                inputDefault.placeholder = 'Valor padrão';
+                tdDefault.appendChild(inputDefault);
+                row.appendChild(tdDefault);
+
+                mappingFields.appendChild(row);
+            });
+        }
+
+        // Função para mostrar visualização dos dados
+        function showPreview() {
+            // Dados simulados para visualização
+            const previewData = [
+                { email: 'joao@example.com', full_name: 'João Silva', date: '2023-05-15', status: 'active', group: 'Técnicos', notes: 'Interessado em BIOS' },
+                { email: 'maria@example.com', full_name: 'Maria Santos', date: '2023-05-14', status: 'active', group: 'Geral', notes: 'Entusiasta de tecnologia' },
+                { email: 'pedro@example.com', full_name: 'Pedro Costa', date: '2023-05-13', status: 'pending', group: 'Técnicos', notes: 'Técnico de informática' }
+            ];
+
+            // Mostrar seção de visualização
+            previewSection.style.display = 'block';
+
+            // Criar cabeçalho da tabela
+            let tableHtml = '<thead><tr>';
+            fileColumns.forEach(column => {
+                tableHtml += `<th>${column}</th>`;
+            });
+            tableHtml += '</tr></thead>';
+
+            // Criar corpo da tabela com os dados
+            tableHtml += '<tbody>';
+            previewData.forEach(row => {
+                tableHtml += '<tr>';
+                fileColumns.forEach(column => {
+                    tableHtml += `<td>${row[column] || ''}</td>`;
+                });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody>';
+
+            previewTable.innerHTML = tableHtml;
+        }
+
+        // Função para simular o processo de importação
+        function simulateImport() {
+            const totalRecords = 215; // Simulação
+            let processedRecords = 0;
+            let successRecords = 0;
+            let skippedRecords = 0;
+            let errorRecords = 0;
+
+            // Adicionar log inicial
+            addImportLog('Iniciando processo de importação...', 'info');
+
+            // Simulação de progresso
+            const importInterval = setInterval(() => {
+                // Incrementar registros processados
+                processedRecords += Math.floor(Math.random() * 5) + 1;
+                if (processedRecords > totalRecords) processedRecords = totalRecords;
+
+                // Calcular estatísticas para esse lote
+                const currentBatchSize = Math.min(5, totalRecords - (successRecords + skippedRecords + errorRecords));
+                const successBatch = Math.floor(Math.random() * currentBatchSize * 0.8);
+                const errorBatch = Math.floor(Math.random() * (currentBatchSize - successBatch) * 0.3);
+                const skippedBatch = currentBatchSize - successBatch - errorBatch;
+
+                successRecords += successBatch;
+                errorRecords += errorBatch;
+                skippedRecords += skippedBatch;
+
+                // Atualizar barra de progresso
+                const progress = Math.floor((processedRecords / totalRecords) * 100);
+                importProgressBar.style.width = `${progress}%`;
+                importProgressText.textContent = `${progress}%`;
+                importCountText.textContent = `${processedRecords} de ${totalRecords} registros processados`;
+
+                // Adicionar alguns logs aleatórios
+                if (successBatch > 0) {
+                    addImportLog(`Importados ${successBatch} registros com sucesso.`, 'success');
+                }
+                if (skippedBatch > 0) {
+                    addImportLog(`Pulados ${skippedBatch} registros duplicados.`, 'warning');
+                }
+                if (errorBatch > 0) {
+                    addImportLog(`Erro ao processar ${errorBatch} registros.`, 'error');
+                }
+
+                // Verificar se a importação foi concluída
+                if (processedRecords >= totalRecords) {
+                    clearInterval(importInterval);
+
+                    // Adicionar log final
+                    addImportLog('Importação concluída!', 'success');
+
+                    // Atualizar estatísticas finais
+                    statTotal.textContent = totalRecords;
+                    statSuccess.textContent = successRecords;
+                    statSkipped.textContent = skippedRecords;
+                    statError.textContent = errorRecords;
+
+                    // Mostrar tela de conclusão
+                    setTimeout(() => {
+                        processingContainer.style.display = 'none';
+                        completeContainer.style.display = 'block';
+                    }, 1000);
+                }
+            }, 500);
+        }
+
+        // Função para adicionar log de importação
+        function addImportLog(message, type = 'info') {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.innerHTML = `<span class="log-time">${timeStr}</span><span class="log-message">${message}</span>`;
+
+            importLog.appendChild(logEntry);
+            importLog.scrollTop = importLog.scrollHeight;
+        }
+
+        // Função para formatar tamanho de arquivo
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Botão para ver dados importados
+        document.getElementById('viewImportedData').addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // Aqui você redirecionaria para a página apropriada baseado no tipo de dados
+            // Para este exemplo, apenas mostraremos uma notificação
+            showNotification('Redirecionando para visualizar dados importados...', 'info');
+
+            setTimeout(() => {
+                window.location.href = importType.value === 'users' ?
+                    '{{ url_for("admin_users") }}' :
+                    '{{ url_for("admin_dashboard") }}';
+            }, 1500);
+        });
+    });
+</script>
+{% endblock %}

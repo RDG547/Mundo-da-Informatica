@@ -1,0 +1,706 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+<script src="{{ url_for('static', filename='js/profile-page.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Enhanced Profile Header -->
+<div class="profile-header" data-page="profile">
+    <div class="container">
+        <div class="profile-content text-center">
+            <div class="profile-avatar-wrapper">
+                <div class="profile-avatar-large">
+                    <img src="{{ url_for('static', filename='uploads/profiles/' + (user.profile_image or 'default_profile.jpg')) }}"
+                        alt="{{ user.get_full_name() or user.username }}"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="avatar-placeholder-large" style="display: none;">
+                        {{ user.get_initials() }}
+                    </div>
+                </div>
+                {% if user.is_admin() %}
+                <div class="profile-role-badge admin">
+                    <i class="fas fa-crown"></i>
+                </div>
+                {% elif user.is_editor() %}
+                <div class="profile-role-badge editor">
+                    <i class="fas fa-pen-nib"></i>
+                </div>
+                {% endif %}
+            </div>
+
+            <h1 class="profile-title">{{ user.get_full_name() or user.username }}</h1>
+            <p class="profile-subtitle">@{{ user.username }}</p>
+
+            {% if user.bio %}
+            <p class="profile-bio">{{ user.bio }}</p>
+            {% endif %}
+
+            <div class="profile-badges">
+                <!-- Plan Badge -->
+                {% if user.plan == 'vip' %}
+                <span class="profile-badge badge-vip" style="background: #ff006e; color: white; border: none;">
+                    <i class="fas fa-crown"></i> VIP
+                </span>
+                {% elif user.plan == 'premium' %}
+                <span class="profile-badge badge-premium" style="background: #667eea; color: white; border: none;">
+                    <i class="fas fa-star"></i> Premium
+                </span>
+                {% else %}
+                <span class="profile-badge badge-free" style="background: #718096; color: white; border: none;">
+                    <i class="fas fa-user"></i> Grátis
+                </span>
+                {% endif %}
+
+                {% if user.is_verified %}
+                <span class="profile-badge">
+                    <i class="fas fa-check-circle"></i> Verificado
+                </span>
+                {% endif %}
+            </div>
+
+            {% if current_user.id == user.id %}
+            <div class="profile-actions">
+                <button type="button" class="btn btn-gradient primary" onclick="openEditModal()">
+                    <i class="fas fa-edit"></i> Editar Perfil
+                </button>
+                <button type="button" class="btn btn-gradient"
+                    style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white;"
+                    onclick="openPasswordModal()">
+                    <i class="fas fa-key"></i> Alterar Senha
+                </button>
+                {% if current_user.is_admin() %}
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-gradient secondary">
+                    <i class="fas fa-tachometer-alt"></i> Painel Admin
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Profile Main -->
+<div class="profile-main" data-page="profile">
+    <div class="container">
+        <div class="row">
+            <!-- Quick Actions (Full Width Top Section) -->
+            <div class="col-12 mb-4">
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Ações Rápidas</h2>
+                            <p class="profile-card-subtitle">Funcionalidades e navegação</p>
+                        </div>
+                    </div>
+                    <div class="quick-actions-grid">
+                        {% if current_user.id == user.id %}
+                        <button class="quick-action-btn" onclick="openEditModal()">
+                            <i class="fas fa-edit"></i>
+                            <span>Editar Perfil</span>
+                        </button>
+                        <button class="quick-action-btn" onclick="openPasswordModal()">
+                            <i class="fas fa-key"></i>
+                            <span>Alterar Senha</span>
+                        </button>
+                        {% if current_user.is_admin() %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="quick-action-btn">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Painel Admin</span>
+                        </a>
+                        {% endif %}
+                        {% endif %}
+                        <a href="{{ url_for('home') }}" class="quick-action-btn">
+                            <i class="fas fa-home"></i>
+                            <span>Página Inicial</span>
+                        </a>
+                        <a href="{{ url_for('posts') }}" class="quick-action-btn">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Ver Posts</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Favorites Section (moved from sidebar) -->
+            {% if current_user.id == user.id and favorite_posts %}
+            <div class="col-12 mb-4">
+                <div class="profile-card" id="favorites-section">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Posts Favoritos</h2>
+                            <p class="profile-card-subtitle">Posts que você salvou para ler depois</p>
+                        </div>
+                    </div>
+                    <div class="posts-grid" style="margin-top: 1.5rem;">
+                        <div class="row">
+                            {% for post in favorite_posts[:6] %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="post-card" style="position: relative;">
+                                    <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
+                                        title="Remover dos favoritos">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    <div class="category-badge-left">
+                                        <i class="fas fa-tag"></i> {{ post.category_str or 'Geral' }}
+                                    </div>
+                                    <div class="post-image">
+                                        {% if post.image_url %}
+                                        <img src="{{ url_for('static', filename='images/' + post.image_url) }}"
+                                            alt="{{ post.title }}" class="img-fluid">
+                                        {% else %}
+                                        <div class="post-placeholder">
+                                            <i class="fas fa-file-alt"></i>
+                                        </div>
+                                        {% endif %}
+                                        {% if post.featured %}
+                                        <div class="featured-badge">
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="post-content">
+                                        <h3 class="post-title">
+                                            <a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a>
+                                        </h3>
+                                        <p class="post-excerpt">{{ (post.content|striptags)[:150] }}{% if
+                                            (post.content|striptags)|length > 150 %}...{% endif %}</p>
+                                        <div class="post-meta">
+                                            <span class="post-date">
+                                                <i class="fas fa-calendar"></i>
+                                                {{ post.date_posted.strftime('%d/%m/%Y') }}
+                                            </span>
+                                            <span class="post-views">
+                                                <i class="fas fa-eye"></i>
+                                                {{ post.views }}
+                                            </span>
+                                            {% if post.downloads %}
+                                            <span class="post-downloads">
+                                                <i class="fas fa-download"></i>
+                                                {{ post.downloads }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="post-actions">
+                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-primary">
+                                                <i class="fas fa-eye"></i> Ver Post
+                                            </a>
+                                            {% if post.download_link %}
+                                            <a href="{{ url_for('download_post', post_id=post.id) }}"
+                                                class="btn btn-success">
+                                                <i class="fas fa-download"></i> Download
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% if favorite_posts|length > 6 %}
+                    <div class="profile-card-footer">
+                        <p class="text-muted">E mais {{ favorite_posts|length - 6 }} favorito(s)</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif current_user.id == user.id %}
+            <div class="col-12 mb-4">
+                <div class="profile-card" id="favorites-section">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Posts Favoritos</h2>
+                            <p class="profile-card-subtitle">Posts que você salvou para ler depois</p>
+                        </div>
+                    </div>
+                    <div class="empty-state">
+                        <i class="fas fa-star" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem;"></i>
+                        <p>Você ainda não tem posts favoritos.</p>
+                        <p class="text-muted">Clique no ícone de estrela nos posts para adicioná-los aos favoritos!</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="col-lg-8">
+                <!-- Enhanced Stats Section -->
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Estatísticas do Perfil</h2>
+                            <p class="profile-card-subtitle">Resumo da atividade e contribuições no sistema</p>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid-enhanced">
+                        <div class="stat-card-enhanced">
+                            <div class="stat-icon-enhanced posts">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="stat-number-enhanced">
+                                <span class="count" data-count="{{ user_posts }}">0</span>
+                            </div>
+                            <h3 class="stat-label-enhanced">Posts Publicados</h3>
+                            <p class="stat-description-enhanced">Artigos e recursos criados e compartilhados com a
+                                comunidade.</p>
+                        </div>
+
+                        <div class="stat-card-enhanced">
+                            <div class="stat-icon-enhanced comments">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <div class="stat-number-enhanced">
+                                <span class="count" data-count="{{ user_comments }}">0</span>
+                            </div>
+                            <h3 class="stat-label-enhanced">Comentários</h3>
+                            <p class="stat-description-enhanced">Interações e contribuições em discussões da comunidade.
+                            </p>
+                        </div>
+
+                        <div class="stat-card-enhanced">
+                            <div class="stat-icon-enhanced days">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <div class="stat-number-enhanced">
+                                <span class="count" data-count="{{ days_as_member }}">0</span>
+                            </div>
+                            <h3 class="stat-label-enhanced">Dias Ativo</h3>
+                            <p class="stat-description-enhanced">Tempo como membro ativo da comunidade Mundo da
+                                Informática.</p>
+                        </div>
+
+                        <div class="stat-card-enhanced">
+                            <div class="stat-icon-enhanced role">
+                                <i class="fas fa-user-shield"></i>
+                            </div>
+                            <div class="stat-number-enhanced">
+                                <span class="role-name">{{ user.role.title() }}</span>
+                            </div>
+                            <h3 class="stat-label-enhanced">Nível de Acesso</h3>
+                            <p class="stat-description-enhanced">Permissões e responsabilidades no sistema da
+                                plataforma.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enhanced Profile Info -->
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Informações do Perfil</h2>
+                            <p class="profile-card-subtitle">Dados pessoais e informações de contato do usuário</p>
+                        </div>
+                    </div>
+
+                    <div class="info-grid-enhanced">
+                        {% if user.location %}
+                        <div class="info-item-enhanced">
+                            <div class="info-icon-enhanced">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </div>
+                            <div class="info-content-enhanced">
+                                <h4>Localização</h4>
+                                <p>{{ user.location }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if user.website %}
+                        <div class="info-item-enhanced">
+                            <div class="info-icon-enhanced">
+                                <i class="fas fa-globe"></i>
+                            </div>
+                            <div class="info-content-enhanced">
+                                <h4>Website</h4>
+                                <p><a href="{{ user.website }}" target="_blank" rel="noopener">{{ user.website }}</a>
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if user.phone %}
+                        <div class="info-item-enhanced">
+                            <div class="info-icon-enhanced">
+                                <i class="fas fa-phone"></i>
+                            </div>
+                            <div class="info-content-enhanced">
+                                <h4>Telefone</h4>
+                                <p>{{ user.phone }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="info-item-enhanced">
+                            <div class="info-icon-enhanced">
+                                <i class="fas fa-calendar-plus"></i>
+                            </div>
+                            <div class="info-content-enhanced">
+                                <h4>Membro Desde</h4>
+                                <p>{{ user.date_joined|format_date_pt if user.date_joined else 'Data não disponível' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        {% if user.email and (current_user.id == user.id or current_user.is_admin()) %}
+                        <div class="info-item-enhanced">
+                            <div class="info-icon-enhanced">
+                                <i class="fas fa-envelope"></i>
+                            </div>
+                            <div class="info-content-enhanced">
+                                <h4>Email</h4>
+                                <p>{{ user.email }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if user.is_verified %}
+                        <div class="info-item-enhanced">
+                            <div class="info-icon-enhanced">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="info-content-enhanced">
+                                <h4>Status</h4>
+                                <p>Email Verificado</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Enhanced Social Links -->
+                {% if user.facebook or user.twitter or user.instagram or user.linkedin or user.github %}
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-share-alt"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Redes Sociais</h2>
+                            <p class="profile-card-subtitle">Conecte-se com {{ user.get_full_name() or user.username }}
+                                em outras plataformas</p>
+                        </div>
+                    </div>
+
+                    <div class="social-grid-enhanced">
+                        {% if user.facebook %}
+                        <a href="{{ user.facebook }}" target="_blank" rel="noopener"
+                            class="social-card-enhanced facebook">
+                            <div class="social-icon-enhanced">
+                                <i class="fab fa-facebook-f"></i>
+                            </div>
+                            <span class="social-label-enhanced">Facebook</span>
+                        </a>
+                        {% endif %}
+
+                        {% if user.twitter %}
+                        <a href="{{ user.twitter }}" target="_blank" rel="noopener"
+                            class="social-card-enhanced twitter">
+                            <div class="social-icon-enhanced">
+                                <i class="fab fa-twitter"></i>
+                            </div>
+                            <span class="social-label-enhanced">Twitter</span>
+                        </a>
+                        {% endif %}
+
+                        {% if user.instagram %}
+                        <a href="{{ user.instagram }}" target="_blank" rel="noopener"
+                            class="social-card-enhanced instagram">
+                            <div class="social-icon-enhanced">
+                                <i class="fab fa-instagram"></i>
+                            </div>
+                            <span class="social-label-enhanced">Instagram</span>
+                        </a>
+                        {% endif %}
+
+                        {% if user.linkedin %}
+                        <a href="{{ user.linkedin }}" target="_blank" rel="noopener"
+                            class="social-card-enhanced linkedin">
+                            <div class="social-icon-enhanced">
+                                <i class="fab fa-linkedin-in"></i>
+                            </div>
+                            <span class="social-label-enhanced">LinkedIn</span>
+                        </a>
+                        {% endif %}
+
+                        {% if user.github %}
+                        <a href="{{ user.github }}" target="_blank" rel="noopener" class="social-card-enhanced github">
+                            <div class="social-icon-enhanced">
+                                <i class="fab fa-github"></i>
+                            </div>
+                            <span class="social-label-enhanced">GitHub</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Profile Sidebar -->
+            <div class="col-lg-4">
+                <!-- Activity Summary -->
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Resumo de Atividade</h2>
+                            <p class="profile-card-subtitle">Últimas ações no sistema</p>
+                        </div>
+                    </div>
+                    <div class="activity-summary">
+                        <div class="activity-item">
+                            <div class="activity-icon">
+                                <i class="fas fa-user-plus"></i>
+                            </div>
+                            <div class="activity-content">
+                                <span class="activity-label">Cadastro realizado</span>
+                                <span class="activity-date">{{ user.date_joined.strftime('%d/%m/%Y') if user.date_joined
+                                    else 'N/A' }}</span>
+                            </div>
+                        </div>
+                        {% if user_posts > 0 %}
+                        <div class="activity-item">
+                            <div class="activity-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="activity-content">
+                                <span class="activity-label">{{ user_posts }} posts publicados</span>
+                                <span class="activity-date">Contribuições ativas</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if user_comments > 0 %}
+                        <div class="activity-item">
+                            <div class="activity-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <div class="activity-content">
+                                <span class="activity-label">{{ user_comments }} comentários</span>
+                                <span class="activity-date">Participação ativa</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Edit Profile Modal -->
+{% if current_user.id == user.id %}
+<div class="modal-overlay" id="editModal">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-edit"></i> Editar Perfil</h3>
+            <button class="modal-close" onclick="closeEditModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="editProfileForm" action="{{ url_for('admin_update_profile') }}" method="POST">
+            <div class="modal-body">
+                <div class="form-section">
+                    <h4><i class="fas fa-user-circle"></i> Informações Pessoais</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="name">
+                                <i class="fas fa-user"></i> Nome Completo
+                            </label>
+                            <input type="text" id="name" name="name" value="{{ user.name or '' }}"
+                                placeholder="Digite seu nome completo" required>
+                            <small class="form-text">Nome que será exibido no perfil</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="username">
+                                <i class="fas fa-at"></i> Nome de Usuário
+                            </label>
+                            <input type="text" id="username" name="username" value="{{ user.username }}"
+                                placeholder="@seuusuario" required pattern="^[a-zA-Z0-9_]{3,20}$">
+                            <small class="form-text">3-20 caracteres (letras, números, _)</small>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="bio">
+                                <i class="fas fa-quote-left"></i> Biografia
+                            </label>
+                            <textarea id="bio" name="bio" rows="4"
+                                placeholder="Conte um pouco sobre você, seus interesses e experiências..."
+                                maxlength="300">{{ user.bio or '' }}</textarea>
+                            <div class="char-counter">
+                                <span id="bioCount">{{ user.bio|length if user.bio else 0 }}</span>/300 caracteres
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4><i class="fas fa-envelope"></i> Contato</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="email">
+                                <i class="fas fa-envelope"></i> Email
+                            </label>
+                            <input type="email" id="email" name="email" value="{{ user.email }}"
+                                placeholder="seu@email.com" required>
+                            <small class="form-text">Email principal da conta</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">
+                                <i class="fas fa-phone"></i> Telefone
+                            </label>
+                            <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}"
+                                placeholder="(11) 99999-9999">
+                            <small class="form-text">Opcional</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="location">
+                                <i class="fas fa-map-marker-alt"></i> Localização
+                            </label>
+                            <input type="text" id="location" name="location" value="{{ user.location or '' }}"
+                                placeholder="Cidade, Estado, País">
+                            <small class="form-text">Sua localização</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4><i class="fas fa-share-alt"></i> Redes Sociais</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="facebook">
+                                <i class="fab fa-facebook" style="color: #1877f2;"></i> Facebook
+                            </label>
+                            <input type="url" id="facebook" name="facebook" value="{{ user.facebook or '' }}"
+                                placeholder="https://facebook.com/seuperfil">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="twitter">
+                                <i class="fab fa-twitter" style="color: #1da1f2;"></i> Twitter
+                            </label>
+                            <input type="url" id="twitter" name="twitter" value="{{ user.twitter or '' }}"
+                                placeholder="https://twitter.com/seuperfil">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="instagram">
+                                <i class="fab fa-instagram" style="color: #e4405f;"></i> Instagram
+                            </label>
+                            <input type="url" id="instagram" name="instagram" value="{{ user.instagram or '' }}"
+                                placeholder="https://instagram.com/seuperfil">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="github">
+                                <i class="fab fa-github" style="color: #333;"></i> GitHub
+                            </label>
+                            <input type="url" id="github" name="github" value="{{ user.github or '' }}"
+                                placeholder="https://github.com/seuperfil">
+                        </div>
+                    </div>
+                    <small class="form-text-info">
+                        <i class="fas fa-info-circle"></i> Todas as redes sociais são opcionais. Adicione apenas as que
+                        você utiliza.
+                    </small>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="justify-content: center;">
+                <button type="button" class="btn btn-outline" onclick="closeEditModal()"
+                    style="background-color: #dc3545; color: white; border-color: #dc3545;">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-gradient primary">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Change Password Modal -->
+{% if current_user.id == user.id %}
+<div class="modal-overlay" id="passwordModal">
+    <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-key"></i> Alterar Senha</h3>
+            <button class="modal-close" onclick="closePasswordModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="changePasswordForm" action="{{ url_for('update_password') }}" method="POST">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="current_password">
+                        <i class="fas fa-lock"></i> Senha Atual
+                    </label>
+                    <input type="password" id="current_password" name="current_password" required
+                        placeholder="Digite sua senha atual">
+                </div>
+
+                <div class="form-group">
+                    <label for="new_password">
+                        <i class="fas fa-key"></i> Nova Senha
+                    </label>
+                    <input type="password" id="new_password" name="new_password" required
+                        placeholder="Digite a nova senha" minlength="6">
+                    <small class="form-text">Mínimo de 6 caracteres</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password">
+                        <i class="fas fa-check-circle"></i> Confirmar Nova Senha
+                    </label>
+                    <input type="password" id="confirm_password" name="confirm_password" required
+                        placeholder="Confirme a nova senha" minlength="6">
+                </div>
+            </div>
+
+            <div class="modal-footer" style="display: flex; justify-content: center; gap: 15px;">
+                <button type="button" class="btn btn-outline" onclick="closePasswordModal()"
+                    style="background-color: #dc3545; color: white; border-color: #dc3545;">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-gradient primary">
+                    <i class="fas fa-save"></i> Alterar Senha
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

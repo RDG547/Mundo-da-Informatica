@@ -45,8 +45,16 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_5f352a14cb7e4b119811')
 
-# Configuração simples do banco SQLite
-database_url = os.environ.get('DATABASE_URL', 'sqlite:////home/rdg/Área de trabalho/Programação/mundodainformatica/instance/site.db')
+# Garantir que o diretório instance existe
+os.makedirs(app.instance_path, exist_ok=True)
+
+# Configuração do banco SQLite - usar caminho relativo
+# Em produção (Render), usa a variável de ambiente
+# Em desenvolvimento, usa o diretório instance local
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    # Caminho padrão para desenvolvimento
+    database_url = f'sqlite:///{os.path.join(app.instance_path, "site.db")}'
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

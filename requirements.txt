@@ -5,6 +5,7 @@ Flask-Login==0.6.3
 Flask-WTF==1.2.2
 Flask-Mail==0.10.0
 Flask-Migrate==4.1.0
+Flask-Compress==1.15
 email-validator==2.3.0
 
 # Security

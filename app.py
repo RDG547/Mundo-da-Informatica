@@ -4747,6 +4747,19 @@ def admin_newsletter():
                          recent_subscribers=recent_subscribers,
                          **sidebar_stats)
 
+@app.route('/downgrade_plan', methods=['POST'])
+@login_required
+def downgrade_plan():
+    try:
+        current_user.plan = 'free'
+        db.session.commit()
+        flash('Seu plano foi alterado para Grátis com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao alterar plano: {e}', 'danger')
+    return redirect(url_for('plans'))
+
+
 @app.route("/admin/tools/backup")
 @login_required
 @admin_required

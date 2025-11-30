@@ -75,7 +75,14 @@
                 </div>
 
                 <div class="plan-cta">
+                    {% if not current_user.is_authenticated %}
                     <a href="{{ url_for('register') }}" class="plan-btn">Começar Gratuitamente</a>
+                    {% elif current_user.plan == 'free' %}
+                    <div class="plan-badge current-plan-free">Plano Atual</div>
+                    {% else %}
+                    <button class="plan-btn downgrade-btn" onclick="openDowngradeModal()">Voltar ao plano
+                        grátis</button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -130,7 +137,11 @@
                 </div>
 
                 <div class="plan-cta">
+                    {% if current_user.is_authenticated and current_user.plan == 'premium' %}
+                    <div class="plan-badge current-plan-premium">Plano Atual</div>
+                    {% else %}
                     <a href="{{ url_for('register') }}" class="plan-btn">Assinar Premium</a>
+                    {% endif %}
                 </div>
             </div>
 
@@ -184,7 +195,11 @@
                 </div>
 
                 <div class="plan-cta">
+                    {% if current_user.is_authenticated and current_user.plan == 'vip' %}
+                    <div class="plan-badge current-plan-vip">Plano Atual</div>
+                    {% else %}
                     <a href="{{ url_for('register') }}" class="plan-btn">Assinar VIP</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -267,6 +282,23 @@
     </div>
 </section>
 
+<!-- Downgrade Modal -->
+<div id="downgradeModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeDowngradeModal()">&times;</span>
+        <h2>Confirmar Alteração de Plano</h2>
+        <p>Tem certeza que deseja voltar para o plano grátis?</p>
+        <p class="warning-text">Você perderá acesso imediato aos benefícios exclusivos do seu plano atual, como
+            downloads ilimitados, suporte prioritário e área VIP.</p>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeDowngradeModal()">Cancelar</button>
+            <form action="{{ url_for('downgrade_plan') }}" method="POST" style="display: inline;">
+                <button type="submit" class="btn-confirm">Confirmar</button>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- CTA Section -->
 {% include 'components/help-cta.html' %}
 {% endblock %}
@@ -287,5 +319,175 @@
             faqItem.classList.add('active');
         }
     }
+
+    // Downgrade Modal Logic
+    const modal = document.getElementById('downgradeModal');
+
+    function openDowngradeModal() {
+        modal.style.display = "block";
+        document.body.style.overflow = "hidden"; // Prevent scrolling
+    }
+
+    function closeDowngradeModal() {
+        modal.style.display = "none";
+        document.body.style.overflow = "auto"; // Enable scrolling
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            closeDowngradeModal();
+        }
+    }
 </script>
+
+<style>
+    /* Downgrade Button Style */
+    .downgrade-btn {
+        background-color: transparent;
+        border: 2px solid #dc3545;
+        color: #dc3545;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .downgrade-btn:hover {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1001;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: 15% auto;
+        padding: 2rem;
+        border-radius: 15px;
+        width: 90%;
+        max-width: 500px;
+        position: relative;
+        box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+        animation: modalFadeIn 0.3s ease;
+    }
+
+    @keyframes modalFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .close-modal {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.3s;
+    }
+
+    .close-modal:hover,
+    .close-modal:focus {
+        color: #333;
+        text-decoration: none;
+    }
+
+    .warning-text {
+        color: #dc3545;
+        font-size: 0.9rem;
+        margin: 1rem 0 2rem;
+        padding: 1rem;
+        background-color: #fff5f5;
+        border-radius: 8px;
+        border-left: 4px solid #dc3545;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .btn-cancel {
+        padding: 0.8rem 1.5rem;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+
+    .btn-cancel:hover {
+        background: #f8f9fa;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-confirm {
+        padding: 0.8rem 1.5rem;
+        border: none;
+        background: #dc3545;
+        color: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+
+    .btn-confirm:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+    }
+
+    /* Current Plan Badge Style */
+    .plan-badge {
+        display: block;
+        width: 100%;
+        padding: 0.8rem 1.5rem;
+        text-align: center;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: default;
+        transition: all 0.3s ease;
+    }
+
+    .current-plan-free {
+        background-color: white;
+        color: #718096;
+        border: 2px solid #718096;
+    }
+
+    .current-plan-premium {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .current-plan-vip {
+        background: linear-gradient(135deg, #ff006e, #ff3085);
+        color: white;
+        border: none;
+        box-shadow: 0 4px 15px rgba(255, 0, 110, 0.3);
+    }
+</style>
 {% endblock %}

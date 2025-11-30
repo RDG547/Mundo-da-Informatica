@@ -447,7 +447,7 @@
 
 <!-- Modal para adicionar/editar usuário -->
 <div class="modal" id="addUserModal">
-    <div class="modal-content modal-lg">
+    <div class="modal-content modal-xl">
         <div class="modal-header">
             <div class="modal-title-container">
                 <h3 id="userModalTitle"><i class="fas fa-user-plus"></i> Adicionar Usuário</h3>
@@ -1547,6 +1547,23 @@
 
         // Search and Filter System
         const searchInput = document.getElementById('searchUsers');
+
+        // Fix for Add User Modal Save Button
+        const saveUserBtn = document.getElementById('saveUser');
+        if (saveUserBtn) {
+            saveUserBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const form = document.getElementById('userForm');
+                if (form) {
+                    // Basic validation
+                    if (form.checkValidity()) {
+                        form.submit();
+                    } else {
+                        form.reportValidity();
+                    }
+                }
+            });
+        }
         const roleFilter = document.getElementById('filterRole');
         const statusFilter = document.getElementById('filterStatus');
         const sortBy = document.getElementById('sortBy');
@@ -1585,6 +1602,17 @@
             const countElement = document.querySelector('.count-badge');
             if (countElement) {
                 countElement.textContent = visibleRows.length;
+            }
+
+            // Update pagination info text
+            const paginationInfo = document.querySelector('.pagination-info');
+            if (paginationInfo) {
+                const totalUsers = tableRows.length;
+                if (visibleRows.length === totalUsers) {
+                    paginationInfo.innerHTML = `Mostrando ${visibleRows.length} de ${totalUsers} usuários`;
+                } else {
+                    paginationInfo.innerHTML = `Mostrando ${visibleRows.length} de ${totalUsers} usuários (filtrado)`;
+                }
             }
         }
 

@@ -3123,6 +3123,129 @@ def admin_dashboard():
 
     return render_template('admin/dashboard.html', **context)
 
+# Rota para exportar posts
+@app.route("/admin/posts/export")
+@login_required
+@admin_required
+def admin_export_posts():
+    """Exportar posts para CSV"""
+    import csv
+    import io
+    from flask import Response
+
+    posts = Post.query.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Cabeçalho
+    writer.writerow(['ID', 'Título', 'Categoria', 'Data Publicação', 'Views', 'Downloads', 'Status', 'Destaque'])
+
+    # Dados
+    for post in posts:
+        # Determinar nome da categoria
+        category_name = post.category_str or 'Sem categoria'
+        if hasattr(post, 'category_rel') and post.category_rel:
+            category_name = post.category_rel.name
+
+        writer.writerow([
+            post.id,
+            post.title,
+            category_name,
+            post.date_posted.strftime('%Y-%m-%d %H:%M:%S') if post.date_posted else '',
+            post.views,
+            post.downloads,
+            'Ativo' if post.is_active else 'Inativo',
+            'Sim' if post.featured else 'Não'
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=posts_export.csv"}
+    )
+
+# Rota para exportar inscritos da newsletter
+@app.route("/admin/newsletter/export/subscribers")
+@login_required
+@admin_required
+def admin_export_subscribers():
+    """Exportar inscritos para CSV"""
+    import csv
+    import io
+    from flask import Response
+
+    subscribers = Subscriber.query.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Cabeçalho
+    writer.writerow(['ID', 'Email', 'Nome', 'Data Inscrição', 'Status', 'Confirmado'])
+
+    # Dados
+    for sub in subscribers:
+        writer.writerow([
+            sub.id,
+            sub.email,
+            sub.name or '',
+            sub.subscribed_date.strftime('%Y-%m-%d %H:%M:%S') if sub.subscribed_date else '',
+            'Ativo' if sub.is_active else 'Inativo',
+            'Sim' if sub.confirmed else 'Não'
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=subscribers_export.csv"}
+    )
+
+# Rota para exportar comentários
+@app.route("/admin/comments/export")
+@login_required
+@admin_required
+def admin_export_comments():
+    """Exportar comentários para CSV"""
+    import csv
+    import io
+    from flask import Response
+
+    comments = Comment.query.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Cabeçalho
+    writer.writerow(['ID', 'Autor', 'Email', 'Data', 'Status', 'Post', 'Conteúdo'])
+
+    # Dados
+    for comment in comments:
+        # Determinar autor
+        author_name = comment.author_name
+        author_email = comment.author_email
+        if comment.user_id and comment.user:
+            author_name = comment.user.name or comment.user.username
+            author_email = comment.user.email
+
+        # Determinar post
+        post_title = comment.post.title if comment.post else 'Post excluído'
+
+        writer.writerow([
+            comment.id,
+            author_name,
+            author_email,
+            comment.date_posted.strftime('%Y-%m-%d %H:%M:%S') if comment.date_posted else '',
+            'Aprovado' if comment.is_approved else 'Pendente',
+            post_title,
+            comment.content[:100]  # Truncar conteúdo longo
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=comments_export.csv"}
+    )
+
 # Rota para criar um novo post
 @app.route("/admin/posts/create", methods=['POST'])
 @login_required
@@ -3339,6 +3462,42 @@ def admin_create_user():
         db.session.rollback()
         flash(f'Erro ao criar usuário: {str(e)}', 'error')
         return redirect(url_for('admin_users'))
+
+# Rota para exportar usuários
+@app.route("/admin/users/export")
+@login_required
+@admin_required
+def admin_export_users():
+    """Exportar usuários para CSV"""
+    import csv
+    import io
+    from flask import Response
+
+    users = User.query.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Cabeçalho
+    writer.writerow(['ID', 'Username', 'Nome', 'Email', 'Função', 'Data Cadastro', 'Status'])
+
+    # Dados
+    for user in users:
+        writer.writerow([
+            user.id,
+            user.username,
+            user.name,
+            user.email,
+            user.role,
+            user.date_joined.strftime('%Y-%m-%d %H:%M:%S') if user.date_joined else '',
+            'Ativo' if user.is_active else 'Inativo'
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=users_export.csv"}
+    )
 
 # Rotas de exclusão
 
@@ -4876,6 +5035,74 @@ def logout():
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Rotas para atualizar a imagem de perfil de usuários regulares
+@app.route('/update-profile-image', methods=['POST'])
+@login_required
+def update_profile_image():
+    """Atualiza a imagem de perfil do usuário logado"""
+    if 'profile_image' not in request.files:
+        flash('Nenhum arquivo selecionado', 'error')
+        return redirect(url_for('profile'))
+
+    file = request.files['profile_image']
+
+    if file.filename == '':
+        flash('Nenhum arquivo selecionado', 'error')
+        return redirect(url_for('profile'))
+
+    if file and file.filename and allowed_file(file.filename):
+        # Crie o diretório de upload se não existir
+        upload_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+        os.makedirs(upload_path, exist_ok=True)
+
+        # Crie um nome de arquivo seguro e único
+        filename = secure_filename(file.filename)
+        # Adicione um timestamp ao nome do arquivo para evitar cache do navegador
+        base, ext = os.path.splitext(filename)
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f"{base}_{timestamp}{ext}"
+
+        filepath = os.path.join(upload_path, filename)
+
+        try:
+            # Deletar imagem antiga se existir
+            if current_user.profile_image:
+                delete_old_image(current_user.profile_image)
+
+            # Redimensione e salve a imagem para otimização
+            img = Image.open(file.stream)
+            img = img.convert('RGB')  # Converte para RGB (remove alfa se existir)
+            img.thumbnail((300, 300))  # Redimensiona mantendo proporção
+            img.save(filepath, optimize=True, quality=85)
+
+            # Atualiza o perfil do usuário com apenas o nome do arquivo
+            current_user.profile_image = filename
+            db.session.commit()
+
+            flash('Imagem de perfil atualizada com sucesso!', 'success')
+        except Exception as e:
+            print(f"Erro ao processar imagem: {e}")
+            flash('Erro ao processar a imagem. Tente novamente.', 'error')
+    else:
+        flash('Formato de arquivo não permitido. Use JPG, JPEG, PNG ou GIF.', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/remove-profile-image', methods=['POST'])
+@login_required
+def remove_profile_image():
+    """Remove a imagem de perfil do usuário logado"""
+    # Deletar a imagem física do filesystem
+    if current_user.profile_image:
+        delete_old_image(current_user.profile_image)
+
+    # Limpa a imagem de perfil do usuário atual
+    current_user.profile_image = ""
+    db.session.commit()
+
+    flash('Imagem de perfil removida com sucesso!', 'success')
+    return redirect(url_for('profile'))
 
 # Rota para atualizar a imagem de perfil do admin
 @app.route('/admin/update-profile-image', methods=['POST'])

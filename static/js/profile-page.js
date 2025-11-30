@@ -53,6 +53,27 @@ window.closePasswordModal = function () {
     }
 };
 
+// Remove Image Modal functions - GLOBAL
+window.openRemoveImageModal = function () {
+    console.log('openRemoveImageModal chamada');
+    const modal = document.getElementById('removeImageModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        console.log('Remove Image Modal aberto com sucesso');
+    }
+};
+
+window.closeRemoveImageModal = function () {
+    console.log('closeRemoveImageModal chamada');
+    const modal = document.getElementById('removeImageModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        console.log('Remove Image Modal fechado com sucesso');
+    }
+};
+
 // Favorite functions - GLOBAL
 window.removeFavorite = async function (postId) {
     // Usa o modal de confirmação do FavoriteManager
@@ -322,12 +343,65 @@ function initializeProfilePage() {
     // Image upload functionality
     const imageInput = document.getElementById('profile-image-input');
     const imageForm = document.getElementById('profile-image-form');
+    const triggerUpload = document.getElementById('trigger-upload');
+    const removeImageBtn = document.getElementById('remove-image');
 
+    // Trigger file upload when camera button is clicked
+    if (triggerUpload && imageInput) {
+        triggerUpload.addEventListener('click', function () {
+            imageInput.click();
+        });
+    }
+
+    // Handle file selection
     if (imageInput && imageForm) {
         imageInput.addEventListener('change', function () {
             if (this.files && this.files[0]) {
+                const file = this.files[0];
+
+                // Validar tipo de arquivo
+                if (!file.type.match('image/(jpeg|png|gif)')) {
+                    showToast('Tipo de arquivo inválido. Use JPG, PNG ou GIF.', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                // Validar tamanho (máximo 5MB)
+                if (file.size > 5242880) {
+                    showToast('Imagem muito grande. Máximo 5MB permitido.', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                // Preview da imagem antes de enviar
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const profileImg = document.querySelector('.profile-avatar-large img');
+                    if (profileImg) {
+                        profileImg.src = e.target.result;
+                        profileImg.style.display = 'block';
+                        profileImg.onerror = null; // Remove handler de erro
+
+                        // Ocultar placeholder se estiver visível
+                        const placeholder = document.querySelector('.avatar-placeholder-large');
+                        if (placeholder) {
+                            placeholder.style.display = 'none';
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+
+                // Enviar formulário automaticamente
+                showToast('Enviando imagem...', 'success');
                 imageForm.submit();
             }
+        });
+    }
+
+    // Open remove image modal
+    if (removeImageBtn) {
+        removeImageBtn.addEventListener('click', function () {
+            window.openRemoveImageModal();
         });
     }
 

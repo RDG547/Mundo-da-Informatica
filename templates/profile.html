@@ -23,6 +23,23 @@
                     <div class="avatar-placeholder-large" style="display: none;">
                         {{ user.get_initials() }}
                     </div>
+
+                    {% if current_user.id == user.id %}
+                    <!-- Profile Image Hover Overlay -->
+                    <div class="profile-image-hover">
+                        <div class="profile-image-actions">
+                            <button type="button" class="btn-profile-action" id="trigger-upload" title="Alterar foto">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                            {% if user.profile_image %}
+                            <button type="button" class="btn-profile-action danger" id="remove-image"
+                                title="Remover foto">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
                 {% if user.is_admin() %}
                 <div class="profile-role-badge admin">
@@ -86,6 +103,14 @@
     </div>
 </div>
 
+{% if current_user.id == user.id %}
+<!-- Hidden form for profile image upload -->
+<form id="profile-image-form" action="{{ url_for('update_profile_image') }}" method="post" enctype="multipart/form-data"
+    style="display: none;">
+    <input type="file" id="profile-image-input" name="profile_image" accept="image/jpeg,image/png,image/gif">
+</form>
+{% endif %}
+
 <!-- Enhanced Profile Main -->
 <div class="profile-main" data-page="profile">
     <div class="container">
@@ -147,7 +172,7 @@
                     <div class="posts-grid" style="margin-top: 1.5rem;">
                         <div class="row">
                             {% for post in favorite_posts[:6] %}
-                            <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="col-md-6 col-lg-4 mb-2">
                                 <div class="post-card" style="position: relative;">
                                     <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
                                         title="Remover dos favoritos">
@@ -699,6 +724,37 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+{% endif %}
+
+
+
+<!-- Modal de confirmação para remover imagem -->
+{% if current_user.id == user.id and user.profile_image %}
+<div class="modal-overlay" id="removeImageModal">
+    <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-trash"></i> Remover Imagem</h3>
+            <button class="modal-close" onclick="closeRemoveImageModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p>Tem certeza que deseja remover sua imagem de perfil?</p>
+            <p class="text-muted" style="font-size: 0.9rem;">Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-footer" style="justify-content: center; gap: 15px;">
+            <button class="btn btn-outline" onclick="closeRemoveImageModal()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <form action="{{ url_for('remove_profile_image') }}" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-gradient"
+                    style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); border: none; color: white;">
+                    <i class="fas fa-trash"></i> Remover
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 {% endif %}

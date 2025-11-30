@@ -3,7 +3,7 @@
  * Controla todas as funcionalidades do painel administrativo
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Inicializar componentes da interface
     initSidebar();
     initThemeToggle();
@@ -29,14 +29,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const navItems = document.querySelectorAll('.admin-nav-item');
 
     navItems.forEach(item => {
-        item.addEventListener('mouseenter', function() {
+        item.addEventListener('mouseenter', function () {
             const icon = this.querySelector('.admin-icon');
             if (icon) {
                 icon.style.transform = 'scale(1.1) translateX(2px)';
             }
         });
 
-        item.addEventListener('mouseleave', function() {
+        item.addEventListener('mouseleave', function () {
             const icon = this.querySelector('.admin-icon');
             if (icon) {
                 icon.style.transform = '';
@@ -44,11 +44,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Efeito de clique
-        item.addEventListener('mousedown', function() {
+        item.addEventListener('mousedown', function () {
             this.style.transform = 'scale(0.97)';
         });
 
-        item.addEventListener('mouseup', function() {
+        item.addEventListener('mouseup', function () {
             this.style.transform = '';
         });
     });
@@ -56,11 +56,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Animar logo e status na barra lateral
     const logoIcon = document.querySelector('.admin-nav-logo .admin-icon');
     if (logoIcon) {
-        logoIcon.addEventListener('mouseover', function() {
+        logoIcon.addEventListener('mouseover', function () {
             this.style.transform = 'rotate(-10deg) scale(1.1)';
         });
 
-        logoIcon.addEventListener('mouseout', function() {
+        logoIcon.addEventListener('mouseout', function () {
             this.style.transform = '';
         });
     }
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Efeito suave ao abrir submenus (se houver)
     const subMenuToggles = document.querySelectorAll('.submenu-toggle');
     subMenuToggles.forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
+        toggle.addEventListener('click', function (e) {
             e.preventDefault();
             const subMenu = this.nextElementSibling;
 
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 2000);
 
         // Remover efeito após o hover
-        newPostBtn.addEventListener('mouseover', function() {
+        newPostBtn.addEventListener('mouseover', function () {
             this.classList.remove('pulse-effect');
         });
     }
@@ -124,13 +124,13 @@ function handleProfileImages() {
         if (img.complete) {
             validateProfileImage(img);
         } else {
-            img.addEventListener('load', function() {
+            img.addEventListener('load', function () {
                 validateProfileImage(this);
             });
         }
 
         // Tratamento de erro para imagens
-        img.addEventListener('error', function() {
+        img.addEventListener('error', function () {
             this.classList.add('error');
 
             // Obtém as iniciais do usuário para o placeholder
@@ -201,7 +201,7 @@ function initSidebar() {
     }
 
     if (sidebarToggle && adminSidebar && adminContent) {
-        sidebarToggle.addEventListener('click', function() {
+        sidebarToggle.addEventListener('click', function () {
             adminSidebar.classList.toggle('collapsed');
             adminContent.classList.toggle('expanded');
 
@@ -214,7 +214,7 @@ function initSidebar() {
         navSections.forEach(section => {
             const title = section.querySelector('.nav-section-title');
             if (title) {
-                title.addEventListener('click', function() {
+                title.addEventListener('click', function () {
                     section.classList.toggle('expanded');
                 });
             }
@@ -264,7 +264,7 @@ function initThemeToggle() {
 
     // Adicionar evento para alternar tema
     if (themeToggle) {
-        themeToggle.addEventListener('click', function(e) {
+        themeToggle.addEventListener('click', function (e) {
             e.preventDefault();
             const currentTheme = htmlElement.getAttribute('data-theme');
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -301,7 +301,7 @@ function initThemeToggle() {
 function initNotifications() {
     // Adicionar evento de clique para fechar notificações existentes
     document.querySelectorAll('.notification-close').forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const notification = this.closest('.notification');
             notification.classList.add('slide-out-right');
             setTimeout(() => notification.remove(), 300);
@@ -398,7 +398,7 @@ function openModal(modalId) {
         }, 10);
 
         // Fechar modal ao clicar fora do conteúdo
-        modal.addEventListener('click', function(e) {
+        modal.addEventListener('click', function (e) {
             if (e.target === modal) {
                 closeModal(modalId);
             }
@@ -435,7 +435,7 @@ function handleModals() {
     // Abrir modal ao clicar em botões com data-modal
     document.querySelectorAll('[data-modal]:not([data-modal-initialized])').forEach(button => {
         button.setAttribute('data-modal-initialized', 'true');
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const modalId = this.getAttribute('data-modal');
             openModal(modalId);
         });
@@ -444,7 +444,8 @@ function handleModals() {
     // Fechar modal ao clicar no botão de fechar
     document.querySelectorAll('.close-modal:not([data-close-initialized])').forEach(button => {
         button.setAttribute('data-close-initialized', 'true');
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function (e) {
+            e.preventDefault();
             const modal = this.closest('.modal');
             if (modal) {
                 closeModal(modal.id);
@@ -452,10 +453,11 @@ function handleModals() {
         });
     });
 
-    // Fechar modal ao clicar em botões com data-bs-dismiss="modal"
-    document.querySelectorAll('[data-bs-dismiss="modal"]:not([data-dismiss-initialized])').forEach(button => {
+    // Fechar modal ao clicar em botões com data-bs-dismiss="modal" ou data-dismiss="modal"
+    document.querySelectorAll('[data-bs-dismiss="modal"]:not([data-dismiss-initialized]), [data-dismiss="modal"]:not([data-dismiss-initialized])').forEach(button => {
         button.setAttribute('data-dismiss-initialized', 'true');
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function (e) {
+            e.preventDefault();
             const modal = this.closest('.modal');
             if (modal) {
                 closeModal(modal.id);
@@ -471,7 +473,7 @@ function initTables() {
     // Habilitar ordenação de colunas
     document.querySelectorAll('.admin-table th[data-sort]').forEach(th => {
         th.classList.add('sortable');
-        th.addEventListener('click', function() {
+        th.addEventListener('click', function () {
             const table = th.closest('table');
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.rows);
@@ -489,22 +491,22 @@ function initTables() {
             // Ordenar linhas
             rows.sort((a, b) => {
                 const aValue = a.querySelector(`td[data-${sortKey}]`) ?
-                               a.querySelector(`td[data-${sortKey}]`).getAttribute(`data-${sortKey}`) :
-                               a.cells[th.cellIndex].textContent;
+                    a.querySelector(`td[data-${sortKey}]`).getAttribute(`data-${sortKey}`) :
+                    a.cells[th.cellIndex].textContent;
 
                 const bValue = b.querySelector(`td[data-${sortKey}]`) ?
-                               b.querySelector(`td[data-${sortKey}]`).getAttribute(`data-${sortKey}`) :
-                               b.cells[th.cellIndex].textContent;
+                    b.querySelector(`td[data-${sortKey}]`).getAttribute(`data-${sortKey}`) :
+                    b.cells[th.cellIndex].textContent;
 
                 // Determinar se devemos ordenar como número ou texto
                 if (!isNaN(aValue) && !isNaN(bValue)) {
                     return direction === 'asc' ?
-                           parseFloat(aValue) - parseFloat(bValue) :
-                           parseFloat(bValue) - parseFloat(aValue);
+                        parseFloat(aValue) - parseFloat(bValue) :
+                        parseFloat(bValue) - parseFloat(aValue);
                 } else {
                     return direction === 'asc' ?
-                           aValue.localeCompare(bValue) :
-                           bValue.localeCompare(aValue);
+                        aValue.localeCompare(bValue) :
+                        bValue.localeCompare(aValue);
                 }
             });
 
@@ -515,7 +517,7 @@ function initTables() {
 
     // Implementar funcionalidade de pesquisa para tabelas com caixas de pesquisa
     document.querySelectorAll('.search-bar input').forEach(searchInput => {
-        searchInput.addEventListener('input', function() {
+        searchInput.addEventListener('input', function () {
             const table = this.closest('.admin-card').querySelector('.admin-table');
             if (!table) return;
 
@@ -531,7 +533,7 @@ function initTables() {
 
     // Implementar seleção em massa com checkboxes
     document.querySelectorAll('.admin-table th input[type="checkbox"]').forEach(headerCheckbox => {
-        headerCheckbox.addEventListener('change', function() {
+        headerCheckbox.addEventListener('change', function () {
             const table = this.closest('table');
             const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]');
 

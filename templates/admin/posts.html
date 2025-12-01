@@ -187,7 +187,8 @@
                     </td>
                     <td class="actions">
                         <div class="action-buttons">
-                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn-action btn-view" title="Visualizar" target="_blank">
+                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn-action btn-view"
+                                title="Visualizar" target="_blank">
                                 <i class="fas fa-eye"></i>
                             </a>
                             <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="{{ post.id }}">
@@ -196,7 +197,8 @@
                             <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="{{ post.id }}">
                                 <i class="fas fa-copy"></i>
                             </a>
-                            <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="{{ post.id }}" data-post-title="{{ post.title }}">
+                            <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="{{ post.id }}"
+                                data-post-title="{{ post.title }}">
                                 <i class="fas fa-trash"></i>
                             </a>
                         </div>
@@ -244,7 +246,8 @@
                 <ul class="pagination">
                     {% if posts.has_prev %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.prev_num) }}" aria-label="Anterior">
+                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.prev_num) }}"
+                            aria-label="Anterior">
                             <i class="fas fa-chevron-left"></i>
                         </a>
                     </li>
@@ -257,26 +260,27 @@
                     {% endif %}
 
                     {% for page_num in posts.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                        {% if page_num %}
-                            {% if posts.page == page_num %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                            {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('admin_posts', page=page_num) }}">{{ page_num }}</a>
-                            </li>
-                            {% endif %}
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">…</span>
-                            </li>
-                        {% endif %}
+                    {% if page_num %}
+                    {% if posts.page == page_num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_posts', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">…</span>
+                    </li>
+                    {% endif %}
                     {% endfor %}
 
                     {% if posts.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.next_num) }}" aria-label="Próximo">
+                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.next_num) }}"
+                            aria-label="Próximo">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     </li>
@@ -351,10 +355,8 @@
                                     <i class="fas fa-heading"></i> Título do Post
                                     <span class="required">*</span>
                                 </label>
-                                <input type="text" id="editPostTitle" name="title"
-                                       class="form-control modern-input"
-                                       placeholder="Digite um título atrativo para o seu post..."
-                                       required>
+                                <input type="text" id="editPostTitle" name="title" class="form-control modern-input"
+                                    placeholder="Digite um título atrativo para o seu post..." required>
                                 <div class="character-count">
                                     <span id="editTitleCount">0</span>/100 caracteres
                                 </div>
@@ -366,31 +368,38 @@
                                     <span class="required">*</span>
                                 </label>
                                 <div class="editor-toolbar">
-                                    <button type="button" class="toolbar-btn" data-command="bold" title="Negrito" onclick="formatEditText('bold')">
+                                    <button type="button" class="toolbar-btn" data-command="bold" title="Negrito"
+                                        onclick="formatEditText('bold')">
                                         <i class="fas fa-bold"></i>
                                     </button>
-                                    <button type="button" class="toolbar-btn" data-command="italic" title="Itálico" onclick="formatEditText('italic')">
+                                    <button type="button" class="toolbar-btn" data-command="italic" title="Itálico"
+                                        onclick="formatEditText('italic')">
                                         <i class="fas fa-italic"></i>
                                     </button>
-                                    <button type="button" class="toolbar-btn" data-command="underline" title="Sublinhado" onclick="formatEditText('underline')">
+                                    <button type="button" class="toolbar-btn" data-command="underline"
+                                        title="Sublinhado" onclick="formatEditText('underline')">
                                         <i class="fas fa-underline"></i>
                                     </button>
                                     <div class="toolbar-separator"></div>
-                                    <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Lista" onclick="formatEditText('insertUnorderedList')">
+                                    <button type="button" class="toolbar-btn" data-command="insertUnorderedList"
+                                        title="Lista" onclick="formatEditText('insertUnorderedList')">
                                         <i class="fas fa-list-ul"></i>
                                     </button>
-                                    <button type="button" class="toolbar-btn" data-command="insertOrderedList" title="Lista Numerada" onclick="formatEditText('insertOrderedList')">
+                                    <button type="button" class="toolbar-btn" data-command="insertOrderedList"
+                                        title="Lista Numerada" onclick="formatEditText('insertOrderedList')">
                                         <i class="fas fa-list-ol"></i>
                                     </button>
                                     <div class="toolbar-separator"></div>
-                                    <button type="button" class="toolbar-btn" data-command="createLink" title="Link" onclick="formatEditText('createLink')">
+                                    <button type="button" class="toolbar-btn" data-command="createLink" title="Link"
+                                        onclick="formatEditText('createLink')">
                                         <i class="fas fa-link"></i>
                                     </button>
                                 </div>
                                 <div class="editor-container">
                                     <div id="editPostContentEditor" class="rich-editor" contenteditable="true"
-                                         placeholder="Descreva detalhadamente o conteúdo do post..."></div>
-                                    <textarea id="editPostContent" name="content" style="display: none;" required></textarea>
+                                        placeholder="Descreva detalhadamente o conteúdo do post..."></div>
+                                    <textarea id="editPostContent" name="content" style="display: none;"
+                                        required></textarea>
                                 </div>
                                 <div class="character-count">
                                     <span id="editContentCount">0</span> caracteres
@@ -407,17 +416,20 @@
                                         <p>Clique ou arraste uma imagem</p>
                                         <span class="file-types">JPG, PNG até 5MB</span>
                                     </div>
-                                    <div class="image-preview-container" id="editImagePreviewContainer" style="display: none;">
+                                    <div class="image-preview-container" id="editImagePreviewContainer"
+                                        style="display: none;">
                                         <img id="editImagePreview" src="" alt="Preview">
                                         <button type="button" class="remove-image" onclick="removeEditImage()">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
-                                    <input type="file" id="editPostImageFile" name="image_file" accept="image/*" style="display: none;">
+                                    <input type="file" id="editPostImageFile" name="image_file" accept="image/*"
+                                        style="display: none;">
                                 </div>
                                 <div class="form-group mt-3">
                                     <label class="form-label">ou URL da Imagem</label>
-                                    <input type="url" id="editPostImageUrl" name="image_url" class="form-control modern-input" placeholder="https://exemplo.com/imagem.jpg">
+                                    <input type="url" id="editPostImageUrl" name="image_url"
+                                        class="form-control modern-input" placeholder="https://exemplo.com/imagem.jpg">
                                 </div>
                             </div>
 
@@ -425,13 +437,15 @@
                                 <h5><i class="fas fa-info-circle"></i> Status</h5>
                                 <div class="status-options">
                                     <div class="form-check">
-                                        <input type="checkbox" id="editPostActive" name="is_active" class="form-check-input" checked>
+                                        <input type="checkbox" id="editPostActive" name="is_active"
+                                            class="form-check-input" checked>
                                         <label for="editPostActive" class="form-check-label">
                                             <i class="fas fa-eye"></i> Post Ativo
                                         </label>
                                     </div>
                                     <div class="form-check">
-                                        <input type="checkbox" id="editPostFeatured" name="featured" class="form-check-input">
+                                        <input type="checkbox" id="editPostFeatured" name="featured"
+                                            class="form-check-input">
                                         <label for="editPostFeatured" class="form-check-label">
                                             <i class="fas fa-star"></i> Post em Destaque
                                         </label>
@@ -460,7 +474,8 @@
                                     <i class="fas fa-folder"></i> Categoria
                                     <span class="required">*</span>
                                 </label>
-                                <select id="editPostCategory" name="category_id" class="form-control modern-select" required>
+                                <select id="editPostCategory" name="category_id" class="form-control modern-select"
+                                    required>
                                     <option value="">Selecione uma categoria</option>
                                     {% for category in categories %}
                                     <option value="{{ category.id }}">{{ category.name }}</option>
@@ -475,8 +490,7 @@
                                     <i class="fas fa-download"></i> Link de Download
                                 </label>
                                 <input type="url" id="editPostDownloadLink" name="download_link"
-                                       class="form-control modern-input"
-                                       placeholder="https://exemplo.com/arquivo.zip">
+                                    class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip">
                                 <small class="form-text">Link para download do arquivo relacionado ao post</small>
                             </div>
                         </div>
@@ -510,8 +524,10 @@
                                 </label>
                                 <div class="seo-preview">
                                     <div class="seo-title" id="editSeoPreviewTitle">Título do Post</div>
-                                    <div class="seo-url" id="editSeoPreviewUrl">https://mundodainformatica.com/post/titulo-do-post</div>
-                                    <div class="seo-description" id="editSeoPreviewDesc">Descrição aparecerá aqui...</div>
+                                    <div class="seo-url" id="editSeoPreviewUrl">
+                                        https://mundodainformatica.com/post/titulo-do-post</div>
+                                    <div class="seo-description" id="editSeoPreviewDesc">Descrição aparecerá aqui...
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -546,7 +562,7 @@
     let currentEditStep = 1;
 
     // Função para avançar para o próximo step
-    window.nextEditStep = function() {
+    window.nextEditStep = function () {
         console.log('nextEditStep chamado, currentEditStep:', currentEditStep);
 
         if (currentEditStep < 3) {
@@ -577,7 +593,7 @@
     };
 
     // Função para voltar ao step anterior
-    window.prevEditStep = function() {
+    window.prevEditStep = function () {
         if (currentEditStep > 1) {
             // Desativar step atual
             const currentStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
@@ -603,10 +619,10 @@
     };
 
     // Função para preview de imagem no modal de edição
-    window.previewEditImage = function(file) {
+    window.previewEditImage = function (file) {
         if (file && file.type.match('image.*')) {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 const preview = document.getElementById('editImagePreview');
                 const previewContainer = document.getElementById('editImagePreviewContainer');
                 const placeholder = document.getElementById('editUploadPlaceholder');
@@ -622,7 +638,7 @@
     };
 
     // Função para remover imagem no modal de edição
-    window.removeEditImage = function() {
+    window.removeEditImage = function () {
         const fileInput = document.getElementById('editPostImageFile');
         const urlInput = document.getElementById('editPostImageUrl');
         const preview = document.getElementById('editImagePreview');
@@ -640,7 +656,7 @@
     // FIM DAS FUNÇÕES GLOBAIS
     // ========================================
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         console.log('DOM carregado, inicializando JavaScript...'); // Debug
 
         // ==========================================
@@ -726,7 +742,7 @@
         statusFilter?.addEventListener('change', filterAndSearchPosts);
 
         // Clear search function
-        window.clearSearch = function() {
+        window.clearSearch = function () {
             searchInput.value = '';
             categoryFilter.value = '';
             statusFilter.value = '';
@@ -734,12 +750,12 @@
         };
 
         // Export function
-        window.exportPosts = function() {
+        window.exportPosts = function () {
             window.location.href = '/admin/posts/export';
         };
 
         // Sorting functionality
-        sortBy?.addEventListener('change', function() {
+        sortBy?.addEventListener('change', function () {
             const sortType = this.value;
             const tbody = document.querySelector('.admin-table tbody');
             const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-state)'));
@@ -747,7 +763,7 @@
             rows.sort((a, b) => {
                 let aValue, bValue;
 
-                switch(sortType) {
+                switch (sortType) {
                     case 'title':
                         aValue = a.querySelector('.post-title')?.textContent || '';
                         bValue = b.querySelector('.post-title')?.textContent || '';
@@ -776,7 +792,7 @@
         const selectAllCheckbox = document.getElementById('selectAllPosts');
         const postCheckboxes = document.querySelectorAll('.post-checkbox');
 
-        selectAllCheckbox?.addEventListener('change', function() {
+        selectAllCheckbox?.addEventListener('change', function () {
             postCheckboxes.forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
@@ -801,7 +817,7 @@
         }
 
         // Bulk actions
-        document.getElementById('applyBulkAction')?.addEventListener('click', function() {
+        document.getElementById('applyBulkAction')?.addEventListener('click', function () {
             const action = document.getElementById('bulkActionSelect').value;
             const checkedBoxes = document.querySelectorAll('.post-checkbox:checked');
 
@@ -820,7 +836,7 @@
 
         // Modal event listeners (as funções openModal e closeModal estão em admin.js)
         document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', function(e) {
+            modal.addEventListener('click', function (e) {
                 if (e.target === this) {
                     const modalId = this.id;
                     closeModal(modalId);
@@ -829,7 +845,7 @@
         });
 
         // Close modal with ESC key
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
                 const openModal = document.querySelector('.modal.show');
                 if (openModal) {
@@ -841,7 +857,7 @@
         // Specific event listener for cancel button in delete modal
         const cancelDeleteBtn = document.getElementById('cancelDelete');
         if (cancelDeleteBtn) {
-            cancelDeleteBtn.addEventListener('click', function() {
+            cancelDeleteBtn.addEventListener('click', function () {
                 closeModal('deleteModal');
             });
         }
@@ -851,7 +867,7 @@
         console.log('Botões de deletar encontrados:', deleteButtons.length); // Debug
 
         deleteButtons.forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 console.log('Botão de deletar clicado!'); // Debug
 
@@ -886,7 +902,7 @@
 
         // Duplicate post functionality
         document.querySelectorAll('.btn-duplicate').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 const postId = this.getAttribute('data-post-id');
 
@@ -904,7 +920,7 @@
 
         // Edit post functionality
         document.querySelectorAll('.btn-edit').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 const postId = this.getAttribute('data-post-id');
                 console.log('Editando post:', postId); // Debug
@@ -1042,13 +1058,20 @@
         }
 
         // Função para fechar modal de edição de post
-        window.closeEditPostModal = function() {
+        window.closeEditPostModal = function () {
             closeModal('editPostModal');
         };
 
         // Função para salvar post
-        window.savePost = function(event) {
+        window.savePost = function (event) {
             event.preventDefault();
+
+            // Sync content from editor to textarea
+            const contentEditor = document.getElementById('editPostContentEditor');
+            const contentTextarea = document.getElementById('editPostContent');
+            if (contentEditor && contentTextarea) {
+                contentTextarea.value = contentEditor.innerHTML;
+            }
 
             const formData = new FormData(event.target);
             const postId = formData.get('post_id');
@@ -1061,21 +1084,21 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification('Post atualizado com sucesso!', 'success');
-                    closeEditPostModal();
-                    // Recarregar a página para mostrar as mudanças
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showNotification(data.message || 'Erro ao atualizar post', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao salvar post:', error);
-                showNotification('Erro ao salvar post', 'error');
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Post atualizado com sucesso!', 'success');
+                        closeEditPostModal();
+                        // Recarregar a página para mostrar as mudanças
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification(data.message || 'Erro ao atualizar post', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao salvar post:', error);
+                    showNotification('Erro ao salvar post', 'error');
+                });
         };
 
         // Animation delays for table rows
@@ -1299,6 +1322,7 @@
             opacity: 0;
             transform: translateY(10px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -1472,8 +1496,15 @@
     }
 
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .slide-in-up {
@@ -1485,6 +1516,7 @@
             opacity: 0;
             transform: translateY(20px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -1535,13 +1567,27 @@
     }
 
     @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
     }
 
     @keyframes slideOutRight {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
     }
 
     /* Modal fixes - Simplified */
@@ -1575,254 +1621,253 @@
 </style>
 
 <script>
-// Funções para gerenciar upload de imagem vs URL
+    // Funções para gerenciar upload de imagem vs URL
 
-// Alternar entre URL e Upload no modal de edição
-document.addEventListener('DOMContentLoaded', function() {
-    const editUrlOption = document.getElementById('editImageUrlOption');
-    const editUploadOption = document.getElementById('editImageUploadOption');
+    // Alternar entre URL e Upload no modal de edição
+    document.addEventListener('DOMContentLoaded', function () {
+        const editUrlOption = document.getElementById('editImageUrlOption');
+        const editUploadOption = document.getElementById('editImageUploadOption');
 
-    if (editUrlOption) {
-        editUrlOption.addEventListener('click', function() {
-            document.getElementById('editImageUrlField').style.display = 'block';
-            document.getElementById('editImageUploadField').style.display = 'none';
-            document.getElementById('editPostImageFile').value = '';
-        });
-    }
+        if (editUrlOption) {
+            editUrlOption.addEventListener('click', function () {
+                document.getElementById('editImageUrlField').style.display = 'block';
+                document.getElementById('editImageUploadField').style.display = 'none';
+                document.getElementById('editPostImageFile').value = '';
+            });
+        }
 
-    if (editUploadOption) {
-        editUploadOption.addEventListener('click', function() {
-            document.getElementById('editImageUrlField').style.display = 'none';
-            document.getElementById('editImageUploadField').style.display = 'block';
-            document.getElementById('editPostImageUrl').value = '';
-        });
-    }
+        if (editUploadOption) {
+            editUploadOption.addEventListener('click', function () {
+                document.getElementById('editImageUrlField').style.display = 'none';
+                document.getElementById('editImageUploadField').style.display = 'block';
+                document.getElementById('editPostImageUrl').value = '';
+            });
+        }
 
-    // Preview de imagem ao selecionar arquivo (modal de edição)
-    const editImageFile = document.getElementById('editPostImageFile');
-    if (editImageFile) {
-        editImageFile.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                // Validar tamanho (máx 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('A imagem é muito grande. Tamanho máximo: 5MB');
-                    e.target.value = '';
-                    return;
+        // Preview de imagem ao selecionar arquivo (modal de edição)
+        const editImageFile = document.getElementById('editPostImageFile');
+        if (editImageFile) {
+            editImageFile.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // Validar tamanho (máx 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('A imagem é muito grande. Tamanho máximo: 5MB');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    // Validar tipo
+                    if (!file.type.startsWith('image/')) {
+                        alert('Por favor, selecione apenas arquivos de imagem');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    // Mostrar preview
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        document.getElementById('editPreviewImg').src = event.target.result;
+                        document.getElementById('editImagePreview').style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
                 }
+            });
+        }
 
-                // Validar tipo
-                if (!file.type.startsWith('image/')) {
-                    alert('Por favor, selecione apenas arquivos de imagem');
-                    e.target.value = '';
-                    return;
-                }
+        // Preview de imagem ao digitar URL (modal de edição)
+        const editImageUrl = document.getElementById('editPostImageUrl');
+        if (editImageUrl) {
+            const updatePreview = function () {
+                const url = editImageUrl.value.trim();
+                const previewImg = document.getElementById('editPreviewImg');
+                const previewContainer = document.getElementById('editImagePreview');
 
-                // Mostrar preview
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    document.getElementById('editPreviewImg').src = event.target.result;
-                    document.getElementById('editImagePreview').style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-    }
-
-    // Preview de imagem ao digitar URL (modal de edição)
-    const editImageUrl = document.getElementById('editPostImageUrl');
-    if (editImageUrl) {
-        const updatePreview = function() {
-            const url = editImageUrl.value.trim();
-            const previewImg = document.getElementById('editPreviewImg');
-            const previewContainer = document.getElementById('editImagePreview');
-
-            if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-                previewImg.src = url;
-                previewContainer.style.display = 'block';
-
-                // Verificar se a imagem carrega
-                previewImg.onerror = function() {
-                    previewContainer.style.display = 'none';
-                };
-
-                previewImg.onload = function() {
+                if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                    previewImg.src = url;
                     previewContainer.style.display = 'block';
-                };
-            } else if (!url) {
-                previewContainer.style.display = 'none';
-            }
-        };
 
-        editImageUrl.addEventListener('input', updatePreview);
-        editImageUrl.addEventListener('change', updatePreview);
-        editImageUrl.addEventListener('paste', function(e) {
-            setTimeout(updatePreview, 100);
-        });
-    }
-});
+                    // Verificar se a imagem carrega
+                    previewImg.onerror = function () {
+                        previewContainer.style.display = 'none';
+                    };
 
-// Limpar preview de imagem (modal de edição)
-function clearEditImagePreview() {
-    document.getElementById('editPreviewImg').src = '';
-    document.getElementById('editImagePreview').style.display = 'none';
-    document.getElementById('editPostImageFile').value = '';
-    document.getElementById('editPostImageUrl').value = '';
-}
+                    previewImg.onload = function () {
+                        previewContainer.style.display = 'block';
+                    };
+                } else if (!url) {
+                    previewContainer.style.display = 'none';
+                }
+            };
 
-// Atualizar formulário de edição para usar FormData (suporte a upload)
-const editPostForm = document.getElementById('editPostForm');
-if (editPostForm) {
-    editPostForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const formData = new FormData(this);
-        const postId = document.getElementById('editPostId').value;
-
-        fetch(`/admin/posts/${postId}/update`, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('Post atualizado com sucesso!', 'success');
-                closeEditPostModal();
-                location.reload();
-            } else {
-                showNotification(data.message || 'Erro ao atualizar post', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            showNotification('Erro ao atualizar post', 'error');
-        });
+            editImageUrl.addEventListener('input', updatePreview);
+            editImageUrl.addEventListener('change', updatePreview);
+            editImageUrl.addEventListener('paste', function (e) {
+                setTimeout(updatePreview, 100);
+            });
+        }
     });
-}
 
-// Função para formatar texto no editor de edição
-function formatEditText(command) {
-    const editor = document.getElementById('editPostContentEditor');
-    if (!editor) return;
+    // Limpar preview de imagem (modal de edição)
+    function clearEditImagePreview() {
+        document.getElementById('editPreviewImg').src = '';
+        document.getElementById('editImagePreview').style.display = 'none';
+        document.getElementById('editPostImageFile').value = '';
+        document.getElementById('editPostImageUrl').value = '';
+    }
 
-    editor.focus();
+    // Atualizar formulário de edição para usar FormData (suporte a upload)
+    const editPostForm = document.getElementById('editPostForm');
+    if (editPostForm) {
+        editPostForm.addEventListener('submit', function (e) {
+            e.preventDefault();
 
-    if (command === 'createLink') {
-        const url = prompt('Digite a URL do link:');
-        if (url) {
-            document.execCommand(command, false, url);
+            const formData = new FormData(this);
+            const postId = document.getElementById('editPostId').value;
+
+            fetch(`/admin/posts/${postId}/update`, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Post atualizado com sucesso!', 'success');
+                        closeEditPostModal();
+                        location.reload();
+                    } else {
+                        showNotification(data.message || 'Erro ao atualizar post', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    showNotification('Erro ao atualizar post', 'error');
+                });
+        });
+    }
+
+    // Função para formatar texto no editor de edição
+    function formatEditText(command) {
+        const editor = document.getElementById('editPostContentEditor');
+        if (!editor) return;
+
+        editor.focus();
+
+        if (command === 'createLink') {
+            const url = prompt('Digite a URL do link:');
+            if (url) {
+                document.execCommand(command, false, url);
+            }
+        } else {
+            document.execCommand(command, false, null);
         }
-    } else {
-        document.execCommand(command, false, null);
-    }
 
-    // Sincronizar com textarea
-    syncEditEditorContent();
-}
-
-// Sincronizar conteúdo do editor com textarea
-function syncEditEditorContent() {
-    const editor = document.getElementById('editPostContentEditor');
-    const textarea = document.getElementById('editPostContent');
-    const counter = document.getElementById('editContentCount');
-
-    if (editor && textarea) {
-        textarea.value = editor.innerHTML;
-        if (counter) {
-            counter.textContent = editor.innerHTML.length;
-        }
-    }
-}
-
-// Adicionar evento de input no editor de edição
-document.addEventListener('DOMContentLoaded', function() {
-    const editContentEditor = document.getElementById('editPostContentEditor');
-    if (editContentEditor) {
-        editContentEditor.addEventListener('input', syncEditEditorContent);
-        editContentEditor.addEventListener('paste', function(e) {
-            e.preventDefault();
-            const text = (e.originalEvent || e).clipboardData.getData('text/plain');
-            document.execCommand('insertText', false, text);
-        });
-    }
-
-    // Adicionar contador de caracteres no título do modal de edição
-    const editTitleInput = document.getElementById('editPostTitle');
-    if (editTitleInput) {
-        editTitleInput.addEventListener('input', function() {
-            const counter = document.getElementById('editTitleCount');
-            if (counter) {
-                counter.textContent = this.value.length;
-            }
-        });
-    }
-
-    // Setup da área de upload de imagem no modal de edição
-    const editImageUploadArea = document.getElementById('editImageUploadArea');
-    const editImageFileInput = document.getElementById('editPostImageFile');
-
-    if (editImageUploadArea && editImageFileInput) {
-        editImageUploadArea.addEventListener('click', function() {
-            editImageFileInput.click();
-        });
-
-        editImageUploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.classList.add('dragover');
-        });
-
-        editImageUploadArea.addEventListener('dragleave', function() {
-            this.classList.remove('dragover');
-        });
-
-        editImageUploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                editImageFileInput.files = files;
-                previewEditImage(files[0]);
-            }
-        });
-
-        editImageFileInput.addEventListener('change', function(e) {
-            if (this.files && this.files[0]) {
-                previewEditImage(this.files[0]);
-            }
-        });
-    }
-});
-        });
-    }
-});
-
-// Adicionar listeners para atualizar preview SEO
-document.addEventListener('DOMContentLoaded', function() {
-    const editTitle = document.getElementById('editPostTitle');
-    const editContent = document.getElementById('editPostContentEditor');
-
-    if (editTitle) {
-        editTitle.addEventListener('input', updateEditSeoPreview);
-    }
-
-    if (editContent) {
-        editContent.addEventListener('input', updateEditSeoPreview);
-    }
-});
-
-// Atualizar formulário de edição para sincronizar antes do submit
-const editPostForm = document.getElementById('editPostForm');
-if (editPostForm) {
-    const originalSubmitHandler = editPostForm.onsubmit;
-    editPostForm.addEventListener('submit', function(e) {
-        // Sincronizar conteúdo antes de enviar
+        // Sincronizar com textarea
         syncEditEditorContent();
-    }, true);
-}
+    }
+
+    // Sincronizar conteúdo do editor com textarea
+    function syncEditEditorContent() {
+        const editor = document.getElementById('editPostContentEditor');
+        const textarea = document.getElementById('editPostContent');
+        const counter = document.getElementById('editContentCount');
+
+        if (editor && textarea) {
+            textarea.value = editor.innerHTML;
+            if (counter) {
+                counter.textContent = editor.innerHTML.length;
+            }
+        }
+    }
+
+    // Adicionar evento de input no editor de edição
+    document.addEventListener('DOMContentLoaded', function () {
+        const editContentEditor = document.getElementById('editPostContentEditor');
+        if (editContentEditor) {
+            editContentEditor.addEventListener('input', syncEditEditorContent);
+            editContentEditor.addEventListener('paste', function (e) {
+                e.preventDefault();
+                const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+                document.execCommand('insertText', false, text);
+            });
+        }
+
+        // Adicionar contador de caracteres no título do modal de edição
+        const editTitleInput = document.getElementById('editPostTitle');
+        if (editTitleInput) {
+            editTitleInput.addEventListener('input', function () {
+                const counter = document.getElementById('editTitleCount');
+                if (counter) {
+                    counter.textContent = this.value.length;
+                }
+            });
+        }
+
+        // Setup da área de upload de imagem no modal de edição
+        const editImageUploadArea = document.getElementById('editImageUploadArea');
+        const editImageFileInput = document.getElementById('editPostImageFile');
+
+        if (editImageUploadArea && editImageFileInput) {
+            editImageUploadArea.addEventListener('click', function () {
+                editImageFileInput.click();
+            });
+
+            editImageUploadArea.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                this.classList.add('dragover');
+            });
+
+            editImageUploadArea.addEventListener('dragleave', function () {
+                this.classList.remove('dragover');
+            });
+
+            editImageUploadArea.addEventListener('drop', function (e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    editImageFileInput.files = files;
+                    previewEditImage(files[0]);
+                }
+            });
+
+            editImageFileInput.addEventListener('change', function (e) {
+                if (this.files && this.files[0]) {
+                    previewEditImage(this.files[0]);
+                }
+            });
+        }
+    });
+        });
+    }
+});
+
+    // Adicionar listeners para atualizar preview SEO
+    document.addEventListener('DOMContentLoaded', function () {
+        const editTitle = document.getElementById('editPostTitle');
+        const editContent = document.getElementById('editPostContentEditor');
+
+        if (editTitle) {
+            editTitle.addEventListener('input', updateEditSeoPreview);
+        }
+
+        if (editContent) {
+            editContent.addEventListener('input', updateEditSeoPreview);
+        }
+    });
+
+    // Atualizar formulário de edição para sincronizar antes do submit
+    const editPostForm = document.getElementById('editPostForm');
+    if (editPostForm) {
+        const originalSubmitHandler = editPostForm.onsubmit;
+        editPostForm.addEventListener('submit', function (e) {
+            // Sincronizar conteúdo antes de enviar
+            syncEditEditorContent();
+        }, true);
+    }
 
 </script>
 
 <!-- Post Wizard Script -->
 <script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
 {% endblock %}
-

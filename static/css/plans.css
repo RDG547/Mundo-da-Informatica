@@ -275,6 +275,10 @@
     box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
 }
 
+.feature-item.included .feature-icon i {
+    color: white !important;
+}
+
 .feature-item.excluded .feature-icon {
     background: #ff0000;
     /* Pure Red */
@@ -282,6 +286,10 @@
     font-weight: 900;
     opacity: 1;
     box-shadow: 0 2px 5px rgba(255, 0, 0, 0.3);
+}
+
+.feature-item.excluded .feature-icon i {
+    color: white !important;
 }
 
 .feature-text {
@@ -491,4 +499,40 @@
     .comparison-table td {
         padding: 1rem 0.5rem;
     }
+}
+
+/* Current Plan Badge Style */
+.plan-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 1rem 2rem;
+    text-align: center;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: default;
+    transition: all 0.3s ease;
+}
+
+.current-plan-free {
+    background-color: white;
+    color: #718096;
+    border: 2px solid #718096;
+}
+
+.current-plan-premium {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.current-plan-vip {
+    background: linear-gradient(135deg, #ff006e, #ff3085);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 15px rgba(255, 0, 110, 0.3);
 }

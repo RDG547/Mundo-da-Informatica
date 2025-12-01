@@ -935,6 +935,41 @@
             }
         }
     </style>
+    <!-- Flash Messages -->
+    <div id="flash-messages"
+        style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="favorite-toast favorite-toast-{{ category }} show">
+            {% if category == 'success' %}
+            <i class="fas fa-check-circle"></i>
+            {% elif category == 'danger' or category == 'error' %}
+            <i class="fas fa-exclamation-circle"></i>
+            {% else %}
+            <i class="fas fa-info-circle"></i>
+            {% endif %}
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <script>
+        // Auto-dismiss flash messages
+        document.addEventListener('DOMContentLoaded', function () {
+            const toasts = document.querySelectorAll('.favorite-toast');
+            toasts.forEach(toast => {
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 300); // Wait for transition
+                }, 5000); // 5 seconds
+            });
+        });
+    </script>
 </body>
 
 </html>

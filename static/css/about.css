@@ -954,14 +954,16 @@
 
 .feature-item {
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.5rem;
     padding: 1.5rem;
     background: white;
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     border: 1px solid #e2e8f0;
     transition: none;
+    text-align: left;
 }
 
 .community-features .feature-item:hover {
@@ -972,27 +974,27 @@
 }
 
 .community-features .feature-item:hover i {
-    color: #ffffff !important;
+    color: #ed8936 !important;
     transform: none !important;
 }
 
-.feature-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #ed8936, #dd6b20);
+.community-features .feature-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(237, 137, 54, 0.1);
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    color: #ffffff !important;
-    font-size: 1.4rem;
+    color: #ed8936 !important;
+    font-size: 1.5rem;
     flex-shrink: 0;
     padding: 0;
     margin: 0;
 }
 
-.feature-icon i {
-    color: #ffffff !important;
+.community-features .feature-icon i {
+    color: #ed8936 !important;
     display: block;
     width: 100%;
     height: 100%;
@@ -1017,7 +1019,7 @@
 }
 
 .community-cta {
-    background: white;
+    background: linear-gradient(135deg, #ed8936, #dd6b20);
     border-radius: 16px;
     padding: 2.5rem;
     text-align: center;
@@ -1028,12 +1030,12 @@
 .community-cta h3 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: #2d3748;
+    color: #000000;
     margin-bottom: 1rem;
 }
 
 .community-cta p {
-    color: #718096;
+    color: white;
     margin-bottom: 2rem;
     line-height: 1.6;
 }

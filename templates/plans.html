@@ -22,7 +22,7 @@
 </div>
 
 <!-- Plans Section -->
-<section class="plans-section">
+<section class="plans-section" data-stripe-key="{{ stripe_public_key }}" data-checkout-plan="{{ checkout_plan }}">
     <div class="container">
         <div class="plans-grid">
             <!-- Free Plan -->
@@ -78,7 +78,7 @@
                     {% if not current_user.is_authenticated %}
                     <a href="{{ url_for('register') }}" class="plan-btn">Começar Gratuitamente</a>
                     {% elif current_user.plan == 'free' %}
-                    <div class="plan-badge current-plan-free">Plano Atual</div>
+                    <div class="plan-badge current-plan-free"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% else %}
                     <button class="plan-btn downgrade-btn" onclick="openDowngradeModal()">Voltar ao plano
                         grátis</button>
@@ -138,9 +138,13 @@
 
                 <div class="plan-cta">
                     {% if current_user.is_authenticated and current_user.plan == 'premium' %}
-                    <div class="plan-badge current-plan-premium">Plano Atual</div>
+                    <div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% else %}
-                    <a href="{{ url_for('register') }}" class="plan-btn">Assinar Premium</a>
+                    {% if current_user.is_authenticated %}
+                    <button class="plan-btn" onclick="checkout('premium')">Assinar Premium</button>
+                    {% else %}
+                    <a href="{{ url_for('register', plan='premium') }}" class="plan-btn">Assinar Premium</a>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -196,9 +200,13 @@
 
                 <div class="plan-cta">
                     {% if current_user.is_authenticated and current_user.plan == 'vip' %}
-                    <div class="plan-badge current-plan-vip">Plano Atual</div>
+                    <div class="plan-badge current-plan-vip"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% else %}
-                    <a href="{{ url_for('register') }}" class="plan-btn">Assinar VIP</a>
+                    {% if current_user.is_authenticated %}
+                    <button class="plan-btn" onclick="checkout('vip')">Assinar VIP</button>
+                    {% else %}
+                    <a href="{{ url_for('register', plan='vip') }}" class="plan-btn">Assinar VIP</a>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -292,9 +300,7 @@
             downloads ilimitados, suporte prioritário e área VIP.</p>
         <div class="modal-actions">
             <button class="btn-cancel" onclick="closeDowngradeModal()">Cancelar</button>
-            <form action="{{ url_for('downgrade_plan') }}" method="POST" style="display: inline;">
-                <button type="submit" class="btn-confirm">Confirmar</button>
-            </form>
+            <button class="btn-confirm" onclick="confirmDowngrade()">Confirmar</button>
         </div>
     </div>
 </div>
@@ -304,42 +310,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function toggleFAQ(element) {
-        const faqItem = element.parentElement;
-        const isActive = faqItem.classList.contains('active');
-
-        // Close all FAQ items
-        document.querySelectorAll('.faq-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        // Toggle current item
-        if (!isActive) {
-            faqItem.classList.add('active');
-        }
-    }
-
-    // Downgrade Modal Logic
-    const modal = document.getElementById('downgradeModal');
-
-    function openDowngradeModal() {
-        modal.style.display = "block";
-        document.body.style.overflow = "hidden"; // Prevent scrolling
-    }
-
-    function closeDowngradeModal() {
-        modal.style.display = "none";
-        document.body.style.overflow = "auto"; // Enable scrolling
-    }
-
-    // Close modal when clicking outside
-    window.onclick = function (event) {
-        if (event.target == modal) {
-            closeDowngradeModal();
-        }
-    }
-</script>
+<script src="https://js.stripe.com/v3/"></script>
+<script src="{{ url_for('static', filename='js/plans.js') }}"></script>
 
 <style>
     /* Downgrade Button Style */
@@ -455,39 +427,6 @@
         background: #c82333;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
-    }
-
-    /* Current Plan Badge Style */
-    .plan-badge {
-        display: block;
-        width: 100%;
-        padding: 0.8rem 1.5rem;
-        text-align: center;
-        border-radius: 50px;
-        font-weight: 600;
-        font-size: 1rem;
-        cursor: default;
-        transition: all 0.3s ease;
-    }
-
-    .current-plan-free {
-        background-color: white;
-        color: #718096;
-        border: 2px solid #718096;
-    }
-
-    .current-plan-premium {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        border: none;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-
-    .current-plan-vip {
-        background: linear-gradient(135deg, #ff006e, #ff3085);
-        color: white;
-        border: none;
-        box-shadow: 0 4px 15px rgba(255, 0, 110, 0.3);
     }
 </style>
 {% endblock %}

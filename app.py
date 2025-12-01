@@ -4,12 +4,14 @@ from flask_assets import Environment
 from webassets.bundle import Bundle
 from flask_compress import Compress
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import math
 import os
 import json
 import sys
 import shutil
 import uuid
+import stripe
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 
@@ -44,6 +46,10 @@ load_dotenv()
 # Configuração da aplicação Flask
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_5f352a14cb7e4b119811')
+
+# Configuração do Stripe
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
 
 # Garantir que o diretório instance existe
 os.makedirs(app.instance_path, exist_ok=True)
@@ -742,6 +748,7 @@ class User(db.Model, UserMixin):
     date_joined = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, default=datetime.utcnow)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    subscription_end_date = db.Column(db.DateTime, nullable=True)
 
     # Preferências
     email_notifications = db.Column(db.Boolean, default=True)
@@ -927,6 +934,15 @@ def unauthorized():
     return redirect(url_for('login', next=request.url))
 
 # Função para carregar o usuário
+@app.before_request
+def check_subscription_expiration():
+    if current_user.is_authenticated and current_user.plan != 'free':
+        if current_user.subscription_end_date and current_user.subscription_end_date < datetime.utcnow():
+            current_user.plan = 'free'
+            current_user.subscription_end_date = None
+            db.session.commit()
+            flash('Sua assinatura expirou. Você voltou para o plano Grátis.', 'info')
+
 @login_manager.user_loader
 def load_user(user_id):
     # Usar a sintaxe recomendada pelo SQLAlchemy 2.0
@@ -1994,7 +2010,85 @@ def about():
 
 @app.route('/planos')
 def plans():
-    return render_template('plans.html', title='Planos')
+    """Página de planos e preços"""
+    checkout_plan = request.args.get('checkout')
+    return render_template('plans.html', title='Planos e Preços', stripe_public_key=app.config['STRIPE_PUBLIC_KEY'], checkout_plan=checkout_plan)
+
+@app.route('/create-checkout-session', methods=['POST'])
+@login_required
+def create_checkout_session():
+    try:
+        data = request.get_json()
+        plan_type = data.get('plan')
+
+        # Define prices (Replace with your actual Stripe Price IDs from env)
+        prices = {
+            'premium': os.environ.get('STRIPE_PRICE_PREMIUM', 'price_premium_placeholder'),
+            'vip': os.environ.get('STRIPE_PRICE_VIP', 'price_vip_placeholder')
+        }
+
+        price_id = prices.get(plan_type)
+        if not price_id:
+             return jsonify({'error': 'Plano inválido'}), 400
+
+        checkout_session = stripe.checkout.Session.create(
+            line_items=[
+                {
+                    'price': price_id,
+                    'quantity': 1,
+                },
+            ],
+            mode='subscription',
+            success_url=url_for('checkout_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('checkout_cancel', _external=True),
+            customer_email=current_user.email,
+            metadata={
+                'user_id': current_user.id,
+                'plan': plan_type
+            }
+        )
+        return jsonify({'id': checkout_session.id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/checkout-success')
+@login_required
+def checkout_success():
+    session_id = request.args.get('session_id')
+    if not session_id:
+        flash('Erro: Sessão de pagamento não encontrada.', 'danger')
+        return redirect(url_for('plans'))
+
+    try:
+        # Retrieve the session from Stripe
+        session = stripe.checkout.Session.retrieve(session_id)
+
+        # Check if the payment was successful
+        if session.payment_status == 'paid':
+            plan_type = session.metadata.get('plan')
+
+            if plan_type in ['premium', 'vip']:
+                current_user.plan = plan_type
+                # Set expiration to exactly 1 month from now
+                current_user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
+                db.session.commit()
+                flash(f'Assinatura {plan_type.upper()} realizada com sucesso! Bem-vindo ao seu novo plano.', 'success')
+            else:
+                flash('Erro: Plano desconhecido na confirmação do pagamento.', 'warning')
+        else:
+            flash('O pagamento ainda não foi confirmado. Aguarde alguns instantes ou entre em contato com o suporte.', 'warning')
+
+    except Exception as e:
+        flash(f'Erro ao verificar pagamento: {str(e)}', 'danger')
+        print(f"Error verifying payment: {e}")
+
+    return redirect(url_for('plans'))
+
+@app.route('/checkout-cancel')
+@login_required
+def checkout_cancel():
+    flash('O processo de assinatura foi cancelado.', 'info')
+    return redirect(url_for('plans'))
 
 @app.route('/faq')
 def faq():
@@ -4753,11 +4847,10 @@ def downgrade_plan():
     try:
         current_user.plan = 'free'
         db.session.commit()
-        flash('Seu plano foi alterado para Grátis com sucesso.', 'success')
+        return jsonify({'success': True, 'message': 'Seu plano foi alterado para Grátis com sucesso.'})
     except Exception as e:
         db.session.rollback()
-        flash(f'Erro ao alterar plano: {e}', 'danger')
-    return redirect(url_for('plans'))
+        return jsonify({'success': False, 'message': f'Erro ao alterar plano: {str(e)}'}), 500
 
 
 @app.route("/admin/tools/backup")

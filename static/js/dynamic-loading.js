@@ -46,6 +46,12 @@ class DynamicLoader {
             setTimeout(() => this.initializeLegalPage(), 100);
         } else if (currentPath === '/' || currentPath === '/home' || document.querySelector('#hero-particles')) {
             setTimeout(() => this.initializeHomePage(), 100);
+        } else if (currentPath === '/planos' || currentPath === '/plans' || document.querySelector('.plans-section')) {
+            setTimeout(() => {
+                if (typeof window.initializePlansPage === 'function') {
+                    window.initializePlansPage();
+                }
+            }, 100);
         }
     }
 
@@ -293,6 +299,11 @@ class DynamicLoader {
         // Re-initialize home page functionality
         if (currentPath === '/' || currentPath === '/home' || document.querySelector('#hero-particles')) {
             this.initializeHomePage();
+        }
+
+        // Re-initialize Plans page functionality
+        if ((currentPath === '/planos' || currentPath === '/plans') && typeof window.initializePlansPage === 'function') {
+            window.initializePlansPage();
         }
 
         // Re-initialize any other components

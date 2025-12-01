@@ -2557,28 +2557,32 @@ def admin_update_post(post_id):
         db.session.commit()
 
         # Log da atividade
+
         log_admin_activity(
-            user_id=current_user.id,
-            action='update_post',
-            description=f'Atualizou o post "{title}"',
-            metadata={
-                'post_id': post_id,
-                'old_data': old_data,
-                'new_data': {
-                    'title': title,
-                    'content': content[:100] + '...' if len(content) > 100 else content,
-                    'category_id': category_id,
-                    'featured': featured,
-                    'is_active': is_active
-                }
-            }
+            current_user.id,
+            'update_post',
+            f'Atualizou post: {post.title}',
+            metadata={'old': old_data, 'new': request.form.to_dict()}
         )
 
-        return jsonify({'success': True, 'message': 'Post atualizado com sucesso'})
+        return jsonify({
+            'success': True,
+            'message': 'Post atualizado com sucesso!',
+            'post': {
+                'id': post.id,
+                'title': post.title,
+                'category_name': post.category_rel.name if post.category_rel else 'Sem Categoria',
+                'views': post.views,
+                'downloads': post.downloads,
+                'is_active': post.is_active,
+                'featured': post.featured,
+                'date': post.date_posted.strftime('%d/%m/%Y')
+            }
+        })
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'Erro ao atualizar post: {str(e)}'})
+        return jsonify({'success': False, 'message': f'Erro ao atualizar post: {str(e)}'}), 500
 
 @app.route('/admin/posts/<int:post_id>/toggle-featured', methods=['POST'])
 @login_required

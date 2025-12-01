@@ -537,7 +537,7 @@
                         <button type="button" class="btn-admin btn-admin-outline" onclick="prevEditStep()">
                             <i class="fas fa-arrow-left"></i> Anterior
                         </button>
-                        <button type="submit" class="btn-admin btn-admin-success">
+                        <button type="button" class="btn-admin btn-admin-success" onclick="savePost(event)">
                             <i class="fas fa-save"></i> Salvar Alterações
                         </button>
                     </div>
@@ -1064,7 +1064,7 @@
 
         // Função para salvar post
         window.savePost = function (event) {
-            event.preventDefault();
+            if (event) event.preventDefault();
             console.log('savePost called');
 
             // Sync content from editor to textarea
@@ -1074,7 +1074,8 @@
                 contentTextarea.value = contentEditor.innerHTML;
             }
 
-            const formData = new FormData(event.target);
+            const form = document.getElementById('editPostForm');
+            const formData = new FormData(form);
             const postId = formData.get('post_id');
             console.log('Post ID:', postId);
 
@@ -1095,12 +1096,48 @@
                     if (data.success) {
                         showNotification('Post atualizado com sucesso!', 'success');
                         closeEditPostModal();
-                        // Recarregar a página para mostrar as mudanças
-                        setTimeout(() => location.reload(), 1000);
+
+                        // Atualizar a linha na tabela dinamicamente
+                        if (data.post) {
+                            const row = document.querySelector(`tr[data-post-id="${data.post.id}"]`);
+                            if (row) {
+                                // Atualizar Título
+                                const titleEl = row.querySelector('.post-title');
+                                if (titleEl) titleEl.textContent = data.post.title;
+
+                                // Atualizar Categoria
+                                const categoryBadge = row.querySelector('.category-badge');
+                                if (categoryBadge) {
+                                    // Manter o ícone se possível ou usar padrão
+                                    const icon = categoryBadge.querySelector('i') ? categoryBadge.querySelector('i').className : 'fas fa-folder';
+                                    categoryBadge.innerHTML = `<i class="${icon}"></i> ${data.post.category_name}`;
+                                }
+
+                                // Atualizar Status
+                                const statusCell = row.querySelector('.status-cell');
+                                if (statusCell) {
+                                    let statusHtml = '';
+                                    if (data.post.featured) {
+                                        statusHtml = '<span class="badge badge-warning"><i class="fas fa-star"></i> Destaque</span>';
+                                    } else if (data.post.is_active) {
+                                        statusHtml = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Ativo</span>';
+                                    } else {
+                                        statusHtml = '<span class="badge badge-secondary"><i class="fas fa-pause-circle"></i> Inativo</span>';
+                                    }
+                                    statusCell.innerHTML = statusHtml;
+                                }
+
+                                // Adicionar efeito visual de atualização
+                                row.style.transition = 'background-color 0.5s';
+                                row.style.backgroundColor = '#e8f5e9';
+                                setTimeout(() => {
+                                    row.style.backgroundColor = '';
+                                }, 1000);
+                            }
+                        }
                     } else {
                         console.error('Update failed:', data.message);
                         showNotification(data.message || 'Erro ao atualizar post', 'error');
-                        alert('Erro: ' + (data.message || 'Erro desconhecido'));
                     }
                 })
                 .catch(error => {

@@ -1065,6 +1065,7 @@
         // Função para salvar post
         window.savePost = function (event) {
             event.preventDefault();
+            console.log('savePost called');
 
             // Sync content from editor to textarea
             const contentEditor = document.getElementById('editPostContentEditor');
@@ -1075,6 +1076,7 @@
 
             const formData = new FormData(event.target);
             const postId = formData.get('post_id');
+            console.log('Post ID:', postId);
 
             // Converter checkboxes para boolean
             formData.set('featured', document.getElementById('editPostFeatured').checked);
@@ -1084,20 +1086,27 @@
                 method: 'POST',
                 body: formData
             })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Response data:', data);
                     if (data.success) {
                         showNotification('Post atualizado com sucesso!', 'success');
                         closeEditPostModal();
                         // Recarregar a página para mostrar as mudanças
                         setTimeout(() => location.reload(), 1000);
                     } else {
+                        console.error('Update failed:', data.message);
                         showNotification(data.message || 'Erro ao atualizar post', 'error');
+                        alert('Erro: ' + (data.message || 'Erro desconhecido'));
                     }
                 })
                 .catch(error => {
                     console.error('Erro ao salvar post:', error);
-                    showNotification('Erro ao salvar post', 'error');
+                    showNotification('Erro ao salvar post: ' + error, 'error');
+                    alert('Erro de conexão ou servidor: ' + error);
                 });
         };
 

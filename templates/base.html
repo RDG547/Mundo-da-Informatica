@@ -52,6 +52,7 @@
     {% endif %}
     {% if request.endpoint == 'profile' %}
     <link rel="preload" href="{{ url_for('static', filename='css/profile-page.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/admin.css') }}" as="style">
     {% endif %}
 
     <!-- Custom CSS -->
@@ -70,7 +71,9 @@
         request.endpoint !='category' and request.endpoint !='all_categories' %}media="print" onload="this.media='all'"
         {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}" id="profile-css" {% if
-        request.endpoint !='profile' %}media="print" onload="this.media='all'" {% endif %}>
+        request.endpoint !='profile' %}media="print" {% endif %}>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" id="admin-css" {% if
+        request.endpoint !='profile' %}media="print" {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}" id="post-detail-css" {% if
         request.endpoint not in ['post', 'post_by_slug' ] %}media="print" onload="this.media='all'" {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}" id="plans-css" {% if
@@ -298,7 +301,9 @@
     </main>
 
     <!-- Footer -->
+    {% if request.endpoint != 'profile' %}
     {% include 'components/footer.html' %}
+    {% endif %}
 
     <!-- Back to Top Button -->
     <div class="scroll-top">

@@ -273,6 +273,40 @@ def generate_slug(text):
     return text
 
 
+def generate_image_filename(title, file_extension):
+    """Gera um nome de arquivo para imagem baseado no título do post
+
+    Args:
+        title: Título do post
+        file_extension: Extensão do arquivo (jpg, png, etc.)
+
+    Returns:
+        Nome do arquivo formatado (ex: Acer_Aspire_A315-53_(Intel_i5_7_Geracao).jpg)
+    """
+    import unicodedata
+
+    # Normalizar caracteres unicode e remover acentos
+    text = unicodedata.normalize('NFKD', title)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+
+    # Substituir espaços por underscores
+    text = text.replace(' ', '_')
+
+    # Remover caracteres especiais, mantendo letras, números, underscores, hífens e parênteses
+    text = re.sub(r'[^\w\s\-()\_-]', '', text)
+
+    # Remover múltiplos underscores consecutivos
+    text = re.sub(r'_+', '_', text)
+
+    # Remover underscores no início e fim
+    text = text.strip('_')
+
+    # Garantir extensão em minúsculas
+    file_extension = file_extension.lower()
+
+    return f"{text}.{file_extension}"
+
+
 def validate_comment_data(data) -> tuple[bool, str | None, dict | None]:
     """
     Valida dados de um comentário.
@@ -764,6 +798,9 @@ class User(db.Model, UserMixin):
 
     browser = db.Column(db.String(100))  # Tipo de navegador e versão
     operating_system = db.Column(db.String(100))  # Sistema operacional
+
+    # Controle de dispositivos simultâneos
+    active_sessions = db.Column(db.Integer, default=0)  # Número de sessões ativas
     pages_visited = db.Column(db.Text)  # JSON com páginas visitadas
     time_on_pages = db.Column(db.Text)  # JSON com tempo em cada página
     access_timestamps = db.Column(db.Text)  # JSON com data/hora de acessos
@@ -1346,7 +1383,10 @@ def format_date_pt(date_value, format_string='%d de %B de %Y'):
 @app.route('/home')
 def home():
     try:
-        posts = Post.query.order_by(Post.date_posted.desc()).limit(6).all()
+        page = request.args.get('page', 1, type=int)
+        posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())
+        posts_paginated = posts_query.paginate(page=page, per_page=6, error_out=False)
+        posts = posts_paginated.items
         featured = Post.query.filter_by(featured=True).limit(4).all()
 
         # Lista de IDs de posts favoritados pelo usuário atual
@@ -1364,7 +1404,7 @@ def home():
             'total_subscribers': Subscriber.query.filter_by(is_active=True).count()
         }
 
-        return render_template('index.html', posts=posts, featured=featured, stats=stats, favorite_post_ids=favorite_post_ids, title='Início')
+        return render_template('index.html', posts=posts, posts_pagination=posts_paginated, featured=featured, stats=stats, favorite_post_ids=favorite_post_ids, title='Início')
     except Exception as e:
         print(f"Erro ao acessar a página inicial: {e}")
         # Tentar inicializar o banco de dados novamente (já estamos no contexto da rota)
@@ -1487,24 +1527,23 @@ def check_download_limit(user):
         return True, "Acesso administrativo."
 
     if user.plan == 'vip':
-        return True, "Acesso VIP ilimitado."
+        return True, "Downloads ilimitados no plano VIP."
 
     now = datetime.utcnow()
 
     if user.plan == 'premium':
-        # 15 downloads per week
+        # 15 downloads semanais
         one_week_ago = now - timedelta(days=7)
         count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_week_ago).count()
         if count >= 15:
             return False, "Você atingiu seu limite de 15 downloads semanais. Faça upgrade para VIP para downloads ilimitados."
-        return True, f"Download autorizado."
+        return True, f"Download autorizado. Você tem {15 - count} downloads restantes esta semana."
 
-    # Free (default)
-    # 1 download per day
+    # Plano Grátis: 1 download por dia
     one_day_ago = now - timedelta(days=1)
     count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_day_ago).count()
     if count >= 1:
-        return False, "Você atingiu seu limite de 1 download diário. Faça upgrade para Premium ou VIP para mais downloads."
+        return False, "Você atingiu seu limite de 1 download diário. Faça upgrade para Premium (15/semana) ou VIP (ilimitado)."
     return True, "Download autorizado."
 
 @app.route('/download/<int:post_id>')
@@ -1514,18 +1553,25 @@ def download_post(post_id):
     post = Post.query.get_or_404(post_id)
     user = current_user
 
-    # Verificar permissões baseadas no plano
+    # Log para debug
+    print(f"[DEBUG] Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
+
+    # Verificar permissões baseadas no plano ANTES de registrar o download
     allowed, message = check_download_limit(user)
+    print(f"[DEBUG] Verificação de limite: allowed={allowed}, message={message}")
+
     if not allowed:
         flash(message, 'warning')
+        print(f"[DEBUG] Download negado para {user.username}")
         return redirect(url_for('plans'))
 
-    # Registrar download
-    new_download = Download(user_id=user.id, post_id=post.id)
+    # Registrar download (isso incrementa o contador para próxima verificação)
+    new_download = Download(user_id=user.id, post_id=post.id, timestamp=datetime.utcnow())
     db.session.add(new_download)
     db.session.commit()
+    print(f"[DEBUG] Download registrado para {user.username}")
 
-    # Incrementar downloads
+    # Incrementar downloads do post
     increment_post_downloads(post_id)
 
     # Log da atividade de download
@@ -1672,6 +1718,14 @@ def add_post_comment_by_slug(category, slug):
 
         # Se usuário estiver logado, usar seus dados
         if current_user.is_authenticated:
+            # Verificar limite de comentários baseado no plano
+            allowed, message = check_comment_limit(current_user)
+            if not allowed:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 403
+
             new_comment = Comment(
                 content=validated_data['content'],
                 post_id=post.id,
@@ -1839,6 +1893,14 @@ def add_post_comment(post_id):
 
         # Se usuário estiver logado, usar seus dados
         if current_user.is_authenticated:
+            # Verificar limite de comentários baseado no plano
+            allowed, message = check_comment_limit(current_user)
+            if not allowed:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 403
+
             new_comment = Comment(
                 content=validated_data['content'],
                 post_id=post_id,
@@ -2014,6 +2076,113 @@ def plans():
     checkout_plan = request.args.get('checkout')
     return render_template('plans.html', title='Planos e Preços', stripe_public_key=app.config['STRIPE_PUBLIC_KEY'], checkout_plan=checkout_plan)
 
+
+@app.route('/api/user/permissions')
+@login_required
+def get_user_permissions():
+    """Retorna as permissões e limites do usuário baseado no plano"""
+    user = current_user
+
+    # Calcular downloads restantes
+    now = datetime.utcnow()
+    downloads_info = {}
+
+    if user.plan == 'free':
+        one_day_ago = now - timedelta(days=1)
+        count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_day_ago).count()
+        downloads_info = {
+            'limit': 1,
+            'period': 'dia',
+            'used': count,
+            'remaining': max(0, 1 - count)
+        }
+    elif user.plan == 'premium':
+        one_week_ago = now - timedelta(days=7)
+        count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_week_ago).count()
+        downloads_info = {
+            'limit': 15,
+            'period': 'semana',
+            'used': count,
+            'remaining': max(0, 15 - count)
+        }
+    else:  # VIP
+        downloads_info = {
+            'limit': 'ilimitado',
+            'period': 'sempre',
+            'used': 0,
+            'remaining': 'ilimitado'
+        }
+
+    # Calcular comentários restantes hoje
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    comments_today = Comment.query.filter(
+        Comment.user_id == user.id,
+        Comment.date_posted >= today_start
+    ).count()
+
+    comments_info = {}
+    if user.plan == 'free':
+        comments_info = {
+            'allowed': False,
+            'limit': 0,
+            'used': 0,
+            'remaining': 0
+        }
+    elif user.plan == 'premium':
+        comments_info = {
+            'allowed': True,
+            'limit': 2,
+            'used': comments_today,
+            'remaining': max(0, 2 - comments_today)
+        }
+    else:  # VIP
+        comments_info = {
+            'allowed': True,
+            'limit': 'ilimitado',
+            'used': comments_today,
+            'remaining': 'ilimitado'
+        }
+
+    # Favoritos
+    favorites_count = Favorite.query.filter_by(user_id=user.id).count()
+    favorites_info = {}
+    if user.plan == 'free':
+        favorites_info = {
+            'limit': 10,
+            'used': favorites_count,
+            'remaining': max(0, 10 - favorites_count)
+        }
+    else:  # Premium e VIP
+        favorites_info = {
+            'limit': 'ilimitado',
+            'used': favorites_count,
+            'remaining': 'ilimitado'
+        }
+
+    # Histórico de downloads
+    history_access, history_limit = check_download_history_access(user)
+
+    permissions = {
+        'plan': user.plan,
+        'plan_name': {'free': 'Grátis', 'premium': 'Premium', 'vip': 'VIP'}.get(user.plan, 'Grátis'),
+        'downloads': downloads_info,
+        'comments': comments_info,
+        'favorites': favorites_info,
+        'download_history': {
+            'access': history_access,
+            'limit': history_limit if history_limit else ('completo' if history_access else 'nenhum')
+        },
+        'support': check_support_priority(user),
+        'devices': {
+            'limit': {'free': 1, 'premium': 2, 'vip': 5}.get(user.plan, 1),
+            'active': user.active_sessions
+        },
+        'can_request_content': can_request_specific_content(user),
+        'vip_area': user.plan == 'vip'
+    }
+
+    return jsonify(permissions)
+
 @app.route('/create-checkout-session', methods=['POST'])
 @login_required
 def create_checkout_session():
@@ -2093,6 +2262,68 @@ def checkout_cancel():
 @app.route('/faq')
 def faq():
     return render_template('faq.html', title='Perguntas Frequentes')
+
+
+@app.route('/debug/check-limits')
+@login_required
+def debug_check_limits():
+    """Rota de debug para verificar os limites do usuário"""
+    user = current_user
+    now = datetime.utcnow()
+
+    # Verificar downloads
+    one_day_ago = now - timedelta(days=1)
+    one_week_ago = now - timedelta(days=7)
+    downloads_today = Download.query.filter(
+        Download.user_id == user.id,
+        Download.timestamp >= one_day_ago
+    ).count()
+    downloads_week = Download.query.filter(
+        Download.user_id == user.id,
+        Download.timestamp >= one_week_ago
+    ).count()
+
+    # Verificar comentários
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    comments_today = Comment.query.filter(
+        Comment.user_id == user.id,
+        Comment.date_posted >= today_start
+    ).count()
+
+    # Verificar favoritos
+    favorites_count = Favorite.query.filter_by(user_id=user.id).count()
+
+    debug_info = {
+        'user': {
+            'username': user.username,
+            'plan': user.plan,
+            'active_sessions': user.active_sessions
+        },
+        'downloads': {
+            'today': downloads_today,
+            'this_week': downloads_week,
+            'can_download': check_download_limit(user)[0],
+            'message': check_download_limit(user)[1]
+        },
+        'comments': {
+            'today': comments_today,
+            'can_comment': check_comment_limit(user)[0],
+            'message': check_comment_limit(user)[1]
+        },
+        'favorites': {
+            'total': favorites_count,
+            'can_add': check_favorite_limit(user)[0],
+            'message': check_favorite_limit(user)[1]
+        },
+        'devices': {
+            'active_sessions': user.active_sessions,
+            'can_login': check_device_limit(user)[0],
+            'message': check_device_limit(user)[1]
+        }
+    }
+
+    return jsonify(debug_info)
+
 
 @app.route('/termos-de-uso')
 def terms_of_service():
@@ -2502,15 +2733,22 @@ def admin_update_post(post_id):
             if file_ext not in allowed_extensions:
                 return jsonify({'success': False, 'message': 'Formato de imagem não permitido. Use: PNG, JPG, GIF, WebP'})
 
-            # Gerar nome único para o arquivo
-            unique_filename = f"{uuid.uuid4().hex}_{secure_filename(image_file.filename)}"
+            # Gerar nome de arquivo baseado no título do post
+            filename = generate_image_filename(title, file_ext)
 
             # Criar diretório se não existir
             upload_folder = os.path.join(app.root_path, 'static', 'images', 'posts')
             os.makedirs(upload_folder, exist_ok=True)
 
+            # Verificar se já existe um arquivo com esse nome e adicionar contador se necessário
+            base_filename = filename.rsplit('.', 1)[0]
+            counter = 1
+            while os.path.exists(os.path.join(upload_folder, filename)):
+                filename = f"{base_filename}_{counter}.{file_ext}"
+                counter += 1
+
             # Salvar arquivo
-            file_path = os.path.join(upload_folder, unique_filename)
+            file_path = os.path.join(upload_folder, filename)
             image_file.save(file_path)
 
             # Deletar imagem antiga se existir uma diferente e não for URL externa
@@ -2518,7 +2756,7 @@ def admin_update_post(post_id):
                 delete_old_image(post.image_url)
 
             # Atualizar image_url para apontar para o arquivo salvo
-            image_url = f"posts/{unique_filename}"
+            image_url = f"posts/{filename}"
         elif image_url and image_url != post.image_url:
             # Se o image_url foi alterado (nova URL externa ou mudança de imagem)
             # Deletar imagem antiga se não for URL externa nem default
@@ -2771,8 +3009,17 @@ def login():
             flash('Esta conta está desativada. Entre em contato com o administrador.', 'danger')
             return redirect(url_for('login'))
 
+        # Verificar limite de dispositivos simultâneos antes do login
+        allowed, device_message = check_device_limit(user)
+        if not allowed:
+            flash(device_message, 'warning')
+            return redirect(url_for('plans'))
+
         # Login bem-sucedido
         login_user(user, remember=remember)
+
+        # Incrementar sessões ativas
+        user.active_sessions = (user.active_sessions or 0) + 1
 
         # Atualizar a data do último login e dados de rastreamento
         user.last_login = datetime.utcnow()
@@ -3460,19 +3707,26 @@ def admin_create_post():
                 flash('Formato de imagem não permitido. Use: PNG, JPG, GIF, WebP', 'error')
                 return redirect(url_for('admin_posts'))
 
-            # Gerar nome único para o arquivo
-            unique_filename = f"{uuid.uuid4().hex}_{secure_filename(image_file.filename)}"
+            # Gerar nome de arquivo baseado no título do post
+            filename = generate_image_filename(title, file_ext)
 
             # Criar diretório se não existir
             upload_folder = os.path.join(app.root_path, 'static', 'images', 'posts')
             os.makedirs(upload_folder, exist_ok=True)
 
+            # Verificar se já existe um arquivo com esse nome e adicionar contador se necessário
+            base_filename = filename.rsplit('.', 1)[0]
+            counter = 1
+            while os.path.exists(os.path.join(upload_folder, filename)):
+                filename = f"{base_filename}_{counter}.{file_ext}"
+                counter += 1
+
             # Salvar arquivo
-            file_path = os.path.join(upload_folder, unique_filename)
+            file_path = os.path.join(upload_folder, filename)
             image_file.save(file_path)
 
             # Atualizar image_url para apontar para o arquivo salvo
-            image_url = f"posts/{unique_filename}"
+            image_url = f"posts/{filename}"
 
         # Se não houver imagem, usar placeholder
         if not image_url:
@@ -5111,6 +5365,7 @@ def profile(user_id=None):
     # Estatísticas do usuário
     user_posts = Post.query.filter_by(author_id=user.id, is_active=True).count() if hasattr(user, 'id') else 0
     user_comments = Comment.query.filter_by(user_id=user.id).count() if hasattr(user, 'id') else 0
+    category_count = Category.query.filter_by(is_active=True).count()  # noqa: F841
 
     # Buscar favoritos do usuário
     favorite_posts = []
@@ -5129,6 +5384,7 @@ def profile(user_id=None):
                          title=f'Perfil - {user.get_full_name() or user.username}',
                          user_posts=user_posts,
                          user_comments=user_comments,
+                         category_count=category_count,
                          days_as_member=days_as_member,
                          favorite_posts=favorite_posts)
 
@@ -5137,6 +5393,11 @@ def profile(user_id=None):
 @login_required
 def logout():
     """Desconecta o usuário atual"""
+    # Decrementar sessões ativas
+    if current_user.is_authenticated:
+        current_user.active_sessions = max(0, (current_user.active_sessions or 0) - 1)
+        db.session.commit()
+
     logout_user()
     flash('Você foi desconectado com sucesso!', 'info')
     return redirect(url_for('home'))
@@ -5369,11 +5630,96 @@ def check_favorite_limit(user):
     if user.plan in ['premium', 'vip']:
         return True, "Favoritos ilimitados."
 
-    # Free
+    # Plano Grátis: Máximo 10 favoritos
     count = Favorite.query.filter_by(user_id=user.id).count()
     if count >= 10:
-        return False, "Você atingiu o limite de 10 favoritos do plano Grátis. Faça upgrade para salvar mais."
+        return False, "Você atingiu o limite de 10 favoritos do plano Grátis. Faça upgrade para Premium ou VIP para favoritos ilimitados."
     return True, "Favorito autorizado."
+
+
+def check_comment_limit(user):
+    """Verifica se o usuário pode comentar baseado no plano"""
+    if user.role == 'admin' or user.role == 'editor':
+        return True, "Acesso administrativo."
+
+    if user.plan == 'vip':
+        return True, "Comentários ilimitados no plano VIP."
+
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Contar comentários de hoje
+    count = Comment.query.filter(
+        Comment.user_id == user.id,
+        Comment.date_posted >= today_start
+    ).count()
+
+    if user.plan == 'premium':
+        # Premium: 2 comentários diários
+        if count >= 2:
+            return False, "Você atingiu o limite de 2 comentários diários. Faça upgrade para VIP para comentários ilimitados."
+        return True, f"Comentário autorizado. Você tem {2 - count} comentários restantes hoje."
+
+    # Plano Grátis: Sem permissão para comentar
+    return False, "Comentários não estão disponíveis no plano Grátis. Faça upgrade para Premium (2/dia) ou VIP (ilimitado) para comentar."
+
+
+def check_download_history_access(user):
+    """Verifica se o usuário pode acessar o histórico de downloads"""
+    if user.role == 'admin' or user.role == 'editor':
+        return True, None  # Acesso total
+
+    if user.plan == 'vip':
+        return True, None  # Histórico completo
+
+    if user.plan == 'premium':
+        return True, 5  # Últimos 5 downloads
+
+    # Plano Grátis: Sem acesso ao histórico
+    return False, None
+
+
+def check_support_priority(user):
+    """Retorna o tempo de resposta do suporte baseado no plano"""
+    if user.role == 'admin' or user.role == 'editor':
+        return "Suporte prioritário"
+
+    if user.plan == 'vip':
+        return "Suporte Prioritário"
+
+    if user.plan == 'premium':
+        return "Suporte em até 24H"
+
+    # Plano Grátis
+    return "Suporte em até 48H"
+
+
+def check_device_limit(user):
+    """Verifica se o usuário pode acessar de mais dispositivos"""
+    if user.role == 'admin' or user.role == 'editor':
+        return True, "Acesso administrativo."
+
+    max_devices = {
+        'vip': 5,
+        'premium': 2,
+        'free': 1
+    }
+
+    limit = max_devices.get(user.plan, 1)
+
+    if user.active_sessions >= limit:
+        return False, f"Você atingiu o limite de {limit} dispositivo(s) simultâneo(s) do plano {user.plan.capitalize()}. Faça upgrade para acessar de mais dispositivos."
+
+    return True, f"Acesso autorizado. Você pode usar até {limit} dispositivo(s)."
+
+
+def can_request_specific_content(user):
+    """Verifica se o usuário pode solicitar conteúdo específico"""
+    if user.role == 'admin' or user.role == 'editor':
+        return True
+
+    # Apenas VIP pode pedir conteúdo específico
+    return user.plan == 'vip'
 
 @app.route('/favorite/<int:post_id>', methods=['POST'])
 @login_required

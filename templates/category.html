@@ -271,7 +271,7 @@
                                 <span>{{ post.category_str }}</span>
                             </div>
                             <div class="post-content">
-                                <h3>{{ post.title }}</h3>
+                                <h3><a href="{{ post_url(post) }}" style="color: inherit; text-decoration: none;">{{ post.title }}</a></h3>
                                 <div class="post-meta">
                                     <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y')
                                         }}</span>

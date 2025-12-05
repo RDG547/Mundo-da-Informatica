@@ -11,17 +11,58 @@ window.initializePlansPage = function () {
     const checkoutPlan = plansContainer.dataset.checkoutPlan;
     let stripe = null;
 
-    // Initialize Stripe
-    if (stripePublicKey && stripePublicKey !== 'None') {
-        try {
-            if (typeof Stripe !== 'undefined') {
-                stripe = Stripe(stripePublicKey);
-            } else {
-                console.error('Stripe.js not loaded');
+    // Function to initialize Stripe when ready
+    const initializeStripe = () => {
+        if (stripePublicKey && stripePublicKey !== 'None') {
+            try {
+                if (typeof Stripe !== 'undefined') {
+                    stripe = Stripe(stripePublicKey);
+                    console.log('Stripe initialized successfully');
+
+                    // Auto-checkout if plan is specified
+                    if (checkoutPlan && checkoutPlan !== 'None') {
+                        window.checkout(checkoutPlan);
+                    }
+                } else {
+                    console.error('Stripe.js not loaded');
+                }
+            } catch (e) {
+                console.error('Error initializing Stripe:', e);
             }
-        } catch (e) {
-            console.error('Error initializing Stripe:', e);
         }
+    };
+
+    // Wait for Stripe.js to load if not already loaded
+    if (typeof Stripe === 'undefined') {
+        // Load Stripe.js dynamically if not present
+        if (!document.querySelector('script[src*="stripe.com"]')) {
+            const stripeScript = document.createElement('script');
+            stripeScript.src = 'https://js.stripe.com/v3/';
+            stripeScript.onload = initializeStripe;
+            stripeScript.onerror = () => {
+                console.error('Failed to load Stripe.js');
+            };
+            document.head.appendChild(stripeScript);
+        } else {
+            // Script is loading, wait for it
+            const checkStripe = setInterval(() => {
+                if (typeof Stripe !== 'undefined') {
+                    clearInterval(checkStripe);
+                    initializeStripe();
+                }
+            }, 100);
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+                clearInterval(checkStripe);
+                if (typeof Stripe === 'undefined') {
+                    console.error('Stripe.js loading timeout');
+                }
+            }, 5000);
+        }
+    } else {
+        // Stripe is already loaded
+        initializeStripe();
     }
 
     // Checkout Function
@@ -60,11 +101,6 @@ window.initializePlansPage = function () {
                 console.error('Error:', error);
             });
     };
-
-    // Auto-checkout if plan is specified
-    if (checkoutPlan && checkoutPlan !== 'None') {
-        window.checkout(checkoutPlan);
-    }
 
     // FAQ Toggle
     window.toggleFAQ = function (element) {

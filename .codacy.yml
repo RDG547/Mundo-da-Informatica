@@ -1,0 +1,14 @@
+---
+engines:
+  pylint:
+    enabled: true
+    python_version: 3
+
+exclude_paths:
+  - "venv/**"
+  - "**/__pycache__/**"
+  - "**/migrations/**"
+  - "instance/**"
+  - "*.pyc"
+  - ".git/**"
+  - "node_modules/**"

@@ -581,6 +581,39 @@ function initializeProfilePage() {
     console.log('Página de perfil inicializada com sucesso');
 }
 
+// Toggle para expandir/colapsar favoritos - GLOBAL
+window.toggleAllFavorites = function(button) {
+    const extraFavorites = document.querySelectorAll('.extra-favorites');
+    const isExpanded = button.classList.contains('expanded');
+    const icon = button.querySelector('i');
+    const text = button.querySelector('.toggle-text');
+    const totalFavorites = document.querySelectorAll('.favorite-post-item').length;
+
+    if (isExpanded) {
+        // Colapsar
+        extraFavorites.forEach(item => {
+            item.style.display = 'none';
+        });
+        button.classList.remove('expanded');
+        icon.className = 'fas fa-chevron-down';
+        text.textContent = `Ver todos os ${totalFavorites} favoritos`;
+
+        // Scroll suave para a seção de favoritos
+        const favSection = document.getElementById('favorites-section');
+        if (favSection) {
+            favSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } else {
+        // Expandir
+        extraFavorites.forEach(item => {
+            item.style.display = 'flex';
+        });
+        button.classList.add('expanded');
+        icon.className = 'fas fa-chevron-up';
+        text.textContent = 'Ver menos';
+    }
+};
+
 // Inicializar quando a página carregar
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeProfilePage);

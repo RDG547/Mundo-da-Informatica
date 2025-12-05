@@ -56,7 +56,7 @@
                     <span>{{ post.category_str }}</span>
                 </div>
                 <div class="post-content">
-                    <h3>{{ post.title }}</h3>
+                    <h3><a href="{{ post_url(post) }}" style="text-decoration: none; color: inherit;">{{ post.title }}</a></h3>
                     <div class="post-meta">
                         <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
                         <span><i class="far fa-eye"></i> {{ post.views }}</span>
@@ -81,6 +81,56 @@
                 </div>
             </div>
             {% endfor %}
+        </div>
+
+        <!-- Pagination for Recent Posts -->
+        {% if posts_pagination and posts_pagination.pages > 1 %}
+        <div class="pagination-wrapper" style="margin-top: 2rem;">
+            <nav aria-label="Navegação de posts recentes">
+                <ul class="pagination justify-content-center">
+                    {% if posts_pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('home', page=posts_pagination.prev_num) }}" aria-label="Anterior">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num != posts_pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('home', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if posts_pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('home', page=posts_pagination.next_num) }}" aria-label="Próxima">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        <!-- Ver Mais Button -->
+        <div class="categories-view-more">
+            <a href="{{ url_for('posts') }}" class="btn-view-more">
+                <i class="fas fa-th-large"></i> Ver Todos os Posts
+            </a>
         </div>
     </div>
 </section>

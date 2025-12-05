@@ -215,6 +215,7 @@ class DynamicLoader {
             if (isAdminPage) {
                 // Instant update for admin
                 mainContainer.innerHTML = pageData.content.innerHTML;
+                this.loadPageScripts(pageData.scripts);
                 this.reinitializeComponents();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
@@ -223,16 +224,37 @@ class DynamicLoader {
 
                 setTimeout(() => {
                     mainContainer.innerHTML = pageData.content.innerHTML;
-                    this.reinitializeComponents();
                     this.loadPageScripts(pageData.scripts);
+                    // Wait a bit for scripts to load before reinitializing
+                    setTimeout(() => {
+                        this.reinitializeComponents();
+                    }, 200);
                     mainContainer.style.opacity = '1';
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }, 150);
             }
         }
 
+        // Handle footer visibility based on page
+        this.handleFooterVisibility(url);
+
         // Update active navigation
         this.updateActiveNavigation(url);
+    }
+
+    handleFooterVisibility(url) {
+        const path = new URL(url, window.location.origin).pathname;
+        const footer = document.querySelector('footer') || document.querySelector('.footer');
+
+        if (footer) {
+            if (path.startsWith('/profile')) {
+                // Hide footer on profile page
+                footer.style.display = 'none';
+            } else {
+                // Show footer on other pages
+                footer.style.display = '';
+            }
+        }
     }
 
     reinitializeComponents() {
@@ -382,7 +404,18 @@ class DynamicLoader {
             if (scriptElement.src && !document.querySelector(`script[src="${scriptElement.src}"]`)) {
                 const script = document.createElement('script');
                 script.src = scriptElement.src;
+                script.async = true; // Load asynchronously
                 script.setAttribute('data-dynamic-js', 'true');
+
+                // Add load listener for debugging
+                script.onload = () => {
+                    console.log('Script loaded:', scriptElement.src);
+                };
+
+                script.onerror = () => {
+                    console.error('Failed to load script:', scriptElement.src);
+                };
+
                 document.head.appendChild(script);
             }
         });

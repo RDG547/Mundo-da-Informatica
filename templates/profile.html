@@ -1,8 +1,17 @@
 {% extends "base.html" %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<!-- Garantir carregamento do CSS admin para sidebar -->
+<style>
+    /* Garantir que sidebar seja carregada corretamente */
+    .profile-admin-sidebar {
+        background: linear-gradient(145deg, #161923, #1d2028) !important;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3) !important;
+    }
+    .admin-nav-item {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -11,11 +20,21 @@
 {% endblock %}
 
 {% block content %}
-<!-- Enhanced Profile Header -->
-<div class="profile-header" data-page="profile">
-    <div class="container">
-        <div class="profile-content text-center">
-            <div class="profile-avatar-wrapper">
+{% if current_user.id == user.id %}
+<!-- Hidden form for profile image upload -->
+<form id="profile-image-form" action="{{ url_for('update_profile_image') }}" method="post" enctype="multipart/form-data"
+    style="display: none;">
+    <input type="file" id="profile-image-input" name="profile_image" accept="image/jpeg,image/png,image/gif">
+</form>
+{% endif %}
+
+<!-- Profile Layout with Admin-Style Sidebar -->
+<div class="profile-layout-container">
+    <!-- Admin-Style Sidebar -->
+    <aside class="profile-admin-sidebar">
+        <!-- Profile Header Section -->
+        <div class="sidebar-profile-header">
+            <div class="profile-avatar-wrapper-sidebar">
                 <div class="profile-avatar-large">
                     <img src="{{ url_for('static', filename='uploads/profiles/' + (user.profile_image or 'default_profile.jpg')) }}"
                         alt="{{ user.get_full_name() or user.username }}"
@@ -52,114 +71,106 @@
                 {% endif %}
             </div>
 
-            <h1 class="profile-title">{{ user.get_full_name() or user.username }}</h1>
-            <p class="profile-subtitle">@{{ user.username }}</p>
+            <h1 class="sidebar-profile-title">{{ user.get_full_name() or user.username }}</h1>
+            <p class="sidebar-profile-subtitle">@{{ user.username }}</p>
 
             {% if user.bio %}
-            <p class="profile-bio">{{ user.bio }}</p>
+            <p class="sidebar-profile-bio">{{ user.bio }}</p>
             {% endif %}
 
-            <div class="profile-badges">
+            <div class="sidebar-profile-badges">
                 <!-- Plan Badge -->
                 {% if user.plan == 'vip' %}
-                <span class="profile-badge badge-vip" style="background: #ff006e; color: white; border: none;">
+                <span class="profile-badge badge-vip">
                     <i class="fas fa-crown"></i> VIP
                 </span>
                 {% elif user.plan == 'premium' %}
-                <span class="profile-badge badge-premium" style="background: #667eea; color: white; border: none;">
+                <span class="profile-badge badge-premium">
                     <i class="fas fa-star"></i> Premium
                 </span>
                 {% else %}
-                <span class="profile-badge badge-free" style="background: #718096; color: white; border: none;">
+                <span class="profile-badge badge-free">
                     <i class="fas fa-user"></i> Grátis
                 </span>
                 {% endif %}
 
                 {% if user.is_verified %}
-                <span class="profile-badge">
+                <span class="profile-badge badge-verified">
                     <i class="fas fa-check-circle"></i> Verificado
                 </span>
                 {% endif %}
             </div>
+        </div>
 
-            {% if current_user.id == user.id %}
-            <div class="profile-actions">
-                <button type="button" class="btn btn-gradient primary" onclick="openEditModal()">
-                    <i class="fas fa-edit"></i> Editar Perfil
-                </button>
-                <button type="button" class="btn btn-gradient"
-                    style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white;"
-                    onclick="openPasswordModal()">
-                    <i class="fas fa-key"></i> Alterar Senha
-                </button>
-                {% if current_user.is_admin() %}
-                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-gradient secondary">
-                    <i class="fas fa-tachometer-alt"></i> Painel Admin
+        <div class="admin-nav">
+            <div class="nav-section">
+                <h5 class="nav-section-title">PRINCIPAL</h5>
+
+                <a href="{{ url_for('home') }}" class="admin-nav-item">
+                    <i class="fas fa-home admin-icon"></i>
+                    <span class="admin-nav-text">Dashboard</span>
+                </a>
+
+                <a href="#favorites-section" class="admin-nav-item" onclick="event.preventDefault(); document.getElementById('favorites-section')?.scrollIntoView({behavior: 'smooth'});">
+                    <i class="fas fa-star admin-icon"></i>
+                    <span class="admin-nav-text">Favoritos</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <h5 class="nav-section-title">GERENCIAMENTO</h5>
+
+                <a href="{{ url_for('posts') }}" class="admin-nav-item">
+                    <i class="fas fa-file-alt admin-icon"></i>
+                    <span class="admin-nav-text">Posts</span>
+                    <span class="nav-badge">{{ user_posts }}</span>
+                </a>
+
+                <a href="{{ url_for('all_categories') }}" class="admin-nav-item">
+                    <i class="fas fa-folder admin-icon"></i>
+                    <span class="admin-nav-text">Categorias</span>
+                    <span class="nav-badge">{{ category_count }}</span>
+                </a>
+
+                {% if current_user.id == user.id %}
+                <a href="#" class="admin-nav-item" onclick="openEditModal(); return false;">
+                    <i class="fas fa-user-edit admin-icon"></i>
+                    <span class="admin-nav-text">Editar Perfil</span>
                 </a>
                 {% endif %}
             </div>
+
+            {% if current_user.id == user.id %}
+            <div class="nav-section">
+                <h5 class="nav-section-title">CONFIGURAÇÕES</h5>
+
+                <a href="#" class="admin-nav-item" onclick="openPasswordModal(); return false;">
+                    <i class="fas fa-key admin-icon"></i>
+                    <span class="admin-nav-text">Alterar Senha</span>
+                </a>
+
+                {% if current_user.is_admin() %}
+                <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-item">
+                    <i class="fas fa-tachometer-alt admin-icon"></i>
+                    <span class="admin-nav-text">Painel Admin</span>
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('logout') }}" class="admin-nav-item">
+                    <i class="fas fa-sign-out-alt admin-icon"></i>
+                    <span class="admin-nav-text">Sair</span>
+                </a>
+            </div>
             {% endif %}
         </div>
-    </div>
-</div>
+    </aside>
 
-{% if current_user.id == user.id %}
-<!-- Hidden form for profile image upload -->
-<form id="profile-image-form" action="{{ url_for('update_profile_image') }}" method="post" enctype="multipart/form-data"
-    style="display: none;">
-    <input type="file" id="profile-image-input" name="profile_image" accept="image/jpeg,image/png,image/gif">
-</form>
-{% endif %}
-
-<!-- Enhanced Profile Main -->
-<div class="profile-main" data-page="profile">
-    <div class="container">
-        <div class="row">
-            <!-- Quick Actions (Full Width Top Section) -->
-            <div class="col-12 mb-4">
-                <div class="profile-card">
-                    <div class="profile-card-header">
-                        <div class="profile-card-icon">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <div>
-                            <h2 class="profile-card-title">Ações Rápidas</h2>
-                            <p class="profile-card-subtitle">Funcionalidades e navegação</p>
-                        </div>
-                    </div>
-                    <div class="quick-actions-grid">
-                        {% if current_user.id == user.id %}
-                        <button class="quick-action-btn" onclick="openEditModal()">
-                            <i class="fas fa-edit"></i>
-                            <span>Editar Perfil</span>
-                        </button>
-                        <button class="quick-action-btn" onclick="openPasswordModal()">
-                            <i class="fas fa-key"></i>
-                            <span>Alterar Senha</span>
-                        </button>
-                        {% if current_user.is_admin() %}
-                        <a href="{{ url_for('admin_dashboard') }}" class="quick-action-btn">
-                            <i class="fas fa-tachometer-alt"></i>
-                            <span>Painel Admin</span>
-                        </a>
-                        {% endif %}
-                        {% endif %}
-                        <a href="{{ url_for('home') }}" class="quick-action-btn">
-                            <i class="fas fa-home"></i>
-                            <span>Página Inicial</span>
-                        </a>
-                        <a href="{{ url_for('posts') }}" class="quick-action-btn">
-                            <i class="fas fa-file-alt"></i>
-                            <span>Ver Posts</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Favorites Section (moved from sidebar) -->
-            {% if current_user.id == user.id and favorite_posts %}
-            <div class="col-12 mb-4">
-                <div class="profile-card" id="favorites-section">
+    <!-- Main Content Area -->
+    <div class="profile-main-content">
+        <div class="container">
+                <!-- Favorites Section -->
+                {% if current_user.id == user.id and favorite_posts %}
+                <div class="profile-card mb-4" id="favorites-section">
                     <div class="profile-card-header">
                         <div class="profile-card-icon">
                             <i class="fas fa-star"></i>
@@ -170,9 +181,9 @@
                         </div>
                     </div>
                     <div class="posts-grid" style="margin-top: 1.5rem;">
-                        <div class="row">
+                        <div class="row" id="favorites-container">
                             {% for post in favorite_posts[:6] %}
-                            <div class="col-md-6 col-lg-4 mb-2">
+                            <div class="col-md-6 col-lg-4 mb-3 favorite-post-item">
                                 <div class="post-card" style="position: relative;">
                                     <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
                                         title="Remover dos favoritos">
@@ -233,18 +244,83 @@
                                 </div>
                             </div>
                             {% endfor %}
+                            {% if favorite_posts|length > 6 %}
+                            {% for post in favorite_posts[6:] %}
+                            <div class="col-md-6 col-lg-4 mb-3 favorite-post-item extra-favorites" style="display: none;">
+                                <div class="post-card" style="position: relative;">
+                                    <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
+                                        title="Remover dos favoritos">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    <div class="category-badge-left">
+                                        <i class="fas fa-tag"></i> {{ post.category_str or 'Geral' }}
+                                    </div>
+                                    <div class="post-image">
+                                        {% if post.image_url %}
+                                        <img src="{{ url_for('static', filename='images/' + post.image_url) }}"
+                                            alt="{{ post.title }}" class="img-fluid">
+                                        {% else %}
+                                        <div class="post-placeholder">
+                                            <i class="fas fa-file-alt"></i>
+                                        </div>
+                                        {% endif %}
+                                        {% if post.featured %}
+                                        <div class="featured-badge">
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="post-content">
+                                        <h3 class="post-title">
+                                            <a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a>
+                                        </h3>
+                                        <p class="post-excerpt">{{ (post.content|striptags)[:150] }}{% if
+                                            (post.content|striptags)|length > 150 %}...{% endif %}</p>
+                                        <div class="post-meta">
+                                            <span class="post-date">
+                                                <i class="fas fa-calendar"></i>
+                                                {{ post.date_posted.strftime('%d/%m/%Y') }}
+                                            </span>
+                                            <span class="post-views">
+                                                <i class="fas fa-eye"></i>
+                                                {{ post.views }}
+                                            </span>
+                                            {% if post.downloads %}
+                                            <span class="post-downloads">
+                                                <i class="fas fa-download"></i>
+                                                {{ post.downloads }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="post-actions">
+                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-primary">
+                                                <i class="fas fa-eye"></i> Ver Post
+                                            </a>
+                                            {% if post.download_link %}
+                                            <a href="{{ url_for('download_post', post_id=post.id) }}"
+                                                class="btn btn-success">
+                                                <i class="fas fa-download"></i> Download
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
                     {% if favorite_posts|length > 6 %}
-                    <div class="profile-card-footer">
-                        <p class="text-muted">E mais {{ favorite_posts|length - 6 }} favorito(s)</p>
+                    <div class="profile-card-footer" style="text-align: center; padding: 1.5rem;">
+                        <button type="button" class="btn btn-gradient primary" onclick="toggleAllFavorites(this)">
+                            <i class="fas fa-chevron-down"></i>
+                            <span class="toggle-text">Ver todos os {{ favorite_posts|length }} favoritos</span>
+                        </button>
                     </div>
                     {% endif %}
                 </div>
-            </div>
-            {% elif current_user.id == user.id %}
-            <div class="col-12 mb-4">
-                <div class="profile-card" id="favorites-section">
+                {% elif current_user.id == user.id %}
+                <div class="profile-card mb-4" id="favorites-section">
                     <div class="profile-card-header">
                         <div class="profile-card-icon">
                             <i class="fas fa-star"></i>
@@ -260,10 +336,8 @@
                         <p class="text-muted">Clique no ícone de estrela nos posts para adicioná-los aos favoritos!</p>
                     </div>
                 </div>
-            </div>
-            {% endif %}
+                {% endif %}
 
-            <div class="col-lg-8">
                 <!-- Enhanced Stats Section -->
                 <div class="profile-card">
                     <div class="profile-card-header">
@@ -480,64 +554,9 @@
                     </div>
                 </div>
                 {% endif %}
-            </div>
-
-            <!-- Profile Sidebar -->
-            <div class="col-lg-4">
-                <!-- Activity Summary -->
-                <div class="profile-card">
-                    <div class="profile-card-header">
-                        <div class="profile-card-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div>
-                            <h2 class="profile-card-title">Resumo de Atividade</h2>
-                            <p class="profile-card-subtitle">Últimas ações no sistema</p>
-                        </div>
-                    </div>
-                    <div class="activity-summary">
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="fas fa-user-plus"></i>
-                            </div>
-                            <div class="activity-content">
-                                <span class="activity-label">Cadastro realizado</span>
-                                <span class="activity-date">{{ user.date_joined.strftime('%d/%m/%Y') if user.date_joined
-                                    else 'N/A' }}</span>
-                            </div>
-                        </div>
-                        {% if user_posts > 0 %}
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="fas fa-file-alt"></i>
-                            </div>
-                            <div class="activity-content">
-                                <span class="activity-label">{{ user_posts }} posts publicados</span>
-                                <span class="activity-date">Contribuições ativas</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% if user_comments > 0 %}
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="fas fa-comments"></i>
-                            </div>
-                            <div class="activity-content">
-                                <span class="activity-label">{{ user_comments }} comentários</span>
-                                <span class="activity-date">Participação ativa</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-
-
-            </div>
         </div>
     </div>
 </div>
-
 
 <!-- Edit Profile Modal -->
 {% if current_user.id == user.id %}

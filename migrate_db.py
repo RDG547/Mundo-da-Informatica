@@ -13,17 +13,29 @@ def migrate():
     cursor = conn.cursor()
 
     try:
-        # Check if column exists
+        # Check if columns exist
         cursor.execute("PRAGMA table_info(user)")
         columns = [info[1] for info in cursor.fetchall()]
+
+        migrations_applied = False
 
         if 'subscription_end_date' not in columns:
             print("Adding subscription_end_date column...")
             cursor.execute("ALTER TABLE user ADD COLUMN subscription_end_date DATETIME")
+            migrations_applied = True
+            print("✓ subscription_end_date column added")
+
+        if 'active_sessions' not in columns:
+            print("Adding active_sessions column...")
+            cursor.execute("ALTER TABLE user ADD COLUMN active_sessions INTEGER DEFAULT 0")
+            migrations_applied = True
+            print("✓ active_sessions column added")
+
+        if migrations_applied:
             conn.commit()
-            print("Migration successful!")
+            print("\n✅ All migrations completed successfully!")
         else:
-            print("Column subscription_end_date already exists.")
+            print("✓ All columns already exist. No migrations needed.")
 
     except Exception as e:
         print(f"An error occurred: {e}")

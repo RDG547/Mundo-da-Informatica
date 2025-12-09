@@ -1540,19 +1540,19 @@ def check_download_limit(user):
         # Encontrar a última segunda-feira às 9h
         days_since_monday = (now_brasilia.weekday()) % 7  # 0 = segunda
         last_monday = now_brasilia.replace(hour=9, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
-        
+
         # Se ainda não passou das 9h da segunda atual, voltar para segunda anterior
         if now_brasilia < last_monday:
             last_monday -= timedelta(days=7)
-        
+
         # Converter para UTC para comparação no banco
         last_monday_utc = last_monday.astimezone(timezone('UTC')).replace(tzinfo=None)
-        
+
         count = Download.query.filter(
             Download.user_id == user.id,
             Download.timestamp >= last_monday_utc
         ).count()
-        
+
         if count >= 15:
             # Calcular próxima segunda às 9h
             days_until_monday = (7 - now_brasilia.weekday()) % 7
@@ -1564,21 +1564,21 @@ def check_download_limit(user):
 
     # Plano Grátis: 1 download por dia - Reset todo dia às 9h
     today_9am = now_brasilia.replace(hour=9, minute=0, second=0, microsecond=0)
-    
+
     # Se ainda não passou das 9h hoje, considerar o reset de ontem às 9h
     if now_brasilia < today_9am:
         last_reset = today_9am - timedelta(days=1)
     else:
         last_reset = today_9am
-    
+
     # Converter para UTC para comparação no banco
     last_reset_utc = last_reset.astimezone(timezone('UTC')).replace(tzinfo=None)
-    
+
     count = Download.query.filter(
         Download.user_id == user.id,
         Download.timestamp >= last_reset_utc
     ).count()
-    
+
     if count >= 1:
         # Calcular próximo reset
         if now_brasilia < today_9am:
@@ -1586,7 +1586,7 @@ def check_download_limit(user):
         else:
             next_reset = today_9am + timedelta(days=1)
         return False, f"Você atingiu seu limite de 1 download diário. Próximo reset: {next_reset.strftime('%d/%m/%Y às %H:%M')}. Faça upgrade para Premium (15/semana) ou VIP (ilimitado)."
-    
+
     return True, "Download autorizado."
 
 @app.route('/download/<int:post_id>')
@@ -2382,7 +2382,7 @@ def contact():
     if current_user.is_authenticated and current_user.plan == 'free':
         flash('O formulário de contato está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
         return redirect(url_for('plans'))
-    
+
     if request.method == 'POST':
         name = request.form.get('name')
         email = request.form.get('email')
@@ -5426,7 +5426,11 @@ def profile(user_id=None):
     if hasattr(user, 'id') and current_user.is_authenticated and current_user.id == user.id:
         has_access, limit = check_download_history_access(user)
         if has_access:
-            query = Download.query.filter_by(user_id=user.id).order_by(Download.timestamp.desc())
+            # Fazer join com Post e Category para carregar os relacionamentos
+            query = Download.query.filter_by(user_id=user.id)\
+                .join(Post, Download.post_id == Post.id)\
+                .join(Category, Post.category_id == Category.id)\
+                .order_by(Download.timestamp.desc())
             if limit:
                 # Premium: últimos 5 downloads
                 download_history = query.limit(limit).all()

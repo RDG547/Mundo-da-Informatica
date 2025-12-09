@@ -220,29 +220,18 @@ class DynamicLoader {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 // Smooth transition for public pages
-                mainContainer.style.transition = 'opacity 0.4s ease-in-out, transform 0.4s ease-in-out';
                 mainContainer.style.opacity = '0';
-                mainContainer.style.transform = 'translateY(20px)';
 
                 setTimeout(() => {
-                    // Scroll to top first
-                    window.scrollTo({ top: 0, behavior: 'instant' });
-                    
-                    // Update content
                     mainContainer.innerHTML = pageData.content.innerHTML;
                     this.loadPageScripts(pageData.scripts);
-                    
-                    // Fade in with slight delay
+                    // Wait a bit for scripts to load before reinitializing
                     setTimeout(() => {
-                        mainContainer.style.opacity = '1';
-                        mainContainer.style.transform = 'translateY(0)';
-                        
-                        // Reinitialize after fade in starts
-                        setTimeout(() => {
-                            this.reinitializeComponents();
-                        }, 200);
-                    }, 50);
-                }, 350);
+                        this.reinitializeComponents();
+                    }, 200);
+                    mainContainer.style.opacity = '1';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }, 150);
             }
         }
 
@@ -705,16 +694,14 @@ class DynamicLoader {
     showLoading() {
         const loader = document.getElementById('dynamic-loader');
         if (loader) {
-            loader.classList.add('active');
+            loader.style.display = 'flex';
         }
     }
 
     hideLoading() {
         const loader = document.getElementById('dynamic-loader');
         if (loader) {
-            setTimeout(() => {
-                loader.classList.remove('active');
-            }, 200);
+            loader.style.display = 'none';
         }
     }
 

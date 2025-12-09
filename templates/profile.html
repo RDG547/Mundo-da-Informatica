@@ -72,13 +72,13 @@
             </div>
 
             <h1 class="sidebar-profile-title">
-                {{ user.get_full_name() or user.username }}
+                {{ user.get_full_name() or user.username }} 
                 {% if user.plan == 'vip' %}
-                <span style="font-size: 0.6em; color: #ffd700; font-weight: 600;">(VIP)</span>
+                (VIP)
                 {% elif user.plan == 'premium' %}
-                <span style="font-size: 0.6em; color: #667eea; font-weight: 600;">(Premium)</span>
+                (Premium)
                 {% else %}
-                <span style="font-size: 0.6em; color: #888; font-weight: 600;">(Grátis)</span>
+                (Grátis)
                 {% endif %}
             </h1>
             <p class="sidebar-profile-subtitle">@{{ user.username }}</p>

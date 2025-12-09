@@ -1529,21 +1529,64 @@ def check_download_limit(user):
     if user.plan == 'vip':
         return True, "Downloads ilimitados no plano VIP."
 
-    now = datetime.utcnow()
+    # Converter para horário de Brasília (UTC-3)
+    from pytz import timezone
+    brasilia_tz = timezone('America/Sao_Paulo')
+    now_utc = datetime.utcnow().replace(tzinfo=timezone('UTC'))
+    now_brasilia = now_utc.astimezone(brasilia_tz)
 
     if user.plan == 'premium':
-        # 15 downloads semanais
-        one_week_ago = now - timedelta(days=7)
-        count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_week_ago).count()
+        # 15 downloads semanais - Reset toda segunda às 9h
+        # Encontrar a última segunda-feira às 9h
+        days_since_monday = (now_brasilia.weekday()) % 7  # 0 = segunda
+        last_monday = now_brasilia.replace(hour=9, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
+        
+        # Se ainda não passou das 9h da segunda atual, voltar para segunda anterior
+        if now_brasilia < last_monday:
+            last_monday -= timedelta(days=7)
+        
+        # Converter para UTC para comparação no banco
+        last_monday_utc = last_monday.astimezone(timezone('UTC')).replace(tzinfo=None)
+        
+        count = Download.query.filter(
+            Download.user_id == user.id,
+            Download.timestamp >= last_monday_utc
+        ).count()
+        
         if count >= 15:
-            return False, "Você atingiu seu limite de 15 downloads semanais. Faça upgrade para VIP para downloads ilimitados."
+            # Calcular próxima segunda às 9h
+            days_until_monday = (7 - now_brasilia.weekday()) % 7
+            if days_until_monday == 0:
+                days_until_monday = 7
+            next_reset = (now_brasilia + timedelta(days=days_until_monday)).replace(hour=9, minute=0, second=0, microsecond=0)
+            return False, f"Você atingiu seu limite de 15 downloads semanais. Próximo reset: {next_reset.strftime('%d/%m/%Y às %H:%M')}. Faça upgrade para VIP para downloads ilimitados."
         return True, f"Download autorizado. Você tem {15 - count} downloads restantes esta semana."
 
-    # Plano Grátis: 1 download por dia
-    one_day_ago = now - timedelta(days=1)
-    count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_day_ago).count()
+    # Plano Grátis: 1 download por dia - Reset todo dia às 9h
+    today_9am = now_brasilia.replace(hour=9, minute=0, second=0, microsecond=0)
+    
+    # Se ainda não passou das 9h hoje, considerar o reset de ontem às 9h
+    if now_brasilia < today_9am:
+        last_reset = today_9am - timedelta(days=1)
+    else:
+        last_reset = today_9am
+    
+    # Converter para UTC para comparação no banco
+    last_reset_utc = last_reset.astimezone(timezone('UTC')).replace(tzinfo=None)
+    
+    count = Download.query.filter(
+        Download.user_id == user.id,
+        Download.timestamp >= last_reset_utc
+    ).count()
+    
     if count >= 1:
-        return False, "Você atingiu seu limite de 1 download diário. Faça upgrade para Premium (15/semana) ou VIP (ilimitado)."
+        # Calcular próximo reset
+        if now_brasilia < today_9am:
+            next_reset = today_9am
+        else:
+            next_reset = today_9am + timedelta(days=1)
+        return False, f"Você atingiu seu limite de 1 download diário. Próximo reset: {next_reset.strftime('%d/%m/%Y às %H:%M')}. Faça upgrade para Premium (15/semana) ou VIP (ilimitado)."
+    
     return True, "Download autorizado."
 
 @app.route('/download/<int:post_id>')

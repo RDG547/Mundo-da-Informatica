@@ -220,18 +220,29 @@ class DynamicLoader {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 // Smooth transition for public pages
+                mainContainer.style.transition = 'opacity 0.4s ease-in-out, transform 0.4s ease-in-out';
                 mainContainer.style.opacity = '0';
+                mainContainer.style.transform = 'translateY(20px)';
 
                 setTimeout(() => {
+                    // Scroll to top first
+                    window.scrollTo({ top: 0, behavior: 'instant' });
+                    
+                    // Update content
                     mainContainer.innerHTML = pageData.content.innerHTML;
                     this.loadPageScripts(pageData.scripts);
-                    // Wait a bit for scripts to load before reinitializing
+                    
+                    // Fade in with slight delay
                     setTimeout(() => {
-                        this.reinitializeComponents();
-                    }, 200);
-                    mainContainer.style.opacity = '1';
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }, 150);
+                        mainContainer.style.opacity = '1';
+                        mainContainer.style.transform = 'translateY(0)';
+                        
+                        // Reinitialize after fade in starts
+                        setTimeout(() => {
+                            this.reinitializeComponents();
+                        }, 200);
+                    }, 50);
+                }, 350);
             }
         }
 
@@ -694,14 +705,16 @@ class DynamicLoader {
     showLoading() {
         const loader = document.getElementById('dynamic-loader');
         if (loader) {
-            loader.style.display = 'flex';
+            loader.classList.add('active');
         }
     }
 
     hideLoading() {
         const loader = document.getElementById('dynamic-loader');
         if (loader) {
-            loader.style.display = 'none';
+            setTimeout(() => {
+                loader.classList.remove('active');
+            }, 200);
         }
     }
 

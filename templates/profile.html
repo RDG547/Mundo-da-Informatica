@@ -71,35 +71,21 @@
                 {% endif %}
             </div>
 
-            <h1 class="sidebar-profile-title">{{ user.get_full_name() or user.username }}</h1>
+            <h1 class="sidebar-profile-title">
+                {{ user.get_full_name() or user.username }}
+                {% if user.plan == 'vip' %}
+                <span style="font-size: 0.6em; color: #ffd700; font-weight: 600;">(VIP)</span>
+                {% elif user.plan == 'premium' %}
+                <span style="font-size: 0.6em; color: #667eea; font-weight: 600;">(Premium)</span>
+                {% else %}
+                <span style="font-size: 0.6em; color: #888; font-weight: 600;">(Grátis)</span>
+                {% endif %}
+            </h1>
             <p class="sidebar-profile-subtitle">@{{ user.username }}</p>
 
             {% if user.bio %}
             <p class="sidebar-profile-bio">{{ user.bio }}</p>
             {% endif %}
-
-            <div class="sidebar-profile-badges">
-                <!-- Plan Badge -->
-                {% if user.plan == 'vip' %}
-                <span class="profile-badge badge-vip">
-                    <i class="fas fa-crown"></i> VIP
-                </span>
-                {% elif user.plan == 'premium' %}
-                <span class="profile-badge badge-premium">
-                    <i class="fas fa-star"></i> Premium
-                </span>
-                {% else %}
-                <span class="profile-badge badge-free">
-                    <i class="fas fa-user"></i> Grátis
-                </span>
-                {% endif %}
-
-                {% if user.is_verified %}
-                <span class="profile-badge badge-verified">
-                    <i class="fas fa-check-circle"></i> Verificado
-                </span>
-                {% endif %}
-            </div>
         </div>
 
         <div class="admin-nav">

@@ -3,7 +3,7 @@ services:
     name: mundodainformatica
     runtime: python
     buildCommand: |
-      pip install -r requirements.txt && 
+      pip install -r requirements.txt &&
       mkdir -p /opt/render/project/src/data/images/posts /opt/render/project/src/data/images/profiles /opt/render/project/src/data/images/admin /opt/render/project/src/data/uploads/profiles &&
       ln -sfn /opt/render/project/src/data /opt/render/project/src/instance &&
       ln -sfn /opt/render/project/src/data/images /opt/render/project/src/static/images &&

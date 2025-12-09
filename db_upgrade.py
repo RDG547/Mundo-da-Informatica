@@ -1,7 +1,5 @@
 # Script para migração de banco de dados
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate, MigrateCommand
+from flask_migrate import Migrate
 import sys
 import os
 

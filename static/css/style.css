@@ -222,12 +222,15 @@ section {
 .btn-outline {
     background-color: transparent;
     border: 2px solid var(--primary-color);
-    color: var(--primary-color);
+    color: var(--primary-color) !important;
+    transition: all 0.3s ease;
 }
 
 .btn-outline:hover {
     background-color: var(--primary-color);
     color: white !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
 }
 
 /* Botões Favoritos nos Cards */

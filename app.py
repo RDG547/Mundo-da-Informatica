@@ -2378,6 +2378,11 @@ def privacy_policy():
 
 @app.route('/contato', methods=['GET', 'POST'])
 def contact():
+    # Bloquear acesso para plano gratuito
+    if current_user.is_authenticated and current_user.plan == 'free':
+        flash('O formulário de contato está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
+        return redirect(url_for('plans'))
+    
     if request.method == 'POST':
         name = request.form.get('name')
         email = request.form.get('email')
@@ -5416,6 +5421,19 @@ def profile(user_id=None):
         favorites = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.date_added.desc()).all()
         favorite_posts = [fav.post for fav in favorites if fav.post and fav.post.is_active]
 
+    # Buscar histórico de downloads baseado no plano
+    download_history = []
+    if hasattr(user, 'id') and current_user.is_authenticated and current_user.id == user.id:
+        has_access, limit = check_download_history_access(user)
+        if has_access:
+            query = Download.query.filter_by(user_id=user.id).order_by(Download.timestamp.desc())
+            if limit:
+                # Premium: últimos 5 downloads
+                download_history = query.limit(limit).all()
+            else:
+                # VIP: todos os downloads
+                download_history = query.all()
+
     # Calcular dias como membro
     days_as_member = 0
     if user.date_joined:
@@ -5429,7 +5447,8 @@ def profile(user_id=None):
                          user_comments=user_comments,
                          category_count=category_count,
                          days_as_member=days_as_member,
-                         favorite_posts=favorite_posts)
+                         favorite_posts=favorite_posts,
+                         download_history=download_history)
 
 # Rota de logout
 @app.route('/logout')

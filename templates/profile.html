@@ -74,11 +74,11 @@
             <h1 class="sidebar-profile-title">
                 {{ user.get_full_name() or user.username }}
                 {% if user.plan == 'vip' %}
-                <span style="color: #ff006e;"><i class="fas fa-crown"></i> (VIP)</span>
+                <span style="color: #ff006e;"><i class="fas fa-crown"></i> VIP</span>
                 {% elif user.plan == 'premium' %}
-                <span style="color: #667eea;"><i class="fas fa-star"></i> (Premium)</span>
+                <span style="color: #667eea;"><i class="fas fa-star"></i> Premium</span>
                 {% else %}
-                <span style="color: #718096;"><i class="fas fa-user"></i> (Grátis)</span>
+                <span style="color: #718096;"><i class="fas fa-user"></i> Grátis</span>
                 {% endif %}
             </h1>
             <p class="sidebar-profile-subtitle">@{{ user.username }}</p>
@@ -101,6 +101,16 @@
                     <i class="fas fa-star admin-icon"></i>
                     <span class="admin-nav-text">Favoritos</span>
                 </a>
+
+                {% if current_user.plan in ['premium', 'vip'] %}
+                <a href="#downloads-section" class="admin-nav-item" onclick="event.preventDefault(); document.getElementById('downloads-section')?.scrollIntoView({behavior: 'smooth'});">
+                    <i class="fas fa-download admin-icon"></i>
+                    <span class="admin-nav-text">Histórico de Downloads</span>
+                    {% if current_user.plan == 'premium' %}
+                    <span class="nav-badge" style="background: #667eea;">5</span>
+                    {% endif %}
+                </a>
+                {% endif %}
             </div>
 
             <div class="nav-section">
@@ -321,6 +331,63 @@
                         <p>Você ainda não tem posts favoritos.</p>
                         <p class="text-muted">Clique no ícone de estrela nos posts para adicioná-los aos favoritos!</p>
                     </div>
+                </div>
+                {% endif %}
+
+                <!-- Downloads History Section -->
+                {% if current_user.id == user.id and current_user.plan in ['premium', 'vip'] %}
+                <div class="profile-card mb-4" id="downloads-section">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <div>
+                            <h2 class="profile-card-title">Histórico de Downloads</h2>
+                            <p class="profile-card-subtitle">
+                                {% if current_user.plan == 'premium' %}
+                                Seus últimos 5 downloads
+                                {% else %}
+                                Histórico completo de downloads
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% if download_history and download_history|length > 0 %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Post</th>
+                                    <th>Data</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for download in download_history %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('post', category=download.post.category.slug, slug=download.post.slug) }}" style="color: var(--primary-color); text-decoration: none;">
+                                            {{ download.post.title }}
+                                        </a>
+                                    </td>
+                                    <td>{{ download.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ download.post.download_link }}" class="btn btn-sm btn-gradient primary" target="_blank">
+                                            <i class="fas fa-download"></i> Baixar Novamente
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-download" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem;"></i>
+                        <p>Você ainda não fez nenhum download.</p>
+                        <p class="text-muted">Explore os posts e faça downloads para ver seu histórico aqui!</p>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -668,7 +735,7 @@
 
             <div class="modal-footer" style="justify-content: center;">
                 <button type="button" class="btn btn-outline" onclick="closeEditModal()"
-                    style="background-color: #dc3545; color: white; border-color: #dc3545;">
+                    style="background-color: #dc3545; color: white !important; border-color: #dc3545;">
                     <i class="fas fa-times"></i> Cancelar
                 </button>
                 <button type="submit" class="btn btn-gradient primary">
@@ -721,7 +788,7 @@
 
             <div class="modal-footer" style="display: flex; justify-content: center; gap: 15px;">
                 <button type="button" class="btn btn-outline" onclick="closePasswordModal()"
-                    style="background-color: #dc3545; color: white; border-color: #dc3545;">
+                    style="background-color: #dc3545; color: white !important; border-color: #dc3545;">
                     <i class="fas fa-times"></i> Cancelar
                 </button>
                 <button type="submit" class="btn btn-gradient primary">
@@ -750,7 +817,7 @@
             <p class="text-muted" style="font-size: 0.9rem;">Esta ação não pode ser desfeita.</p>
         </div>
         <div class="modal-footer" style="justify-content: center; gap: 15px;">
-            <button class="btn btn-outline" onclick="closeRemoveImageModal()">
+            <button class="btn btn-outline" onclick="closeRemoveImageModal()" style="color: white !important;">
                 <i class="fas fa-times"></i> Cancelar
             </button>
             <form action="{{ url_for('remove_profile_image') }}" method="post" style="display: inline;">

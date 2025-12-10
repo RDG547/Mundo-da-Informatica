@@ -89,7 +89,7 @@ class DynamicLoader {
 
         // Don't intercept download links
         if (link.download) return false;
-        
+
         // DON'T INTERCEPT DOWNLOAD ROUTES - handled by download-control.js
         if (link.href.includes('/download/')) return false;
 
@@ -187,7 +187,9 @@ class DynamicLoader {
             title: doc.title,
             content: content,
             scripts: Array.from(doc.querySelectorAll('script[src]')),
-            styles: Array.from(doc.querySelectorAll('link[rel="stylesheet"]'))
+            inlineScripts: Array.from(doc.querySelectorAll('script:not([src])')),
+            styles: Array.from(doc.querySelectorAll('link[rel="stylesheet"]')),
+            inlineStyles: Array.from(doc.querySelectorAll('style'))
         };
     }
 
@@ -219,6 +221,9 @@ class DynamicLoader {
                 // Instant update for admin
                 mainContainer.innerHTML = pageData.content.innerHTML;
                 this.loadPageScripts(pageData.scripts);
+                this.executeInlineScripts(pageData.inlineScripts);
+                this.applyInlineStyles(pageData.inlineStyles);
+                this.executeContentScripts(mainContainer);
                 this.reinitializeComponents();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
@@ -228,6 +233,9 @@ class DynamicLoader {
                 setTimeout(() => {
                     mainContainer.innerHTML = pageData.content.innerHTML;
                     this.loadPageScripts(pageData.scripts);
+                    this.executeInlineScripts(pageData.inlineScripts);
+                    this.applyInlineStyles(pageData.inlineStyles);
+                    this.executeContentScripts(mainContainer);
                     // Wait a bit for scripts to load before reinitializing
                     setTimeout(() => {
                         this.reinitializeComponents();
@@ -426,6 +434,69 @@ class DynamicLoader {
 
                 document.head.appendChild(script);
             }
+        });
+    }
+
+    executeInlineScripts(inlineScripts) {
+        // Remove previous inline scripts added dynamically
+        document.querySelectorAll('script[data-dynamic-inline="true"]').forEach(s => s.remove());
+
+        // Execute inline scripts from the loaded page
+        inlineScripts.forEach(scriptElement => {
+            const script = document.createElement('script');
+            script.textContent = scriptElement.textContent;
+            script.setAttribute('data-dynamic-inline', 'true');
+
+            // Copy all attributes except src
+            Array.from(scriptElement.attributes).forEach(attr => {
+                if (attr.name !== 'src') {
+                    script.setAttribute(attr.name, attr.value);
+                }
+            });
+
+            document.body.appendChild(script);
+        });
+    }
+
+    applyInlineStyles(inlineStyles) {
+        // Remove previous inline styles added dynamically
+        document.querySelectorAll('style[data-dynamic-style="true"]').forEach(s => s.remove());
+
+        // Apply inline styles from the loaded page
+        inlineStyles.forEach(styleElement => {
+            const style = document.createElement('style');
+            style.textContent = styleElement.textContent;
+            style.setAttribute('data-dynamic-style', 'true');
+
+            // Copy all attributes
+            Array.from(styleElement.attributes).forEach(attr => {
+                style.setAttribute(attr.name, attr.value);
+            });
+
+            document.head.appendChild(style);
+        });
+    }
+
+    executeContentScripts(container) {
+        // Execute scripts that are inside the loaded HTML content
+        const scripts = container.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+            const newScript = document.createElement('script');
+
+            // Copy script content
+            if (oldScript.src) {
+                newScript.src = oldScript.src;
+            } else {
+                newScript.textContent = oldScript.textContent;
+            }
+
+            // Copy all attributes
+            Array.from(oldScript.attributes).forEach(attr => {
+                newScript.setAttribute(attr.name, attr.value);
+            });
+
+            // Replace old script with new one to force execution
+            oldScript.parentNode.replaceChild(newScript, oldScript);
         });
     }
 

@@ -3,6 +3,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_assets import Environment
 from webassets.bundle import Bundle
 from flask_compress import Compress
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import math
@@ -13,6 +17,7 @@ import shutil
 import uuid
 import stripe
 import pytz
+import bleach
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 
@@ -44,9 +49,24 @@ if python_version.major == 3 and python_version.minor >= 13:
 # Carregar variáveis de ambiente
 load_dotenv()
 
+# Verificar se está em modo debug
+DEBUG_MODE = os.environ.get('FLASK_ENV') != 'production' and not os.environ.get('RENDER')
+
+def debug_log(message):
+    """Log apenas em modo de desenvolvimento"""
+    if DEBUG_MODE:
+        print(f"[DEBUG] {message}")
+
 # Configuração da aplicação Flask
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_5f352a14cb7e4b119811')
+
+# Usar SECRET_KEY forte - obrigatório em produção
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
+        raise ValueError('SECRET_KEY deve ser definida em produção!')
+    secret_key = 'dev_key_5f352a14cb7e4b119811'
+app.config['SECRET_KEY'] = secret_key
 
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -84,6 +104,43 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB máximo
 db = SQLAlchemy(app)
 compress = Compress(app)
 assets = Environment(app)
+
+# Proteção CSRF - Desabilitada temporariamente
+# TODO: Adicionar tokens CSRF em todos os formulários antes de habilitar
+# csrf = CSRFProtect(app)
+app.config['WTF_CSRF_ENABLED'] = False  # Desabilitar CSRF globalmente por enquanto
+
+# Rate Limiting para evitar ataques de força bruta
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Headers de Segurança HTTP (Talisman)
+# Configurar CSP para permitir recursos locais e CDNs necessários
+csp = {
+    'default-src': ["'self'"],
+    'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://js.stripe.com"],
+    'style-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
+    'img-src': ["'self'", "data:", "https:"],
+    'font-src': ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com"],
+    'connect-src': ["'self'", "https://api.stripe.com"]
+}
+
+# Aplicar Talisman apenas em produção
+if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
+    Talisman(app,
+             force_https=True,
+             strict_transport_security=True,
+             content_security_policy=csp,
+             content_security_policy_nonce_in=['script-src'])
+else:
+    # Em desenvolvimento, usar versão mais permissiva
+    Talisman(app,
+             force_https=False,
+             content_security_policy=None)
 
 # Bundles de CSS e JS para otimização
 css = Bundle('css/style.css', 'css/additional.css', 'css/social.css', filters='cssmin', output='gen/style.min.css')
@@ -334,15 +391,21 @@ def validate_comment_data(data) -> tuple[bool, str | None, dict | None]:
     if len(content) > 1000:
         return False, 'O comentário não pode ter mais de 1000 caracteres.', None
 
+    # Sanitizar conteúdo para prevenir XSS
+    content = sanitize_html(content)
+
     # Validação opcional de nome (se fornecido)
-    if author_name and len(author_name) > 100:
-        return False, 'O nome não pode ter mais de 100 caracteres.', None
+    if author_name:
+        if len(author_name) > 100:
+            return False, 'O nome não pode ter mais de 100 caracteres.', None
+        author_name = sanitize_input(author_name)
 
     # Validação opcional de email (se fornecido)
     if author_email:
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_regex, author_email):
             return False, 'Email inválido.', None
+        author_email = sanitize_input(author_email)
 
     validated_data = {
         'content': content,
@@ -351,6 +414,73 @@ def validate_comment_data(data) -> tuple[bool, str | None, dict | None]:
     }
 
     return True, None, validated_data
+
+
+def sanitize_input(text):
+    """Remove HTML e scripts perigosos de inputs de texto"""
+    if not text:
+        return text
+    # Remove tags HTML e normaliza espaços
+    text = bleach.clean(text, tags=[], strip=True)
+    return text.strip()
+
+
+def sanitize_html(html_content):
+    """Sanitiza conteúdo HTML permitindo apenas tags seguras"""
+    if not html_content:
+        return html_content
+
+    # Tags e atributos permitidos
+    allowed_tags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'blockquote', 'code']
+    allowed_attributes = {'a': ['href', 'title']}
+
+    # Limpar HTML mantendo apenas tags seguras
+    clean_html = bleach.clean(
+        html_content,
+        tags=allowed_tags,
+        attributes=allowed_attributes,
+        strip=True
+    )
+
+    return clean_html
+
+
+def validate_password_strength(password):
+    """
+    Valida a força de uma senha
+
+    Args:
+        password: Senha a ser validada
+
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not password:
+        return False, 'A senha não pode estar vazia.'
+
+    if len(password) < 8:
+        return False, 'A senha deve ter pelo menos 8 caracteres.'
+
+    if len(password) > 128:
+        return False, 'A senha não pode ter mais de 128 caracteres.'
+
+    # Verificar se contém pelo menos uma letra maiúscula
+    if not re.search(r'[A-Z]', password):
+        return False, 'A senha deve conter pelo menos uma letra maiúscula.'
+
+    # Verificar se contém pelo menos uma letra minúscula
+    if not re.search(r'[a-z]', password):
+        return False, 'A senha deve conter pelo menos uma letra minúscula.'
+
+    # Verificar se contém pelo menos um número
+    if not re.search(r'\d', password):
+        return False, 'A senha deve conter pelo menos um número.'
+
+    # Verificar se contém pelo menos um caractere especial
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, 'A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?":{}|<>).'
+
+    return True, None
 
 
 def delete_old_image(image_path, protected_images=None):
@@ -1003,7 +1133,7 @@ def get_admin_sidebar_stats():
     """
     Retorna as estatísticas reais para exibir na sidebar do painel administrativo
     """
-    print("DEBUG - Calculando stats da sidebar...")
+    debug_log("Calculando stats da sidebar...")
 
     post_count = Post.query.filter_by(is_active=True).count()
     category_count = Category.query.filter_by(is_active=True).count()
@@ -1011,8 +1141,8 @@ def get_admin_sidebar_stats():
     user_count = User.query.count()
     subscriber_count = Subscriber.query.count()
 
-    print(f"DEBUG - Posts: {post_count}, Categorias: {category_count}, Comentários: {comment_count}")
-    print(f"DEBUG - Usuários: {user_count}, Inscritos: {subscriber_count}")
+    debug_log(f"Posts: {post_count}, Categorias: {category_count}, Comentários: {comment_count}")
+    debug_log(f"Usuários: {user_count}, Inscritos: {subscriber_count}")
 
     return {
         'post_count': post_count,
@@ -1609,11 +1739,11 @@ def download_post(post_id):
     user = current_user
 
     # Log para debug
-    print(f"[DEBUG] Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
+    debug_log(f"Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
 
     # Verificar permissões baseadas no plano ANTES de registrar o download
     can_download, remaining, limit, reset_time, period = check_user_download_limit(user)
-    print(f"[DEBUG] Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}, period={period}")
+    debug_log(f"Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}, period={period}")
 
     if not can_download:
         # Se a verificação JavaScript falhou ou foi bypassada, retornar erro 403
@@ -1623,7 +1753,7 @@ def download_post(post_id):
         reset_text = "à meia-noite" if period == 'daily' else "no domingo às 00:00" if period == 'weekly' else ""
         message = f"Você atingiu o limite de {int(limit)} {download_text} {period_text}. Próximo reset {reset_text}."
 
-        print(f"[DEBUG] Download negado para {user.username}")
+        debug_log(f"Download negado para {user.username}")
 
         # Retornar JSON se for requisição AJAX, senão mostrar flash message
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1645,10 +1775,10 @@ def download_post(post_id):
     # Incrementar contador correto baseado no plano
     if user.plan == 'premium':
         user.weekly_downloads = (user.weekly_downloads or 0) + 1
-        print(f"[DEBUG] Download registrado para {user.username} - Total esta semana: {user.weekly_downloads}")
+        debug_log(f"Download registrado para {user.username} - Total esta semana: {user.weekly_downloads}")
     else:
         user.daily_downloads = (user.daily_downloads or 0) + 1
-        print(f"[DEBUG] Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
+        debug_log(f"Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
 
     db.session.commit()
 
@@ -2121,7 +2251,7 @@ def search():
         # Combinar resultados (começam primeiro, depois contém)
         posts = results_starts + results_contains
 
-        print(f"[DEBUG SEARCH] Query: '{query}', Posts found: {len(posts)}")  # DEBUG
+        debug_log(f"SEARCH Query: '{query}', Posts found: {len(posts)}")  # DEBUG
 
     return render_template('search.html',
                          posts=posts,
@@ -2307,7 +2437,7 @@ def checkout_success():
     session_id = request.args.get('session_id')
     if not session_id:
         flash('Erro: Sessão de pagamento não encontrada.', 'danger')
-        return redirect(url_for('planos'))
+        return redirect(url_for('plans'))
 
     try:
         # Retrieve the session from Stripe
@@ -2332,13 +2462,13 @@ def checkout_success():
         flash(f'Erro ao verificar pagamento: {str(e)}', 'danger')
         print(f"Error verifying payment: {e}")
 
-    return redirect(url_for('planos'))
+    return redirect(url_for('plans'))
 
 @app.route('/checkout-cancel')
 @login_required
 def checkout_cancel():
     flash('O processo de assinatura foi cancelado.', 'info')
-    return redirect(url_for('planos'))
+    return redirect(url_for('plans'))
 
 @app.route('/faq')
 def faq():
@@ -2417,12 +2547,21 @@ def privacy_policy():
 
 @app.route('/contato', methods=['GET', 'POST'])
 def contact():
-    # Bloquear acesso para plano gratuito
-    if current_user.is_authenticated and current_user.plan == 'free':
-        flash('O formulário de contato está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
-        return redirect(url_for('planos'))
-
     if request.method == 'POST':
+        category = request.form.get('category')
+
+        # Verificar plano apenas para categoria 'solicitacao'
+        if category == 'solicitacao' and current_user.is_authenticated and current_user.plan == 'free':
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'success': False,
+                    'message': 'A solicitação de conteúdo está disponível apenas para planos Premium e VIP.',
+                    'requires_upgrade': True
+                }), 403
+            else:
+                flash('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
+                return redirect(url_for('plans'))
+
         name = request.form.get('name')
         email = request.form.get('email')
         subject = request.form.get('subject')
@@ -2431,6 +2570,13 @@ def contact():
         new_contact = Contact(name=name, email=email, subject=subject, message=message)
         db.session.add(new_contact)
         db.session.commit()
+
+        # Retornar JSON se for AJAX
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'message': 'Sua mensagem foi enviada com sucesso! Entraremos em contato em breve.'
+            })
 
         flash('Sua mensagem foi enviada com sucesso! Entraremos em contato em breve.', 'success')
         return redirect(url_for('contact'))
@@ -2470,7 +2616,7 @@ def posts():
         # Forçar refresh da sessão para evitar cache
         db.session.expire_all()
         favorite_post_ids = [f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()]
-        print(f"[DEBUG POSTS] Usuário {current_user.id} tem {len(favorite_post_ids)} favoritos: {favorite_post_ids}")
+        debug_log(f"POSTS Usuário {current_user.id} tem {len(favorite_post_ids)} favoritos: {favorite_post_ids}")
 
     return render_template('posts.html', posts=posts, favorite_post_ids=favorite_post_ids, title='Todos os Posts')
 
@@ -2517,10 +2663,10 @@ def search_suggestions():
     query = request.args.get('q', '').strip()
     category = request.args.get('category', '').strip()
 
-    print(f"[DEBUG] Search query: '{query}', category: '{category}'")  # DEBUG
+    debug_log(f" Search query: '{query}', category: '{category}'")  # DEBUG
 
     if not query or len(query) < 1:
-        print("[DEBUG] Query too short or empty")  # DEBUG
+        debug_log(" Query too short or empty")  # DEBUG
         return jsonify([])
 
     suggestions = []
@@ -2532,7 +2678,7 @@ def search_suggestions():
             Category.name.ilike(f'{query}%')
         ).filter_by(is_active=True).limit(2).all()
 
-        print(f"[DEBUG] Categories starting with '{query}': {len(categories_starts)}")  # DEBUG
+        debug_log(f" Categories starting with '{query}': {len(categories_starts)}")  # DEBUG
 
         # Buscar categorias que CONTÉM a query (caso não encontre suficientes)
         if len(categories_starts) < 2:
@@ -2564,7 +2710,7 @@ def search_suggestions():
 
     posts_starts_list = posts_starts.limit(5).all()
 
-    print(f"[DEBUG] Posts starting with '{query}': {len(posts_starts_list)}")  # DEBUG
+    debug_log(f" Posts starting with '{query}': {len(posts_starts_list)}")  # DEBUG
 
     # Buscar posts que CONTÉM a query (caso não encontre suficientes)
     posts_contains_list = []
@@ -2590,14 +2736,14 @@ def search_suggestions():
 
         posts_contains_list = posts_contains.limit(5 - len(posts_starts_list)).all()
 
-        print(f"[DEBUG] Posts containing '{query}': {len(posts_contains_list)}")  # DEBUG
+        debug_log(f" Posts containing '{query}': {len(posts_contains_list)}")  # DEBUG
 
     posts = posts_starts_list + posts_contains_list
 
     # Verificar total de posts ativos no banco
     total_active_posts = Post.query.filter_by(is_active=True).count()
-    print(f"[DEBUG] Total active posts in database: {total_active_posts}")  # DEBUG
-    print(f"[DEBUG] Returning {len(posts)} suggestions")  # DEBUG
+    debug_log(f" Total active posts in database: {total_active_posts}")  # DEBUG
+    debug_log(f" Returning {len(posts)} suggestions")  # DEBUG
 
     for post in posts:
         category_name = post.category_str or (post.category_rel.name if post.category_rel else 'Sem categoria')
@@ -3058,6 +3204,7 @@ def initialize_db():
 
 # Rota de login
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")  # Limitar tentativas de login
 def login():
     # Se o usuário já estiver logado, redirecione para a página inicial
     if current_user.is_authenticated:
@@ -3100,7 +3247,7 @@ def login():
         allowed, device_message = check_device_limit(user)
         if not allowed:
             flash(device_message, 'warning')
-            return redirect(url_for('planos'))
+            return redirect(url_for('plans'))
 
         # Login bem-sucedido
         login_user(user, remember=remember)
@@ -3141,6 +3288,7 @@ def login():
 
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit("3 per hour")  # Limitar criação de contas
 def register():
     # Se o usuário já estiver logado, redirecione para a página inicial
     if current_user.is_authenticated:
@@ -3166,12 +3314,15 @@ def register():
             error = 'O nome de usuário deve conter apenas letras, números e underscore (_).'
         elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             error = 'Por favor, insira um endereço de email válido.'
-        elif len(password) < 6:
-            error = 'A senha deve ter pelo menos 6 caracteres.'
         elif password != confirm_password:
             error = 'As senhas não correspondem.'
         elif not terms:
             error = 'Você precisa aceitar os Termos de Uso e Política de Privacidade.'
+        else:
+            # Validar força da senha
+            is_valid, password_error = validate_password_strength(password)
+            if not is_valid:
+                error = password_error
 
         # Se houver erro, exiba a mensagem e redirecione
         if error:
@@ -3413,7 +3564,7 @@ def admin_dashboard():
         chart_data['downloads_by_category'] = []
 
     # Debug: Imprimir valores reais no console
-    print(f"DEBUG - Stats reais do banco:")
+    debug_log(f"- Stats reais do banco:")
     print(f"  Posts ativos: {posts_count}")
     print(f"  Posts em destaque: {featured_posts_count}")
     print(f"  Total de visualizações: {total_views}")
@@ -3551,7 +3702,7 @@ def admin_dashboard():
         "chart_data": chart_data  # Dados dos gráficos
     }
 
-    print(f"DEBUG - Context stats sendo enviado para o template: {context['stats']}")
+    debug_log(f"- Context stats sendo enviado para o template: {context['stats']}")
 
     return render_template('admin/dashboard.html', **context)
 
@@ -4975,7 +5126,7 @@ def admin_users():
 def admin_user_data(user_id):
     """Retorna dados do usuário em JSON para edição"""
     user = User.query.get_or_404(user_id)
-    
+
     # Calcular limites baseados no plano
     if user.plan == 'free':
         daily_limit = 1
@@ -5135,26 +5286,26 @@ def admin_update_download_limits(user_id):
     try:
         user = User.query.get_or_404(user_id)
         data = request.get_json()
-        
+
         action = data.get('action')
         period = data.get('period', 'daily')  # daily, weekly, monthly
         value = data.get('value', 0)
-        
+
         brasilia = pytz.timezone('America/Sao_Paulo')
         now = datetime.now(brasilia)
-        
+
         old_values = {
             'daily_downloads': user.daily_downloads,
             'weekly_downloads': user.weekly_downloads
         }
-        
+
         if action == 'reset':
             # Resetar contadores
             if period == 'daily' or period == 'all':
                 user.daily_downloads = 0
                 user.download_reset_date = now + timedelta(days=1)
                 user.download_reset_date = user.download_reset_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                
+
             if period == 'weekly' or period == 'all':
                 user.weekly_downloads = 0
                 # Próximo domingo
@@ -5163,9 +5314,9 @@ def admin_update_download_limits(user_id):
                     days_until_sunday = 7
                 next_sunday = now + timedelta(days=days_until_sunday)
                 user.week_reset_date = next_sunday.replace(hour=0, minute=0, second=0, microsecond=0)
-                
+
             message = f"Limite de download {'diário e semanal' if period == 'all' else period} resetado"
-            
+
         elif action == 'set':
             # Definir valor exato
             if period == 'daily':
@@ -5173,7 +5324,7 @@ def admin_update_download_limits(user_id):
             elif period == 'weekly':
                 user.weekly_downloads = int(value)
             message = f"Downloads {period} definidos para {value}"
-            
+
         elif action == 'increase':
             # Aumentar valor
             if period == 'daily':
@@ -5181,7 +5332,7 @@ def admin_update_download_limits(user_id):
             elif period == 'weekly':
                 user.weekly_downloads = (user.weekly_downloads or 0) + int(value)
             message = f"Downloads {period} aumentados em {value}"
-            
+
         elif action == 'decrease':
             # Diminuir valor
             if period == 'daily':
@@ -5191,9 +5342,9 @@ def admin_update_download_limits(user_id):
             message = f"Downloads {period} diminuídos em {value}"
         else:
             return jsonify({'success': False, 'message': 'Ação inválida'})
-            
+
         db.session.commit()
-        
+
         # Log da atividade
         log_admin_activity(
             user_id=current_user.id,
@@ -5211,14 +5362,14 @@ def admin_update_download_limits(user_id):
                 }
             }
         )
-        
+
         return jsonify({
-            'success': True, 
+            'success': True,
             'message': message,
             'daily_downloads': user.daily_downloads,
             'weekly_downloads': user.weekly_downloads
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao atualizar limites: {str(e)}'})
@@ -5687,8 +5838,62 @@ def logout():
 
 # Função auxiliar para verificar se o arquivo tem uma extensão permitida
 def allowed_file(filename):
+    """Verifica se o arquivo tem uma extensão permitida"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def validate_image_file(file):
+    """
+    Valida um arquivo de imagem de forma rigorosa
+
+    Args:
+        file: Objeto de arquivo do Flask
+
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not file or not file.filename:
+        return False, 'Nenhum arquivo foi fornecido.'
+
+    # Verificar extensão
+    if not allowed_file(file.filename):
+        return False, f'Tipo de arquivo não permitido. Use apenas: {", ".join(ALLOWED_EXTENSIONS)}'
+
+    # Verificar tamanho (já configurado no MAX_CONTENT_LENGTH, mas validar aqui também)
+    file.seek(0, 2)  # Ir para o final do arquivo
+    size = file.tell()
+    file.seek(0)  # Voltar ao início
+
+    max_size = 5 * 1024 * 1024  # 5MB
+    if size > max_size:
+        return False, f'O arquivo é muito grande. Tamanho máximo: 5MB'
+
+    if size == 0:
+        return False, 'O arquivo está vazio.'
+
+    # Validar que é realmente uma imagem usando Pillow
+    try:
+        img = Image.open(file)
+        img.verify()  # Verifica se é uma imagem válida
+        file.seek(0)  # Resetar o ponteiro do arquivo após verificação
+
+        # Verificar formato
+        if img.format.lower() not in ['jpeg', 'jpg', 'png', 'gif', 'webp']:
+            return False, 'Formato de imagem inválido.'
+
+        # Verificar dimensões razoáveis
+        width, height = img.size
+        if width > 5000 or height > 5000:
+            return False, 'As dimensões da imagem são muito grandes (máximo: 5000x5000).'
+
+        if width < 10 or height < 10:
+            return False, 'As dimensões da imagem são muito pequenas (mínimo: 10x10).'
+
+    except Exception as e:
+        return False, f'Arquivo não é uma imagem válida: {str(e)}'
+
+    return True, None
 
 # Rotas para atualizar a imagem de perfil de usuários regulares
 @app.route('/update-profile-image', methods=['POST'])

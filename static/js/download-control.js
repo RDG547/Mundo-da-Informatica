@@ -58,6 +58,30 @@ function showDownloadLimitModal(message) {
     document.body.style.overflow = 'hidden';
 }
 
+// Mostrar modal de solicitação de conteúdo (para plano free)
+function showContentRequestModal(message) {
+    createDownloadLimitModal();
+
+    const modal = document.getElementById('downloadLimitModal');
+    const titleEl = modal.querySelector('.download-limit-title');
+    const messageEl = document.getElementById('limitMessage');
+    const iconEl = modal.querySelector('.download-limit-icon i');
+    const countdownContainer = modal.querySelector('.download-limit-countdown');
+
+    // Personalizar para solicitação de conteúdo
+    titleEl.textContent = 'Solicitação de Conteúdo Restrita';
+    messageEl.textContent = message;
+    iconEl.className = 'fas fa-envelope-open-text'; // Ícone diferente
+
+    // Ocultar contador regressivo
+    if (countdownContainer) {
+        countdownContainer.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
 // Fechar modal
 // eslint-disable-next-line no-unused-vars
 function closeDownloadLimitModal() {
@@ -74,7 +98,7 @@ function closeDownloadLimitModal() {
 
 // Redirecionar para página de planos
 function redirectToPlans() {
-    window.location.href = '/planos';
+    window.location.href = '/plans';
 }
 
 // Verificar limite de downloads antes de baixar
@@ -131,7 +155,7 @@ window.setupDownloadButtons = function setupDownloadButtons() {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation(); // Impede TODOS os outros handlers
-            
+
             // Retornar false explicitamente
             try {
                 // Prevenir múltiplos cliques
@@ -176,7 +200,7 @@ window.setupDownloadButtons = function setupDownloadButtons() {
                 console.error('[DOWNLOAD-CONTROL] Erro:', error);
                 button.dataset.downloading = 'false';
             }
-            
+
             return false;
         }, true); // useCapture=true para garantir execução antes de outros handlers
     });
@@ -219,10 +243,10 @@ async function confirmClearHistory() {
 // Inicializar quando o DOM estiver pronto E após pequeno delay
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[DOWNLOAD-CONTROL] DOMContentLoaded - iniciando configuração');
-    
+
     // Chamar imediatamente
     setupDownloadButtons();
-    
+
     // E também após 500ms para garantir que pegou botões carregados dinamicamente
     setTimeout(() => {
         console.log('[DOWNLOAD-CONTROL] Setup atrasado (500ms) - reprocessando botões');

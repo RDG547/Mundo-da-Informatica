@@ -298,7 +298,7 @@ function updateProfileHeader(userData) {
         // Hide bio if empty
         profileBio.style.display = 'none';
     }
-    
+
     // Update location
     const locationElement = document.querySelector('.profile-location');
     if (locationElement && userData.location) {
@@ -307,7 +307,7 @@ function updateProfileHeader(userData) {
     } else if (locationElement) {
         locationElement.style.display = 'none';
     }
-    
+
     // Update website
     const websiteElement = document.querySelector('.profile-website');
     if (websiteElement && userData.website) {
@@ -317,7 +317,7 @@ function updateProfileHeader(userData) {
     } else if (websiteElement) {
         websiteElement.style.display = 'none';
     }
-    
+
     // Update social links
     const socialLinks = {
         facebook: userData.facebook_url,
@@ -325,7 +325,7 @@ function updateProfileHeader(userData) {
         linkedin: userData.linkedin_url,
         github: userData.github_url
     };
-    
+
     Object.keys(socialLinks).forEach(platform => {
         const link = document.querySelector(`.social-link[data-platform="${platform}"]`);
         if (link && socialLinks[platform]) {
@@ -335,7 +335,7 @@ function updateProfileHeader(userData) {
             link.style.display = 'none';
         }
     });
-    
+
     // Update all username references in the page
     document.querySelectorAll('[data-username]').forEach(el => {
         if (userData.username) {
@@ -343,7 +343,7 @@ function updateProfileHeader(userData) {
             el.setAttribute('data-username', userData.username);
         }
     });
-    
+
     // Update all name references
     document.querySelectorAll('[data-name]').forEach(el => {
         if (userData.name) {
@@ -351,7 +351,7 @@ function updateProfileHeader(userData) {
             el.setAttribute('data-name', userData.name);
         }
     });
-    
+
     console.log('Perfil atualizado com sucesso em tempo real');
 }
 

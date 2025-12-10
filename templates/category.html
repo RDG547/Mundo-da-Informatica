@@ -357,24 +357,25 @@
                         <p>Entre em contato conosco para solicitar conteúdo específico! Nossa equipe está sempre pronta
                             para ajudar e pode localizar recursos específicos para suas necessidades. Estamos
                             constantemente adicionando novos materiais e suas sugestões são muito importantes.</p>
-                        <div class="cta-buttons">
+                        <div class="cta-buttons" id="ctaButtonsContainer" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
                             <button type="button" class="btn btn-gradient primary" id="toggleSearchBtnCat"
-                                onclick="toggleInlineSearchCat()">
+                                onclick="transformToSearchBar()" style="flex: 0 0 auto;">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <a href="{{ url_for('contact') }}" class="btn btn-gradient secondary">
+                            <button type="button" class="btn btn-gradient secondary" id="requestContentBtn" onclick="checkPlanForContentRequest()" style="flex: 0 0 auto;">
                                 <i class="fas fa-envelope"></i> Solicitar Conteúdo
-                            </a>
+                            </button>
                         </div>
                         <form action="{{ url_for('search') }}" method="get" class="inline-search-form"
-                            id="inlineSearchFormCat" style="display: none; margin-top: 1.5rem;">
+                            id="inlineSearchFormCat" style="display: none; opacity: 0; transform: translateY(-10px); transition: all 0.4s ease; max-width: 600px; margin: 1.5rem auto 0; position: relative; z-index: 1000;">
                             <div class="search-input-wrapper"
                                 style="position: relative; display: flex; align-items: center;">
                                 <input type="text" name="q" placeholder="Digite sua busca..." autocomplete="off"
                                     id="inlineSearchInputCat" required
                                     style="padding: 1rem 150px 1rem 1.5rem; border: 2px solid #ddd; border-radius: 50px; width: 100%; font-size: 1rem; outline: none; transition: all 0.3s;">
+                                <div class="search-suggestions-dropdown" id="catSearchSuggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid #ddd; border-top: none; border-radius: 0 0 15px 15px; max-height: 300px; overflow-y: auto; z-index: 10000; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-top: 0.5rem;"></div>
                                 <button type="submit"
-                                    style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                                    style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); z-index: 1;">
                                     <i class="fas fa-search"></i> Buscar
                                 </button>
                             </div>
@@ -404,27 +405,50 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
 <script>
-    function toggleInlineSearchCat() {
+    function transformToSearchBar() {
+        const searchBtn = document.getElementById('toggleSearchBtnCat');
         const form = document.getElementById('inlineSearchFormCat');
-        const btn = document.getElementById('toggleSearchBtnCat');
         const input = document.getElementById('inlineSearchInputCat');
 
-        if (form.style.display === 'none') {
+        // Animar saída apenas do botão de busca
+        searchBtn.style.transition = 'all 0.4s ease';
+        searchBtn.style.opacity = '0';
+        searchBtn.style.transform = 'scale(0.8)';
+
+        setTimeout(() => {
+            // Esconder apenas o botão de busca
+            searchBtn.style.display = 'none';
+
+            // Mostrar formulário
             form.style.display = 'block';
-            btn.innerHTML = '<i class="fas fa-times"></i> Fechar Busca';
-            btn.classList.remove('primary');
-            btn.classList.add('secondary');
-            setTimeout(() => input.focus(), 100);
-        } else {
-            form.style.display = 'none';
-            btn.innerHTML = '<i class="fas fa-search"></i> Fazer uma Busca';
-            btn.classList.remove('secondary');
-            btn.classList.add('primary');
-        }
+
+            // Animar entrada do formulário
+            setTimeout(() => {
+                form.style.opacity = '1';
+                form.style.transform = 'translateY(0)';
+                input.focus();
+            }, 50);
+        }, 400);
     }
 
-    // Adicionar efeito hover no input
+    async function checkPlanForContentRequest() {
+        {% if current_user.is_authenticated %}
+            {% if current_user.plan == 'free' %}
+                // Mostrar modal de upgrade com conteúdo personalizado
+                showContentRequestModal('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso a esse recurso exclusivo e solicitar materiais personalizados!');
+            {% else %}
+                // Redirecionar para página de contato com categoria pré-selecionada
+                window.location.href = '{{ url_for("contact") }}?category=solicitacao';
+            {% endif %}
+        {% else %}
+            // Redirecionar para login
+            window.location.href = '{{ url_for("login") }}?next={{ url_for("contact") }}';
+        {% endif %}
+    }
+
+    // Adicionar efeito hover no input e ativar sugestões
     document.addEventListener('DOMContentLoaded', function () {
         const input = document.getElementById('inlineSearchInputCat');
         if (input) {
@@ -436,6 +460,14 @@
                 this.style.borderColor = '#ddd';
                 this.style.boxShadow = 'none';
             });
+
+            // Ativar sugestões de pesquisa
+            if (typeof SearchSuggestions !== 'undefined') {
+                const catSearchSuggestions = new SearchSuggestions(
+                    '#inlineSearchInputCat',
+                    '#catSearchSuggestions'
+                );
+            }
         }
     });
 

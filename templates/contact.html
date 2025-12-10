@@ -139,7 +139,7 @@
                                         <select id="category" name="category" required>
                                             <option value="">Selecione uma categoria</option>
                                             <option value="suporte">Suporte Técnico</option>
-                                            <option value="solicitacao">Solicitação de Recurso</option>
+                                            <option value="solicitacao" {% if request.args.get('category') == 'solicitacao' %}selected{% endif %}>Solicitação de Recurso</option>
                                             <option value="problema">Reportar Problema</option>
                                             <option value="sugestao">Sugestão</option>
                                             <option value="parcerias">Parcerias</option>
@@ -344,4 +344,72 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const contactForm = document.getElementById('contact-form');
+
+        if (contactForm) {
+            contactForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                // Preparar dados do formulário
+                const formData = new FormData(contactForm);
+
+                // Enviar via AJAX
+                fetch('{{ url_for("contact") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.requires_upgrade) {
+                        // Mostrar modal de upgrade personalizado
+                        if (typeof showContentRequestModal === 'function') {
+                            showContentRequestModal(data.message);
+                        } else {
+                            showDownloadLimitModal(data.message);
+                        }
+                    } else if (data.success) {
+                        // Mensagem de sucesso
+                        alert('Mensagem enviada com sucesso!');
+                        contactForm.reset();
+                        const charCount = document.getElementById('char-count');
+                        if (charCount) charCount.textContent = '0';
+                    } else {
+                        // Erro genérico
+                        alert(data.message || 'Erro ao enviar mensagem. Tente novamente.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao enviar mensagem. Tente novamente.');
+                });
+            });
+        }
+
+        // Contador de caracteres para textarea
+        const messageTextarea = document.getElementById('message');
+        const charCount = document.getElementById('char-count');
+
+        if (messageTextarea && charCount) {
+            messageTextarea.addEventListener('input', function() {
+                const length = this.value.length;
+                charCount.textContent = length;
+
+                // Limitar a 1000 caracteres
+                if (length > 1000) {
+                    this.value = this.value.substring(0, 1000);
+                    charCount.textContent = '1000';
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

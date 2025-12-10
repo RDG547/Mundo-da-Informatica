@@ -667,7 +667,7 @@
     color: white;
     text-align: center;
     position: relative;
-    overflow: hidden;
+    overflow: visible; /* Permitir que elementos filhos ultrapassem o container */
 }
 
 .cta-background-pattern {

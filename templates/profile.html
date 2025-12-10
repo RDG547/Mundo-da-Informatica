@@ -39,7 +39,6 @@
                     <img src="{{ url_for('static', filename='uploads/profiles/' + (user.profile_image or 'default_profile.jpg')) }}"
                         alt="{{ user.get_full_name() or user.username }}"
                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/profiles/default_profile.jpg') }}';">
-                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     <div class="avatar-placeholder-large" style="display: none;">
                         {{ user.get_initials() }}
                     </div>

@@ -139,6 +139,12 @@ function setupDownloadButtons() {
 
         // Adicionar listener
         button.addEventListener('click', async function(e) {
+            // Prevenir múltiplos cliques
+            if (button.dataset.downloading === 'true') {
+                e.preventDefault();
+                return;
+            }
+
             // Verificar se o usuário está logado
             const isAuthenticated = document.body.dataset.authenticated === 'true';
 
@@ -149,16 +155,24 @@ function setupDownloadButtons() {
                 return;
             }
 
+            // Marcar como processando para evitar cliques duplicados
+            button.dataset.downloading = 'true';
+
             // Verificar limite de downloads
             const canDownload = await checkDownloadLimit();
 
             if (!canDownload) {
                 e.preventDefault();
+                button.dataset.downloading = 'false'; // Liberar botão se bloqueado
                 return;
             }
 
             // Se passou nas verificações, permitir o download
             // O link será seguido normalmente
+            // Após 2 segundos, liberar botão (tempo para o servidor registrar)
+            setTimeout(() => {
+                button.dataset.downloading = 'false';
+            }, 2000);
         });
     });
 }

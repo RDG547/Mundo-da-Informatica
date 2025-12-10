@@ -106,7 +106,8 @@
 
 <body
     data-is-admin="{% if current_user.is_authenticated and current_user.role == 'admin' %}true{% else %}false{% endif %}"
-    data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}">
+    data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
+    data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}">
     <!-- Preloader -->
     <div class="preloader">
         <div class="loader"></div>
@@ -975,6 +976,9 @@
             });
         });
     </script>
+
+    <!-- Download Control System -->
+    <script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
 </body>
 
 </html>

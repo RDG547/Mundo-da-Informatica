@@ -808,6 +808,10 @@ class User(db.Model, UserMixin):
     access_timestamps = db.Column(db.Text)  # JSON com data/hora de acessos
     referrer = db.Column(db.String(500))  # Site de onde o usuário veio
 
+    # Controle de downloads diários
+    daily_downloads = db.Column(db.Integer, default=0)  # Contador de downloads do dia
+    download_reset_date = db.Column(db.DateTime)  # Data de reset do contador
+
     def set_password(self, password):
         """Gera hash da senha fornecida"""
         self.password_hash = generate_password_hash(password)
@@ -5491,6 +5495,35 @@ def profile(user_id=None):
                          favorite_posts=favorite_posts,
                          download_history=download_history)
 
+# Rota para limpar histórico de downloads
+@app.route('/clear-download-history', methods=['POST'])
+@login_required
+def clear_download_history():
+    """Limpa o histórico de downloads do usuário"""
+    try:
+        # Deletar todos os downloads do usuário
+        Download.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Histórico limpo com sucesso!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao limpar histórico: {str(e)}'}), 500
+
+# Rota para verificar limite de downloads
+@app.route('/check-download-limit', methods=['GET'])
+@login_required
+def check_download_limit():
+    """Verifica se o usuário pode fazer download"""
+    can_download, remaining, limit, reset_time = check_user_download_limit(current_user)
+    
+    return jsonify({
+        'can_download': can_download,
+        'remaining': remaining,
+        'limit': limit,
+        'reset_time': reset_time.isoformat() if reset_time else None,
+        'plan': current_user.plan
+    })
+
 # Rota de logout
 @app.route('/logout')
 @login_required
@@ -5780,6 +5813,48 @@ def check_download_history_access(user):
 
     # Plano Grátis: Sem acesso ao histórico
     return False, None
+
+
+def check_user_download_limit(user):
+    """Verifica se o usuário atingiu o limite de downloads diários"""
+    if user.role == 'admin' or user.role == 'editor':
+        return True, float('inf'), float('inf'), None  # Sem limites
+
+    # Limites por plano
+    download_limits = {
+        'vip': float('inf'),  # Ilimitado
+        'premium': 50,  # 50 downloads por dia
+        'free': 5  # 5 downloads por dia
+    }
+
+    limit = download_limits.get(user.plan, 5)
+    
+    # Verificar downloads nas últimas 24 horas
+    brasilia_tz = pytz.timezone('America/Sao_Paulo')
+    now = datetime.utcnow()
+    
+    # Calcular reset_time (meia-noite de Brasília)
+    now_brasilia = pytz.utc.localize(now).astimezone(brasilia_tz)
+    next_midnight = (now_brasilia + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    reset_time = next_midnight.astimezone(pytz.utc).replace(tzinfo=None)
+    
+    if user.download_reset_date:
+        # Se já passou da data de reset, resetar contador
+        if now >= user.download_reset_date:
+            user.daily_downloads = 0
+            user.download_reset_date = reset_time
+            db.session.commit()
+    else:
+        # Primeira vez, definir data de reset
+        user.download_reset_date = reset_time
+        db.session.commit()
+    
+    # Verificar se atingiu o limite
+    current_downloads = user.daily_downloads or 0
+    remaining = max(0, limit - current_downloads) if limit != float('inf') else float('inf')
+    can_download = limit == float('inf') or current_downloads < limit
+    
+    return can_download, remaining, limit, reset_time
 
 
 def check_support_priority(user):

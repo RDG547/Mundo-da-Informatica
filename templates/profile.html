@@ -2,7 +2,6 @@
 
 {% block extra_css %}
 <!-- Garantir carregamento do CSS admin para sidebar -->
-<link rel="stylesheet" href="{{ url_for('static', filename='css/download-history.css') }}">
 <style>
     /* Garantir que sidebar seja carregada corretamente */
     .profile-admin-sidebar {
@@ -342,7 +341,7 @@
                         <div class="profile-card-icon">
                             <i class="fas fa-download"></i>
                         </div>
-                        <div>
+                        <div style="flex: 1;">
                             <h2 class="profile-card-title">Histórico de Downloads</h2>
                             <p class="profile-card-subtitle">
                                 {% if current_user.plan == 'premium' %}
@@ -352,6 +351,11 @@
                                 {% endif %}
                             </p>
                         </div>
+                        {% if download_history and download_history|length > 0 %}
+                        <button onclick="confirmClearHistory()" class="btn btn-sm btn-danger" style="margin-left: auto;">
+                            <i class="fas fa-trash"></i> Limpar Histórico
+                        </button>
+                        {% endif %}
                     </div>
                     {% if download_history and download_history|length > 0 %}
                     <div class="download-history-grid">

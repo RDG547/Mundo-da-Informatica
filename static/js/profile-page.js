@@ -469,8 +469,11 @@ function initializeProfilePage() {
 
     // Edit Profile Form Handler
     const editProfileForm = document.getElementById('editProfileForm');
+    console.log('[DEBUG] Edit Profile Form:', editProfileForm ? 'encontrado' : 'NÃO encontrado');
+    
     if (editProfileForm) {
         editProfileForm.addEventListener('submit', async function (e) {
+            console.log('[DEBUG] Form submit interceptado');
             e.preventDefault();
             e.stopPropagation(); // Previne que o DynamicLoader intercepte
 
@@ -483,6 +486,7 @@ function initializeProfilePage() {
 
             try {
                 const formData = new FormData(this);
+                console.log('[DEBUG] Enviando requisição AJAX para:', this.action);
 
                 const response = await fetch(this.action, {
                     method: 'POST',
@@ -492,9 +496,13 @@ function initializeProfilePage() {
                     }
                 });
 
+                console.log('[DEBUG] Response status:', response.status);
                 const data = await response.json();
+                console.log('[DEBUG] Response data:', data);
 
                 if (data.success) {
+                    console.log('[DEBUG] Sucesso! Fechando modal e atualizando interface');
+                    
                     // Close modal
                     window.closeEditModal();
 
@@ -504,16 +512,19 @@ function initializeProfilePage() {
                     // Show success message
                     showToast('Perfil atualizado com sucesso!', 'success');
                 } else {
+                    console.log('[DEBUG] Erro na resposta:', data.message);
                     showToast(data.message || 'Erro ao atualizar perfil', 'error');
                 }
             } catch (error) {
-                console.error('Erro ao atualizar perfil:', error);
+                console.error('[DEBUG] Erro ao atualizar perfil:', error);
                 showToast('Erro ao atualizar perfil. Tente novamente.', 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             }
         });
+    } else {
+        console.error('[DEBUG] Formulário editProfileForm não encontrado no DOM!');
     }
 
     // Stats animation

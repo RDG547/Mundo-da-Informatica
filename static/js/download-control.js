@@ -94,7 +94,7 @@ function closeDownloadLimitModal() {
 
 // Redirecionar para página de planos
 function redirectToPlans() {
-    window.location.href = '/plans';
+    window.location.href = '/planos';
 }
 
 // Verificar limite de downloads antes de baixar
@@ -105,11 +105,12 @@ async function checkDownloadLimit() {
 
         if (!data.can_download) {
             let message = '';
+            const periodText = data.period === 'daily' ? 'diários' : data.period === 'weekly' ? 'semanais' : '';
 
             if (data.plan === 'free') {
-                message = `Você atingiu o limite de ${data.limit} downloads diários do plano gratuito. Faça upgrade para continuar baixando!`;
+                message = `Você atingiu o limite de ${data.limit} download${data.limit > 1 ? 's' : ''} ${periodText} do plano gratuito. Faça upgrade para continuar baixando!`;
             } else if (data.plan === 'premium') {
-                message = `Você atingiu o limite de ${data.limit} downloads diários do plano Premium. Considere o plano VIP para downloads ilimitados!`;
+                message = `Você atingiu o limite de ${data.limit} downloads ${periodText} do plano Premium. Considere o plano VIP para downloads ilimitados!`;
             }
 
             showDownloadLimitModal(message);
@@ -162,11 +163,15 @@ function setupDownloadButtons() {
             const canDownload = await checkDownloadLimit();
 
             if (!canDownload) {
+                console.log('[DOWNLOAD] Limite atingido, bloqueando navegação');
                 e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 button.dataset.downloading = 'false'; // Liberar botão se bloqueado
-                return;
+                return false; // Explicitamente bloquear
             }
 
+            console.log('[DOWNLOAD] Limite OK, permitindo download');
             // Se passou nas verificações, permitir o download
             // O link será seguido normalmente
             // Após 2 segundos, liberar botão (tempo para o servidor registrar)

@@ -810,6 +810,10 @@ class User(db.Model, UserMixin):
     # Controle de downloads diários
     daily_downloads = db.Column(db.Integer, default=0)  # Contador de downloads do dia
     download_reset_date = db.Column(db.DateTime)  # Data de reset do contador
+    
+    # Controle de downloads semanais (para plano Premium)
+    weekly_downloads = db.Column(db.Integer, default=0)  # Contador de downloads da semana
+    week_reset_date = db.Column(db.DateTime)  # Data de reset semanal (domingo 00:00)
 
     def set_password(self, password):
         """Gera hash da senha fornecida"""
@@ -1608,24 +1612,31 @@ def download_post(post_id):
     print(f"[DEBUG] Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
 
     # Verificar permissões baseadas no plano ANTES de registrar o download
-    can_download, remaining, limit, _ = check_user_download_limit(user)
-    print(f"[DEBUG] Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}")
+    can_download, remaining, limit, reset_time, period = check_user_download_limit(user)
+    print(f"[DEBUG] Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}, period={period}")
 
     if not can_download:
-        message = f"Você atingiu o limite de {limit} downloads diários. Próximo reset à meia-noite."
+        download_text = "download" if limit == 1 else "downloads"
+        period_text = "diários" if period == 'daily' else "semanais" if period == 'weekly' else ""
+        reset_text = "à meia-noite" if period == 'daily' else "no domingo às 00:00" if period == 'weekly' else ""
+        message = f"Você atingiu o limite de {int(limit)} {download_text} {period_text}. Próximo reset {reset_text}."
         flash(message, 'warning')
         print(f"[DEBUG] Download negado para {user.username}")
-        return redirect(url_for('plans'))
+        return redirect(url_for('planos'))
 
     # Registrar download (isso incrementa o contador para próxima verificação)
     new_download = Download(user_id=user.id, post_id=post.id, timestamp=datetime.utcnow())
     db.session.add(new_download)
 
-    # Incrementar contador diário do usuário
-    user.daily_downloads = (user.daily_downloads or 0) + 1
+    # Incrementar contador correto baseado no plano
+    if user.plan == 'premium':
+        user.weekly_downloads = (user.weekly_downloads or 0) + 1
+        print(f"[DEBUG] Download registrado para {user.username} - Total esta semana: {user.weekly_downloads}")
+    else:
+        user.daily_downloads = (user.daily_downloads or 0) + 1
+        print(f"[DEBUG] Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
 
     db.session.commit()
-    print(f"[DEBUG] Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
 
     # Incrementar downloads do post
     increment_post_downloads(post_id)
@@ -2282,7 +2293,7 @@ def checkout_success():
     session_id = request.args.get('session_id')
     if not session_id:
         flash('Erro: Sessão de pagamento não encontrada.', 'danger')
-        return redirect(url_for('plans'))
+        return redirect(url_for('planos'))
 
     try:
         # Retrieve the session from Stripe
@@ -2307,13 +2318,13 @@ def checkout_success():
         flash(f'Erro ao verificar pagamento: {str(e)}', 'danger')
         print(f"Error verifying payment: {e}")
 
-    return redirect(url_for('plans'))
+    return redirect(url_for('planos'))
 
 @app.route('/checkout-cancel')
 @login_required
 def checkout_cancel():
     flash('O processo de assinatura foi cancelado.', 'info')
-    return redirect(url_for('plans'))
+    return redirect(url_for('planos'))
 
 @app.route('/faq')
 def faq():
@@ -2395,7 +2406,7 @@ def contact():
     # Bloquear acesso para plano gratuito
     if current_user.is_authenticated and current_user.plan == 'free':
         flash('O formulário de contato está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
-        return redirect(url_for('plans'))
+        return redirect(url_for('planos'))
 
     if request.method == 'POST':
         name = request.form.get('name')
@@ -3075,7 +3086,7 @@ def login():
         allowed, device_message = check_device_limit(user)
         if not allowed:
             flash(device_message, 'warning')
-            return redirect(url_for('plans'))
+            return redirect(url_for('planos'))
 
         # Login bem-sucedido
         login_user(user, remember=remember)
@@ -5821,45 +5832,73 @@ def check_download_history_access(user):
 
 
 def check_user_download_limit(user):
-    """Verifica se o usuário atingiu o limite de downloads diários"""
+    """Verifica se o usuário atingiu o limite de downloads (diários para Free, semanais para Premium)"""
     if user.role == 'admin' or user.role == 'editor':
-        return True, float('inf'), float('inf'), None  # Sem limites
+        return True, float('inf'), float('inf'), None, 'unlimited'  # Sem limites
 
-    # Limites por plano
-    download_limits = {
-        'vip': float('inf'),  # Ilimitado
-        'premium': 50,  # 50 downloads por dia
-        'free': 5  # 5 downloads por dia
-    }
-
-    limit = download_limits.get(user.plan, 5)
-
-    # Verificar downloads nas últimas 24 horas
     brasilia_tz = pytz.timezone('America/Sao_Paulo')
     now = datetime.utcnow()
-
-    # Calcular reset_time (meia-noite de Brasília)
     now_brasilia = pytz.utc.localize(now).astimezone(brasilia_tz)
-    next_midnight = (now_brasilia + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    reset_time = next_midnight.astimezone(pytz.utc).replace(tzinfo=None)
 
-    if user.download_reset_date:
-        # Se já passou da data de reset, resetar contador
-        if now >= user.download_reset_date:
-            user.daily_downloads = 0
+    # VIP: ilimitado
+    if user.plan == 'vip':
+        return True, float('inf'), float('inf'), None, 'unlimited'
+    
+    # PREMIUM: 15 downloads semanais (reset domingo 00:00 Brasília)
+    elif user.plan == 'premium':
+        limit = 15
+        
+        # Calcular próximo domingo às 00:00 (horário Brasília)
+        days_until_sunday = (6 - now_brasilia.weekday()) % 7  # 0=segunda, 6=domingo
+        if days_until_sunday == 0 and now_brasilia.hour >= 0:
+            days_until_sunday = 7  # Já é domingo, próximo reset é em 7 dias
+        
+        next_sunday = (now_brasilia + timedelta(days=days_until_sunday)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        reset_time = next_sunday.astimezone(pytz.utc).replace(tzinfo=None)
+        
+        # Resetar contador se passou da data de reset
+        if user.week_reset_date:
+            if now >= user.week_reset_date:
+                user.weekly_downloads = 0
+                user.week_reset_date = reset_time
+                db.session.commit()
+        else:
+            user.week_reset_date = reset_time
+            db.session.commit()
+        
+        current_downloads = user.weekly_downloads or 0
+        remaining = max(0, limit - current_downloads)
+        can_download = current_downloads < limit
+        
+        return can_download, remaining, limit, reset_time, 'weekly'
+    
+    # FREE: 1 download diário (reset meia-noite Brasília)
+    else:
+        limit = 1
+        
+        # Calcular próxima meia-noite (horário Brasília)
+        next_midnight = (now_brasilia + timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        reset_time = next_midnight.astimezone(pytz.utc).replace(tzinfo=None)
+        
+        # Resetar contador se passou da data de reset
+        if user.download_reset_date:
+            if now >= user.download_reset_date:
+                user.daily_downloads = 0
+                user.download_reset_date = reset_time
+                db.session.commit()
+        else:
             user.download_reset_date = reset_time
             db.session.commit()
-    else:
-        # Primeira vez, definir data de reset
-        user.download_reset_date = reset_time
-        db.session.commit()
-
-    # Verificar se atingiu o limite
-    current_downloads = user.daily_downloads or 0
-    remaining = max(0, limit - current_downloads) if limit != float('inf') else float('inf')
-    can_download = limit == float('inf') or current_downloads < limit
-
-    return can_download, remaining, limit, reset_time
+        
+        current_downloads = user.daily_downloads or 0
+        remaining = max(0, limit - current_downloads)
+        can_download = current_downloads < limit
+        
+        return can_download, remaining, limit, reset_time, 'daily'
 
 
 def check_support_priority(user):

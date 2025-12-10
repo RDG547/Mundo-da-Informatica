@@ -31,6 +31,31 @@ def migrate():
             migrations_applied = True
             print("✓ active_sessions column added")
 
+        # Novas colunas para controle de downloads
+        if 'daily_downloads' not in columns:
+            print("Adding daily_downloads column...")
+            cursor.execute("ALTER TABLE user ADD COLUMN daily_downloads INTEGER DEFAULT 0")
+            migrations_applied = True
+            print("✓ daily_downloads column added")
+
+        if 'download_reset_date' not in columns:
+            print("Adding download_reset_date column...")
+            cursor.execute("ALTER TABLE user ADD COLUMN download_reset_date DATETIME")
+            migrations_applied = True
+            print("✓ download_reset_date column added")
+
+        if 'weekly_downloads' not in columns:
+            print("Adding weekly_downloads column...")
+            cursor.execute("ALTER TABLE user ADD COLUMN weekly_downloads INTEGER DEFAULT 0")
+            migrations_applied = True
+            print("✓ weekly_downloads column added")
+
+        if 'week_reset_date' not in columns:
+            print("Adding week_reset_date column...")
+            cursor.execute("ALTER TABLE user ADD COLUMN week_reset_date DATETIME")
+            migrations_applied = True
+            print("✓ week_reset_date column added")
+
         if migrations_applied:
             conn.commit()
             print("\n✅ All migrations completed successfully!")

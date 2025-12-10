@@ -13,6 +13,7 @@ import sys
 import shutil
 import uuid
 import stripe
+import pytz
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 
@@ -5432,7 +5433,7 @@ def profile(user_id=None):
         if has_access:
             # Buscar apenas o download mais recente de cada post (evita duplicatas)
             from sqlalchemy import func
-            
+
             # Subquery para pegar o ID do download mais recente de cada post
             subquery = db.session.query(
                 Download.post_id,
@@ -5440,7 +5441,7 @@ def profile(user_id=None):
             ).filter(
                 Download.user_id == user.id
             ).group_by(Download.post_id).subquery()
-            
+
             # Query principal juntando com a subquery
             query = db.session.query(Download).join(
                 subquery,
@@ -5449,7 +5450,7 @@ def profile(user_id=None):
                     Download.timestamp == subquery.c.max_timestamp
                 )
             ).filter(Download.user_id == user.id).order_by(Download.timestamp.desc())
-            
+
             if limit:
                 # Premium: últimos 5 downloads únicos
                 downloads = query.limit(limit).all()
@@ -5463,12 +5464,14 @@ def profile(user_id=None):
                 if download.post:
                     # Carregar a categoria se não estiver carregada
                     if download.post.category_id and not hasattr(download.post, '_category_cache'):
-                        download.post._category_cache = Category.query.get(download.post.category_id)
-                    
+                        # type: ignore - atributo dinâmico para cache de categoria
+                        setattr(download.post, '_category_cache', Category.query.get(download.post.category_id))
+
                     # Converter timestamp para timezone de Brasília
                     if download.timestamp:
                         utc_time = pytz.utc.localize(download.timestamp)
-                        download._brasilia_time = utc_time.astimezone(brasilia_tz)
+                        # type: ignore - atributo dinâmico para timestamp em Brasília
+                        setattr(download, '_brasilia_time', utc_time.astimezone(brasilia_tz))
 
             download_history = downloads
 

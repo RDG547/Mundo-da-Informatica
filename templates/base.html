@@ -260,7 +260,8 @@
                             {% if current_user.profile_image %}
                             <img src="{{ url_for('static', filename='uploads/profiles/' + current_user.profile_image) }}"
                                 alt="{{ current_user.username }}"
-                                style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;">
+                                style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
+                                onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/profiles/default_profile.jpg') }}'">
                             {{ current_user.username }}
                             {% else %}
                             <i class="fas fa-user-circle"></i>

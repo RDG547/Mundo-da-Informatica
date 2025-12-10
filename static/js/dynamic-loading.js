@@ -328,6 +328,11 @@ class DynamicLoader {
             window.initializePlansPage();
         }
 
+        // Re-initialize download buttons (CRITICAL for download limit checks)
+        if (typeof window.setupDownloadButtons === 'function') {
+            window.setupDownloadButtons();
+        }
+
         // Re-initialize any other components
         this.dispatchEvent('pageLoaded');
     }

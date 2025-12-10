@@ -179,7 +179,7 @@
                                 <span>Atualizado</span>
                             </div>
                         </div>
-                        <a href="{{ post.download_link }}" class="btn-download-primary" target="_blank">
+                        <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn-download-primary download-btn" data-action="download">
                             <i class="fas fa-download"></i>
                             <span>Fazer Download</span>
                         </a>

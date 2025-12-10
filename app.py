@@ -810,7 +810,7 @@ class User(db.Model, UserMixin):
     # Controle de downloads diários
     daily_downloads = db.Column(db.Integer, default=0)  # Contador de downloads do dia
     download_reset_date = db.Column(db.DateTime)  # Data de reset do contador
-    
+
     # Controle de downloads semanais (para plano Premium)
     weekly_downloads = db.Column(db.Integer, default=0)  # Contador de downloads da semana
     week_reset_date = db.Column(db.DateTime)  # Data de reset semanal (domingo 00:00)
@@ -5528,16 +5528,17 @@ def clear_download_history():
 # Rota para verificar limite de downloads
 @app.route('/check-download-limit', methods=['GET'])
 @login_required
-def check_download_limit():
+def check_download_limit_route():
     """Verifica se o usuário pode fazer download"""
-    can_download, remaining, limit, reset_time = check_user_download_limit(current_user)
+    can_download, remaining, limit, reset_time, period = check_user_download_limit(current_user)
 
     return jsonify({
         'can_download': can_download,
-        'remaining': remaining,
-        'limit': limit,
+        'remaining': int(remaining) if remaining != float('inf') else 'unlimited',
+        'limit': int(limit) if limit != float('inf') else 'unlimited',
         'reset_time': reset_time.isoformat() if reset_time else None,
-        'plan': current_user.plan
+        'plan': current_user.plan,
+        'period': period  # 'daily', 'weekly' ou 'unlimited'
     })
 
 # Rota de logout
@@ -5843,21 +5844,21 @@ def check_user_download_limit(user):
     # VIP: ilimitado
     if user.plan == 'vip':
         return True, float('inf'), float('inf'), None, 'unlimited'
-    
+
     # PREMIUM: 15 downloads semanais (reset domingo 00:00 Brasília)
     elif user.plan == 'premium':
         limit = 15
-        
+
         # Calcular próximo domingo às 00:00 (horário Brasília)
         days_until_sunday = (6 - now_brasilia.weekday()) % 7  # 0=segunda, 6=domingo
         if days_until_sunday == 0 and now_brasilia.hour >= 0:
             days_until_sunday = 7  # Já é domingo, próximo reset é em 7 dias
-        
+
         next_sunday = (now_brasilia + timedelta(days=days_until_sunday)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
         reset_time = next_sunday.astimezone(pytz.utc).replace(tzinfo=None)
-        
+
         # Resetar contador se passou da data de reset
         if user.week_reset_date:
             if now >= user.week_reset_date:
@@ -5867,23 +5868,23 @@ def check_user_download_limit(user):
         else:
             user.week_reset_date = reset_time
             db.session.commit()
-        
+
         current_downloads = user.weekly_downloads or 0
         remaining = max(0, limit - current_downloads)
         can_download = current_downloads < limit
-        
+
         return can_download, remaining, limit, reset_time, 'weekly'
-    
+
     # FREE: 1 download diário (reset meia-noite Brasília)
     else:
         limit = 1
-        
+
         # Calcular próxima meia-noite (horário Brasília)
         next_midnight = (now_brasilia + timedelta(days=1)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
         reset_time = next_midnight.astimezone(pytz.utc).replace(tzinfo=None)
-        
+
         # Resetar contador se passou da data de reset
         if user.download_reset_date:
             if now >= user.download_reset_date:
@@ -5893,11 +5894,11 @@ def check_user_download_limit(user):
         else:
             user.download_reset_date = reset_time
             db.session.commit()
-        
+
         current_downloads = user.daily_downloads or 0
         remaining = max(0, limit - current_downloads)
         can_download = current_downloads < limit
-        
+
         return can_download, remaining, limit, reset_time, 'daily'
 
 

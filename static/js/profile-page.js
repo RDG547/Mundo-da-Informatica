@@ -87,6 +87,12 @@ window.removeFavorite = async function (postId) {
     if (removed) {
         // Recarrega apenas a seção de favoritos dinamicamente
         await reloadFavoritesSection();
+        
+        // Invalidar cache para garantir dados atualizados
+        if (window.dynamicLoader && window.dynamicLoader.cache) {
+            window.dynamicLoader.cache.clear();
+            console.log('[DEBUG] Cache invalidado após remover favorito');
+        }
     }
 };
 
@@ -211,6 +217,11 @@ async function reloadFavoritesSection() {
         setTimeout(() => {
             favoritesSection.style.transition = 'opacity 0.3s ease';
             favoritesSection.style.opacity = '1';
+            
+            // Reinicializar botões de download após atualizar o HTML
+            if (typeof window.setupDownloadButtons === 'function') {
+                window.setupDownloadButtons();
+            }
         }, 10);
 
     } catch (error) {
@@ -219,6 +230,34 @@ async function reloadFavoritesSection() {
             window.favoriteManager.showToast('Erro ao atualizar favoritos', 'error');
         }
     }
+}
+
+// Update ALL profile images across the page
+function updateAllProfileImages(userData) {
+    if (!userData.profile_image) return;
+    
+    const timestamp = new Date().getTime();
+    const imagePath = `/static/uploads/profiles/${userData.profile_image}?t=${timestamp}`;
+    
+    // Update main profile avatar
+    const profileAvatar = document.querySelector('.profile-avatar-large img');
+    if (profileAvatar) {
+        profileAvatar.src = imagePath;
+    }
+    
+    // Update navbar avatar
+    const navbarAvatar = document.querySelector('.navbar .user-dropdown img');
+    if (navbarAvatar) {
+        navbarAvatar.src = imagePath;
+    }
+    
+    // Update sidebar avatar if exists
+    const sidebarAvatar = document.querySelector('.admin-sidebar img[alt*="Perfil"]');
+    if (sidebarAvatar) {
+        sidebarAvatar.src = imagePath;
+    }
+    
+    console.log('Todas as imagens de perfil atualizadas');
 }
 
 // Update profile header with new data
@@ -258,48 +297,6 @@ function updateProfileHeader(userData) {
     } else if (profileBio) {
         // Hide bio if empty
         profileBio.style.display = 'none';
-    }
-
-    // Update profile image if changed
-    if (userData.profile_image) {
-        const profileImg = document.querySelector('.profile-avatar-large img');
-        if (profileImg) {
-            const newSrc = `/static/uploads/profiles/${userData.profile_image}`;
-            // Adiciona timestamp para evitar cache
-            const newSrcWithCache = `${newSrc}?t=${new Date().getTime()}`;
-            profileImg.src = newSrcWithCache;
-        }
-
-        // Update navbar dropdown image too
-        const navbarToggle = document.querySelector('.navbar .user-dropdown .dropdown-toggle');
-        if (navbarToggle) {
-            const navbarImg = navbarToggle.querySelector('img');
-            const navSrc = `/static/uploads/profiles/${userData.profile_image}`;
-            const navSrcWithCache = `${navSrc}?t=${new Date().getTime()}`;
-
-            if (navbarImg) {
-                // Update existing image
-                navbarImg.src = navSrcWithCache;
-            } else {
-                // Replace icon with image
-                const icon = navbarToggle.querySelector('i');
-                if (icon) {
-                    const newImg = document.createElement('img');
-                    newImg.src = navSrcWithCache;
-                    newImg.alt = userData.username || 'User';
-                    newImg.style.width = '30px';
-                    newImg.style.height = '30px';
-                    newImg.style.borderRadius = '50%';
-                    newImg.style.objectFit = 'cover';
-                    newImg.style.marginRight = '5px'; // Espaçamento
-
-                    // Inserir antes do texto (que é um nó de texto)
-                    // O ícone geralmente é o primeiro filho
-                    navbarToggle.insertBefore(newImg, icon);
-                    icon.remove();
-                }
-            }
-        }
     }
 }
 
@@ -470,7 +467,7 @@ function initializeProfilePage() {
     // Edit Profile Form Handler
     const editProfileForm = document.getElementById('editProfileForm');
     console.log('[DEBUG] Edit Profile Form:', editProfileForm ? 'encontrado' : 'NÃO encontrado');
-    
+
     if (editProfileForm) {
         editProfileForm.addEventListener('submit', async function (e) {
             console.log('[DEBUG] Form submit interceptado');
@@ -502,12 +499,21 @@ function initializeProfilePage() {
 
                 if (data.success) {
                     console.log('[DEBUG] Sucesso! Fechando modal e atualizando interface');
-                    
+
                     // Close modal
                     window.closeEditModal();
 
                     // Update profile header with new data
                     updateProfileHeader(data.user);
+                    
+                    // Update ALL profile images in the page (including navbar)
+                    updateAllProfileImages(data.user);
+                    
+                    // Invalidar cache do Dynamic Loading para forçar recarga na próxima navegação
+                    if (window.dynamicLoader && window.dynamicLoader.cache) {
+                        window.dynamicLoader.cache.clear();
+                        console.log('[DEBUG] Cache do Dynamic Loading invalidado');
+                    }
 
                     // Show success message
                     showToast('Perfil atualizado com sucesso!', 'success');

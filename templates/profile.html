@@ -231,7 +231,7 @@
                                             </a>
                                             {% if post.download_link %}
                                             <a href="{{ url_for('download_post', post_id=post.id) }}"
-                                                class="btn btn-success">
+                                                class="btn btn-success download-btn" data-action="download">
                                                 <i class="fas fa-download"></i> Download
                                             </a>
                                             {% endif %}
@@ -294,7 +294,7 @@
                                             </a>
                                             {% if post.download_link %}
                                             <a href="{{ url_for('download_post', post_id=post.id) }}"
-                                                class="btn btn-success">
+                                                class="btn btn-success download-btn" data-action="download">
                                                 <i class="fas fa-download"></i> Download
                                             </a>
                                             {% endif %}

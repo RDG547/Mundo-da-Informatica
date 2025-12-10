@@ -48,12 +48,12 @@ function showDownloadLimitModal(message) {
     const countdownContainer = modal.querySelector('.download-limit-countdown');
 
     messageEl.textContent = message;
-    
+
     // Ocultar contador regressivo (usuário decide se quer ver planos)
     if (countdownContainer) {
         countdownContainer.style.display = 'none';
     }
-    
+
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
@@ -104,8 +104,8 @@ async function checkDownloadLimit() {
     }
 }
 
-// Interceptar cliques em botões de download
-function setupDownloadButtons() {
+// Interceptar cliques em botões de download (GLOBAL para ser chamado pelo Dynamic Loading)
+window.setupDownloadButtons = function setupDownloadButtons() {
     // Selecionar todos os botões de download
     const downloadButtons = document.querySelectorAll('a[href*="download"], .download-btn, .btn-download, [data-action="download"]');
 
@@ -123,7 +123,7 @@ function setupDownloadButtons() {
             // SEMPRE prevenir comportamento padrão primeiro
             e.preventDefault();
             e.stopPropagation();
-            
+
             // Prevenir múltiplos cliques
             if (button.dataset.downloading === 'true') {
                 return;
@@ -151,13 +151,13 @@ function setupDownloadButtons() {
             }
 
             console.log('[DOWNLOAD] Limite OK, redirecionando para download');
-            
+
             // Apenas se passou na verificação, fazer navegação manual
             const downloadUrl = button.href || button.dataset.href;
             if (downloadUrl) {
                 window.location.href = downloadUrl;
             }
-            
+
             // Liberar botão após navegação
             setTimeout(() => {
                 button.dataset.downloading = 'false';

@@ -39,43 +39,23 @@ function createDownloadLimitModal() {
     }
 }
 
-// Mostrar modal de limite excedido
-function showDownloadLimitModal(message, autoRedirect = true) {
+// Mostrar modal de limite excedido (SEM redirecionamento automático)
+function showDownloadLimitModal(message) {
     createDownloadLimitModal();
 
     const modal = document.getElementById('downloadLimitModal');
     const messageEl = document.getElementById('limitMessage');
-    const countdownNumber = document.getElementById('countdownNumber');
-    const countdownText = document.getElementById('countdownText');
-    const progressCircle = modal.querySelector('.countdown-progress');
+    const countdownContainer = modal.querySelector('.download-limit-countdown');
 
     messageEl.textContent = message;
+    
+    // Ocultar contador regressivo (usuário decide se quer ver planos)
+    if (countdownContainer) {
+        countdownContainer.style.display = 'none';
+    }
+    
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-
-    if (autoRedirect) {
-        let countdown = 5;
-        const circumference = 2 * Math.PI * 54;
-        progressCircle.style.strokeDasharray = circumference;
-
-        const interval = setInterval(() => {
-            countdown--;
-            countdownNumber.textContent = countdown;
-            countdownText.textContent = countdown;
-
-            // Atualizar círculo de progresso
-            const offset = circumference - (countdown / 5) * circumference;
-            progressCircle.style.strokeDashoffset = offset;
-
-            if (countdown <= 0) {
-                clearInterval(interval);
-                redirectToPlans();
-            }
-        }, 1000);
-
-        // Armazenar interval para poder cancelar
-        modal.dataset.interval = interval;
-    }
 }
 
 // Fechar modal
@@ -138,11 +118,14 @@ function setupDownloadButtons() {
         // Marcar como processado
         button.dataset.downloadControlled = 'true';
 
-        // Adicionar listener
+        // Adicionar listener com PREVENÇÃO IMEDIATA
         button.addEventListener('click', async function(e) {
+            // SEMPRE prevenir comportamento padrão primeiro
+            e.preventDefault();
+            e.stopPropagation();
+            
             // Prevenir múltiplos cliques
             if (button.dataset.downloading === 'true') {
-                e.preventDefault();
                 return;
             }
 
@@ -150,35 +133,36 @@ function setupDownloadButtons() {
             const isAuthenticated = document.body.dataset.authenticated === 'true';
 
             if (!isAuthenticated) {
-                e.preventDefault();
                 alert('Você precisa estar logado para fazer downloads!');
                 window.location.href = '/login';
                 return;
             }
 
-            // Marcar como processando para evitar cliques duplicados
+            // Marcar como processando
             button.dataset.downloading = 'true';
 
-            // Verificar limite de downloads
+            // VERIFICAR LIMITE PRIMEIRO, antes de qualquer navegação
             const canDownload = await checkDownloadLimit();
 
             if (!canDownload) {
-                console.log('[DOWNLOAD] Limite atingido, bloqueando navegação');
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                button.dataset.downloading = 'false'; // Liberar botão se bloqueado
-                return false; // Explicitamente bloquear
+                console.log('[DOWNLOAD] Limite atingido, bloqueando download');
+                button.dataset.downloading = 'false';
+                return; // Modal já foi exibido, não fazer nada mais
             }
 
-            console.log('[DOWNLOAD] Limite OK, permitindo download');
-            // Se passou nas verificações, permitir o download
-            // O link será seguido normalmente
-            // Após 2 segundos, liberar botão (tempo para o servidor registrar)
+            console.log('[DOWNLOAD] Limite OK, redirecionando para download');
+            
+            // Apenas se passou na verificação, fazer navegação manual
+            const downloadUrl = button.href || button.dataset.href;
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+            }
+            
+            // Liberar botão após navegação
             setTimeout(() => {
                 button.dataset.downloading = 'false';
             }, 2000);
-        });
+        }, true); // useCapture=true para garantir execução antes de outros handlers
     });
 }
 

@@ -238,23 +238,34 @@
     flex: 1;
 }
 
-.feature-item {
+.plan-card .feature-item {
     display: flex;
     align-items: flex-start;
     gap: 1rem;
     padding: 0.75rem 0;
-    border-bottom: 1px solid #f8f9fa;
+    border: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    cursor: default !important;
+    pointer-events: none;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
-.feature-item.excluded {
+.plan-card .feature-item.excluded {
     opacity: 0.6;
 }
 
-.feature-item:last-child {
-    border-bottom: none;
+/* Remove hover effects from feature items in plans */
+.plan-card .feature-item:hover {
+    background: transparent !important;
+    color: inherit !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
-.feature-icon {
+.plan-card .feature-icon {
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -264,9 +275,10 @@
     flex-shrink: 0;
     font-size: 0.75rem;
     margin-top: 2px;
+    pointer-events: auto;
 }
 
-.feature-item.included .feature-icon {
+.plan-card .feature-item.included .feature-icon {
     background: #28a745;
     /* Vivid Green */
     color: white;
@@ -275,11 +287,11 @@
     box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
 }
 
-.feature-item.included .feature-icon i {
+.plan-card .feature-item.included .feature-icon i {
     color: white !important;
 }
 
-.feature-item.excluded .feature-icon {
+.plan-card .feature-item.excluded .feature-icon {
     background: #ff0000;
     /* Pure Red */
     color: white;
@@ -288,15 +300,16 @@
     box-shadow: 0 2px 5px rgba(255, 0, 0, 0.3);
 }
 
-.feature-item.excluded .feature-icon i {
+.plan-card .feature-item.excluded .feature-icon i {
     color: white !important;
 }
 
-.feature-text {
+.plan-card .feature-text {
     flex: 1;
     font-size: 0.95rem;
     color: #4a5568;
     line-height: 1.5;
+    pointer-events: auto;
 }
 
 /* Plan CTA Button */

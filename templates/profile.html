@@ -359,7 +359,7 @@
                         <div class="download-card">
                             <!-- Imagem do Post -->
                             {% if download.post.image_url and download.post.image_url != 'default.jpg' %}
-                            <img src="{{ url_for('static', filename='images/posts/' + download.post.image_url) }}"
+                            <img src="{{ url_for('static', filename='images/' + download.post.image_url) }}"
                                  alt="{{ download.post.title }}"
                                  class="download-card-image"
                                  onerror="this.style.display='none'">

@@ -1530,8 +1530,8 @@ def post_by_slug(category, slug):
     return render_template('post.html', post=post, related_posts=related_posts, comments=comments,
                          favorite_post_ids=favorite_post_ids, title=post.title)
 
-def check_download_limit(user):
-    """Verifica se o usuário pode fazer download baseado no plano"""
+def check_download_limit_legacy(user):
+    """[DEPRECATED] Verifica se o usuário pode fazer download baseado no plano - Use check_user_download_limit()"""
     if user.role == 'admin' or user.role == 'editor':
         return True, "Acesso administrativo."
 
@@ -1609,10 +1609,11 @@ def download_post(post_id):
     print(f"[DEBUG] Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
 
     # Verificar permissões baseadas no plano ANTES de registrar o download
-    allowed, message = check_download_limit(user)
-    print(f"[DEBUG] Verificação de limite: allowed={allowed}, message={message}")
+    can_download, remaining, limit, reset_time = check_user_download_limit(user)
+    print(f"[DEBUG] Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}")
 
-    if not allowed:
+    if not can_download:
+        message = f"Você atingiu o limite de {limit} downloads diários. Próximo reset à meia-noite."
         flash(message, 'warning')
         print(f"[DEBUG] Download negado para {user.username}")
         return redirect(url_for('plans'))
@@ -1620,8 +1621,12 @@ def download_post(post_id):
     # Registrar download (isso incrementa o contador para próxima verificação)
     new_download = Download(user_id=user.id, post_id=post.id, timestamp=datetime.utcnow())
     db.session.add(new_download)
+
+    # Incrementar contador diário do usuário
+    user.daily_downloads = (user.daily_downloads or 0) + 1
+
     db.session.commit()
-    print(f"[DEBUG] Download registrado para {user.username}")
+    print(f"[DEBUG] Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
 
     # Incrementar downloads do post
     increment_post_downloads(post_id)
@@ -2354,8 +2359,9 @@ def debug_check_limits():
         'downloads': {
             'today': downloads_today,
             'this_week': downloads_week,
-            'can_download': check_download_limit(user)[0],
-            'message': check_download_limit(user)[1]
+            'can_download': check_user_download_limit(user)[0],
+            'remaining': check_user_download_limit(user)[1],
+            'limit': check_user_download_limit(user)[2]
         },
         'comments': {
             'today': comments_today,
@@ -5515,7 +5521,7 @@ def clear_download_history():
 def check_download_limit():
     """Verifica se o usuário pode fazer download"""
     can_download, remaining, limit, reset_time = check_user_download_limit(current_user)
-    
+
     return jsonify({
         'can_download': can_download,
         'remaining': remaining,
@@ -5828,16 +5834,16 @@ def check_user_download_limit(user):
     }
 
     limit = download_limits.get(user.plan, 5)
-    
+
     # Verificar downloads nas últimas 24 horas
     brasilia_tz = pytz.timezone('America/Sao_Paulo')
     now = datetime.utcnow()
-    
+
     # Calcular reset_time (meia-noite de Brasília)
     now_brasilia = pytz.utc.localize(now).astimezone(brasilia_tz)
     next_midnight = (now_brasilia + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     reset_time = next_midnight.astimezone(pytz.utc).replace(tzinfo=None)
-    
+
     if user.download_reset_date:
         # Se já passou da data de reset, resetar contador
         if now >= user.download_reset_date:
@@ -5848,12 +5854,12 @@ def check_user_download_limit(user):
         # Primeira vez, definir data de reset
         user.download_reset_date = reset_time
         db.session.commit()
-    
+
     # Verificar se atingiu o limite
     current_downloads = user.daily_downloads or 0
     remaining = max(0, limit - current_downloads) if limit != float('inf') else float('inf')
     can_download = limit == float('inf') or current_downloads < limit
-    
+
     return can_download, remaining, limit, reset_time
 
 

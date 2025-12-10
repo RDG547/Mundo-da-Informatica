@@ -7,22 +7,22 @@ def add_download_control_fields():
     with app.app_context():
         try:
             print("Verificando campos de controle de downloads...")
-            
+
             # Verificar se as colunas já existem
             check_columns_query = text("""
-                SELECT COUNT(*) FROM pragma_table_info('user') 
+                SELECT COUNT(*) FROM pragma_table_info('user')
                 WHERE name IN ('daily_downloads', 'download_reset_date')
             """)
-            
+
             result = db.session.execute(check_columns_query)
             columns_exist = result.scalar()
-            
+
             if columns_exist == 2:
                 print("✅ Campos já existem no banco de dados.")
                 return
-            
+
             print("Adicionando campos de controle de downloads...")
-            
+
             # Adicionar coluna daily_downloads se não existir
             try:
                 db.session.execute(text("""
@@ -33,7 +33,7 @@ def add_download_control_fields():
                 if "duplicate column name" not in str(e).lower():
                     raise
                 print("Campo daily_downloads já existe.")
-            
+
             # Adicionar coluna download_reset_date se não existir
             try:
                 db.session.execute(text("""
@@ -44,10 +44,10 @@ def add_download_control_fields():
                 if "duplicate column name" not in str(e).lower():
                     raise
                 print("Campo download_reset_date já existe.")
-            
+
             db.session.commit()
             print("✅ Migração concluída com sucesso!")
-            
+
         except Exception as e:
             db.session.rollback()
             print(f"❌ Erro ao adicionar campos: {e}")

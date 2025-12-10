@@ -126,7 +126,7 @@
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                     {% if post.download_link %}
-                                    <a href="{{ post.download_link }}" class="btn btn-download" target="_blank" style="flex: 1; min-width: 120px;">
+                                    <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                         <i class="fas fa-download"></i> Download
                                     </a>
                                     {% endif %}

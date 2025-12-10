@@ -87,7 +87,7 @@ window.removeFavorite = async function (postId) {
     if (removed) {
         // Recarrega apenas a seção de favoritos dinamicamente
         await reloadFavoritesSection();
-        
+
         // Invalidar cache para garantir dados atualizados
         if (window.dynamicLoader && window.dynamicLoader.cache) {
             window.dynamicLoader.cache.clear();
@@ -217,7 +217,7 @@ async function reloadFavoritesSection() {
         setTimeout(() => {
             favoritesSection.style.transition = 'opacity 0.3s ease';
             favoritesSection.style.opacity = '1';
-            
+
             // Reinicializar botões de download após atualizar o HTML
             if (typeof window.setupDownloadButtons === 'function') {
                 window.setupDownloadButtons();
@@ -235,28 +235,28 @@ async function reloadFavoritesSection() {
 // Update ALL profile images across the page
 function updateAllProfileImages(userData) {
     if (!userData.profile_image) return;
-    
+
     const timestamp = new Date().getTime();
     const imagePath = `/static/uploads/profiles/${userData.profile_image}?t=${timestamp}`;
-    
+
     // Update main profile avatar
     const profileAvatar = document.querySelector('.profile-avatar-large img');
     if (profileAvatar) {
         profileAvatar.src = imagePath;
     }
-    
+
     // Update navbar avatar
     const navbarAvatar = document.querySelector('.navbar .user-dropdown img');
     if (navbarAvatar) {
         navbarAvatar.src = imagePath;
     }
-    
+
     // Update sidebar avatar if exists
     const sidebarAvatar = document.querySelector('.admin-sidebar img[alt*="Perfil"]');
     if (sidebarAvatar) {
         sidebarAvatar.src = imagePath;
     }
-    
+
     console.log('Todas as imagens de perfil atualizadas');
 }
 
@@ -298,6 +298,61 @@ function updateProfileHeader(userData) {
         // Hide bio if empty
         profileBio.style.display = 'none';
     }
+    
+    // Update location
+    const locationElement = document.querySelector('.profile-location');
+    if (locationElement && userData.location) {
+        locationElement.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${userData.location}`;
+        locationElement.style.display = '';
+    } else if (locationElement) {
+        locationElement.style.display = 'none';
+    }
+    
+    // Update website
+    const websiteElement = document.querySelector('.profile-website');
+    if (websiteElement && userData.website) {
+        websiteElement.href = userData.website;
+        websiteElement.textContent = userData.website.replace(/^https?:\/\//, '');
+        websiteElement.style.display = '';
+    } else if (websiteElement) {
+        websiteElement.style.display = 'none';
+    }
+    
+    // Update social links
+    const socialLinks = {
+        facebook: userData.facebook_url,
+        twitter: userData.twitter_url,
+        linkedin: userData.linkedin_url,
+        github: userData.github_url
+    };
+    
+    Object.keys(socialLinks).forEach(platform => {
+        const link = document.querySelector(`.social-link[data-platform="${platform}"]`);
+        if (link && socialLinks[platform]) {
+            link.href = socialLinks[platform];
+            link.style.display = '';
+        } else if (link) {
+            link.style.display = 'none';
+        }
+    });
+    
+    // Update all username references in the page
+    document.querySelectorAll('[data-username]').forEach(el => {
+        if (userData.username) {
+            el.textContent = userData.username;
+            el.setAttribute('data-username', userData.username);
+        }
+    });
+    
+    // Update all name references
+    document.querySelectorAll('[data-name]').forEach(el => {
+        if (userData.name) {
+            el.textContent = userData.name;
+            el.setAttribute('data-name', userData.name);
+        }
+    });
+    
+    console.log('Perfil atualizado com sucesso em tempo real');
 }
 
 // Show toast notification
@@ -505,10 +560,10 @@ function initializeProfilePage() {
 
                     // Update profile header with new data
                     updateProfileHeader(data.user);
-                    
+
                     // Update ALL profile images in the page (including navbar)
                     updateAllProfileImages(data.user);
-                    
+
                     // Invalidar cache do Dynamic Loading para forçar recarga na próxima navegação
                     if (window.dynamicLoader && window.dynamicLoader.cache) {
                         window.dynamicLoader.cache.clear();

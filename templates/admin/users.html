@@ -702,6 +702,93 @@
                         </div>
                     </div>
                 </div>
+                
+                <hr class="my-4">
+
+                <div class="row">
+                    <div class="col-12">
+                        <h5><i class="fas fa-download"></i> Controle de Downloads</h5>
+                        <p class="text-muted mb-3">Gerencie os limites e contadores de download do usuário</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="download-stats-card">
+                                    <div class="stats-header">
+                                        <h6><i class="fas fa-calendar-day"></i> Downloads Diários</h6>
+                                    </div>
+                                    <div class="stats-body">
+                                        <div class="current-count">
+                                            <span class="count-label">Atual:</span>
+                                            <span class="count-value" id="currentDailyDownloads">0</span>
+                                            <span class="count-separator">/</span>
+                                            <span class="count-limit" id="dailyLimit">1</span>
+                                        </div>
+                                        <div class="reset-info">
+                                            <i class="fas fa-clock"></i>
+                                            <span id="dailyResetTime">Reset à meia-noite</span>
+                                        </div>
+                                    </div>
+                                    <div class="stats-actions">
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-success" onclick="adjustDownloads('daily', 'reset')">
+                                            <i class="fas fa-redo"></i> Resetar
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-outline" onclick="adjustDownloads('daily', 'increase', 1)">
+                                            <i class="fas fa-plus"></i> +1
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-outline" onclick="adjustDownloads('daily', 'decrease', 1)">
+                                            <i class="fas fa-minus"></i> -1
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-primary" onclick="setExactDownloads('daily')">
+                                            <i class="fas fa-edit"></i> Definir
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="download-stats-card">
+                                    <div class="stats-header">
+                                        <h6><i class="fas fa-calendar-week"></i> Downloads Semanais</h6>
+                                    </div>
+                                    <div class="stats-body">
+                                        <div class="current-count">
+                                            <span class="count-label">Atual:</span>
+                                            <span class="count-value" id="currentWeeklyDownloads">0</span>
+                                            <span class="count-separator">/</span>
+                                            <span class="count-limit" id="weeklyLimit">15</span>
+                                        </div>
+                                        <div class="reset-info">
+                                            <i class="fas fa-clock"></i>
+                                            <span id="weeklyResetTime">Reset no domingo</span>
+                                        </div>
+                                    </div>
+                                    <div class="stats-actions">
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-success" onclick="adjustDownloads('weekly', 'reset')">
+                                            <i class="fas fa-redo"></i> Resetar
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-outline" onclick="adjustDownloads('weekly', 'increase', 1)">
+                                            <i class="fas fa-plus"></i> +1
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-outline" onclick="adjustDownloads('weekly', 'decrease', 1)">
+                                            <i class="fas fa-minus"></i> -1
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-sm btn-admin-primary" onclick="setExactDownloads('weekly')">
+                                            <i class="fas fa-edit"></i> Definir
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button type="button" class="btn-admin btn-admin-warning" onclick="adjustDownloads('all', 'reset')">
+                                    <i class="fas fa-sync-alt"></i> Resetar Todos os Contadores
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </form>
         </div>
         <div class="modal-footer">
@@ -1160,6 +1247,80 @@
             transform: translateX(100%);
             opacity: 0;
         }
+    }
+
+    /* Download Controls Styles */
+    .download-stats-card {
+        background: var(--admin-card-bg, #fff);
+        border: 1px solid var(--admin-border, #e0e0e0);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .download-stats-card .stats-header {
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--admin-border, #e0e0e0);
+    }
+    
+    .download-stats-card .stats-header h6 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--admin-text, #333);
+    }
+    
+    .download-stats-card .stats-body {
+        padding: 1rem 0;
+    }
+    
+    .download-stats-card .current-count {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .download-stats-card .count-label {
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: var(--admin-text-light, #666);
+    }
+    
+    .download-stats-card .count-value {
+        color: var(--admin-primary, #8338ec);
+    }
+    
+    .download-stats-card .count-separator {
+        color: var(--admin-text-light, #666);
+    }
+    
+    .download-stats-card .count-limit {
+        color: var(--admin-text, #333);
+    }
+    
+    .download-stats-card .reset-info {
+        font-size: 0.85rem;
+        color: var(--admin-text-light, #666);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .download-stats-card .stats-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding-top: 1rem;
+        border-top: 1px solid var(--admin-border, #e0e0e0);
+    }
+    
+    .btn-admin-sm {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
     }
 
     /* Modal fixes for Users - Simplified */
@@ -1840,5 +2001,99 @@
             applyButton.classList.add('disabled');
         }
     });
+    
+    // Funções de controle de downloads
+    let currentEditingUserId = null;
+    
+    window.adjustDownloads = async function(period, action, value = 1) {
+        if (!currentEditingUserId) {
+            showNotification('Erro: Nenhum usuário selecionado', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/admin/users/${currentEditingUserId}/download-limits`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: action,
+                    period: period,
+                    value: value
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification(data.message, 'success');
+                // Atualizar displays
+                if (data.daily_downloads !== undefined) {
+                    document.getElementById('currentDailyDownloads').textContent = data.daily_downloads;
+                }
+                if (data.weekly_downloads !== undefined) {
+                    document.getElementById('currentWeeklyDownloads').textContent = data.weekly_downloads;
+                }
+            } else {
+                showNotification(data.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erro ao atualizar limites de download', 'error');
+            console.error('Erro:', error);
+        }
+    };
+    
+    window.setExactDownloads = async function(period) {
+        const value = prompt(`Digite o número exato de downloads ${period === 'daily' ? 'diários' : 'semanais'}:`);
+        if (value === null) return; // Cancelado
+        
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 0) {
+            showNotification('Por favor, digite um número válido', 'error');
+            return;
+        }
+        
+        await adjustDownloads(period, 'set', numValue);
+    };
+    
+    // Atualizar função editUser para carregar dados de download
+    const originalEditUser = window.editUser;
+    window.editUser = async function(userId) {
+        currentEditingUserId = userId;
+        
+        // Chamar função original se existir
+        if (typeof originalEditUser === 'function') {
+            originalEditUser(userId);
+        }
+        
+        // Carregar dados de download
+        try {
+            const response = await fetch(`/admin/users/${userId}/data`);
+            const data = await response.json();
+            
+            if (data) {
+                document.getElementById('currentDailyDownloads').textContent = data.daily_downloads || 0;
+                document.getElementById('currentWeeklyDownloads').textContent = data.weekly_downloads || 0;
+                document.getElementById('dailyLimit').textContent = data.daily_limit || 1;
+                document.getElementById('weeklyLimit').textContent = data.weekly_limit || 15;
+                
+                // Formatar datas de reset
+                if (data.download_reset_date) {
+                    const resetDate = new Date(data.download_reset_date);
+                    document.getElementById('dailyResetTime').textContent = 
+                        `Reset em ${resetDate.toLocaleDateString('pt-BR')} às ${resetDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}`;
+                }
+                
+                if (data.week_reset_date) {
+                    const resetDate = new Date(data.week_reset_date);
+                    document.getElementById('weeklyResetTime').textContent = 
+                        `Reset em ${resetDate.toLocaleDateString('pt-BR')} às ${resetDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}`;
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados de download:', error);
+        }
+    };
 </script>
 {% endblock %}

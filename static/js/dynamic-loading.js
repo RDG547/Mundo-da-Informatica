@@ -89,6 +89,9 @@ class DynamicLoader {
 
         // Don't intercept download links
         if (link.download) return false;
+        
+        // DON'T INTERCEPT DOWNLOAD ROUTES - handled by download-control.js
+        if (link.href.includes('/download/')) return false;
 
         // Don't intercept anchor links on same page
         if (link.href.includes('#') && link.pathname === window.location.pathname) return false;

@@ -1616,13 +1616,27 @@ def download_post(post_id):
     print(f"[DEBUG] Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}, period={period}")
 
     if not can_download:
+        # Se a verificação JavaScript falhou ou foi bypassada, retornar erro 403
+        # O frontend DEVE fazer a verificação primeiro via /check-download-limit
         download_text = "download" if limit == 1 else "downloads"
         period_text = "diários" if period == 'daily' else "semanais" if period == 'weekly' else ""
         reset_text = "à meia-noite" if period == 'daily' else "no domingo às 00:00" if period == 'weekly' else ""
         message = f"Você atingiu o limite de {int(limit)} {download_text} {period_text}. Próximo reset {reset_text}."
-        flash(message, 'warning')
+
         print(f"[DEBUG] Download negado para {user.username}")
-        return redirect(url_for('planos'))
+
+        # Retornar JSON se for requisição AJAX, senão mostrar flash message
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': False,
+                'message': message,
+                'can_download': False,
+                'remaining': int(remaining) if remaining != float('inf') else 'unlimited',
+                'limit': int(limit) if limit != float('inf') else 'unlimited'
+            }), 403
+        else:
+            flash(message, 'warning')
+            return redirect(url_for('post', post_id=post_id))
 
     # Registrar download (isso incrementa o contador para próxima verificação)
     new_download = Download(user_id=user.id, post_id=post.id, timestamp=datetime.utcnow())
@@ -4961,6 +4975,20 @@ def admin_users():
 def admin_user_data(user_id):
     """Retorna dados do usuário em JSON para edição"""
     user = User.query.get_or_404(user_id)
+    
+    # Calcular limites baseados no plano
+    if user.plan == 'free':
+        daily_limit = 1
+        weekly_limit = 7
+    elif user.plan == 'premium':
+        daily_limit = 5
+        weekly_limit = 15
+    elif user.plan == 'vip':
+        daily_limit = 999
+        weekly_limit = 999
+    else:
+        daily_limit = 1
+        weekly_limit = 7
 
     return jsonify({
         'id': user.id,
@@ -4970,7 +4998,13 @@ def admin_user_data(user_id):
         'role': user.role,
         'plan': user.plan,
         'is_active': user.is_active,
-        'date_joined': user.date_joined.isoformat() if user.date_joined else None
+        'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+        'daily_downloads': user.daily_downloads or 0,
+        'weekly_downloads': user.weekly_downloads or 0,
+        'daily_limit': daily_limit,
+        'weekly_limit': weekly_limit,
+        'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else None,
+        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else None
     })
 
 @app.route("/admin/users/<int:user_id>/update", methods=['POST'])
@@ -5092,6 +5126,102 @@ def admin_reset_user_password(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao redefinir senha: {str(e)}'})
+
+@app.route("/admin/users/<int:user_id>/download-limits", methods=['POST'])
+@login_required
+@admin_required
+def admin_update_download_limits(user_id):
+    """Atualizar limites de download do usuário"""
+    try:
+        user = User.query.get_or_404(user_id)
+        data = request.get_json()
+        
+        action = data.get('action')
+        period = data.get('period', 'daily')  # daily, weekly, monthly
+        value = data.get('value', 0)
+        
+        brasilia = pytz.timezone('America/Sao_Paulo')
+        now = datetime.now(brasilia)
+        
+        old_values = {
+            'daily_downloads': user.daily_downloads,
+            'weekly_downloads': user.weekly_downloads
+        }
+        
+        if action == 'reset':
+            # Resetar contadores
+            if period == 'daily' or period == 'all':
+                user.daily_downloads = 0
+                user.download_reset_date = now + timedelta(days=1)
+                user.download_reset_date = user.download_reset_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                
+            if period == 'weekly' or period == 'all':
+                user.weekly_downloads = 0
+                # Próximo domingo
+                days_until_sunday = (6 - now.weekday()) % 7
+                if days_until_sunday == 0:
+                    days_until_sunday = 7
+                next_sunday = now + timedelta(days=days_until_sunday)
+                user.week_reset_date = next_sunday.replace(hour=0, minute=0, second=0, microsecond=0)
+                
+            message = f"Limite de download {'diário e semanal' if period == 'all' else period} resetado"
+            
+        elif action == 'set':
+            # Definir valor exato
+            if period == 'daily':
+                user.daily_downloads = int(value)
+            elif period == 'weekly':
+                user.weekly_downloads = int(value)
+            message = f"Downloads {period} definidos para {value}"
+            
+        elif action == 'increase':
+            # Aumentar valor
+            if period == 'daily':
+                user.daily_downloads = (user.daily_downloads or 0) + int(value)
+            elif period == 'weekly':
+                user.weekly_downloads = (user.weekly_downloads or 0) + int(value)
+            message = f"Downloads {period} aumentados em {value}"
+            
+        elif action == 'decrease':
+            # Diminuir valor
+            if period == 'daily':
+                user.daily_downloads = max(0, (user.daily_downloads or 0) - int(value))
+            elif period == 'weekly':
+                user.weekly_downloads = max(0, (user.weekly_downloads or 0) - int(value))
+            message = f"Downloads {period} diminuídos em {value}"
+        else:
+            return jsonify({'success': False, 'message': 'Ação inválida'})
+            
+        db.session.commit()
+        
+        # Log da atividade
+        log_admin_activity(
+            user_id=current_user.id,
+            action='update_download_limits',
+            description=f'Atualizou limites de download de {user.username}',
+            metadata={
+                'target_user_id': user_id,
+                'action': action,
+                'period': period,
+                'value': value,
+                'old_values': old_values,
+                'new_values': {
+                    'daily_downloads': user.daily_downloads,
+                    'weekly_downloads': user.weekly_downloads
+                }
+            }
+        )
+        
+        return jsonify({
+            'success': True, 
+            'message': message,
+            'daily_downloads': user.daily_downloads,
+            'weekly_downloads': user.weekly_downloads
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao atualizar limites: {str(e)}'})
 
 @app.route("/admin/newsletter")
 @login_required
@@ -5721,7 +5851,7 @@ def admin_update_profile():
 
         db.session.commit()
 
-        # Se for uma requisição AJAX, retorna JSON
+        # Se for uma requisição AJAX, retorna JSON com todos os dados
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': True,
@@ -5729,7 +5859,16 @@ def admin_update_profile():
                 'user': {
                     'name': current_user.name,
                     'username': current_user.username,
+                    'email': current_user.email,
                     'bio': current_user.bio,
+                    'phone': current_user.phone,
+                    'location': current_user.location,
+                    'website': current_user.website,
+                    'facebook_url': current_user.facebook,
+                    'twitter_url': current_user.twitter,
+                    'instagram_url': current_user.instagram,
+                    'linkedin_url': current_user.linkedin,
+                    'github_url': current_user.github,
                     'profile_image': current_user.profile_image
                 }
             })

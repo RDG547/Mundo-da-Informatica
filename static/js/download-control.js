@@ -106,62 +106,78 @@ async function checkDownloadLimit() {
 
 // Interceptar cliques em botões de download (GLOBAL para ser chamado pelo Dynamic Loading)
 window.setupDownloadButtons = function setupDownloadButtons() {
-    // Selecionar todos os botões de download
-    const downloadButtons = document.querySelectorAll('a[href*="download"], .download-btn, .btn-download, [data-action="download"]');
+    // Selecionar todos os botões de download - APENAS rotas /download/
+    const downloadButtons = document.querySelectorAll('a[href*="/download/"], .download-btn[href*="/download/"], [data-action="download"][href*="/download/"]');
+
+    console.log(`[DOWNLOAD-CONTROL] Encontrados ${downloadButtons.length} botões de download`);
+    downloadButtons.forEach(btn => console.log('[DOWNLOAD-CONTROL] Botão:', btn.href, btn.className));
 
     downloadButtons.forEach(button => {
         // Verificar se já foi processado (evita duplicação)
         if (button.dataset.downloadControlled === 'true') {
+            console.log('[DOWNLOAD-CONTROL] Botão já controlado:', button.href);
             return;
         }
 
         // Marcar como processado
         button.dataset.downloadControlled = 'true';
+        console.log('[DOWNLOAD-CONTROL] ✅ Listener adicionado ao botão:', button.href);
 
         // Adicionar listener com PREVENÇÃO IMEDIATA
         button.addEventListener('click', async function(e) {
+            console.log('[DOWNLOAD-CONTROL] 🎯 CLICK INTERCEPTADO!', button.href);
+
             // SEMPRE prevenir comportamento padrão primeiro
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation(); // Impede TODOS os outros handlers
+            
+            // Retornar false explicitamente
+            try {
+                // Prevenir múltiplos cliques
+                if (button.dataset.downloading === 'true') {
+                    return false;
+                }
 
-            // Prevenir múltiplos cliques
-            if (button.dataset.downloading === 'true') {
-                return;
-            }
+                // Verificar se o usuário está logado
+                const isAuthenticated = document.body.dataset.authenticated === 'true';
 
-            // Verificar se o usuário está logado
-            const isAuthenticated = document.body.dataset.authenticated === 'true';
+                if (!isAuthenticated) {
+                    alert('Você precisa estar logado para fazer downloads!');
+                    window.location.href = '/login';
+                    return false;
+                }
 
-            if (!isAuthenticated) {
-                alert('Você precisa estar logado para fazer downloads!');
-                window.location.href = '/login';
-                return;
-            }
+                // Marcar como processando
+                button.dataset.downloading = 'true';
 
-            // Marcar como processando
-            button.dataset.downloading = 'true';
+                // VERIFICAR LIMITE PRIMEIRO, antes de qualquer navegação
+                const canDownload = await checkDownloadLimit();
 
-            // VERIFICAR LIMITE PRIMEIRO, antes de qualquer navegação
-            const canDownload = await checkDownloadLimit();
+                if (!canDownload) {
+                    console.log('[DOWNLOAD] Limite atingido, bloqueando download');
+                    button.dataset.downloading = 'false';
+                    return false; // Modal já foi exibido, não fazer nada mais
+                }
 
-            if (!canDownload) {
-                console.log('[DOWNLOAD] Limite atingido, bloqueando download');
+                console.log('[DOWNLOAD] Limite OK, redirecionando para download');
+
+                // Apenas se passou na verificação, fazer navegação manual
+                const downloadUrl = button.href || button.dataset.href;
+                if (downloadUrl) {
+                    window.location.href = downloadUrl;
+                }
+
+                // Liberar botão após navegação
+                setTimeout(() => {
+                    button.dataset.downloading = 'false';
+                }, 2000);
+            } catch (error) {
+                console.error('[DOWNLOAD-CONTROL] Erro:', error);
                 button.dataset.downloading = 'false';
-                return; // Modal já foi exibido, não fazer nada mais
             }
-
-            console.log('[DOWNLOAD] Limite OK, redirecionando para download');
-
-            // Apenas se passou na verificação, fazer navegação manual
-            const downloadUrl = button.href || button.dataset.href;
-            if (downloadUrl) {
-                window.location.href = downloadUrl;
-            }
-
-            // Liberar botão após navegação
-            setTimeout(() => {
-                button.dataset.downloading = 'false';
-            }, 2000);
+            
+            return false;
         }, true); // useCapture=true para garantir execução antes de outros handlers
     });
 }
@@ -200,9 +216,18 @@ async function confirmClearHistory() {
     }
 }
 
-// Inicializar quando o DOM estiver pronto
+// Inicializar quando o DOM estiver pronto E após pequeno delay
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('[DOWNLOAD-CONTROL] DOMContentLoaded - iniciando configuração');
+    
+    // Chamar imediatamente
     setupDownloadButtons();
+    
+    // E também após 500ms para garantir que pegou botões carregados dinamicamente
+    setTimeout(() => {
+        console.log('[DOWNLOAD-CONTROL] Setup atrasado (500ms) - reprocessando botões');
+        setupDownloadButtons();
+    }, 500);
 
     // Observar mudanças no DOM para novos botões adicionados dinamicamente
     let observerTimeout;
@@ -210,6 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Debounce: aguardar 100ms antes de processar mudanças
         clearTimeout(observerTimeout);
         observerTimeout = setTimeout(() => {
+            console.log('[DOWNLOAD-CONTROL] MutationObserver detectou mudanças');
             setupDownloadButtons();
         }, 100);
     });

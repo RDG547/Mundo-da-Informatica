@@ -1,6 +1,5 @@
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import joinedload
 from flask_assets import Environment
 from webassets.bundle import Bundle
 from flask_compress import Compress
@@ -1609,7 +1608,7 @@ def download_post(post_id):
     print(f"[DEBUG] Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
 
     # Verificar permissões baseadas no plano ANTES de registrar o download
-    can_download, remaining, limit, reset_time = check_user_download_limit(user)
+    can_download, remaining, limit, _ = check_user_download_limit(user)
     print(f"[DEBUG] Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}")
 
     if not can_download:

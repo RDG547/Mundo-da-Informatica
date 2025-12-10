@@ -79,6 +79,7 @@ function showDownloadLimitModal(message, autoRedirect = true) {
 }
 
 // Fechar modal
+// eslint-disable-next-line no-unused-vars
 function closeDownloadLimitModal() {
     const modal = document.getElementById('downloadLimitModal');
     if (modal) {
@@ -128,12 +129,16 @@ function setupDownloadButtons() {
     const downloadButtons = document.querySelectorAll('a[href*="download"], .download-btn, .btn-download, [data-action="download"]');
 
     downloadButtons.forEach(button => {
-        // Remover listeners antigos
-        const newButton = button.cloneNode(true);
-        button.parentNode.replaceChild(newButton, button);
+        // Verificar se já foi processado (evita duplicação)
+        if (button.dataset.downloadControlled === 'true') {
+            return;
+        }
 
-        // Adicionar novo listener
-        newButton.addEventListener('click', async function(e) {
+        // Marcar como processado
+        button.dataset.downloadControlled = 'true';
+
+        // Adicionar listener
+        button.addEventListener('click', async function(e) {
             // Verificar se o usuário está logado
             const isAuthenticated = document.body.dataset.authenticated === 'true';
 
@@ -159,6 +164,7 @@ function setupDownloadButtons() {
 }
 
 // Função para limpar histórico de downloads
+// eslint-disable-next-line no-unused-vars
 async function confirmClearHistory() {
     const confirmation = confirm('Tem certeza que deseja limpar todo o histórico de downloads? Esta ação não pode ser desfeita.');
 
@@ -196,8 +202,13 @@ document.addEventListener('DOMContentLoaded', function() {
     setupDownloadButtons();
 
     // Observar mudanças no DOM para novos botões adicionados dinamicamente
+    let observerTimeout;
     const observer = new MutationObserver(function(mutations) {
-        setupDownloadButtons();
+        // Debounce: aguardar 100ms antes de processar mudanças
+        clearTimeout(observerTimeout);
+        observerTimeout = setTimeout(() => {
+            setupDownloadButtons();
+        }, 100);
     });
 
     observer.observe(document.body, {

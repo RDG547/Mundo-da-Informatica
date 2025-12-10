@@ -2,6 +2,7 @@
 
 {% block extra_css %}
 <!-- Garantir carregamento do CSS admin para sidebar -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/download-history.css') }}">
 <style>
     /* Garantir que sidebar seja carregada corretamente */
     .profile-admin-sidebar {
@@ -353,43 +354,64 @@
                         </div>
                     </div>
                     {% if download_history and download_history|length > 0 %}
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Post</th>
-                                    <th>Data</th>
-                                    <th>Ação</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for download in download_history %}
-                                <tr>
-                                    <td>
-                                        {% if download.post._category_cache %}
-                                        <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}" style="color: var(--primary-color); text-decoration: none;">
-                                            {{ download.post.title }}
-                                        </a>
-                                        {% else %}
-                                        <span>{{ download.post.title }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ download.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
-                                    <td>
-                                        <a href="{{ download.post.download_link }}" class="btn btn-sm btn-gradient primary" target="_blank">
-                                            <i class="fas fa-download"></i> Baixar Novamente
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="download-history-grid">
+                        {% for download in download_history %}
+                        <div class="download-card">
+                            <!-- Imagem do Post -->
+                            <img src="{{ url_for('static', filename='images/posts/' + (download.post.image or 'default-post.jpg')) }}" 
+                                 alt="{{ download.post.title }}"
+                                 class="download-card-image"
+                                 onerror="this.src='{{ url_for('static', filename='images/posts/default-post.jpg') }}'">
+                            
+                            <div class="download-card-body">
+                                <!-- Título do Post -->
+                                <div class="download-card-title">
+                                    {% if download.post._category_cache %}
+                                    <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}">
+                                        {{ download.post.title }}
+                                    </a>
+                                    {% else %}
+                                    <span>{{ download.post.title }}</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Metadados: Data e Categoria -->
+                                <div class="download-card-meta">
+                                    <div class="download-card-date">
+                                        <i class="far fa-clock"></i>
+                                        <span>{{ download._brasilia_time.strftime('%d/%m/%Y às %H:%M') }}</span>
+                                    </div>
+                                    {% if download.post._category_cache %}
+                                    <div class="download-card-category">
+                                        <i class="fas fa-folder"></i>
+                                        {{ download.post._category_cache.name }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Botões de Ação -->
+                                <div class="download-card-actions">
+                                    {% if download.post._category_cache %}
+                                    <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}" 
+                                       class="download-card-btn download-card-btn-secondary">
+                                        <i class="fas fa-eye"></i> Ver Post
+                                    </a>
+                                    {% endif %}
+                                    <a href="{{ download.post.download_link }}" 
+                                       class="download-card-btn download-card-btn-primary" 
+                                       target="_blank">
+                                        <i class="fas fa-download"></i> Baixar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                     {% else %}
-                    <div class="empty-state">
-                        <i class="fas fa-download" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem;"></i>
-                        <p>Você ainda não fez nenhum download.</p>
-                        <p class="text-muted">Explore os posts e faça downloads para ver seu histórico aqui!</p>
+                    <div class="download-empty-state">
+                        <i class="fas fa-download"></i>
+                        <h3>Nenhum download ainda</h3>
+                        <p>Explore os posts e faça downloads para ver seu histórico aqui!</p>
                     </div>
                     {% endif %}
                 </div>

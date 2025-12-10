@@ -892,6 +892,9 @@ class Download(db.Model):
     user = db.relationship('User', backref=db.backref('download_records', lazy=True, cascade="all, delete"))
     post = db.relationship('Post', backref=db.backref('download_records', lazy=True, cascade="all, delete"))
 
+    # Constraint para evitar duplicatas no mesmo momento
+    __table_args__ = (db.UniqueConstraint('user_id', 'post_id', 'timestamp', name='unique_user_post_download_time'),)
+
 # Modelo de Favoritos
 class Favorite(db.Model):
     __tablename__ = 'favorites'
@@ -5427,22 +5430,46 @@ def profile(user_id=None):
     if hasattr(user, 'id') and current_user.is_authenticated and current_user.id == user.id:
         has_access, limit = check_download_history_access(user)
         if has_access:
-            # Buscar downloads e carregar relacionamentos manualmente
-            query = Download.query.filter_by(user_id=user.id).order_by(Download.timestamp.desc())
+            # Buscar apenas o download mais recente de cada post (evita duplicatas)
+            from sqlalchemy import func
+            
+            # Subquery para pegar o ID do download mais recente de cada post
+            subquery = db.session.query(
+                Download.post_id,
+                func.max(Download.timestamp).label('max_timestamp')
+            ).filter(
+                Download.user_id == user.id
+            ).group_by(Download.post_id).subquery()
+            
+            # Query principal juntando com a subquery
+            query = db.session.query(Download).join(
+                subquery,
+                db.and_(
+                    Download.post_id == subquery.c.post_id,
+                    Download.timestamp == subquery.c.max_timestamp
+                )
+            ).filter(Download.user_id == user.id).order_by(Download.timestamp.desc())
+            
             if limit:
-                # Premium: últimos 5 downloads
+                # Premium: últimos 5 downloads únicos
                 downloads = query.limit(limit).all()
             else:
-                # VIP: todos os downloads
+                # VIP: todos os downloads únicos
                 downloads = query.all()
-            
+
             # Carregar posts e categorias para cada download
+            brasilia_tz = pytz.timezone('America/Sao_Paulo')
             for download in downloads:
                 if download.post:
                     # Carregar a categoria se não estiver carregada
                     if download.post.category_id and not hasattr(download.post, '_category_cache'):
                         download.post._category_cache = Category.query.get(download.post.category_id)
-            
+                    
+                    # Converter timestamp para timezone de Brasília
+                    if download.timestamp:
+                        utc_time = pytz.utc.localize(download.timestamp)
+                        download._brasilia_time = utc_time.astimezone(brasilia_tz)
+
             download_history = downloads
 
     # Calcular dias como membro

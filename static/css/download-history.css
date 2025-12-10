@@ -165,17 +165,17 @@
         grid-template-columns: 1fr;
         gap: 1rem;
     }
-    
+
     .download-card-image {
         height: 200px;
     }
-    
+
     .download-card-meta {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
     }
-    
+
     .download-card-actions {
         flex-direction: column;
     }

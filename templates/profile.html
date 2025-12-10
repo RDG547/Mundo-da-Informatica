@@ -358,11 +358,17 @@
                         {% for download in download_history %}
                         <div class="download-card">
                             <!-- Imagem do Post -->
-                            <img src="{{ url_for('static', filename='images/posts/' + (download.post.image or 'default-post.jpg')) }}" 
+                            {% if download.post.image_url and download.post.image_url != 'default.jpg' %}
+                            <img src="{{ url_for('static', filename='images/posts/' + download.post.image_url) }}"
                                  alt="{{ download.post.title }}"
                                  class="download-card-image"
-                                 onerror="this.src='{{ url_for('static', filename='images/posts/default-post.jpg') }}'">
-                            
+                                 onerror="this.style.display='none'">
+                            {% else %}
+                            <div class="download-card-image" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            {% endif %}
+
                             <div class="download-card-body">
                                 <!-- Título do Post -->
                                 <div class="download-card-title">
@@ -374,7 +380,7 @@
                                     <span>{{ download.post.title }}</span>
                                     {% endif %}
                                 </div>
-                                
+
                                 <!-- Metadados: Data e Categoria -->
                                 <div class="download-card-meta">
                                     <div class="download-card-date">
@@ -388,17 +394,17 @@
                                     </div>
                                     {% endif %}
                                 </div>
-                                
+
                                 <!-- Botões de Ação -->
                                 <div class="download-card-actions">
                                     {% if download.post._category_cache %}
-                                    <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}" 
+                                    <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}"
                                        class="download-card-btn download-card-btn-secondary">
                                         <i class="fas fa-eye"></i> Ver Post
                                     </a>
                                     {% endif %}
-                                    <a href="{{ download.post.download_link }}" 
-                                       class="download-card-btn download-card-btn-primary" 
+                                    <a href="{{ download.post.download_link }}"
+                                       class="download-card-btn download-card-btn-primary"
                                        target="_blank">
                                         <i class="fas fa-download"></i> Baixar
                                     </a>

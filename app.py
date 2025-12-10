@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import joinedload
 from flask_assets import Environment
 from webassets.bundle import Bundle
 from flask_compress import Compress
@@ -5426,17 +5427,23 @@ def profile(user_id=None):
     if hasattr(user, 'id') and current_user.is_authenticated and current_user.id == user.id:
         has_access, limit = check_download_history_access(user)
         if has_access:
-            # Fazer join com Post e Category para carregar os relacionamentos
-            query = Download.query.filter_by(user_id=user.id)\
-                .join(Post, Download.post_id == Post.id)\
-                .join(Category, Post.category_id == Category.id)\
-                .order_by(Download.timestamp.desc())
+            # Buscar downloads e carregar relacionamentos manualmente
+            query = Download.query.filter_by(user_id=user.id).order_by(Download.timestamp.desc())
             if limit:
                 # Premium: últimos 5 downloads
-                download_history = query.limit(limit).all()
+                downloads = query.limit(limit).all()
             else:
                 # VIP: todos os downloads
-                download_history = query.all()
+                downloads = query.all()
+            
+            # Carregar posts e categorias para cada download
+            for download in downloads:
+                if download.post:
+                    # Carregar a categoria se não estiver carregada
+                    if download.post.category_id and not hasattr(download.post, '_category_cache'):
+                        download.post._category_cache = Category.query.get(download.post.category_id)
+            
+            download_history = downloads
 
     # Calcular dias como membro
     days_as_member = 0

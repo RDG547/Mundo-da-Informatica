@@ -366,9 +366,13 @@
                                 {% for download in download_history %}
                                 <tr>
                                     <td>
-                                        <a href="{{ url_for('post', category=download.post.category.slug, slug=download.post.slug) }}" style="color: var(--primary-color); text-decoration: none;">
+                                        {% if download.post._category_cache %}
+                                        <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}" style="color: var(--primary-color); text-decoration: none;">
                                             {{ download.post.title }}
                                         </a>
+                                        {% else %}
+                                        <span>{{ download.post.title }}</span>
+                                        {% endif %}
                                     </td>
                                     <td>{{ download.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
                                     <td>

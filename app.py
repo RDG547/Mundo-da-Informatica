@@ -122,11 +122,11 @@ limiter = Limiter(
 # Configurar CSP para permitir recursos locais e CDNs necessários
 csp = {
     'default-src': ["'self'"],
-    'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://js.stripe.com"],
-    'style-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
+    'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://js.stripe.com", "https://cdnjs.cloudflare.com", "https://kit.fontawesome.com"],
+    'style-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://use.fontawesome.com", "https://ka-f.fontawesome.com"],
     'img-src': ["'self'", "data:", "https:"],
-    'font-src': ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com"],
-    'connect-src': ["'self'", "https://api.stripe.com"]
+    'font-src': ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://use.fontawesome.com", "https://ka-f.fontawesome.com"],
+    'connect-src': ["'self'", "https://api.stripe.com", "https://ka-f.fontawesome.com"]
 }
 
 # Aplicar Talisman apenas em produção

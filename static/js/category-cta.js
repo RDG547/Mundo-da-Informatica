@@ -52,7 +52,7 @@ async function checkPlanForContentRequest(isAuthenticated, userPlan, contactUrl,
 function showContentRequestModal(message) {
     // Criar modal dinamicamente se não existir
     let modal = document.getElementById('contentRequestModal');
-    
+
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'contentRequestModal';
@@ -79,7 +79,7 @@ function showContentRequestModal(message) {
     } else {
         document.getElementById('contentRequestMessage').textContent = message;
     }
-    
+
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }

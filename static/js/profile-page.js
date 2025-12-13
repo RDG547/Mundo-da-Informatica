@@ -64,13 +64,81 @@ window.openRemoveImageModal = function () {
     }
 };
 
-window.closeRemoveImageModal = function () {
+window.closeRemoveImageModal = function (event) {
     console.log('closeRemoveImageModal chamada');
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     const modal = document.getElementById('removeImageModal');
     if (modal) {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
         console.log('Remove Image Modal fechado com sucesso');
+    }
+};
+
+window.confirmRemoveImage = async function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Desabilitar botão e mostrar loading
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removendo...';
+    
+    try {
+        const response = await fetch('/remove-profile-image', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Fechar modal
+            window.closeRemoveImageModal();
+            
+            // Atualizar imagem para default em tempo real
+            const profileImg = document.querySelector('.profile-avatar-large img');
+            const placeholder = document.querySelector('.avatar-placeholder-large');
+            
+            if (profileImg) {
+                profileImg.style.display = 'none';
+            }
+            
+            if (placeholder) {
+                placeholder.style.display = 'flex';
+            }
+            
+            // Atualizar também no header se existir
+            const headerImg = document.querySelector('.profile-dropdown .user-avatar img');
+            if (headerImg) {
+                headerImg.src = '/static/images/profiles/default.jpg';
+            }
+            
+            // Mostrar mensagem de sucesso
+            showToast(data.message || 'Imagem removida com sucesso!', 'success');
+            
+            // Recarregar página após 1 segundo para garantir atualização completa
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error(data.message || 'Erro ao remover imagem');
+        }
+    } catch (error) {
+        console.error('Erro ao remover imagem:', error);
+        showToast(error.message || 'Erro ao remover imagem. Tente novamente.', 'error');
+        
+        // Restaurar botão
+        button.disabled = false;
+        button.innerHTML = originalText;
     }
 };
 
@@ -646,6 +714,26 @@ function initializeProfilePage() {
         modal.addEventListener('click', function (e) {
             if (e.target === modal) {
                 window.closeEditModal();
+            }
+        });
+    }
+
+    // Close remove image modal on outside click
+    const removeModal = document.getElementById('removeImageModal');
+    if (removeModal) {
+        removeModal.addEventListener('click', function (e) {
+            if (e.target === removeModal) {
+                window.closeRemoveImageModal();
+            }
+        });
+    }
+
+    // Close password modal on outside click
+    const passwordModal = document.getElementById('passwordModal');
+    if (passwordModal) {
+        passwordModal.addEventListener('click', function (e) {
+            if (e.target === passwordModal) {
+                window.closePasswordModal();
             }
         });
     }

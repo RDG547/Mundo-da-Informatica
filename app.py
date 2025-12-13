@@ -1493,11 +1493,11 @@ def to_brazil_time(utc_datetime):
     """Converte datetime UTC para horário de Brasília"""
     if not utc_datetime:
         return None
-    
+
     # Se o datetime não tem timezone, assume UTC
     if utc_datetime.tzinfo is None:
         utc_datetime = pytz.UTC.localize(utc_datetime)
-    
+
     # Converte para horário de Brasília
     brazil_time = utc_datetime.astimezone(BRAZIL_TZ)
     return brazil_time
@@ -6039,16 +6039,33 @@ def update_profile_image():
 @login_required
 def remove_profile_image():
     """Remove a imagem de perfil do usuário logado"""
-    # Deletar a imagem física do filesystem
-    if current_user.profile_image:
-        delete_old_image(current_user.profile_image)
+    try:
+        # Deletar a imagem física do filesystem
+        if current_user.profile_image:
+            delete_old_image(current_user.profile_image)
 
-    # Limpa a imagem de perfil do usuário atual
-    current_user.profile_image = ""
-    db.session.commit()
+        # Limpa a imagem de perfil do usuário atual
+        current_user.profile_image = ""
+        db.session.commit()
 
-    flash('Imagem de perfil removida com sucesso!', 'success')
-    return redirect(url_for('profile'))
+        # Se for requisição AJAX, retorna JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'message': 'Imagem de perfil removida com sucesso!'
+            })
+
+        flash('Imagem de perfil removida com sucesso!', 'success')
+        return redirect(url_for('profile'))
+    except Exception as e:
+        db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': False,
+                'message': f'Erro ao remover imagem: {str(e)}'
+            }), 500
+        flash(f'Erro ao remover imagem: {str(e)}', 'error')
+        return redirect(url_for('profile'))
 
 # Rota para atualizar a imagem de perfil do admin
 @app.route('/admin/update-profile-image', methods=['POST'])

@@ -844,7 +844,7 @@
     <div class="modal-container" style="max-width: 500px;">
         <div class="modal-header">
             <h3><i class="fas fa-trash"></i> Remover Imagem</h3>
-            <button class="modal-close" onclick="closeRemoveImageModal()">
+            <button class="modal-close" onclick="closeRemoveImageModal(event)">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -853,15 +853,13 @@
             <p class="text-muted" style="font-size: 0.9rem;">Esta ação não pode ser desfeita.</p>
         </div>
         <div class="modal-footer" style="justify-content: center; gap: 15px;">
-            <button class="btn btn-outline" onclick="closeRemoveImageModal()" style="color: white !important;">
+            <button class="btn btn-outline" onclick="closeRemoveImageModal(event)" style="background: white !important; color: #6c757d !important; border: 2px solid #dee2e6 !important;">
                 <i class="fas fa-times"></i> Cancelar
             </button>
-            <form action="{{ url_for('remove_profile_image') }}" method="post" style="display: inline;">
-                <button type="submit" class="btn btn-gradient"
-                    style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); border: none; color: white;">
-                    <i class="fas fa-trash"></i> Remover
-                </button>
-            </form>
+            <button type="button" class="btn btn-gradient" onclick="confirmRemoveImage(event)"
+                style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); border: none; color: white;">
+                <i class="fas fa-trash"></i> Remover
+            </button>
         </div>
     </div>
 </div>

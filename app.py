@@ -68,6 +68,12 @@ if not secret_key:
     secret_key = 'dev_key_5f352a14cb7e4b119811'
 app.config['SECRET_KEY'] = secret_key
 
+# Configurações de segurança de sessão
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')  # HTTPS apenas em produção
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Não acessível via JavaScript
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Proteção CSRF
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira em 24h
+
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
@@ -91,6 +97,13 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
 }
+
+# Configuração de Timezone para horário de Brasília
+BRAZIL_TZ = pytz.timezone('America/Sao_Paulo')
+
+def get_brazil_time():
+    """Retorna datetime atual no fuso horário de Brasília"""
+    return datetime.now(BRAZIL_TZ)
 
 # Definição de constantes
 UPLOAD_FOLDER = 'static/uploads/profiles'
@@ -119,28 +132,14 @@ limiter = Limiter(
 )
 
 # Headers de Segurança HTTP (Talisman)
-# Configurar CSP para permitir recursos locais e CDNs necessários
-csp = {
-    'default-src': ["'self'"],
-    'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://js.stripe.com", "https://cdnjs.cloudflare.com", "https://kit.fontawesome.com"],
-    'style-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://use.fontawesome.com", "https://ka-f.fontawesome.com"],
-    'img-src': ["'self'", "data:", "https:"],
-    'font-src': ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://use.fontawesome.com", "https://ka-f.fontawesome.com"],
-    'connect-src': ["'self'", "https://api.stripe.com", "https://ka-f.fontawesome.com"]
-}
-
-# Aplicar Talisman apenas em produção
-if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
-    Talisman(app,
-             force_https=True,
-             strict_transport_security=True,
-             content_security_policy=csp,
-             content_security_policy_nonce_in=['script-src'])
-else:
-    # Em desenvolvimento, usar versão mais permissiva
-    Talisman(app,
-             force_https=False,
-             content_security_policy=None)
+# DESABILITADO: CSP estava bloqueando recursos externos
+# TODO: Reconfigurar CSP adequadamente no futuro
+# if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
+#     Talisman(app,
+#              force_https=True,
+#              strict_transport_security=True,
+#              content_security_policy=csp,
+#              content_security_policy_nonce_in=['script-src'])
 
 # Bundles de CSS e JS para otimização
 css = Bundle('css/style.css', 'css/additional.css', 'css/social.css', filters='cssmin', output='gen/style.min.css')
@@ -1489,11 +1488,29 @@ def apply_theme_colors(css_content):
     except Exception:
         return css_content
 
+@app.template_filter('to_brazil_time')
+def to_brazil_time(utc_datetime):
+    """Converte datetime UTC para horário de Brasília"""
+    if not utc_datetime:
+        return None
+    
+    # Se o datetime não tem timezone, assume UTC
+    if utc_datetime.tzinfo is None:
+        utc_datetime = pytz.UTC.localize(utc_datetime)
+    
+    # Converte para horário de Brasília
+    brazil_time = utc_datetime.astimezone(BRAZIL_TZ)
+    return brazil_time
+
 @app.template_filter('format_date_pt')
 def format_date_pt(date_value, format_string='%d de %B de %Y'):
     """Formata datas em português brasileiro"""
     if not date_value:
         return 'Data não disponível'
+
+    # Converte para horário de Brasília se for datetime
+    if isinstance(date_value, datetime):
+        date_value = to_brazil_time(date_value)
 
     # Mapeamento de meses em português
     months_pt = {
@@ -2548,7 +2565,7 @@ def privacy_policy():
 @app.route('/contato', methods=['GET', 'POST'])
 def contact():
     if request.method == 'POST':
-        category = request.form.get('category')
+        category = sanitize_input(request.form.get('category', ''))
 
         # Verificar plano apenas para categoria 'solicitacao'
         if category == 'solicitacao' and current_user.is_authenticated and current_user.plan == 'free':
@@ -2562,10 +2579,40 @@ def contact():
                 flash('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
                 return redirect(url_for('plans'))
 
-        name = request.form.get('name')
-        email = request.form.get('email')
-        subject = request.form.get('subject')
-        message = request.form.get('message')
+        # Sanitizar e validar inputs
+        name = sanitize_input(request.form.get('name', '').strip())
+        email = request.form.get('email', '').strip().lower()
+        subject = sanitize_input(request.form.get('subject', '').strip())
+        message = sanitize_html(request.form.get('message', '').strip())
+
+        # Validar tamanhos
+        if not name or len(name) > 100:
+            error_msg = 'Nome inválido ou muito longo'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': error_msg})
+            flash(error_msg, 'danger')
+            return redirect(url_for('contact'))
+
+        if not email or len(email) > 255 or not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            error_msg = 'Email inválido'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': error_msg})
+            flash(error_msg, 'danger')
+            return redirect(url_for('contact'))
+
+        if not subject or len(subject) > 200:
+            error_msg = 'Assunto inválido ou muito longo'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': error_msg})
+            flash(error_msg, 'danger')
+            return redirect(url_for('contact'))
+
+        if not message or len(message) > 5000:
+            error_msg = 'Mensagem inválida ou muito longa'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': error_msg})
+            flash(error_msg, 'danger')
+            return redirect(url_for('contact'))
 
         new_contact = Contact(name=name, email=email, subject=subject, message=message)
         db.session.add(new_contact)
@@ -2584,11 +2631,16 @@ def contact():
     return render_template('contact.html', title='Contato')
 
 @app.route('/newsletter', methods=['POST'])
+@limiter.limit("10 per hour")  # Limitar inscrições na newsletter
 def newsletter():
-    email = request.form.get('email')
+    email = request.form.get('email', '').strip().lower()
 
-    if not email:
+    if not email or len(email) > 255:
         return jsonify({'success': False, 'message': 'E-mail é obrigatório'})
+
+    # Validar formato de email
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        return jsonify({'success': False, 'message': 'Email inválido'})
 
     existing = Subscriber.query.filter_by(email=email).first()
 
@@ -3211,13 +3263,21 @@ def login():
         return redirect(url_for('home'))
 
     if request.method == 'POST':
-        username_email = request.form.get('username_email')
-        password = request.form.get('password')
+        username_email = request.form.get('username_email', '').strip()
+        password = request.form.get('password', '')
         remember = True if request.form.get('remember') else False
 
         # Validação de entrada
         if not username_email or not password:
             flash('Por favor, preencha todos os campos', 'danger')
+            return redirect(url_for('login'))
+
+        # Sanitizar input de username/email
+        username_email = bleach.clean(username_email, tags=[], strip=True)
+
+        # Limitar tamanho do input
+        if len(username_email) > 255 or len(password) > 128:
+            flash('Dados inválidos', 'danger')
             return redirect(url_for('login'))
 
         # Verificar se é um email ou nome de usuário
@@ -3257,11 +3317,11 @@ def login():
 
         # Atualizar a data do último login e dados de rastreamento
         user.last_login = datetime.utcnow()
-        # Capturar dados de rastreamento
-        user.ip_address = request.remote_addr
-        user.browser = request.user_agent.browser
-        user.operating_system = request.user_agent.platform
-        user.referrer = request.referrer or 'Direct Access'
+        # Capturar dados de rastreamento (sanitizado)
+        user.ip_address = request.remote_addr or 'unknown'
+        user.browser = request.user_agent.browser or 'unknown'
+        user.operating_system = request.user_agent.platform or 'unknown'
+        user.referrer = (request.referrer or 'Direct Access')[:500]  # Limitar tamanho
         db.session.commit()
 
         flash('Login realizado com sucesso!', 'success')
@@ -3295,13 +3355,26 @@ def register():
         return redirect(url_for('home'))
 
     if request.method == 'POST':
-        # Obter dados do formulário
-        name = request.form.get('name')
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
+        # Obter dados do formulário e sanitizar
+        name = sanitize_input(request.form.get('name', '').strip())
+        username = sanitize_input(request.form.get('username', '').strip())
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
         terms = True if request.form.get('terms') else False
+
+        # Validações de tamanho antes de processar
+        if name and len(name) > 100:
+            flash('Nome muito longo (máximo 100 caracteres)', 'danger')
+            return redirect(url_for('register'))
+
+        if username and len(username) > 50:
+            flash('Nome de usuário muito longo (máximo 50 caracteres)', 'danger')
+            return redirect(url_for('register'))
+
+        if email and len(email) > 255:
+            flash('Email muito longo', 'danger')
+            return redirect(url_for('register'))
 
         # Validações
         error = None
@@ -3310,7 +3383,7 @@ def register():
             error = 'Todos os campos são obrigatórios.'
         elif len(username) < 4:
             error = 'O nome de usuário deve ter pelo menos 4 caracteres.'
-        elif not username.isalnum() and not '_' in username:
+        elif not username.replace('_', '').isalnum():
             error = 'O nome de usuário deve conter apenas letras, números e underscore (_).'
         elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             error = 'Por favor, insira um endereço de email válido.'
@@ -5898,6 +5971,7 @@ def validate_image_file(file):
 # Rotas para atualizar a imagem de perfil de usuários regulares
 @app.route('/update-profile-image', methods=['POST'])
 @login_required
+@limiter.limit("10 per hour")  # Limitar uploads de imagem
 def update_profile_image():
     """Atualiza a imagem de perfil do usuário logado"""
     if 'profile_image' not in request.files:
@@ -5910,6 +5984,12 @@ def update_profile_image():
         flash('Nenhum arquivo selecionado', 'error')
         return redirect(url_for('profile'))
 
+    # Validação rigorosa da imagem
+    is_valid, error_message = validate_image_file(file)
+    if not is_valid:
+        flash(error_message or 'Arquivo de imagem inválido', 'error')
+        return redirect(url_for('profile'))
+
     if file and file.filename and allowed_file(file.filename):
         # Crie o diretório de upload se não existir
         upload_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
@@ -5917,23 +5997,30 @@ def update_profile_image():
 
         # Crie um nome de arquivo seguro e único
         filename = secure_filename(file.filename)
-        # Adicione um timestamp ao nome do arquivo para evitar cache do navegador
+        # Adicione um UUID ao nome para garantir unicidade e evitar conflitos
         base, ext = os.path.splitext(filename)
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f"{base}_{timestamp}{ext}"
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"{base}_{timestamp}_{unique_id}{ext}"
 
         filepath = os.path.join(upload_path, filename)
 
         try:
             # Deletar imagem antiga se existir
-            if current_user.profile_image:
+            if current_user.profile_image and current_user.profile_image != 'default.jpg':
                 delete_old_image(current_user.profile_image)
 
             # Redimensione e salve a imagem para otimização
             img = Image.open(file.stream)
-            img = img.convert('RGB')  # Converte para RGB (remove alfa se existir)
-            img.thumbnail((300, 300))  # Redimensiona mantendo proporção
-            img.save(filepath, optimize=True, quality=85)
+
+            # Remover dados EXIF (pode conter informações sensíveis de localização)
+            img_data = list(img.getdata())
+            img_without_exif = Image.new(img.mode, img.size)
+            img_without_exif.putdata(img_data)
+
+            img_without_exif = img_without_exif.convert('RGB')  # Converte para RGB (remove alfa se existir)
+            img_without_exif.thumbnail((300, 300))  # Redimensiona mantendo proporção
+            img_without_exif.save(filepath, optimize=True, quality=85)
 
             # Atualiza o perfil do usuário com apenas o nome do arquivo
             current_user.profile_image = filename

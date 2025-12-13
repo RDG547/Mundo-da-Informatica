@@ -362,7 +362,7 @@
                                 onclick="transformToSearchBar()" style="flex: 0 0 auto;">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <button type="button" class="btn btn-gradient secondary" id="requestContentBtn" onclick="checkPlanForContentRequest()" style="flex: 0 0 auto;">
+                            <button type="button" class="btn btn-gradient secondary" id="requestContentBtn" onclick="checkPlanForContentRequestWrapper()" style="flex: 0 0 auto;">
                                 <i class="fas fa-envelope"></i> Solicitar Conteúdo
                             </button>
                         </div>
@@ -406,70 +406,17 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
+<script src="{{ url_for('static', filename='js/category-cta.js') }}"></script>
 <script>
-    function transformToSearchBar() {
-        const searchBtn = document.getElementById('toggleSearchBtnCat');
-        const form = document.getElementById('inlineSearchFormCat');
-        const input = document.getElementById('inlineSearchInputCat');
-
-        // Animar saída apenas do botão de busca
-        searchBtn.style.transition = 'all 0.4s ease';
-        searchBtn.style.opacity = '0';
-        searchBtn.style.transform = 'scale(0.8)';
-
-        setTimeout(() => {
-            // Esconder apenas o botão de busca
-            searchBtn.style.display = 'none';
-
-            // Mostrar formulário
-            form.style.display = 'block';
-
-            // Animar entrada do formulário
-            setTimeout(() => {
-                form.style.opacity = '1';
-                form.style.transform = 'translateY(0)';
-                input.focus();
-            }, 50);
-        }, 400);
-    }
-
-    async function checkPlanForContentRequest() {
-        {% if current_user.is_authenticated %}
-            {% if current_user.plan == 'free' %}
-                // Mostrar modal de upgrade com conteúdo personalizado
-                showContentRequestModal('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso a esse recurso exclusivo e solicitar materiais personalizados!');
-            {% else %}
-                // Redirecionar para página de contato com categoria pré-selecionada
-                window.location.href = '{{ url_for("contact") }}?category=solicitacao';
-            {% endif %}
-        {% else %}
-            // Redirecionar para login
-            window.location.href = '{{ url_for("login") }}?next={{ url_for("contact") }}';
-        {% endif %}
-    }
-
-    // Adicionar efeito hover no input e ativar sugestões
-    document.addEventListener('DOMContentLoaded', function () {
-        const input = document.getElementById('inlineSearchInputCat');
-        if (input) {
-            input.addEventListener('focus', function () {
-                this.style.borderColor = '#667eea';
-                this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-            });
-            input.addEventListener('blur', function () {
-                this.style.borderColor = '#ddd';
-                this.style.boxShadow = 'none';
-            });
-
-            // Ativar sugestões de pesquisa
-            if (typeof SearchSuggestions !== 'undefined') {
-                const catSearchSuggestions = new SearchSuggestions(
-                    '#inlineSearchInputCat',
-                    '#catSearchSuggestions'
-                );
-            }
-        }
-    });
+    // Configurar função checkPlanForContentRequest com dados do servidor
+    window.checkPlanForContentRequestWrapper = function() {
+        checkPlanForContentRequest(
+            {{ 'true' if current_user.is_authenticated else 'false' }},
+            '{{ current_user.plan if current_user.is_authenticated else "free" }}',
+            '{{ url_for("contact") }}',
+            '{{ url_for("login") }}'
+        );
+    };
 
     console.log('Script de features carregado!');
 

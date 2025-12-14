@@ -230,18 +230,48 @@ function updateSidebar(user) {
         console.log('[DEBUG] Sidebar image atualizada:', imageUrl);
     }
 
-    // Atualizar nome na sidebar
-    const sidebarName = document.querySelector('.sidebar-profile-header h3, .admin-sidebar-profile h3');
-    if (sidebarName && user.username) {
-        sidebarName.textContent = user.username;
+    // Atualizar título (nome completo ou username) na sidebar
+    const sidebarTitle = document.querySelector('.sidebar-profile-title');
+    if (sidebarTitle) {
+        // A API retorna 'name', mas podemos ter 'full_name' em outros contextos
+        const displayName = user.name || user.full_name || user.username;
+        const planBadge = sidebarTitle.querySelector('span');
+        if (planBadge) {
+            // Preservar o badge do plano
+            sidebarTitle.childNodes[0].textContent = displayName + ' ';
+        } else {
+            sidebarTitle.textContent = displayName;
+        }
+        console.log('[DEBUG] Sidebar title atualizado:', displayName);
+    }
+
+    // Atualizar username (@username) na sidebar
+    const sidebarSubtitle = document.querySelector('.sidebar-profile-subtitle');
+    if (sidebarSubtitle && user.username) {
+        sidebarSubtitle.textContent = '@' + user.username;
         console.log('[DEBUG] Sidebar username atualizado:', user.username);
     }
 
-    // Atualizar bio na sidebar se existir
-    const sidebarBio = document.querySelector('.sidebar-profile-header p, .admin-sidebar-profile .user-role');
-    if (sidebarBio && user.bio) {
-        sidebarBio.textContent = user.bio;
+    // Atualizar bio na sidebar
+    const sidebarBio = document.querySelector('.sidebar-profile-bio');
+    if (user.bio) {
+        if (sidebarBio) {
+            sidebarBio.textContent = user.bio;
+        } else {
+            // Se não existe, criar o elemento
+            const bioElement = document.createElement('p');
+            bioElement.className = 'sidebar-profile-bio';
+            bioElement.textContent = user.bio;
+            const profileHeader = document.querySelector('.sidebar-profile-header');
+            if (profileHeader) {
+                profileHeader.appendChild(bioElement);
+            }
+        }
         console.log('[DEBUG] Sidebar bio atualizada:', user.bio);
+    } else if (sidebarBio) {
+        // Se a bio foi removida, remover o elemento
+        sidebarBio.remove();
+        console.log('[DEBUG] Sidebar bio removida');
     }
 }
 

@@ -53,12 +53,12 @@ window.featureData = {
     },
     // Esquemas Features
     'esquemas-placas': {
-        icon: 'fas fa-layer-group',
+        icon: 'fas fa-memory',
         title: 'Esquemas de Placas-mãe',
         text: 'Esquemas elétricos completos (schematics e boardview) para placas-mãe de notebooks e desktops. Documentação técnica essencial para diagnóstico avançado de falhas, identificação de componentes danificados e reparos em nível de circuito. Compatível com softwares de análise de esquemas.'
     },
     'esquemas-carregamento': {
-        icon: 'fas fa-bolt',
+        icon: 'fas fa-battery-half',
         title: 'Circuitos de Carregamento',
         text: 'Esquemas detalhados dos circuitos de carregamento de bateria para notebooks e tablets. Inclui diagramas de tensão, pontos de medição e componentes críticos do sistema de alimentação. Fundamental para diagnóstico de problemas de carregamento e substituição de componentes do circuito de energia.'
     },
@@ -68,7 +68,7 @@ window.featureData = {
         text: 'Pinouts e diagramas de conectores para diversos tipos de interfaces: LVDS (displays), USB-C, Thunderbolt, conectores de bateria, teclado, touchpad e outros. Inclui especificações elétricas, tensões e sinais de cada pino. Essencial para identificar conexões corretas durante reparos.'
     },
     'esquemas-fontes': {
-        icon: 'fas fa-battery-full',
+        icon: 'fas fa-bolt',
         title: 'Circuitos de Fonte',
         text: 'Esquemas de fontes de alimentação ATX, SFX e fontes específicas de notebooks. Inclui diagramas de conversores DC-DC, reguladores de tensão e circuitos de proteção. Útil para diagnóstico de problemas de energia, reparo de fontes e identificação de componentes de potência.'
     },
@@ -121,12 +121,12 @@ window.featureData = {
         text: 'Drivers oficiais e atualizados para impressoras de todas as marcas principais: HP, Canon, Epson, Brother, Samsung, Xerox. Inclui drivers para impressoras laser, jato de tinta, multifuncionais e plotters. Compatível com Windows, Linux e macOS.'
     },
     'impressoras-firmwares': {
-        icon: 'fas fa-cog',
+        icon: 'fas fa-microchip',
         title: 'Firmwares para Impressoras',
         text: 'Arquivos de firmware para atualização e reparo de impressoras. Inclui firmwares para resolver problemas de travamento, erros de comunicação e incompatibilidades. Essencial para técnicos especializados em manutenção de impressoras.'
     },
     'impressoras-reset': {
-        icon: 'fas fa-sync',
+        icon: 'fas fa-redo',
         title: 'Ferramentas de Reset',
         text: 'Software para reset de contadores de páginas, almofadas de tinta e chips. Programas como SSC Service Utility, WIC Reset e ferramentas específicas por fabricante. Essencial para manutenção preventiva e economia com cartuchos.'
     },
@@ -137,7 +137,7 @@ window.featureData = {
     },
     // Cursos Features
     'cursos-video': {
-        icon: 'fas fa-play-circle',
+        icon: 'fas fa-video',
         title: 'Vídeo Aulas',
         text: 'Cursos em vídeo sobre manutenção de computadores, redes, eletrônica e programação. Aulas práticas e teóricas ministradas por profissionais experientes. Inclui cursos de hardware, software, recuperação de dados e empreendedorismo na área técnica.'
     },

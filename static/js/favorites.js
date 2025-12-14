@@ -96,16 +96,35 @@ window.FavoriteManager = class FavoriteManager {
     }
 
     /**
-     * Busca o estado atual de um favorito no servidor
+     * Busca o estado atual de um favorito no servidor (com rate limiting)
      */
     async getStatus(postId) {
         try {
+            // Rate limiting local - evita múltiplas chamadas
+            const now = Date.now();
+            const cacheKey = `status_${postId}`;
+            
+            if (this._statusCache && this._statusCache[cacheKey]) {
+                const cached = this._statusCache[cacheKey];
+                if (now - cached.timestamp < 2000) { // 2 segundos
+                    return cached.value;
+                }
+            }
+            
             const response = await fetch(`/api/check-favorite/${postId}`, {
-                cache: 'no-cache',
-                headers: { 'Cache-Control': 'no-cache' }
+                cache: 'force-cache',
+                headers: { 'Cache-Control': 'max-age=2' }
             });
             if (!response.ok) throw new Error('Erro na requisição');
             const data = await response.json();
+            
+            // Salvar em cache local
+            if (!this._statusCache) this._statusCache = {};
+            this._statusCache[cacheKey] = {
+                value: data.is_favorited,
+                timestamp: now
+            };
+            
             return data.is_favorited;
         } catch (error) {
             return null;

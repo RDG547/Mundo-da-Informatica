@@ -107,6 +107,7 @@ window.confirmRemoveImage = async function(event) {
             // Atualizar imagem para default em tempo real
             const profileImg = document.querySelector('.profile-avatar-large img');
             const placeholder = document.querySelector('.avatar-placeholder-large');
+            const removeButton = document.getElementById('remove-image');
 
             if (profileImg) {
                 profileImg.style.display = 'none';
@@ -114,6 +115,11 @@ window.confirmRemoveImage = async function(event) {
 
             if (placeholder) {
                 placeholder.style.display = 'flex';
+            }
+
+            // Remover botão de deletar da UI
+            if (removeButton) {
+                removeButton.remove();
             }
 
             // Atualizar também no header se existir
@@ -418,8 +424,8 @@ function updateProfileHeader(userData) {
     console.log('Perfil atualizado com sucesso em tempo real');
 }
 
-// Show toast notification
-function showToast(message, type = 'success') {
+// Show toast notification - GLOBAL
+window.showToast = function(message, type = 'success') {
     // Check if favoriteManager toast exists
     if (window.favoriteManager && window.favoriteManager.showToast) {
         window.favoriteManager.showToast(message, type);
@@ -431,11 +437,11 @@ function showToast(message, type = 'success') {
     toast.className = `toast toast-${type}`;
     toast.style.cssText = `
         position: fixed;
-        top: 20px;
+        bottom: 20px;
         right: 20px;
         padding: 15px 20px;
-        background: ${type === 'success' ? '#28a745' : '#dc3545'};
-        color: white;
+        background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
+        color: ${type === 'warning' ? '#000' : 'white'};
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         z-index: 10000;
@@ -449,7 +455,7 @@ function showToast(message, type = 'success') {
         toast.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
-}
+};
 
 // Initialize profile page functionality
 function initializeProfilePage() {

@@ -190,6 +190,11 @@ window.setupDownloadButtons = function setupDownloadButtons() {
                 const downloadUrl = button.href || button.dataset.href;
                 if (downloadUrl) {
                     window.location.href = downloadUrl;
+                    
+                    // Atualizar histórico de download após 1 segundo
+                    setTimeout(() => {
+                        refreshDownloadHistory();
+                    }, 1000);
                 }
 
                 // Liberar botão após navegação
@@ -286,6 +291,62 @@ function confirmClearHistory() {
             modal.remove();
         }
     });
+}
+
+// Função para atualizar histórico de download em tempo real
+async function refreshDownloadHistory() {
+    const historyContainer = document.querySelector('.download-history-grid');
+    if (!historyContainer) return;
+    
+    try {
+        const response = await fetch('/api/download-history');
+        const data = await response.json();
+        
+        if (data.success && data.downloads && data.downloads.length > 0) {
+            // Limpar container
+            historyContainer.innerHTML = '';
+            
+            // Renderizar cada download
+            data.downloads.forEach(download => {
+                const card = document.createElement('div');
+                card.className = 'download-card';
+                
+                const imageHtml = download.post_image && download.post_image !== 'default.jpg' 
+                    ? `<img src="/static/images/${download.post_image}" alt="${download.post_title}" class="download-card-image" onerror="this.style.display='none'">`
+                    : `<div class="download-card-image" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;"><i class="fas fa-file-alt"></i></div>`;
+                
+                const linkHtml = download.category_slug 
+                    ? `<a href="/categoria/${download.category_slug}/${download.post_slug}">${download.post_title}</a>`
+                    : `<span>${download.post_title}</span>`;
+                
+                const categoryHtml = download.category_name 
+                    ? `<div class="download-card-category"><i class="fas fa-folder"></i> ${download.category_name}</div>`
+                    : '';
+                
+                card.innerHTML = `
+                    ${imageHtml}
+                    <div class="download-card-body">
+                        <div class="download-card-title">${linkHtml}</div>
+                        <div class="download-card-meta">
+                            <div class="download-card-date">
+                                <i class="far fa-clock"></i>
+                                <span>${download.timestamp}</span>
+                            </div>
+                            ${categoryHtml}
+                        </div>
+                    </div>
+                `;
+                
+                historyContainer.appendChild(card);
+            });
+            
+            console.log('[DOWNLOAD] Histórico atualizado com sucesso');
+        } else if (data.downloads && data.downloads.length === 0) {
+            historyContainer.innerHTML = '<p style="text-align: center; color: #999;">Nenhum download registrado ainda.</p>';
+        }
+    } catch (error) {
+        console.error('[DOWNLOAD] Erro ao atualizar histórico:', error);
+    }
 }
 
 // Inicializar quando o DOM estiver pronto E após pequeno delay

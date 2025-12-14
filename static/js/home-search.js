@@ -74,17 +74,19 @@ function initializeHomeSearch() {
         // Se não há query, prevenir submit e mostrar mensagem
         if (!query) {
             e.preventDefault();
+            e.stopPropagation();
             showInlineToast('Por favor, digite algo para pesquisar.', 'warning');
             searchInput.focus();
-            return;
+            return false;
         }
 
         // Se a query é muito curta, buscar sugestões ao invés de submeter
         if (query.length < 2) {
             e.preventDefault();
+            e.stopPropagation();
             showInlineToast('Digite pelo menos 2 caracteres para pesquisar.', 'warning');
             searchInput.focus();
-            return;
+            return false;
         }
 
         // Se houver query válida, permitir o submit para a página de resultados

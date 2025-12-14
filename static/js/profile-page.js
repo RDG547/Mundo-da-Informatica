@@ -152,6 +152,11 @@ window.confirmRemoveImage = async function(event) {
 
             // Mostrar mensagem de sucesso
             showToast(data.message || 'Imagem removida com sucesso!', 'success');
+            
+            // Recarregar página após 1 segundo (como ao adicionar foto)
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } else {
             throw new Error(data.message || 'Erro ao remover imagem');
         }

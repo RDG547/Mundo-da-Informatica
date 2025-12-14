@@ -3,8 +3,13 @@
  * Gerencia os popups de informações das features
  */
 
+// Verificar se já foi carregado
+if (typeof window.featureData !== 'undefined') {
+    console.log('feature-modals.js já carregado, ignorando redeclaração');
+} else {
+
 // Feature Data - Dados dos modals de features
-const featureData = {
+window.featureData = {
     verified: {
         icon: 'fas fa-shield-alt',
         title: 'Conteúdo Verificado',
@@ -165,7 +170,7 @@ function initFeatureModals() {
     featureItems.forEach(item => {
         item.addEventListener('click', function() {
             const feature = this.dataset.feature;
-            const data = featureData[feature];
+            const data = window.featureData[feature];
 
             if (data) {
                 const iconElement = modal.querySelector('.feature-modal-icon');
@@ -219,3 +224,4 @@ if (document.readyState === 'loading') {
 // Expõe a função globalmente para ser chamada pelo dynamic-loading
 window.initFeatureModals = initFeatureModals;
 
+} // Fim da verificação de carregamento

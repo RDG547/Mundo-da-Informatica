@@ -3,11 +3,16 @@
  * Creates floating particles animation for hero section
  */
 
-class ParticlesAnimation {
+// Verificar se já foi carregado
+if (typeof window.ParticlesAnimation !== 'undefined') {
+    console.log('particles.js já carregado, ignorando redeclaração');
+} else {
+
+window.ParticlesAnimation = class ParticlesAnimation {
     constructor(containerId, options = {}) {
         this.container = document.getElementById(containerId);
         if (!this.container) return;
-        
+
         this.options = {
             particleCount: options.particleCount || 50,
             particleSize: options.particleSize || 3,
@@ -17,22 +22,22 @@ class ParticlesAnimation {
             connectionColor: options.connectionColor || 'rgba(255, 255, 255, 0.2)',
             ...options
         };
-        
+
         this.particles = [];
         this.canvas = null;
         this.ctx = null;
         this.animationId = null;
-        
+
         this.init();
     }
-    
+
     init() {
         this.createCanvas();
         this.createParticles();
         this.animate();
         this.handleResize();
     }
-    
+
     createCanvas() {
         this.canvas = document.createElement('canvas');
         this.canvas.style.position = 'absolute';
@@ -42,23 +47,23 @@ class ParticlesAnimation {
         this.canvas.style.height = '100%';
         this.canvas.style.pointerEvents = 'none';
         this.canvas.style.zIndex = '5';
-        
+
         this.container.style.position = 'relative';
         this.container.appendChild(this.canvas);
-        
+
         this.ctx = this.canvas.getContext('2d');
         this.resizeCanvas();
     }
-    
+
     resizeCanvas() {
         const rect = this.container.getBoundingClientRect();
         this.canvas.width = rect.width;
         this.canvas.height = rect.height;
     }
-    
+
     createParticles() {
         this.particles = [];
-        
+
         for (let i = 0; i < this.options.particleCount; i++) {
             this.particles.push({
                 x: Math.random() * this.canvas.width,
@@ -70,12 +75,12 @@ class ParticlesAnimation {
             });
         }
     }
-    
+
     updateParticles() {
         this.particles.forEach(particle => {
             particle.x += particle.vx;
             particle.y += particle.vy;
-            
+
             // Bounce off edges
             if (particle.x < 0 || particle.x > this.canvas.width) {
                 particle.vx *= -1;
@@ -83,13 +88,13 @@ class ParticlesAnimation {
             if (particle.y < 0 || particle.y > this.canvas.height) {
                 particle.vy *= -1;
             }
-            
+
             // Keep particles within bounds
             particle.x = Math.max(0, Math.min(this.canvas.width, particle.x));
             particle.y = Math.max(0, Math.min(this.canvas.height, particle.y));
         });
     }
-    
+
     drawParticles() {
         this.particles.forEach(particle => {
             this.ctx.beginPath();
@@ -98,14 +103,14 @@ class ParticlesAnimation {
             this.ctx.fill();
         });
     }
-    
+
     drawConnections() {
         for (let i = 0; i < this.particles.length; i++) {
             for (let j = i + 1; j < this.particles.length; j++) {
                 const dx = this.particles[i].x - this.particles[j].x;
                 const dy = this.particles[i].y - this.particles[j].y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                
+
                 if (distance < this.options.connectionDistance) {
                     const opacity = (1 - distance / this.options.connectionDistance) * 0.3;
                     this.ctx.beginPath();
@@ -118,24 +123,24 @@ class ParticlesAnimation {
             }
         }
     }
-    
+
     animate() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
+
         this.updateParticles();
         this.drawConnections();
         this.drawParticles();
-        
+
         this.animationId = requestAnimationFrame(() => this.animate());
     }
-    
+
     handleResize() {
         window.addEventListener('resize', () => {
             this.resizeCanvas();
             this.createParticles();
         });
     }
-    
+
     destroy() {
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
@@ -155,12 +160,12 @@ function initializeParticles() {
         if (existingCanvas) {
             existingCanvas.remove();
         }
-        
+
         // Add particles container
         heroSection.style.overflow = 'hidden';
-        
+
         // Initialize particles animation
-        new ParticlesAnimation('hero-particles', {
+        new window.ParticlesAnimation('hero-particles', {
             particleCount: 60,
             particleSize: 2,
             particleSpeed: 0.3,
@@ -171,8 +176,12 @@ function initializeParticles() {
     }
 }
 
+} // Fim da verificação de carregamento
+
 // Initialize on DOM load
-document.addEventListener('DOMContentLoaded', initializeParticles);
+if (typeof window.ParticlesAnimation !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', initializeParticles);
+}
 
 // Make function globally available for dynamic loading
 window.initializeParticles = initializeParticles;

@@ -27,9 +27,14 @@ function initializeHomeSearch() {
     searchForm.addEventListener('submit', function (e) {
         const query = searchInput.value.trim();
 
-        // Se não há query, prevenir submit
+        // Se não há query, prevenir submit e mostrar mensagem
         if (!query) {
             e.preventDefault();
+            if (typeof showToast === 'function') {
+                showToast('Por favor, digite algo para pesquisar.', 'warning');
+            } else {
+                alert('Por favor, digite algo para pesquisar.');
+            }
             searchInput.focus();
             return;
         }
@@ -37,6 +42,9 @@ function initializeHomeSearch() {
         // Se a query é muito curta, buscar sugestões ao invés de submeter
         if (query.length < 2) {
             e.preventDefault();
+            if (typeof showToast === 'function') {
+                showToast('Digite pelo menos 2 caracteres para pesquisar.', 'warning');
+            }
             searchInput.focus();
             return;
         }

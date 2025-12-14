@@ -3,7 +3,12 @@
  * Loads page content dynamically without full page reload
  */
 
-class DynamicLoader {
+// Verificar se já foi carregado
+if (typeof window.DynamicLoader !== 'undefined') {
+    console.log('dynamic-loading.js já carregado, ignorando redeclaração');
+} else {
+
+window.DynamicLoader = class DynamicLoader {
     constructor() {
         this.currentUrl = window.location.href;
         this.isLoading = false;
@@ -1220,13 +1225,19 @@ class DynamicLoader {
     }
 }
 
+} // Fim da verificação de carregamento
+
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function () {
-    // Only initialize if not in admin area
-    if (!window.location.pathname.startsWith('/admin')) {
-        window.dynamicLoader = new DynamicLoader();
-    }
-});
+if (typeof window.DynamicLoader !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function () {
+        // Only initialize if not in admin area
+        if (!window.location.pathname.startsWith('/admin')) {
+            if (!window.dynamicLoader) {
+                window.dynamicLoader = new window.DynamicLoader();
+            }
+        }
+    });
+}
 
 // Global functions
 window.showCoverageMap = function () {

@@ -208,36 +208,84 @@ window.setupDownloadButtons = function setupDownloadButtons() {
 
 // Função para limpar histórico de downloads
 // eslint-disable-next-line no-unused-vars
-async function confirmClearHistory() {
-    const confirmation = confirm('Tem certeza que deseja limpar todo o histórico de downloads? Esta ação não pode ser desfeita.');
+function confirmClearHistory() {
+    // Criar modal de confirmação
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
+    
+    modalContent.innerHTML = `
+        <div style="text-align: center;">
+            <div style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 style="margin-bottom: 1rem; color: #333;">Limpar Histórico</h3>
+            <p style="color: #666; margin-bottom: 2rem;">
+                Tem certeza que deseja limpar todo o histórico de downloads?<br>
+                <strong>Esta ação não pode ser desfeita.</strong>
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="btn-cancel" style="padding: 0.75rem 2rem; border: none; background: #6c757d; color: white; border-radius: 5px; cursor: pointer; font-size: 1rem;">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn-confirm" style="padding: 0.75rem 2rem; border: none; background: #dc3545; color: white; border-radius: 5px; cursor: pointer; font-size: 1rem;">
+                    <i class="fas fa-trash"></i> Confirmar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Botão cancelar
+    modalContent.querySelector('.btn-cancel').addEventListener('click', () => {
+        modal.remove();
+    });
+    
+    // Botão confirmar
+    modalContent.querySelector('.btn-confirm').addEventListener('click', async () => {
+        const confirmBtn = modalContent.querySelector('.btn-confirm');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpando...';
+        
+        try {
+            const response = await fetch('/clear-download-history', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-    if (!confirmation) {
-        return;
-    }
+            const data = await response.json();
 
-    try {
-        const response = await fetch('/clear-download-history', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
+            if (data.success) {
+                modal.remove();
+                showToast(data.message || 'Histórico limpo com sucesso!', 'success');
+                
+                // Recarregar a página para atualizar o histórico
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                throw new Error(data.message);
             }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            // Mostrar mensagem de sucesso
-            alert(data.message);
-
-            // Recarregar a página para atualizar o histórico
-            window.location.reload();
-        } else {
-            alert('Erro: ' + data.message);
+        } catch (error) {
+            console.error('Erro ao limpar histórico:', error);
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Confirmar';
+            showToast('Erro ao limpar histórico. Tente novamente.', 'error');
         }
-    } catch (error) {
-        console.error('Erro ao limpar histórico:', error);
-        alert('Erro ao limpar histórico. Tente novamente.');
-    }
+    });
+    
+    // Fechar ao clicar fora
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
 }
 
 // Inicializar quando o DOM estiver pronto E após pequeno delay

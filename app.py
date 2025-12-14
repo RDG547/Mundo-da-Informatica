@@ -2185,6 +2185,12 @@ def search():
     filter_type = request.args.get('filter', 'all').strip()  # all, posts, categories
 
     if not query:
+        # Se for requisição AJAX, retornar JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': False,
+                'message': 'Por favor, digite algo para pesquisar.'
+            }), 400
         flash('Por favor, digite algo para pesquisar.', 'warning')
         return redirect(url_for('home'))
 
@@ -6497,13 +6503,26 @@ def remove_favorite(post_id):
 def check_favorite(post_id):
     """Verifica se um post está nos favoritos do usuário"""
     try:
+        # Cache por 5 segundos para evitar múltiplas requisições
+        cache_key = f'fav_{current_user.id}_{post_id}'
+        from flask import g
+        
+        if not hasattr(g, 'favorite_cache'):
+            g.favorite_cache = {}
+        
+        if cache_key in g.favorite_cache:
+            return jsonify({'is_favorited': g.favorite_cache[cache_key]})
+        
         db.session.expire_all()
         is_favorited = Favorite.query.filter_by(
             user_id=current_user.id,
             post_id=post_id
         ).first() is not None
-
-        return jsonify({'is_favorited': is_favorited})
+        
+        g.favorite_cache[cache_key] = is_favorited
+        response = jsonify({'is_favorited': is_favorited})
+        response.cache_control.max_age = 5
+        return response
 
     except Exception:
         return jsonify({'is_favorited': False}), 500

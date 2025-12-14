@@ -5,7 +5,9 @@ services:
     buildCommand: |
       pip install -r requirements.txt &&
       mkdir -p /opt/render/project/src/data/images/posts /opt/render/project/src/data/images/profiles /opt/render/project/src/data/images/admin /opt/render/project/src/data/uploads/profiles &&
-      rm -rf /opt/render/project/src/instance /opt/render/project/src/static/images /opt/render/project/src/static/uploads &&
+      ([ -L /opt/render/project/src/instance ] && rm -f /opt/render/project/src/instance || true) &&
+      ([ -L /opt/render/project/src/static/images ] && rm -f /opt/render/project/src/static/images || true) &&
+      ([ -L /opt/render/project/src/static/uploads ] && rm -f /opt/render/project/src/static/uploads || true) &&
       ln -sfn /opt/render/project/src/data /opt/render/project/src/instance &&
       ln -sfn /opt/render/project/src/data/images /opt/render/project/src/static/images &&
       ln -sfn /opt/render/project/src/data/uploads /opt/render/project/src/static/uploads &&

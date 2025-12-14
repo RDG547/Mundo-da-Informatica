@@ -41,14 +41,19 @@ mkdir -p /opt/render/project/src/data/images/posts \
          /opt/render/project/src/data/images/profiles \
          /opt/render/project/src/data/images/admin \
          /opt/render/project/src/data/uploads/profiles &&
-rm -rf /opt/render/project/src/instance \
-       /opt/render/project/src/static/images \
-       /opt/render/project/src/static/uploads &&
+([ -L /opt/render/project/src/instance ] && rm -f /opt/render/project/src/instance || true) &&
+([ -L /opt/render/project/src/static/images ] && rm -f /opt/render/project/src/static/images || true) &&
+([ -L /opt/render/project/src/static/uploads ] && rm -f /opt/render/project/src/static/uploads || true) &&
 ln -sfn /opt/render/project/src/data /opt/render/project/src/instance &&
 ln -sfn /opt/render/project/src/data/images /opt/render/project/src/static/images &&
 ln -sfn /opt/render/project/src/data/uploads /opt/render/project/src/static/uploads &&
 python migrate_db.py
 ```
+
+**Explicação:**
+- `[ -L path ]`: Verifica se é um symlink
+- `rm -f`: Remove apenas o symlink (não o conteúdo)
+- `|| true`: Ignora erros se o symlink não existir
 
 ## 🔍 Como Verificar se Está Funcionando
 

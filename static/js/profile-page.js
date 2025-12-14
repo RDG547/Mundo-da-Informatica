@@ -106,7 +106,7 @@ window.confirmRemoveImage = async function(event) {
 
             // Atualizar TODAS as imagens de perfil no DOM
             const defaultImage = '/static/images/profiles/default.jpg';
-            
+
             // 1. Imagem grande do perfil
             const profileImg = document.querySelector('.profile-avatar-large img');
             const placeholder = document.querySelector('.avatar-placeholder-large');
@@ -130,20 +130,20 @@ window.confirmRemoveImage = async function(event) {
             if (headerImg) {
                 headerImg.src = defaultImage;
             }
-            
+
             // 3. Navbar avatar (se existir)
             const navbarAvatar = document.querySelector('.navbar .user-avatar img');
             if (navbarAvatar) {
                 navbarAvatar.src = defaultImage;
             }
-            
+
             // 4. Todas as outras instâncias de imagem de perfil
             document.querySelectorAll('img[src*="uploads/profiles/"]').forEach(img => {
                 if (!img.src.includes('default')) {
                     img.src = defaultImage;
                 }
             });
-            
+
             // 5. Atualizar sidebar se existir
             const sidebarImg = document.querySelector('.sidebar-profile-header img');
             if (sidebarImg) {
@@ -152,7 +152,7 @@ window.confirmRemoveImage = async function(event) {
 
             // Mostrar mensagem de sucesso
             showToast(data.message || 'Imagem removida com sucesso!', 'success');
-            
+
             // Recarregar página após 1 segundo (como ao adicionar foto)
             setTimeout(() => {
                 window.location.reload();

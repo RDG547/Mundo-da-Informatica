@@ -5879,12 +5879,12 @@ def get_download_history_api():
     try:
         user = current_user
         has_access, limit = check_download_history_access(user)
-        
+
         if not has_access:
             return jsonify({'success': False, 'message': 'Acesso negado'}), 403
-        
+
         from sqlalchemy import func
-        
+
         # Subquery para pegar o ID do download mais recente de cada post
         subquery = db.session.query(
             Download.post_id,
@@ -5910,15 +5910,15 @@ def get_download_history_api():
         # Converter para JSON
         brasilia_tz = pytz.timezone('America/Sao_Paulo')
         downloads_data = []
-        
+
         for download in downloads:
             if download.post:
                 category = Category.query.get(download.post.category_id) if download.post.category_id else None
-                
+
                 # Converter timestamp
                 utc_time = pytz.utc.localize(download.timestamp)
                 brasilia_time = utc_time.astimezone(brasilia_tz)
-                
+
                 downloads_data.append({
                     'id': download.id,
                     'post_id': download.post.id,
@@ -5929,7 +5929,7 @@ def get_download_history_api():
                     'category_slug': category.slug if category else None,
                     'timestamp': brasilia_time.strftime('%d/%m/%Y às %H:%M')
                 })
-        
+
         return jsonify({'success': True, 'downloads': downloads_data})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -6573,7 +6573,7 @@ def check_favorite(post_id):
         import time
         cache_key = f'fav_{current_user.id}_{post_id}'
         current_time = time.time()
-        
+
         # Verificar se existe cache válido (menos de 2 segundos)
         if cache_key in _favorite_check_timestamps:
             time_diff = current_time - _favorite_check_timestamps[cache_key]
@@ -6582,24 +6582,24 @@ def check_favorite(post_id):
                     response = jsonify({'is_favorited': _favorite_check_cache[cache_key]})
                     response.headers['X-From-Cache'] = 'true'
                     return response
-        
+
         # Buscar no banco
         db.session.expire_all()
         is_favorited = Favorite.query.filter_by(
             user_id=current_user.id,
             post_id=post_id
         ).first() is not None
-        
+
         # Atualizar cache
         _favorite_check_cache[cache_key] = is_favorited
         _favorite_check_timestamps[cache_key] = current_time
-        
+
         # Limpar cache antigo (mais de 10 segundos)
         keys_to_remove = [k for k, v in _favorite_check_timestamps.items() if current_time - v > 10]
         for k in keys_to_remove:
             _favorite_check_cache.pop(k, None)
             _favorite_check_timestamps.pop(k, None)
-        
+
         response = jsonify({'is_favorited': is_favorited})
         response.cache_control.max_age = 2
         return response

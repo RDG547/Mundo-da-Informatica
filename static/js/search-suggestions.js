@@ -3,7 +3,12 @@
  * Provides real-time search suggestions for categories and posts
  */
 
-class SearchSuggestions {
+// Verificar se já foi carregado
+if (typeof window.SearchSuggestions !== 'undefined') {
+    console.log('search-suggestions.js já carregado, ignorando redeclaração');
+} else {
+
+window.SearchSuggestions = class SearchSuggestions {
     constructor(inputSelector, suggestionsSelector) {
         this.input = document.querySelector(inputSelector);
         this.suggestionsContainer = document.querySelector(suggestionsSelector);
@@ -222,36 +227,32 @@ class SearchSuggestions {
         this.suggestionsContainer.style.display = 'none';
         this.suggestionsContainer.innerHTML = '';
     }
-}
+};
+
+} // Fim da verificação de carregamento
 
 // Initialize search suggestions when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize for hero search bar
-    const heroInput = document.querySelector('.hero .search-bar input[name="q"]');
-    const homeSearchInput = document.getElementById('home-search-input');
+if (typeof window.SearchSuggestions !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize for hero search bar
+        const heroInput = document.querySelector('.hero .search-bar input[name="q"]');
+        const homeSearchInput = document.getElementById('home-search-input');
 
-    if (heroInput || homeSearchInput) {
-        const input = heroInput || homeSearchInput;
-        if (!input.hasAttribute('data-suggestions-initialized')) {
-            new SearchSuggestions(`#${input.id || 'home-search-input'}`);
-            input.setAttribute('data-suggestions-initialized', 'true');
+        if (heroInput || homeSearchInput) {
+            const input = heroInput || homeSearchInput;
+            if (!input.hasAttribute('data-suggestions-initialized')) {
+                new window.SearchSuggestions(`#${input.id || 'home-search-input'}`);
+                input.setAttribute('data-suggestions-initialized', 'true');
+            }
         }
-    }
 
-    // Initialize for any other search inputs
-    const otherSearchInputs = document.querySelectorAll('input[name="q"]:not([data-suggestions-initialized])');
-    otherSearchInputs.forEach(input => {
-        if (input.id) {
-            new SearchSuggestions(`#${input.id}`, null);
-            input.setAttribute('data-suggestions-initialized', 'true');
-        }
+        // Initialize for any other search inputs
+        const otherSearchInputs = document.querySelectorAll('input[name="q"]:not([data-suggestions-initialized])');
+        otherSearchInputs.forEach(input => {
+            if (input.id) {
+                new window.SearchSuggestions(`#${input.id}`, null);
+                input.setAttribute('data-suggestions-initialized', 'true');
+            }
+        });
     });
-});
-
-// Export for module usage and expose globally
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SearchSuggestions;
 }
-
-// Expose globally for dynamic-loading
-window.SearchSuggestions = SearchSuggestions;

@@ -2,10 +2,15 @@
 /* global window, fetch */
 // Sistema de Favoritos - Versão Corrigida
 
+// Verificar se já foi carregado
+if (typeof window.FavoriteManager !== 'undefined') {
+    console.log('favorites.js já carregado, ignorando redeclaração');
+} else {
+
 /**
  * Classe para gerenciar favoritos de forma centralizada
  */
-class FavoriteManager {
+window.FavoriteManager = class FavoriteManager {
     constructor() {
         this.pendingRequests = new Map();
         this.createConfirmModal();
@@ -313,20 +318,24 @@ class FavoriteManager {
             return false;
         }
     }
-}
-
-// Instância global
-const favoriteManager = new FavoriteManager();
-window.favoriteManager = favoriteManager;
-
-// Função global para ser chamada pelos botões HTML
-window.toggleFavorite = function(postId) {
-    favoriteManager.toggle(postId);
 };
 
-// Inicializa quando o DOM estiver pronto
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => favoriteManager.init());
-} else {
-    favoriteManager.init();
+} // Fim da verificação de carregamento
+
+// Instância global
+if (typeof window.FavoriteManager !== 'undefined') {
+    const favoriteManager = new window.FavoriteManager();
+    window.favoriteManager = favoriteManager;
+
+    // Função global para ser chamada pelos botões HTML
+    window.toggleFavorite = function(postId) {
+        favoriteManager.toggle(postId);
+    };
+
+    // Inicializa quando o DOM estiver pronto
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => favoriteManager.init());
+    } else {
+        favoriteManager.init();
+    }
 }

@@ -637,6 +637,25 @@
         }
     };
 
+    // Função para preview de imagem no modal de edição
+    window.previewEditImage = function (file) {
+        const preview = document.getElementById('editImagePreview');
+        const previewContainer = document.getElementById('editImagePreviewContainer');
+        const placeholder = document.getElementById('editUploadPlaceholder');
+        const urlInput = document.getElementById('editPostImageUrl');
+
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                if (preview) preview.src = e.target.result;
+                if (previewContainer) previewContainer.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+                if (urlInput) urlInput.value = ''; // Limpa URL se houver arquivo
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     // Função para remover imagem no modal de edição
     window.removeEditImage = function () {
         const fileInput = document.getElementById('editPostImageFile');
@@ -918,11 +937,12 @@
             });
         });
 
-        // Edit post functionality
-        document.querySelectorAll('.btn-edit').forEach(btn => {
-            btn.addEventListener('click', function (e) {
+        // Edit post functionality - Usando delegação de eventos
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-edit')) {
                 e.preventDefault();
-                const postId = this.getAttribute('data-post-id');
+                const btn = e.target.closest('.btn-edit');
+                const postId = btn.getAttribute('data-post-id');
                 console.log('Editando post:', postId); // Debug
 
                 // Verificar se o modal existe
@@ -949,7 +969,7 @@
                         console.error('Erro ao carregar dados do post:', error);
                         showNotification('Erro ao carregar dados do post: ' + error.message, 'error');
                     });
-            });
+            }
         });
 
         // Atualizar preview SEO no modal de edição
@@ -1021,22 +1041,21 @@
             document.getElementById('editPostDownloadLink').value = post.download_link || '';
 
             // Carregar imagem se existir
-            if (post.image_url) {
+            if (post.image_url && post.image_url !== 'default.jpg') {
                 document.getElementById('editPostImageUrl').value = post.image_url;
                 const preview = document.getElementById('editImagePreview');
                 const previewContainer = document.getElementById('editImagePreviewContainer');
                 const placeholder = document.getElementById('editUploadPlaceholder');
 
                 if (preview && previewContainer && placeholder) {
-                    // Construir caminho completo da imagem
-                    // Se já começa com /, http ou posts/, usa direto, senão adiciona /static/images/
-                    let imageUrl;
-                    if (post.image_url.startsWith('/') || post.image_url.startsWith('http')) {
-                        imageUrl = post.image_url;
-                    } else if (post.image_url.startsWith('posts/')) {
-                        imageUrl = `/static/images/${post.image_url}`;
-                    } else {
-                        imageUrl = `/static/images/posts/${post.image_url}`;
+                    // Se a URL já é completa (Cloudinary), usar direto
+                    // Senão, é uma URL relativa antiga e não vai funcionar
+                    let imageUrl = post.image_url;
+                    if (!imageUrl.startsWith('http')) {
+                        // URL relativa antiga - não exibir
+                        console.warn('Imagem com URL relativa antiga:', imageUrl);
+                        removeEditImage();
+                        return;
                     }
 
                     preview.src = imageUrl;
@@ -1344,10 +1363,19 @@
         background: #f8f9fa;
     }
 
+    #editPostModal .upload-placeholder {
+        pointer-events: none;
+    }
+
     #editPostModal .upload-placeholder i {
         font-size: 2.5rem;
         color: #6c757d;
         margin-bottom: 0.75rem;
+    }
+
+    #editPostModal .upload-placeholder p,
+    #editPostModal .upload-placeholder span {
+        pointer-events: none;
     }
 
     #editPostModal .image-preview-container {
@@ -1754,12 +1782,43 @@
         }
     });
 
-    // Limpar preview de imagem (modal de edição)
+    // Preview de imagem no modal de edição
+    function previewEditImage(file) {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('editImagePreview');
+            const previewContainer = document.getElementById('editImagePreviewContainer');
+            const placeholder = document.getElementById('editUploadPlaceholder');
+
+            if (preview && previewContainer && placeholder) {
+                preview.src = e.target.result;
+                previewContainer.style.display = 'block';
+                placeholder.style.display = 'none';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Remover imagem no modal de edição
+    function removeEditImage() {
+        const preview = document.getElementById('editImagePreview');
+        const previewContainer = document.getElementById('editImagePreviewContainer');
+        const placeholder = document.getElementById('editUploadPlaceholder');
+        const fileInput = document.getElementById('editPostImageFile');
+        const urlInput = document.getElementById('editPostImageUrl');
+
+        if (preview) preview.src = '';
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'block';
+        if (fileInput) fileInput.value = '';
+        if (urlInput) urlInput.value = '';
+    }
+
+    // Limpar preview de imagem (modal de edição) - mantido para compatibilidade
     function clearEditImagePreview() {
-        document.getElementById('editPreviewImg').src = '';
-        document.getElementById('editImagePreview').style.display = 'none';
-        document.getElementById('editPostImageFile').value = '';
-        document.getElementById('editPostImageUrl').value = '';
+        removeEditImage();
     }
 
     // Atualizar formulário de edição para usar FormData (suporte a upload)
@@ -1826,6 +1885,60 @@
         }
     }
 
+    // Função para preview da imagem no modal de edição
+    window.previewEditImage = function(file) {
+        if (!file) return;
+
+        // Validar tipo e tamanho
+        const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            alert('Formato de arquivo inválido. Use JPG, PNG, GIF ou WebP.');
+            return;
+        }
+
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            alert('Arquivo muito grande. Tamanho máximo: 5MB');
+            return;
+        }
+
+        // Criar preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('editImagePreview');
+            const previewContainer = document.getElementById('editImagePreviewContainer');
+            const placeholder = document.getElementById('editUploadPlaceholder');
+            const imageUrlInput = document.getElementById('editPostImageUrl');
+
+            if (preview && previewContainer && placeholder) {
+                preview.src = e.target.result;
+                previewContainer.style.display = 'block';
+                placeholder.style.display = 'none';
+
+                // Limpar campo de URL quando faz upload
+                if (imageUrlInput) {
+                    imageUrlInput.value = '';
+                }
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Função para remover preview da imagem no modal de edição
+    window.removeEditImage = function() {
+        const preview = document.getElementById('editImagePreview');
+        const previewContainer = document.getElementById('editImagePreviewContainer');
+        const placeholder = document.getElementById('editUploadPlaceholder');
+        const fileInput = document.getElementById('editPostImageFile');
+        const urlInput = document.getElementById('editPostImageUrl');
+
+        if (preview) preview.src = '';
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        if (fileInput) fileInput.value = '';
+        if (urlInput) urlInput.value = '';
+    };
+
     // Adicionar evento de input no editor de edição
     document.addEventListener('DOMContentLoaded', function () {
         const editContentEditor = document.getElementById('editPostContentEditor');
@@ -1854,7 +1967,12 @@
         const editImageFileInput = document.getElementById('editPostImageFile');
 
         if (editImageUploadArea && editImageFileInput) {
-            editImageUploadArea.addEventListener('click', function () {
+            editImageUploadArea.addEventListener('click', function (e) {
+                // Prevenir clique se for no botão de remover
+                if (e.target.closest('.remove-image')) {
+                    return;
+                }
+                console.log('Clicou na área de upload - abrindo seletor de arquivo');
                 editImageFileInput.click();
             });
 
@@ -1884,9 +2002,6 @@
             });
         }
     });
-        });
-    }
-});
 
     // Adicionar listeners para atualizar preview SEO
     document.addEventListener('DOMContentLoaded', function () {

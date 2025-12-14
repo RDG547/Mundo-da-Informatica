@@ -258,7 +258,7 @@
                     <div class="dropdown user-dropdown">
                         <a href="#" class="dropdown-toggle">
                             {% if current_user.profile_image %}
-                            <img src="{{ url_for('static', filename='uploads/profiles/' + current_user.profile_image) }}"
+                            <img src="{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}"
                                 alt="{{ current_user.username }}"
                                 style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/profiles/default_profile.jpg') }}'">

@@ -3,7 +3,7 @@
     {% for post in posts.items %}
     <div class="modern-post-card">
         <div class="post-image-container">
-            <img src="{{ url_for('static', filename='images/' + (post.image_url or 'default.jpg')) }}" alt="{{ post.title }}" loading="lazy">
+            <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}" loading="lazy">
             <div class="post-overlay">
                 <div class="post-actions">
                     <a href="{{ url_for('post', post_id=post.id) }}" class="action-btn view-btn">

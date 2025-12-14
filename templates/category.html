@@ -245,7 +245,7 @@
                         {% for post in posts.items %}
                         <div class="post-card">
                             <div class="post-image">
-                                <img src="{{ url_for('static', filename='images/' + (post.image_url or 'default.jpg')) }}"
+                                <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
                                     alt="{{ post.title }}">
                             </div>
                             <div class="post-category">

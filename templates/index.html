@@ -33,7 +33,7 @@
             {% for post in posts %}
             <div class="post-card">
                 <div class="post-image">
-                    <img src="{{ url_for('static', filename='images/'+post.image_url) }}" alt="{{ post.title }}">
+                    <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}">
                 </div>
                 <div class="post-category">
                     {% if post.category and post.category.icon %}

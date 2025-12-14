@@ -14,7 +14,7 @@
 
     <div class="admin-profile">
         <div class="admin-profile-img">
-            <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="Admin profile" onerror="this.classList.add('error')">
+            <img src="{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}" alt="Admin profile" onerror="this.classList.add('error')">
             <div class="profile-placeholder">
                 {% if current_user.name %}
                     {% set name_parts = current_user.name.split() %}

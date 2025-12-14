@@ -48,5 +48,11 @@ python-slugify==8.0.4
 
 # Caching
 Flask-Caching==2.3.1
+
+# Payment & External Services
 stripe==11.1.1
 mediafire
+cloudinary==1.44.1
+
+# Cloud Storage
+cloudinary==1.41.0

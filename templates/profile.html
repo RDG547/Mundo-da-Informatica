@@ -36,7 +36,7 @@
         <div class="sidebar-profile-header">
             <div class="profile-avatar-wrapper-sidebar">
                 <div class="profile-avatar-large">
-                    <img src="{{ url_for('static', filename='uploads/profiles/' + (user.profile_image or 'default_profile.jpg')) }}"
+                    <img src="{{ get_image_url(user.profile_image, folder='profiles', default='default_profile.jpg') }}"
                         alt="{{ user.get_full_name() or user.username }}"
                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/profiles/default_profile.jpg') }}';">
                     <div class="avatar-placeholder-large" style="display: none;">
@@ -195,7 +195,7 @@
                                     </div>
                                     <div class="post-image">
                                         {% if post.image_url %}
-                                        <img src="{{ url_for('static', filename='images/' + post.image_url) }}"
+                                        <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
                                             alt="{{ post.title }}" class="img-fluid">
                                         {% else %}
                                         <div class="post-placeholder">
@@ -258,7 +258,7 @@
                                     </div>
                                     <div class="post-image">
                                         {% if post.image_url %}
-                                        <img src="{{ url_for('static', filename='images/' + post.image_url) }}"
+                                        <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
                                             alt="{{ post.title }}" class="img-fluid">
                                         {% else %}
                                         <div class="post-placeholder">
@@ -372,7 +372,7 @@
                             </button>
                             <!-- Imagem do Post -->
                             {% if download.post.image_url and download.post.image_url != 'default.jpg' %}
-                            <img src="{{ url_for('static', filename='images/' + download.post.image_url) }}"
+                            <img src="{{ get_image_url(download.post.image_url, folder='posts', default='default.jpg') }}"
                                  alt="{{ download.post.title }}"
                                  class="download-card-image"
                                  onerror="this.style.display='none'">

@@ -37,6 +37,9 @@ import re
 from werkzeug.utils import secure_filename
 from PIL import Image
 from dotenv import load_dotenv
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Verificar versão do Python e ajustar configurações
 python_version = sys.version_info
@@ -78,6 +81,14 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
+
+# Configuração do Cloudinary
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
 # Garantir que o diretório instance existe
 os.makedirs(app.instance_path, exist_ok=True)
@@ -849,6 +860,26 @@ def before_request():
         log_visitor()
 
 @app.context_processor
+def utility_processor():
+    """Funções utilitárias para templates"""
+    def get_image_url(image_path, default='default.jpg'):
+        """Retorna URL correta da imagem (Cloudinary ou local)"""
+        if not image_path:
+            return url_for('static', filename=f'images/profiles/{default}')
+
+        # Se já for URL do Cloudinary, retornar diretamente
+        if 'cloudinary.com' in image_path or image_path.startswith('http'):
+            return image_path
+
+        # Se for caminho local
+        if image_path.startswith('posts/'):
+            return url_for('static', filename=f'images/{image_path}')
+
+        return url_for('static', filename=f'uploads/profiles/{image_path}')
+
+    return dict(get_image_url=get_image_url)
+
+@app.context_processor
 def inject_admin_data():
     """Injeta dados administrativos em todos os templates"""
     if request.endpoint and request.endpoint.startswith('admin'):
@@ -1445,6 +1476,29 @@ def inject_global_data():
             return url_for('post_by_slug', category=category_slug, slug=post.slug)
         return url_for('post', post_id=post.id)
 
+    # Função helper para gerar URL de imagem (local ou Cloudinary)
+    def get_image_url(image_path, folder='profiles', default='default.jpg'):
+        """
+        Retorna a URL correta da imagem (Cloudinary ou local)
+
+        Args:
+            image_path: Caminho da imagem (pode ser URL do Cloudinary ou nome do arquivo)
+            folder: Pasta local caso seja arquivo local
+            default: Imagem padrão se não houver imagem
+
+        Returns:
+            str: URL completa da imagem
+        """
+        if not image_path or image_path == 'default.jpg':
+            return url_for('static', filename=f'images/{folder}/{default}')
+
+        # Se já é uma URL do Cloudinary, retornar diretamente
+        if image_path.startswith('http://') or image_path.startswith('https://'):
+            return image_path
+
+        # Caso contrário, é um arquivo local
+        return url_for('static', filename=f'uploads/{folder}/{image_path}')
+
     # Categorias
     categories = Category.query.filter_by(is_active=True).order_by(Category.order).all()
 
@@ -1479,6 +1533,7 @@ def inject_global_data():
         categories=categories,
         featured_posts=featured_posts,
         post_url=post_url,
+        get_image_url=get_image_url,  # Adicionar helper de imagens
         config=config,
         site_configs=config,  # Adicionar alias para compatibilidade
         stats=stats,
@@ -3100,9 +3155,12 @@ def admin_delete_post(post_id):
     post = Post.query.get_or_404(post_id)
 
     try:
-        # Deletar imagem associada antes de deletar o post
+        # Deletar imagem do Cloudinary ou filesystem
         if post.image_url:
-            delete_old_image(post.image_url)
+            if 'cloudinary.com' in post.image_url:
+                delete_from_cloudinary(post.image_url)
+            else:
+                delete_old_image(post.image_url)
 
         db.session.delete(post)
         db.session.commit()
@@ -3130,36 +3188,9 @@ def admin_duplicate_post(post_id):
             slug = f"{base_slug}-{counter}"
             counter += 1
 
-        # Copiar imagem se não for URL externa nem default
+        # A imagem duplicada mantém a mesma URL do Cloudinary (não precisa copiar)
+        # URLs do Cloudinary podem ser usadas por múltiplos posts
         duplicated_image_url = original_post.image_url
-        if original_post.image_url and original_post.image_url != 'default.jpg' and not original_post.image_url.startswith('http'):
-            try:
-                # Construir caminho da imagem original
-                if original_post.image_url.startswith('posts/'):
-                    original_path = os.path.join(app.root_path, 'static', 'images', original_post.image_url)
-                elif original_post.image_url.startswith('images/'):
-                    original_path = os.path.join(app.root_path, 'static', original_post.image_url)
-                else:
-                    original_path = os.path.join(app.root_path, 'static', 'images', 'posts', original_post.image_url)
-
-                # Verificar se a imagem existe
-                if os.path.exists(original_path):
-                    # Gerar novo nome único
-                    file_ext = os.path.splitext(original_post.image_url)[1]
-                    unique_filename = f"{uuid.uuid4().hex}_copy{file_ext}"
-
-                    # Caminho do destino
-                    upload_folder = os.path.join(app.root_path, 'static', 'images', 'posts')
-                    os.makedirs(upload_folder, exist_ok=True)
-                    destination_path = os.path.join(upload_folder, unique_filename)
-
-                    # Copiar o arquivo
-                    shutil.copy2(original_path, destination_path)
-                    duplicated_image_url = f"posts/{unique_filename}"
-                    print(f"✓ Imagem copiada: {original_path} -> {destination_path}")
-            except Exception as img_error:
-                print(f"✗ Erro ao copiar imagem: {img_error}")
-                # Mantém a URL original se falhar a cópia
 
         # Criar uma cópia do post
         new_post = Post(
@@ -3258,35 +3289,23 @@ def admin_update_post(post_id):
             if file_ext not in allowed_extensions:
                 return jsonify({'success': False, 'message': 'Formato de imagem não permitido. Use: PNG, JPG, GIF, WebP'})
 
-            # Gerar nome de arquivo baseado no título do post
-            filename = generate_image_filename(title, file_ext)
+            # Deletar imagem antiga do Cloudinary se existir
+            if post.image_url and post.image_url != 'post-placeholder.svg' and post.image_url.startswith('https://res.cloudinary.com'):
+                delete_from_cloudinary(post.image_url)
 
-            # Criar diretório se não existir
-            upload_folder = os.path.join(app.root_path, 'static', 'images', 'posts')
-            os.makedirs(upload_folder, exist_ok=True)
+            # Upload para Cloudinary
+            success, result = upload_to_cloudinary(image_file, folder='posts')
 
-            # Verificar se já existe um arquivo com esse nome e adicionar contador se necessário
-            base_filename = filename.rsplit('.', 1)[0]
-            counter = 1
-            while os.path.exists(os.path.join(upload_folder, filename)):
-                filename = f"{base_filename}_{counter}.{file_ext}"
-                counter += 1
+            if success:
+                image_url = result  # URL do Cloudinary
+            else:
+                return jsonify({'success': False, 'message': f'Erro ao fazer upload da imagem: {result}'})
 
-            # Salvar arquivo
-            file_path = os.path.join(upload_folder, filename)
-            image_file.save(file_path)
-
-            # Deletar imagem antiga se existir uma diferente e não for URL externa
-            if post.image_url and post.image_url != 'default.jpg' and not post.image_url.startswith('http'):
-                delete_old_image(post.image_url)
-
-            # Atualizar image_url para apontar para o arquivo salvo
-            image_url = f"posts/{filename}"
         elif image_url and image_url != post.image_url:
-            # Se o image_url foi alterado (nova URL externa ou mudança de imagem)
-            # Deletar imagem antiga se não for URL externa nem default
-            if post.image_url and post.image_url != 'default.jpg' and not post.image_url.startswith('http'):
-                delete_old_image(post.image_url)
+            # Se o image_url foi alterado (nova URL externa)
+            # Deletar imagem antiga do Cloudinary se existir
+            if post.image_url and post.image_url != 'post-placeholder.svg' and post.image_url.startswith('https://res.cloudinary.com'):
+                delete_from_cloudinary(post.image_url)
 
         # Atualizar dados
         old_data = {
@@ -4258,26 +4277,14 @@ def admin_create_post():
                 flash('Formato de imagem não permitido. Use: PNG, JPG, GIF, WebP', 'error')
                 return redirect(url_for('admin_posts'))
 
-            # Gerar nome de arquivo baseado no título do post
-            filename = generate_image_filename(title, file_ext)
+            # Upload para Cloudinary
+            success, result = upload_to_cloudinary(image_file, folder='posts')
 
-            # Criar diretório se não existir
-            upload_folder = os.path.join(app.root_path, 'static', 'images', 'posts')
-            os.makedirs(upload_folder, exist_ok=True)
-
-            # Verificar se já existe um arquivo com esse nome e adicionar contador se necessário
-            base_filename = filename.rsplit('.', 1)[0]
-            counter = 1
-            while os.path.exists(os.path.join(upload_folder, filename)):
-                filename = f"{base_filename}_{counter}.{file_ext}"
-                counter += 1
-
-            # Salvar arquivo
-            file_path = os.path.join(upload_folder, filename)
-            image_file.save(file_path)
-
-            # Atualizar image_url para apontar para o arquivo salvo
-            image_url = f"posts/{filename}"
+            if success:
+                image_url = result  # URL do Cloudinary
+            else:
+                flash(f'Erro ao fazer upload da imagem: {result}', 'error')
+                return redirect(url_for('admin_posts'))
 
         # Se não houver imagem, usar placeholder
         if not image_url:
@@ -6343,6 +6350,77 @@ def validate_image_file(file):
 
     return True, None
 
+def upload_to_cloudinary(file, folder='profiles'):
+    """
+    Faz upload de imagem para o Cloudinary
+
+    Args:
+        file: Objeto de arquivo do Flask
+        folder: Pasta no Cloudinary (profiles, posts, etc.)
+
+    Returns:
+        tuple: (success: bool, url_or_error: str)
+    """
+    try:
+        # Processar a imagem antes do upload
+        img = Image.open(file.stream)
+
+        # Remover dados EXIF (segurança)
+        img_data = list(img.getdata())
+        img_without_exif = Image.new(img.mode, img.size)
+        img_without_exif.putdata(img_data)
+        img_without_exif = img_without_exif.convert('RGB')
+
+        # Redimensionar para otimizar (máximo 800x800 para perfis)
+        if folder == 'profiles':
+            img_without_exif.thumbnail((800, 800))
+
+        # Salvar em buffer temporário
+        from io import BytesIO
+        buffer = BytesIO()
+        img_without_exif.save(buffer, format='JPEG', optimize=True, quality=85)
+        buffer.seek(0)
+
+        # Upload para Cloudinary
+        result = cloudinary.uploader.upload(
+            buffer,
+            folder=f'mundodainformatica/{folder}',
+            resource_type='image',
+            format='jpg',
+            transformation=[
+                {'width': 800, 'height': 800, 'crop': 'limit'},
+                {'quality': 'auto:good'},
+                {'fetch_format': 'auto'}
+            ]
+        )
+
+        return True, result['secure_url']
+
+    except Exception as e:
+        print(f"Erro ao fazer upload para Cloudinary: {e}")
+        return False, str(e)
+
+def delete_from_cloudinary(image_url):
+    """
+    Deleta imagem do Cloudinary
+
+    Args:
+        image_url: URL da imagem no Cloudinary
+    """
+    try:
+        # Extrair public_id da URL
+        # URL formato: https://res.cloudinary.com/cloud_name/image/upload/v123/folder/public_id.jpg
+        if 'cloudinary.com' in image_url:
+            parts = image_url.split('/')
+            # Pegar folder/public_id (últimas 2 partes antes da extensão)
+            public_id_with_ext = '/'.join(parts[-2:])
+            public_id = public_id_with_ext.rsplit('.', 1)[0]
+
+            cloudinary.uploader.destroy(public_id)
+            print(f"Imagem deletada do Cloudinary: {public_id}")
+    except Exception as e:
+        print(f"Erro ao deletar do Cloudinary: {e}")
+
 # Rotas para atualizar a imagem de perfil de usuários regulares
 @app.route('/update-profile-image', methods=['POST'])
 @login_required
@@ -6366,42 +6444,25 @@ def update_profile_image():
         return redirect(url_for('profile'))
 
     if file and file.filename and allowed_file(file.filename):
-        # Crie o diretório de upload se não existir
-        upload_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
-        os.makedirs(upload_path, exist_ok=True)
-
-        # Crie um nome de arquivo seguro e único
-        filename = secure_filename(file.filename)
-        # Adicione um UUID ao nome para garantir unicidade e evitar conflitos
-        base, ext = os.path.splitext(filename)
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        unique_id = str(uuid.uuid4())[:8]
-        filename = f"{base}_{timestamp}_{unique_id}{ext}"
-
-        filepath = os.path.join(upload_path, filename)
-
         try:
-            # Deletar imagem antiga se existir
-            if current_user.profile_image and current_user.profile_image != 'default.jpg':
+            # Deletar imagem antiga do Cloudinary se existir
+            if current_user.profile_image and 'cloudinary.com' in current_user.profile_image:
+                delete_from_cloudinary(current_user.profile_image)
+            elif current_user.profile_image and current_user.profile_image != 'default.jpg':
+                # Deletar imagem antiga local (fallback)
                 delete_old_image(current_user.profile_image)
 
-            # Redimensione e salve a imagem para otimização
-            img = Image.open(file.stream)
+            # Upload para Cloudinary
+            success, result = upload_to_cloudinary(file, folder='profiles')
 
-            # Remover dados EXIF (pode conter informações sensíveis de localização)
-            img_data = list(img.getdata())
-            img_without_exif = Image.new(img.mode, img.size)
-            img_without_exif.putdata(img_data)
+            if success:
+                # Salvar URL do Cloudinary no banco
+                current_user.profile_image = result
+                db.session.commit()
+                flash('Imagem de perfil atualizada com sucesso!', 'success')
+            else:
+                flash(f'Erro ao fazer upload da imagem: {result}', 'error')
 
-            img_without_exif = img_without_exif.convert('RGB')  # Converte para RGB (remove alfa se existir)
-            img_without_exif.thumbnail((300, 300))  # Redimensiona mantendo proporção
-            img_without_exif.save(filepath, optimize=True, quality=85)
-
-            # Atualiza o perfil do usuário com apenas o nome do arquivo
-            current_user.profile_image = filename
-            db.session.commit()
-
-            flash('Imagem de perfil atualizada com sucesso!', 'success')
         except Exception as e:
             print(f"Erro ao processar imagem: {e}")
             flash('Erro ao processar a imagem. Tente novamente.', 'error')
@@ -6415,9 +6476,12 @@ def update_profile_image():
 def remove_profile_image():
     """Remove a imagem de perfil do usuário logado"""
     try:
-        # Deletar a imagem física do filesystem
+        # Deletar do Cloudinary ou filesystem
         if current_user.profile_image:
-            delete_old_image(current_user.profile_image)
+            if 'cloudinary.com' in current_user.profile_image:
+                delete_from_cloudinary(current_user.profile_image)
+            else:
+                delete_old_image(current_user.profile_image)
 
         # Limpa a imagem de perfil do usuário atual
         current_user.profile_image = ""

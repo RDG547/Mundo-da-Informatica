@@ -14,7 +14,7 @@
 
         <div class="profile-image-container">
             <div class="admin-profile-img large-profile-img">
-                <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="{{ current_user.name }}" onerror="this.classList.add('error')">
+                <img src="{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}" alt="{{ current_user.name }}" onerror="this.classList.add('error')">
                 <div class="profile-placeholder">
                     {% if current_user.name %}
                         {% set name_parts = current_user.name.split() %}
@@ -248,7 +248,7 @@
             <button class="close-modal" data-dismiss="modal">&times;</button>
         </div>
         <div class="modal-body text-center">
-            <img src="{{ url_for('static', filename='uploads/profiles/' + (current_user.profile_image or 'default_profile.jpg')) }}" alt="{{ current_user.name }}" class="preview-image">
+            <img src="{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}" alt="{{ current_user.name }}" class="preview-image">
         </div>
         <div class="modal-footer">
             <button class="btn-admin btn-admin-outline" data-dismiss="modal">Fechar</button>

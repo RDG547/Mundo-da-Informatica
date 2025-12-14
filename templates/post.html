@@ -51,7 +51,7 @@
                     <div class="post-header-content">
                         <!-- Thumbnail Image -->
                         <div class="post-thumbnail-container">
-                            <img src="{{ url_for('static', filename='images/' + post.image_url) }}" alt="{{ post.title }}" class="post-thumbnail-image">
+                            <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}" class="post-thumbnail-image">
                             <div class="thumbnail-overlay">
                                 <i class="fas fa-search-plus"></i>
                             </div>

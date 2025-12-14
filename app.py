@@ -16,6 +16,7 @@ import sys
 import shutil
 import uuid
 import stripe
+from stripe import error as stripe_error
 import pytz
 import bleach
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
@@ -1050,6 +1051,35 @@ class Favorite(db.Model):
 
     def __repr__(self):
         return f"Favorite(user_id={self.user_id}, post_id={self.post_id})"
+
+# Modelo de Transações de Pagamento
+class Transaction(db.Model):
+    __tablename__ = 'transactions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    # Dados do Stripe
+    stripe_session_id = db.Column(db.String(255), unique=True, nullable=False)  # checkout.session.id
+    stripe_customer_id = db.Column(db.String(255), nullable=True)  # customer ID do Stripe
+    stripe_subscription_id = db.Column(db.String(255), nullable=True)  # subscription ID do Stripe
+    stripe_payment_intent_id = db.Column(db.String(255), nullable=True)  # payment_intent ID
+
+    # Dados da transação
+    plan_type = db.Column(db.String(20), nullable=False)  # 'premium' ou 'vip'
+    amount = db.Column(db.Integer, nullable=False)  # Valor em centavos
+    currency = db.Column(db.String(3), default='brl')  # Moeda
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'completed', 'failed', 'refunded'
+
+    # Datas
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    paid_at = db.Column(db.DateTime, nullable=True)  # Quando o pagamento foi confirmado
+
+    # Relacionamento
+    user = db.relationship('User', backref=db.backref('transactions', lazy=True, cascade="all, delete"))
+
+    def __repr__(self):
+        return f"Transaction(user_id={self.user_id}, plan={self.plan_type}, status={self.status})"
 
 # Adicionar o modelo Comment depois de definir User
 class Comment(db.Model):
@@ -2446,7 +2476,7 @@ def create_checkout_session():
             cancel_url=url_for('checkout_cancel', _external=True),
             customer_email=current_user.email,
             metadata={
-                'user_id': current_user.id,
+                'user_id': str(current_user.id),
                 'plan': plan_type
             }
         )
@@ -2466,16 +2496,42 @@ def checkout_success():
         # Retrieve the session from Stripe
         session = stripe.checkout.Session.retrieve(session_id)
 
+        # Verificar se já existe uma transação registrada para esta sessão
+        existing_transaction = Transaction.query.filter_by(stripe_session_id=session_id).first()
+
         # Check if the payment was successful
         if session.payment_status == 'paid':
             plan_type = session.metadata.get('plan')
 
             if plan_type in ['premium', 'vip']:
-                current_user.plan = plan_type
-                # Set expiration to exactly 1 month from now
-                current_user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
-                db.session.commit()
-                flash(f'Assinatura {plan_type.upper()} realizada com sucesso! Bem-vindo ao seu novo plano.', 'success')
+                # Atualizar usuário apenas se ainda não foi processado
+                if current_user.plan == 'free' or not existing_transaction or existing_transaction.status != 'completed':
+                    current_user.plan = plan_type
+                    # Set expiration to exactly 1 month from now
+                    current_user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
+
+                    # Criar ou atualizar registro de transação
+                    if not existing_transaction:
+                        transaction = Transaction(
+                            user_id=current_user.id,
+                            stripe_session_id=session_id,
+                            stripe_customer_id=session.customer,
+                            stripe_subscription_id=session.subscription,
+                            plan_type=plan_type,
+                            amount=session.amount_total,
+                            currency=session.currency,
+                            status='completed',
+                            paid_at=datetime.utcnow()
+                        )
+                        db.session.add(transaction)
+                    else:
+                        existing_transaction.status = 'completed'
+                        existing_transaction.paid_at = datetime.utcnow()
+
+                    db.session.commit()
+                    flash(f'Assinatura {plan_type.upper()} realizada com sucesso! Bem-vindo ao seu novo plano.', 'success')
+                else:
+                    flash('Sua assinatura já está ativa!', 'info')
             else:
                 flash('Erro: Plano desconhecido na confirmação do pagamento.', 'warning')
         else:
@@ -2492,6 +2548,184 @@ def checkout_success():
 def checkout_cancel():
     flash('O processo de assinatura foi cancelado.', 'info')
     return redirect(url_for('plans'))
+
+@app.route('/stripe-webhook', methods=['POST'])
+def stripe_webhook():
+    """
+    Webhook do Stripe para processar eventos de pagamento automaticamente.
+    Este é o método RECOMENDADO e mais seguro para processar pagamentos.
+
+    Configure este endpoint no Dashboard do Stripe:
+    https://dashboard.stripe.com/webhooks
+
+    Eventos importantes:
+    - checkout.session.completed: Sessão de checkout concluída
+    - customer.subscription.created: Assinatura criada
+    - customer.subscription.updated: Assinatura atualizada
+    - customer.subscription.deleted: Assinatura cancelada
+    - invoice.payment_succeeded: Pagamento de fatura bem-sucedido
+    - invoice.payment_failed: Falha no pagamento
+    """
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature')
+    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
+
+    if not webhook_secret:
+        debug_log('AVISO: STRIPE_WEBHOOK_SECRET não configurado! Webhook não pode verificar assinatura.')
+        # Em produção, você DEVE rejeitar webhooks sem verificação
+        if os.environ.get('FLASK_ENV') == 'production':
+            return jsonify({'error': 'Webhook secret not configured'}), 500
+
+    try:
+        # Verificar assinatura do webhook (SEGURANÇA CRÍTICA)
+        if webhook_secret and sig_header:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, webhook_secret
+            )
+        else:
+            # Modo dev sem verificação (NÃO USE EM PRODUÇÃO!)
+            event = json.loads(payload)
+
+        debug_log(f'Webhook recebido: {event["type"]}')
+
+        # Processar eventos de pagamento
+        if event['type'] == 'checkout.session.completed':
+            session = event['data']['object']
+            handle_checkout_completed(session)
+
+        elif event['type'] == 'customer.subscription.created':
+            subscription = event['data']['object']
+            debug_log(f'Assinatura criada: {subscription["id"]}')
+
+        elif event['type'] == 'customer.subscription.updated':
+            subscription = event['data']['object']
+            handle_subscription_updated(subscription)
+
+        elif event['type'] == 'customer.subscription.deleted':
+            subscription = event['data']['object']
+            handle_subscription_cancelled(subscription)
+
+        elif event['type'] == 'invoice.payment_succeeded':
+            invoice = event['data']['object']
+            debug_log(f'Pagamento bem-sucedido: {invoice["id"]}')
+
+        elif event['type'] == 'invoice.payment_failed':
+            invoice = event['data']['object']
+            debug_log(f'Falha no pagamento: {invoice["id"]}')
+
+        return jsonify({'status': 'success'}), 200
+
+    except ValueError as e:
+        # Payload inválido
+        debug_log(f'Erro no payload do webhook: {str(e)}')
+        return jsonify({'error': 'Invalid payload'}), 400
+
+    except stripe_error.SignatureVerificationError as e:
+        # Assinatura inválida
+        debug_log(f'Erro na verificação da assinatura: {str(e)}')
+        return jsonify({'error': 'Invalid signature'}), 400
+
+    except Exception as e:
+        debug_log(f'Erro ao processar webhook: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+def handle_checkout_completed(session):
+    """Processa checkout completado - ATIVA O PLANO AUTOMATICAMENTE"""
+    session_id = session['id']
+    user_id = session['metadata'].get('user_id')
+    plan_type = session['metadata'].get('plan')
+
+    debug_log(f'Checkout completado: session_id={session_id}, user_id={user_id}, plan={plan_type}')
+
+    if not user_id or not plan_type:
+        debug_log('ERRO: Metadata incompleto no checkout')
+        return
+
+    try:
+        user = User.query.get(int(user_id))
+        if not user:
+            debug_log(f'ERRO: Usuário {user_id} não encontrado')
+            return
+
+        # Verificar se já foi processado
+        existing_transaction = Transaction.query.filter_by(stripe_session_id=session_id).first()
+        if existing_transaction and existing_transaction.status == 'completed':
+            debug_log(f'Transação já processada: {session_id}')
+            return
+
+        # ATIVAR PLANO PREMIUM/VIP
+        user.plan = plan_type
+        user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
+
+        # Registrar transação
+        if not existing_transaction:
+            transaction = Transaction(
+                user_id=user.id,
+                stripe_session_id=session_id,
+                stripe_customer_id=session.get('customer'),
+                stripe_subscription_id=session.get('subscription'),
+                plan_type=plan_type,
+                amount=session.get('amount_total', 0),
+                currency=session.get('currency', 'brl'),
+                status='completed',
+                paid_at=datetime.utcnow()
+            )
+            db.session.add(transaction)
+        else:
+            existing_transaction.status = 'completed'
+            existing_transaction.paid_at = datetime.utcnow()
+            existing_transaction.stripe_customer_id = session.get('customer')
+            existing_transaction.stripe_subscription_id = session.get('subscription')
+
+        db.session.commit()
+        debug_log(f'✅ Plano {plan_type.upper()} ativado para usuário {user.username} via webhook')
+
+    except Exception as e:
+        db.session.rollback()
+        debug_log(f'ERRO ao processar checkout: {str(e)}')
+
+def handle_subscription_updated(subscription):
+    """Processa atualização de assinatura"""
+    subscription_id = subscription['id']
+    status = subscription['status']
+
+    debug_log(f'Assinatura atualizada: {subscription_id}, status={status}')
+
+    transaction = Transaction.query.filter_by(stripe_subscription_id=subscription_id).first()
+    if not transaction:
+        debug_log(f'Transação não encontrada para subscription_id: {subscription_id}')
+        return
+
+    user = User.query.get(transaction.user_id)
+    if not user:
+        return
+
+    # Se assinatura foi cancelada ou expirou
+    if status in ['canceled', 'unpaid', 'past_due']:
+        user.plan = 'free'
+        user.subscription_end_date = None
+        db.session.commit()
+        debug_log(f'⚠️ Plano do usuário {user.username} revertido para FREE (status: {status})')
+
+def handle_subscription_cancelled(subscription):
+    """Processa cancelamento de assinatura"""
+    subscription_id = subscription['id']
+
+    debug_log(f'Assinatura cancelada: {subscription_id}')
+
+    transaction = Transaction.query.filter_by(stripe_subscription_id=subscription_id).first()
+    if not transaction:
+        return
+
+    user = User.query.get(transaction.user_id)
+    if not user:
+        return
+
+    # Reverter para plano gratuito
+    user.plan = 'free'
+    user.subscription_end_date = None
+    db.session.commit()
+    debug_log(f'❌ Assinatura cancelada - usuário {user.username} voltou ao plano FREE')
 
 @app.route('/faq')
 def faq():
@@ -5871,6 +6105,47 @@ def profile(user_id=None):
                          favorite_posts=favorite_posts,
                          download_history=download_history)
 
+# Rota para obter favoritos do usuário (API JSON)
+@app.route('/api/user-favorites', methods=['GET'])
+@login_required
+def get_user_favorites_api():
+    """Retorna os favoritos do usuário em JSON para atualização em tempo real"""
+    try:
+        user = current_user
+
+        # Buscar favoritos do usuário
+        favorites = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.date_added.desc()).all()
+
+        posts_data = []
+        for favorite in favorites[:6]:  # Limitar a 6 posts para a página de perfil
+            post = Post.query.get(favorite.post_id)
+            if post and post.is_active:
+                posts_data.append({
+                    'id': post.id,
+                    'title': post.title,
+                    'slug': post.slug,
+                    'content': post.content,
+                    'image_url': post.image_url,
+                    'category_str': post.category_str or 'Geral',
+                    'category_slug': Category.query.get(post.category_id).slug if post.category_id else None,
+                    'download_link': post.download_link,
+                    'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
+                    'views': post.views or 0,
+                    'downloads': post.downloads or 0,
+                    'featured': post.featured or False
+                })
+
+        return jsonify({
+            'success': True,
+            'posts': posts_data,
+            'total': len(favorites)
+        })
+    except Exception as e:
+        print(f"[ERRO] Ao buscar favoritos: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # Rota para obter histórico de downloads (API JSON)
 @app.route('/api/download-history', methods=['GET'])
 @login_required
@@ -5947,6 +6222,37 @@ def clear_download_history():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao limpar histórico: {str(e)}'}), 500
+
+# Rota para remover um download individual
+@app.route('/api/remove-download/<int:download_id>', methods=['DELETE'])
+@login_required
+def remove_download(download_id):
+    """Remove um download específico do histórico"""
+    try:
+        download = Download.query.filter_by(id=download_id, user_id=current_user.id).first()
+        if not download:
+            return jsonify({'success': False, 'message': 'Download não encontrado'}), 404
+
+        db.session.delete(download)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Download removido do histórico!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao remover download: {str(e)}'}), 500
+
+# Rota para limpar todos os favoritos
+@app.route('/api/clear-all-favorites', methods=['POST'])
+@login_required
+def clear_all_favorites():
+    """Remove todos os favoritos do usuário"""
+    try:
+        # Deletar todos os favoritos do usuário
+        Favorite.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Todos os favoritos foram removidos!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao limpar favoritos: {str(e)}'}), 500
 
 # Rota para verificar limite de downloads
 @app.route('/check-download-limit', methods=['GET'])
@@ -6466,8 +6772,11 @@ def can_request_specific_content(user):
 def add_favorite(post_id):
     """Adiciona um post aos favoritos do usuário"""
     try:
+        print(f"[FAVORITOS] Tentando adicionar post {post_id} para usuário {current_user.id}")
+
         # Verifica se o post existe
-        Post.query.get_or_404(post_id)
+        post = Post.query.get_or_404(post_id)
+        print(f"[FAVORITOS] Post encontrado: {post.title}")
 
         # Limpa o cache da sessão
         db.session.expire_all()
@@ -6479,16 +6788,20 @@ def add_favorite(post_id):
         ).first()
 
         if existing:
+            print(f"[FAVORITOS] Post {post_id} já está nos favoritos")
             return jsonify({
                 'success': True,
                 'message': 'Post já está nos favoritos',
                 'is_favorited': True
             })
 
-
         # Verificar limite de favoritos
+        print(f"[FAVORITOS] Verificando limites para usuário {current_user.username} (plano: {current_user.plan})")
         allowed, message = check_favorite_limit(current_user)
+        print(f"[FAVORITOS] Resultado verificação: allowed={allowed}, message={message}")
+
         if not allowed:
+            print(f"[FAVORITOS] Limite atingido: {message}")
             return jsonify({
                 'success': False,
                 'message': message,
@@ -6496,23 +6809,33 @@ def add_favorite(post_id):
             }), 403
 
         # Adiciona aos favoritos
+        print(f"[FAVORITOS] Adicionando ao banco de dados")
         favorite = Favorite(user_id=current_user.id, post_id=post_id)
         db.session.add(favorite)
         db.session.flush()
         db.session.commit()
         db.session.refresh(favorite)
 
+        # Invalidar cache
+        cache_key = f'fav_{current_user.id}_{post_id}'
+        _favorite_check_cache[cache_key] = True
+        _favorite_check_timestamps[cache_key] = __import__('time').time()
+
+        print(f"[FAVORITOS] Favorito adicionado com sucesso: ID={favorite.id}")
         return jsonify({
             'success': True,
             'message': 'Post adicionado aos favoritos',
             'is_favorited': True
         })
 
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        print(f"[ERRO] Ao adicionar favorito: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
-            'message': 'Erro ao adicionar favorito'
+            'message': f'Erro ao adicionar favorito: {str(e)}'
         }), 500
 
 @app.route('/unfavorite/<int:post_id>', methods=['POST'])
@@ -6548,17 +6871,23 @@ def remove_favorite(post_id):
             db.session.delete(still_exists)
             db.session.commit()
 
+        # Invalidar cache
+        cache_key = f'fav_{current_user.id}_{post_id}'
+        _favorite_check_cache[cache_key] = False
+        _favorite_check_timestamps[cache_key] = __import__('time').time()
+
         return jsonify({
             'success': True,
             'message': 'Post removido dos favoritos',
             'is_favorited': False
         })
 
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        print(f"[ERRO] Ao remover favorito: {str(e)}")
         return jsonify({
             'success': False,
-            'message': 'Erro ao remover favorito'
+            'message': f'Erro ao remover favorito: {str(e)}'
         }), 500
 
 # Cache global para check-favorite com timestamp
@@ -6574,13 +6903,14 @@ def check_favorite(post_id):
         cache_key = f'fav_{current_user.id}_{post_id}'
         current_time = time.time()
 
-        # Verificar se existe cache válido (menos de 2 segundos)
+        # Verificar se existe cache válido (menos de 30 segundos)
         if cache_key in _favorite_check_timestamps:
             time_diff = current_time - _favorite_check_timestamps[cache_key]
-            if time_diff < 2:  # 2 segundos de cache
+            if time_diff < 30:  # 30 segundos de cache
                 if cache_key in _favorite_check_cache:
                     response = jsonify({'is_favorited': _favorite_check_cache[cache_key]})
                     response.headers['X-From-Cache'] = 'true'
+                    response.headers['Cache-Control'] = 'public, max-age=30'
                     return response
 
         # Buscar no banco
@@ -6594,50 +6924,18 @@ def check_favorite(post_id):
         _favorite_check_cache[cache_key] = is_favorited
         _favorite_check_timestamps[cache_key] = current_time
 
-        # Limpar cache antigo (mais de 10 segundos)
-        keys_to_remove = [k for k, v in _favorite_check_timestamps.items() if current_time - v > 10]
+        # Limpar cache antigo (mais de 60 segundos)
+        keys_to_remove = [k for k, v in _favorite_check_timestamps.items() if current_time - v > 60]
         for k in keys_to_remove:
             _favorite_check_cache.pop(k, None)
             _favorite_check_timestamps.pop(k, None)
 
         response = jsonify({'is_favorited': is_favorited})
-        response.cache_control.max_age = 2
+        response.headers['Cache-Control'] = 'public, max-age=30'
         return response
 
     except Exception:
         return jsonify({'is_favorited': False}), 500
-
-@app.route('/api/user-favorites', methods=['GET'])
-@login_required
-def get_user_favorites():
-    """Retorna os posts favoritos do usuário em formato JSON"""
-    try:
-        favorites = Favorite.query.filter_by(user_id=current_user.id).order_by(Favorite.date_added.desc()).all()
-        favorite_posts = [fav.post for fav in favorites if fav.post and fav.post.is_active]
-
-        posts_data = []
-        for post in favorite_posts[:6]:
-            posts_data.append({
-                'id': post.id,
-                'title': post.title,
-                'category_str': post.category_str or 'Geral',
-                'image_url': post.image_url,
-                'content': post.content,
-                'date_posted': post.date_posted.strftime('%d/%m/%Y'),
-                'views': post.views,
-                'downloads': post.downloads if hasattr(post, 'downloads') else 0,
-                'featured': post.featured if hasattr(post, 'featured') else False,
-                'download_link': post.download_link if hasattr(post, 'download_link') else None
-            })
-
-        return jsonify({
-            'success': True,
-            'posts': posts_data,
-            'total': len(favorite_posts)
-        })
-
-    except Exception:
-        return jsonify({'success': False, 'message': 'Erro ao buscar favoritos'}), 500
 
 @app.route('/admin/update-preferences', methods=['POST'])
 @login_required

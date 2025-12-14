@@ -171,10 +171,15 @@
                         <div class="profile-card-icon">
                             <i class="fas fa-star"></i>
                         </div>
-                        <div>
+                        <div style="flex: 1;">
                             <h2 class="profile-card-title">Posts Favoritos</h2>
                             <p class="profile-card-subtitle">Posts que você salvou para ler depois</p>
                         </div>
+                        {% if favorite_posts and favorite_posts|length > 0 %}
+                        <button onclick="confirmClearFavorites()" class="btn btn-sm btn-danger" style="margin-left: auto;">
+                            <i class="fas fa-trash"></i> Limpar Favoritos
+                        </button>
+                        {% endif %}
                     </div>
                     <div class="posts-grid" style="margin-top: 1.5rem;">
                         <div class="row" id="favorites-container">
@@ -336,7 +341,7 @@
 
                 <!-- Downloads History Section -->
                 {% if current_user.id == user.id and current_user.plan in ['premium', 'vip'] %}
-                <div class="profile-card mb-4" id="downloads-section">
+                <div class="profile-card mb-4" id="download-history-section">
                     <div class="profile-card-header">
                         <div class="profile-card-icon">
                             <i class="fas fa-download"></i>
@@ -360,7 +365,11 @@
                     {% if download_history and download_history|length > 0 %}
                     <div class="download-history-grid">
                         {% for download in download_history %}
-                        <div class="download-card">
+                        <div class="download-card" data-download-id="{{ download.id }}">
+                            <!-- Botão X para remover -->
+                            <button class="download-remove-btn" onclick="removeDownload({{ download.id }})" title="Remover do histórico">
+                                <i class="fas fa-times"></i>
+                            </button>
                             <!-- Imagem do Post -->
                             {% if download.post.image_url and download.post.image_url != 'default.jpg' %}
                             <img src="{{ url_for('static', filename='images/' + download.post.image_url) }}"

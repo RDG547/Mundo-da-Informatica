@@ -108,8 +108,7 @@
                             </div>
                         </div>
                         {% elif category == 'Drivers' %}
-                        <p>Drivers atualizados e compatíveis para diversos componentes de hardware. Mantemos uma
-                            biblioteca extensa com drivers para placas de vídeo, som, rede e outros dispositivos.</p>
+                        <p>Encontre drivers pelo ID do Hardware ou modelo do seu dispositivo. Identifique e baixe o driver correto para qualquer componente, garantindo compatibilidade total com seu equipamento.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="drivers-video" style="cursor: pointer;">
                                 <i class="fas fa-tv"></i>
@@ -150,8 +149,7 @@
                             </div>
                         </div>
                         {% elif category == 'Softwares' %}
-                        <p>Programas especializados para diagnóstico, recuperação e manutenção de sistemas. Ferramentas
-                            essenciais para técnicos de informática.</p>
+                        <p>Ferramentas para diagnóstico, recuperação e manutenção de sistemas. Programas essenciais para profissionais de TI realizarem seu trabalho com eficiência.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="softwares-diagnostico" style="cursor: pointer;">
                                 <i class="fas fa-stethoscope"></i>
@@ -172,7 +170,7 @@
                         </div>
                         {% elif category == 'Impressoras' %}
                         <p>Recursos especializados para impressoras incluindo drivers, firmwares, software de reset e
-                            manuais técnicos para diversas marcas e modelos.</p>
+                            utilitários para diversas marcas e modelos.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="impressoras-drivers" style="cursor: pointer;">
                                 <i class="fas fa-download"></i>
@@ -187,8 +185,8 @@
                                 <span>Reset</span>
                             </div>
                             <div class="feature-item" data-feature="impressoras-manuais" style="cursor: pointer;">
-                                <i class="fas fa-book"></i>
-                                <span>Manuais</span>
+                                <i class="fas fa-tools"></i>
+                                <span>Utilitários</span>
                             </div>
                         </div>
                         {% elif category == 'Cursos' %}
@@ -221,10 +219,10 @@
                     <div class="posts-header text-center">
                         <h2>
                             <i class="fas fa-list"></i>
-                            Recursos Disponíveis
+                            Posts Disponíveis
                         </h2>
                         <p class="text-center">Encontrados <strong>{{ posts.total if posts and posts.total else 0
-                                }}</strong> recursos nesta categoria</p>
+                                }}</strong> posts nesta categoria</p>
                     </div>
 
                     <!-- Category Search -->

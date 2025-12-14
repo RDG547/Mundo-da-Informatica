@@ -160,76 +160,165 @@
 
 /* Search Filters no Hero (abaixo do campo de pesquisa) */
 .search-filters-hero {
-    margin-top: 25px;
+    margin-top: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 15px;
+    gap: 20px;
     flex-wrap: wrap;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .filter-label-hero {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.95);
+    gap: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.98);
     font-size: 15px;
-    background: rgba(255, 255, 255, 0.15);
-    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 12px 24px;
     border-radius: 50px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(15px);
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1),
+                0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-label-hero:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15),
+                0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .filter-label-hero i {
-    color: rgba(255, 255, 255, 0.95);
-    font-size: 14px;
+    color: rgba(255, 255, 255, 0.98);
+    font-size: 15px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
 }
 
 .search-filters-hero .filter-buttons {
     display: flex;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 8px;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 10px;
     border-radius: 50px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12),
+                0 2px 8px rgba(0, 0, 0, 0.08);
     backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .search-filters-hero .filter-btn {
-    padding: 10px 24px;
+    padding: 12px 28px;
     border: 2px solid transparent;
     border-radius: 50px;
     background: transparent;
-    color: #666;
+    color: #4a5568;
     text-decoration: none;
-    font-weight: 600;
-    transition: all 0.3s ease;
+    font-weight: 700;
+    font-size: 14px;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     cursor: pointer;
     white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.search-filters-hero .filter-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(102, 126, 234, 0.15);
+    transform: translate(-50%, -50%);
+    transition: width 0.5s ease, height 0.5s ease;
+}
+
+.search-filters-hero .filter-btn:hover::before {
+    width: 200%;
+    height: 200%;
 }
 
 .search-filters-hero .filter-btn:hover {
     color: #667eea;
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(102, 126, 234, 0.08);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.search-filters-hero .filter-btn:active {
+    transform: translateY(0) scale(0.98);
 }
 
 .search-filters-hero .filter-btn.active {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5),
+                0 2px 8px rgba(118, 75, 162, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.search-filters-hero .filter-btn.active::before {
+    display: none;
+}
+
+.search-filters-hero .filter-btn.active:hover {
+    box-shadow: 0 8px 28px rgba(102, 126, 234, 0.6),
+                0 4px 12px rgba(118, 75, 162, 0.4);
+    transform: translateY(-3px) scale(1.05);
 }
 
 .search-filters-hero .filter-btn i {
-    font-size: 16px;
+    font-size: 17px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 1;
+}
+
+.search-filters-hero .filter-btn:hover i {
+    transform: rotate(5deg) scale(1.1);
+}
+
+.search-filters-hero .filter-btn.active i {
+    transform: scale(1.15);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .search-filters-hero .filter-btn span {
     font-size: 14px;
+    position: relative;
+    z-index: 1;
+    letter-spacing: 0.3px;
 }
 
 /* Search Filters (antigo - remover se não for usado) */
@@ -435,29 +524,49 @@
     }
 
     .search-filters-hero {
-        gap: 10px;
+        gap: 12px;
+        margin-top: 20px;
+        flex-direction: column;
     }
 
     .filter-label-hero {
         font-size: 13px;
-        padding: 8px 16px;
+        padding: 10px 18px;
+        width: 100%;
+        max-width: 200px;
+        justify-content: center;
     }
 
     .filter-label-hero i {
-        font-size: 12px;
+        font-size: 13px;
     }
 
     .search-filters-hero .filter-buttons {
         flex-wrap: wrap;
         gap: 8px;
-        padding: 10px;
-    }    .search-filters-hero .filter-btn {
-        padding: 8px 16px;
+        padding: 8px;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .search-filters-hero .filter-btn {
+        padding: 10px 20px;
         font-size: 13px;
+        flex: 1 1 auto;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    .search-filters-hero .filter-btn:hover {
+        transform: translateY(-1px) scale(1.02);
+    }
+
+    .search-filters-hero .filter-btn.active:hover {
+        transform: translateY(-2px) scale(1.03);
     }
 
     .search-filters-hero .filter-btn i {
-        font-size: 14px;
+        font-size: 15px;
     }
 
     .search-filters-hero .filter-btn span {

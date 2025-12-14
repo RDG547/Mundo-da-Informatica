@@ -4,37 +4,78 @@
  * Home Page Search with Dropdown Suggestions
  */
 
-// Função toast inline que sempre funciona
+// Função toast inline padronizada (igual às notificações do sistema)
 function showInlineToast(message, type = 'success') {
+    // Tentar usar o sistema de toast global se disponível
+    if (window.favoriteManager && typeof window.favoriteManager.showToast === 'function') {
+        window.favoriteManager.showToast(message, type);
+        return;
+    }
+
+    // Fallback: criar toast com aparência padronizada
     const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+
+    // Cores padronizadas do sistema
+    const colors = {
+        success: { bg: '#10b981', icon: 'check-circle' },
+        warning: { bg: '#f59e0b', icon: 'exclamation-triangle' },
+        error: { bg: '#ef4444', icon: 'times-circle' }
+    };
+
+    const color = colors[type] || colors.success;
+
     toast.style.cssText = `
         position: fixed;
         bottom: 20px;
         right: 20px;
-        padding: 15px 20px;
-        background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
-        color: ${type === 'warning' ? '#000' : 'white'};
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        min-width: 300px;
+        max-width: 500px;
+        padding: 16px 20px;
+        background: white;
+        color: #1f2937;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 14px;
-        animation: slideInRight 0.3s ease;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: slideInRight 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        border-left: 4px solid ${color.bg};
     `;
-    toast.textContent = message;
 
-    // Adicionar animação CSS
+    toast.innerHTML = `
+        <i class="fas fa-${color.icon}" style="color: ${color.bg}; font-size: 20px;"></i>
+        <span style="flex: 1;">${message}</span>
+    `;
+
+    // Adicionar animação CSS se não existir
     if (!document.getElementById('toast-animations')) {
         const style = document.createElement('style');
         style.id = 'toast-animations';
         style.textContent = `
             @keyframes slideInRight {
-                from { transform: translateX(400px); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
             }
             @keyframes slideOutRight {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(400px); opacity: 0; }
+                from {
+                    transform: translateX(0) scale(1);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px) scale(0.9);
+                    opacity: 0;
+                }
             }
         `;
         document.head.appendChild(style);

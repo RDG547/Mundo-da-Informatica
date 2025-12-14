@@ -236,15 +236,20 @@ window.DynamicLoader = class DynamicLoader {
                 mainContainer.style.opacity = '0';
 
                 setTimeout(() => {
+                    console.log('[DYNAMIC-LOADING] 📄 Atualizando conteúdo da página');
                     mainContainer.innerHTML = pageData.content.innerHTML;
+
+                    console.log('[DYNAMIC-LOADING] 📜 Carregando scripts');
                     this.loadPageScripts(pageData.scripts);
                     this.executeInlineScripts(pageData.inlineScripts);
                     this.applyInlineStyles(pageData.inlineStyles);
                     this.executeContentScripts(mainContainer);
+
                     // Wait a bit for scripts to load before reinitializing
                     setTimeout(() => {
                         this.reinitializeComponents();
-                    }, 200);
+                    }, 300);
+
                     mainContainer.style.opacity = '1';
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }, 150);
@@ -274,83 +279,160 @@ window.DynamicLoader = class DynamicLoader {
     }
 
     reinitializeComponents() {
+        console.log('[DYNAMIC-LOADING] 🔄 Reinicializando componentes...');
+
+        // Limpa TODOS os atributos de inicialização para permitir reinicialização
+        document.querySelectorAll('[data-suggestions-initialized]').forEach(el => {
+            el.removeAttribute('data-suggestions-initialized');
+        });
+        document.querySelectorAll('[data-faq-initialized]').forEach(el => {
+            el.removeAttribute('data-faq-initialized');
+        });
+        document.querySelectorAll('[data-contact-initialized]').forEach(el => {
+            el.removeAttribute('data-contact-initialized');
+        });
+        document.querySelectorAll('[data-form-initialized]').forEach(el => {
+            el.removeAttribute('data-form-initialized');
+        });
+        document.querySelectorAll('[data-suggestion-initialized]').forEach(el => {
+            el.removeAttribute('data-suggestion-initialized');
+        });
+
         // Re-initialize favorite buttons and modal
         if (window.favoriteManager) {
+            console.log('[DYNAMIC-LOADING] ⭐ Reinicializando favoriteManager');
             // Garante que o modal existe após carregamento dinâmico
             window.favoriteManager.createConfirmModal();
+            // Força reinicialização sem duplicar listeners
+            window.favoriteManager._isInitialized = false;
             window.favoriteManager.init();
         }
 
         // Re-initialize search suggestions for all search inputs
         if (window.SearchSuggestions) {
+            console.log('[DYNAMIC-LOADING] 🔍 Reinicializando search suggestions');
             // Buscar todos os inputs de pesquisa
             const searchInputs = document.querySelectorAll('input[name="q"], .search-bar input, #home-search-input');
-            searchInputs.forEach(input => {
-                if (input && !input.hasAttribute('data-suggestions-initialized')) {
-                    new SearchSuggestions(`#${input.id || 'home-search-input'}`);
-                    input.setAttribute('data-suggestions-initialized', 'true');
+            searchInputs.forEach((input, idx) => {
+                if (input && input.id) {
+                    try {
+                        new SearchSuggestions(`#${input.id}`);
+                        console.log(`[DYNAMIC-LOADING] ✅ Search suggestions ${idx + 1} inicializado`);
+                    } catch (e) {
+                        console.warn(`[DYNAMIC-LOADING] ⚠️ Erro ao inicializar search ${idx + 1}:`, e);
+                    }
                 }
             });
         }
 
         // Re-initialize feature modals (for categories pages)
         if (typeof window.initFeatureModals === 'function') {
+            console.log('[DYNAMIC-LOADING] 🎬 Reinicializando feature modals');
             window.initFeatureModals();
         }
 
         // Re-initialize FAQ functionality
         if (window.location.pathname === '/faq' && typeof window.toggleFAQ === 'function') {
+            console.log('[DYNAMIC-LOADING] ❓ Reinicializando FAQ');
             this.initializeFAQ();
         }
 
         // Re-initialize contact form functionality
-        if (window.location.pathname === '/contact') {
+        if (window.location.pathname === '/contact' || window.location.pathname === '/contato') {
+            console.log('[DYNAMIC-LOADING] 📧 Reinicializando contact form');
             this.initializeContactForm();
         }
 
         // Re-initialize category page functionality
         if (window.location.pathname.startsWith('/categoria/')) {
+            console.log('[DYNAMIC-LOADING] 📁 Reinicializando category page');
             this.initializeCategoryPage();
         }
 
         // Re-initialize profile page functionality
         if (window.location.pathname.startsWith('/profile')) {
+            console.log('[DYNAMIC-LOADING] 👤 Reinicializando profile page');
             this.initializeProfilePage();
+
+            // Atualizar histórico de downloads e favoritos ao navegar para perfil
+            setTimeout(() => {
+                console.log('[DYNAMIC-LOADING] 📊 Atualizando histórico e favoritos');
+                if (typeof window.reloadDownloadHistorySection === 'function') {
+                    window.reloadDownloadHistorySection();
+                } else if (typeof window.refreshDownloadHistory === 'function') {
+                    window.refreshDownloadHistory();
+                }
+                if (typeof window.reloadFavoritesSection === 'function') {
+                    window.reloadFavoritesSection();
+                }
+            }, 500);
         }
+
+
+
+
+
+
+
+
+
+
+
 
         // Re-initialize post page functionality
         const currentPath = window.location.pathname;
         if (currentPath.startsWith('/post/') || (currentPath.split('/').length === 3 && currentPath.split('/')[1] && currentPath.split('/')[2])) {
+            console.log('[DYNAMIC-LOADING] 📄 Reinicializando post page');
             this.initializePostPage();
         }
 
         // Re-initialize legal pages functionality
         if (window.location.pathname === '/termos-de-uso' || window.location.pathname === '/politica-de-privacidade') {
+            console.log('[DYNAMIC-LOADING] ⚖️ Reinicializando legal page');
             this.initializeLegalPage();
         }
 
         // Re-initialize admin components
         if (currentPath.startsWith('/admin')) {
+            console.log('[DYNAMIC-LOADING] 🔧 Reinicializando admin components');
             this.reinitializeAdminComponents();
         }
 
         // Re-initialize home page functionality
         if (currentPath === '/' || currentPath === '/home' || document.querySelector('#hero-particles')) {
+            console.log('[DYNAMIC-LOADING] 🏠 Reinicializando home page');
             this.initializeHomePage();
         }
 
         // Re-initialize Plans page functionality
         if ((currentPath === '/planos' || currentPath === '/plans') && typeof window.initializePlansPage === 'function') {
+            console.log('[DYNAMIC-LOADING] 💳 Reinicializando plans page');
             window.initializePlansPage();
         }
 
         // Re-initialize download buttons (CRITICAL for download limit checks)
         if (typeof window.setupDownloadButtons === 'function') {
+            console.log('[DYNAMIC-LOADING] 📥 Reinicializando download buttons');
             window.setupDownloadButtons();
         }
 
+        // Re-initialize theme toggler
+        if (typeof window.initTheme === 'function') {
+            console.log('[DYNAMIC-LOADING] 🎨 Reinicializando theme');
+            window.initTheme();
+        }
+
+        // Re-initialize navbar interactions
+        if (typeof window.initNavbar === 'function') {
+            console.log('[DYNAMIC-LOADING] 📱 Reinicializando navbar');
+            window.initNavbar();
+        }
+
         // Re-initialize any other components
+        console.log('[DYNAMIC-LOADING] ✨ Disparando evento pageLoaded');
         this.dispatchEvent('pageLoaded');
+
+        console.log('[DYNAMIC-LOADING] ✅ Reinicialização completa!');
     }
 
     reinitializeAdminComponents() {
@@ -509,8 +591,9 @@ window.DynamicLoader = class DynamicLoader {
         // Initialize FAQ functionality
         setTimeout(() => {
             const faqSearch = document.getElementById('faq-search');
-            if (faqSearch) {
+            if (faqSearch && !faqSearch.hasAttribute('data-faq-initialized')) {
                 // Re-bind FAQ search functionality
+                faqSearch.setAttribute('data-faq-initialized', 'true');
                 faqSearch.addEventListener('input', function () {
                     const searchTerm = this.value.toLowerCase();
                     const faqItems = document.querySelectorAll('.faq-item');
@@ -533,13 +616,16 @@ window.DynamicLoader = class DynamicLoader {
 
             // Re-bind suggestion clicks
             document.querySelectorAll('.search-suggestion').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const searchTerm = this.dataset.search;
-                    if (faqSearch) {
-                        faqSearch.value = searchTerm;
-                        faqSearch.dispatchEvent(new Event('input'));
-                    }
-                });
+                if (!btn.hasAttribute('data-suggestion-initialized')) {
+                    btn.setAttribute('data-suggestion-initialized', 'true');
+                    btn.addEventListener('click', function () {
+                        const searchTerm = this.dataset.search;
+                        if (faqSearch) {
+                            faqSearch.value = searchTerm;
+                            faqSearch.dispatchEvent(new Event('input'));
+                        }
+                    });
+                }
             });
         }, 100);
     }
@@ -550,7 +636,8 @@ window.DynamicLoader = class DynamicLoader {
             const messageTextarea = document.getElementById('message');
             const charCounter = document.getElementById('char-count');
 
-            if (messageTextarea && charCounter) {
+            if (messageTextarea && charCounter && !messageTextarea.hasAttribute('data-contact-initialized')) {
+                messageTextarea.setAttribute('data-contact-initialized', 'true');
                 messageTextarea.addEventListener('input', function () {
                     const currentLength = this.value.length;
                     charCounter.textContent = currentLength;
@@ -567,7 +654,8 @@ window.DynamicLoader = class DynamicLoader {
 
             // Form validation and submission
             const contactForm = document.getElementById('contact-form');
-            if (contactForm) {
+            if (contactForm && !contactForm.hasAttribute('data-form-initialized')) {
+                contactForm.setAttribute('data-form-initialized', 'true');
                 contactForm.addEventListener('submit', function (e) {
                     e.preventDefault();
 

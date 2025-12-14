@@ -192,6 +192,59 @@ window.removeFavorite = async function (postId) {
     }
 };
 
+// Função para atualizar navbar dinamicamente
+function updateNavbar(user) {
+    console.log('[DEBUG] Atualizando navbar com:', user);
+
+    // Atualizar foto de perfil na navbar
+    const navbarImg = document.querySelector('.user-dropdown img');
+    if (navbarImg && user.profile_image) {
+        const imageUrl = `/static/uploads/profiles/${user.profile_image}`;
+        navbarImg.src = imageUrl;
+        console.log('[DEBUG] Navbar image atualizada:', imageUrl);
+    }
+
+    // Atualizar nome de usuário na navbar
+    const navbarUsername = document.querySelector('.user-dropdown .dropdown-toggle');
+    if (navbarUsername && user.username) {
+        // Preservar a imagem e apenas atualizar o texto
+        const imgElement = navbarUsername.querySelector('img');
+        if (imgElement) {
+            navbarUsername.innerHTML = '';
+            navbarUsername.appendChild(imgElement.cloneNode(true));
+            navbarUsername.appendChild(document.createTextNode(' ' + user.username));
+        }
+        console.log('[DEBUG] Navbar username atualizado:', user.username);
+    }
+}
+
+// Função para atualizar sidebar dinamicamente
+function updateSidebar(user) {
+    console.log('[DEBUG] Atualizando sidebar com:', user);
+
+    // Atualizar foto na sidebar
+    const sidebarImg = document.querySelector('.sidebar-profile-header img, .admin-sidebar-profile img');
+    if (sidebarImg && user.profile_image) {
+        const imageUrl = `/static/uploads/profiles/${user.profile_image}`;
+        sidebarImg.src = imageUrl;
+        console.log('[DEBUG] Sidebar image atualizada:', imageUrl);
+    }
+
+    // Atualizar nome na sidebar
+    const sidebarName = document.querySelector('.sidebar-profile-header h3, .admin-sidebar-profile h3');
+    if (sidebarName && user.username) {
+        sidebarName.textContent = user.username;
+        console.log('[DEBUG] Sidebar username atualizado:', user.username);
+    }
+
+    // Atualizar bio na sidebar se existir
+    const sidebarBio = document.querySelector('.sidebar-profile-header p, .admin-sidebar-profile .user-role');
+    if (sidebarBio && user.bio) {
+        sidebarBio.textContent = user.bio;
+        console.log('[DEBUG] Sidebar bio atualizada:', user.bio);
+    }
+}
+
 // Função para recarregar apenas a seção de favoritos
 async function reloadFavoritesSection() {
     try {
@@ -291,13 +344,18 @@ async function reloadFavoritesSection() {
                 <div class="profile-card-icon">
                     <i class="fas fa-star"></i>
                 </div>
-                <div>
+                <div style="flex: 1;">
                     <h2 class="profile-card-title">Posts Favoritos</h2>
                     <p class="profile-card-subtitle">Posts que você salvou para ler depois</p>
                 </div>
+                ${data.posts.length > 0 ? `
+                    <button onclick="confirmClearFavorites()" class="btn btn-sm btn-danger" style="margin-left: auto;">
+                        <i class="fas fa-trash"></i> Limpar Favoritos
+                    </button>
+                ` : ''}
             </div>
             <div class="posts-grid" style="margin-top: 1.5rem;">
-                <div class="row">
+                <div class="row" id="favorites-container">
                     ${postsHTML}
                 </div>
             </div>
@@ -327,6 +385,9 @@ async function reloadFavoritesSection() {
         }
     }
 }
+
+// Expor função globalmente para uso em outros scripts
+window.reloadFavoritesSection = reloadFavoritesSection;
 
 // Update ALL profile images across the page
 function updateAllProfileImages(userData) {
@@ -659,6 +720,12 @@ function initializeProfilePage() {
 
                     // Update ALL profile images in the page (including navbar)
                     updateAllProfileImages(data.user);
+
+                    // Atualizar navbar dinamicamente
+                    updateNavbar(data.user);
+
+                    // Atualizar sidebar se existir (página de perfil)
+                    updateSidebar(data.user);
 
                     // Invalidar cache do Dynamic Loading para forçar recarga na próxima navegação
                     if (window.dynamicLoader && window.dynamicLoader.cache) {

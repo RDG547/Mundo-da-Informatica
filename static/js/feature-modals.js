@@ -13,17 +13,17 @@ window.featureData = {
     verified: {
         icon: 'fas fa-shield-alt',
         title: 'Conteúdo Verificado',
-        text: 'Todos os arquivos em nossa plataforma passam por uma rigorosa verificação de segurança. Utilizamos múltiplas camadas de análise antivírus e checagem de integridade para garantir que você baixe apenas conteúdo seguro e livre de malware. Nossa equipe técnica revisa manualmente cada upload antes de disponibilizá-lo.'
+        text: 'Todos os arquivos em nossa plataforma passam por uma verificação de segurança e qualidade. Checamos a integridade dos arquivos, para garantir que você baixe apenas conteúdo funcional, seguro e livre de malware. Nossa equipe técnica revisa manualmente cada arquivo antes de disponibilizá-lo.'
     },
     updated: {
         icon: 'fas fa-rocket',
         title: 'Sempre Atualizado',
-        text: 'Nosso acervo é constantemente atualizado com as versões mais recentes de BIOS, drivers, esquemas e softwares. Monitoramos lançamentos oficiais dos fabricantes e atualizamos nosso banco de dados regularmente para garantir que você tenha acesso às versões mais estáveis e compatíveis disponíveis no mercado.'
+        text: 'Nossa plataforma é constantemente atualizada com novos conteúdos. Adicionamos regularmente novos arquivos ao nosso banco de dados para garantir que você tenha acesso a um acervo cada vez mais completo e diversificado.'
     },
     professional: {
         icon: 'fas fa-users',
         title: 'Feito para Profissionais',
-        text: 'Nossa plataforma foi desenvolvida pensando nas necessidades de técnicos profissionais de informática. Organizamos o conteúdo de forma intuitiva, com filtros avançados, descrições detalhadas e informações técnicas precisas. Economize tempo em suas pesquisas e encontre exatamente o que precisa para seu trabalho.'
+        text: 'Nossa plataforma foi desenvolvida pensando nas necessidades de profissionais de informática. Organizamos o conteúdo de forma intuitiva, com filtros avançados, descrições detalhadas e informações técnicas precisas. Economize tempo em suas pesquisas e encontre exatamente o que precisa para seu trabalho.'
     },
     support: {
         icon: 'fas fa-headset',
@@ -34,17 +34,17 @@ window.featureData = {
     'bios-notebooks': {
         icon: 'fas fa-laptop',
         title: 'BIOS para Notebooks',
-        text: 'Arquivos de BIOS específicos para notebooks de todas as marcas principais (Dell, HP, Lenovo, Acer, Asus, etc.). Inclui versões atualizadas e compatíveis com diferentes modelos e gerações. Essencial para reparos de placa-mãe, desbloqueio de senha de BIOS e atualizações de firmware.'
+        text: 'Arquivos de BIOS específicos para notebooks de todas as principais marcas (Dell, HP, Lenovo, Acer, Asus, etc.). Essencial para reparos de placa-mãe.'
     },
     'bios-desktops': {
         icon: 'fas fa-desktop',
         title: 'BIOS para Desktops',
-        text: 'BIOS para computadores desktop e placas-mãe de diversos fabricantes. Nossa coleção abrange desde placas antigas até modelos mais recentes, com suporte a múltiplos chipsets (Intel, AMD). Ideal para técnicos que trabalham com manutenção e montagem de PCs.'
+        text: 'BIOS para placas-mãe de computadores desktop de diversos fabricantes. Nossa coleção abrange desde placas antigas até modelos mais recentes, com suporte a múltiplos chipsets (Intel, AMD). Ideal para técnicos que trabalham com manutenção de PCs.'
     },
     'bios-monitores': {
         icon: 'fas fa-tv',
         title: 'BIOS para Monitores',
-        text: 'Firmwares e BIOS especializados para monitores LCD, LED e OLED das principais marcas como Samsung, LG, Dell, AOC e BenQ. Inclui arquivos para atualização de firmware, correção de problemas de imagem, ajuste de cores e configurações avançadas. Essencial para técnicos que trabalham com manutenção e reparo de monitores profissionais, permitindo resolver problemas de tela, botões, menus OSD e configurações de fábrica.'
+        text: 'Firmwares e BIOS para monitores LCD, LED e OLED das principais marcas como Samsung, LG, Dell, AOC e BenQ. Inclui arquivos para atualização de firmware, correção de problemas de imagem, ajuste de cores e configurações avançadas. Essencial para técnicos que trabalham com manutenção e reparo de monitores, permitindo resolver problemas de tela, botões, menus OSD e configurações de fábrica.'
     },
     'bios-embarcados': {
         icon: 'fas fa-microchip',
@@ -76,43 +76,43 @@ window.featureData = {
     'drivers-video': {
         icon: 'fas fa-tv',
         title: 'Drivers de Placas de Vídeo',
-        text: 'Drivers atualizados para GPUs NVIDIA, AMD e Intel. Inclui versões estáveis (WHQL) e beta, drivers específicos para workstations e suporte a múltiplos monitores. Essencial para resolver problemas gráficos, melhorar performance em jogos e aplicações profissionais.'
+        text: 'Drivers para GPUs NVIDIA, AMD e Intel. Encontre o driver correto para sua placa de vídeo através do modelo ou Hardware ID, garantindo compatibilidade perfeita e melhor desempenho gráfico.'
     },
     'drivers-som': {
         icon: 'fas fa-volume-up',
         title: 'Drivers de Placas de Som',
-        text: 'Drivers para chipsets de áudio Realtek, Creative, Conexant e outros. Inclui pacotes completos com painéis de controle, equalização e configurações avançadas. Resolve problemas de ausência de som, microfone não funcional e melhora qualidade de áudio.'
+        text: 'Drivers para chipsets de áudio Realtek, Creative, Conexant e outros fabricantes. Encontre o driver correto para resolver problemas de ausência de som, microfone não funcional e melhorar a qualidade de áudio.'
     },
     'drivers-rede': {
         icon: 'fas fa-wifi',
         title: 'Drivers de Rede/WiFi',
-        text: 'Drivers para placas de rede ethernet (Intel, Realtek, Broadcom) e adaptadores WiFi (Intel, Qualcomm Atheros, MediaTek). Inclui suporte a padrões modernos (WiFi 6/6E) e drivers para redes 10Gbps. Essencial para resolver problemas de conectividade.'
+        text: 'Drivers para placas de rede ethernet (Intel, Realtek, Broadcom) e adaptadores WiFi (Qualcomm Atheros, MediaTek). Resolva problemas de conectividade e melhore a estabilidade da sua rede.'
     },
     'drivers-usb': {
         icon: 'fas fa-ellipsis-h',
         title: 'Outros Drivers',
-        text: 'Drivers diversos para componentes e periféricos não categorizados: controladores USB, adaptadores seriais, chipsets, dispositivos Bluetooth, card readers, webcams, touchpads e outros componentes específicos. Inclui drivers para hardware especializado e dispositivos menos comuns.'
+        text: 'Drivers para diversos dispositivos: controladores USB, Bluetooth, chipsets, webcams, touchpads, card readers e outros periféricos. Encontre o driver correto para qualquer componente do seu sistema.'
     },
     // Softwares Features
     'softwares-diagnostico': {
         icon: 'fas fa-stethoscope',
         title: 'Ferramentas de Diagnóstico',
-        text: 'Software profissional para diagnóstico de hardware: AIDA64, HWiNFO, CPU-Z, GPU-Z, CrystalDiskInfo, MemTest86. Ferramentas essenciais para identificar problemas em processador, memória, disco, temperatura e estabilidade do sistema.'
+        text: 'Ferramentas profissionais para diagnóstico de hardware: HWiNFO, CPU-Z, GPU-Z, CrystalDiskInfo, MemTest86. Identifique problemas em processador, memória, disco, temperatura e estabilidade do sistema.'
     },
     'softwares-recuperacao': {
         icon: 'fas fa-redo',
         title: 'Softwares de Recuperação',
-        text: 'Programas para recuperação de dados: Recuva, TestDisk, PhotoRec, EaseUS Data Recovery. Ferramentas para recuperar arquivos deletados, partições perdidas e dados de discos danificados. Inclui software para clonagem e backup de discos.'
+        text: 'Programas para recuperação de dados: Recuva, TestDisk, PhotoRec. Recupere arquivos deletados, partições perdidas e dados de discos danificados. Inclui ferramentas para clonagem e backup de discos.'
     },
     'softwares-limpeza': {
         icon: 'fas fa-broom',
         title: 'Ferramentas de Limpeza',
-        text: 'Software para otimização e limpeza: CCleaner, BleachBit, Wise Care 365, ferramentas de remoção de malware e limpeza de registro. Programas para desinstalação completa de aplicativos, limpeza de arquivos temporários e otimização de sistema.'
+        text: 'Software para otimização e limpeza: CCleaner, BleachBit e outros utilitários. Desinstale aplicativos, limpe arquivos temporários, otimize o registro e melhore o desempenho geral do sistema.'
     },
     'softwares-benchmark': {
         icon: 'fas fa-tachometer-alt',
         title: 'Software de Benchmark',
-        text: 'Ferramentas para teste de performance: 3DMark, Cinebench, Prime95, FurMark, CrystalDiskMark. Programas para avaliar desempenho de CPU, GPU, RAM e armazenamento. Essencial para validar upgrades e comparar performance de sistemas.'
+        text: 'Ferramentas para teste de performance: Cinebench, Prime95, FurMark, CrystalDiskMark, Geekbench. Avalie o desempenho de CPU, GPU, RAM e armazenamento. Essencial para validar upgrades e comparar sistemas.'
     },
     // Impressoras Features
     'impressoras-drivers': {
@@ -131,9 +131,9 @@ window.featureData = {
         text: 'Software para reset de contadores de páginas, almofadas de tinta e chips. Programas como SSC Service Utility, WIC Reset e ferramentas específicas por fabricante. Essencial para manutenção preventiva e economia com cartuchos.'
     },
     'impressoras-manuais': {
-        icon: 'fas fa-book',
-        title: 'Manuais Técnicos',
-        text: 'Manuais de serviço completos para impressoras, incluindo diagramas de desmontagem, procedimentos de manutenção, códigos de erro e especificações técnicas. Documentação oficial para técnicos profissionais realizarem reparos qualificados.'
+        icon: 'fas fa-tools',
+        title: 'Utilitários',
+        text: 'Ferramentas e utilitários para manutenção de impressoras: programas de diagnóstico, ajuste de cabeçotes, limpeza de bicos, calibração de cores e outras utilidades. Inclui software de teste de páginas, ferramentas de alinhamento e programas de manutenção preventiva.'
     },
     // Cursos Features
     'cursos-video': {

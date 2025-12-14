@@ -61,7 +61,7 @@
                             <i class="fas fa-list"></i>
                             Categorias Disponíveis
                         </h2>
-                        <p class="text-center">Encontradas <strong>{{ categories|length if categories else 0 }}</strong> categorias organizadas</p>
+                        <p class="text-center"><strong>{{ categories|length if categories else 0 }}</strong> Categorias encontradas</p>
                     </div>
 
                     <!-- Category Search -->
@@ -122,17 +122,22 @@
                         </div>
                         <h4>Não encontrou o que procura?</h4>
                         <p>Use nossa busca avançada para encontrar recursos específicos em todas as categorias disponíveis. Se não encontrar o que precisa, entre em contato conosco para solicitar conteúdo específico. Nossa equipe está sempre trabalhando para adicionar novos recursos!</p>
-                        <div class="cta-buttons">
-                            <button type="button" class="btn btn-gradient primary" id="toggleSearchBtn" onclick="toggleInlineSearch()">
+                        <div class="cta-buttons" id="ctaButtonsContainer" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                            <button type="button" class="btn btn-gradient primary" id="toggleSearchBtnCategories"
+                                onclick="transformToSearchBarCategories()" style="flex: 0 0 auto;">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <a href="{{ url_for('contact') }}" class="btn btn-gradient secondary">
+                            <a href="{{ url_for('contact') }}" class="btn btn-gradient secondary" style="flex: 0 0 auto;">
                                 <i class="fas fa-envelope"></i> Solicitar Conteúdo
                             </a>
                         </div>
-                        <form action="{{ url_for('search') }}" method="get" class="inline-search-form" id="inlineSearchForm" style="display: none; margin-top: 1.5rem;">
-                            <div class="search-input-wrapper" style="position: relative; display: flex; align-items: center;">
-                                <input type="text" name="q" placeholder="Digite sua busca..." autocomplete="off" id="inlineSearchInput" required style="padding: 1rem 150px 1rem 1.5rem; border: 2px solid #ddd; border-radius: 50px; width: 100%; font-size: 1rem; outline: none; transition: all 0.3s;">
+                        <form action="{{ url_for('search') }}" method="get" class="inline-search-form"
+                            id="inlineSearchFormCategories" style="display: none; opacity: 0; transform: translateY(-10px); transition: all 0.4s ease; max-width: 600px; margin: 1.5rem auto 0; position: relative; z-index: 1000;">
+                            <div class="search-input-wrapper"
+                                style="position: relative; display: flex; align-items: center;">
+                                <input type="text" name="q" placeholder="Digite sua busca..." autocomplete="off"
+                                    id="inlineSearchInputCategories" required
+                                    style="padding: 1rem 150px 1rem 1.5rem; border: 2px solid #ddd; border-radius: 50px; width: 100%; font-size: 1rem; outline: none; transition: all 0.3s;">
                                 <button type="submit" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
                                     <i class="fas fa-search"></i> Buscar
                                 </button>
@@ -147,28 +152,40 @@
 </div>
 
 <script>
-function toggleInlineSearch() {
-    const form = document.getElementById('inlineSearchForm');
-    const btn = document.getElementById('toggleSearchBtn');
-    const input = document.getElementById('inlineSearchInput');
+function transformToSearchBarCategories() {
+    const searchBtn = document.getElementById('toggleSearchBtnCategories');
+    const form = document.getElementById('inlineSearchFormCategories');
+    const input = document.getElementById('inlineSearchInputCategories');
 
-    if (form.style.display === 'none') {
-        form.style.display = 'block';
-        btn.innerHTML = '<i class="fas fa-times"></i> Fechar Busca';
-        btn.classList.remove('primary');
-        btn.classList.add('secondary');
-        setTimeout(() => input.focus(), 100);
-    } else {
-        form.style.display = 'none';
-        btn.innerHTML = '<i class="fas fa-search"></i> Fazer uma Busca';
-        btn.classList.remove('secondary');
-        btn.classList.add('primary');
+    if (!searchBtn || !form || !input) {
+        console.error('Elementos não encontrados:', { searchBtn, form, input });
+        return;
     }
+
+    // Animar saída apenas do botão de busca
+    searchBtn.style.transition = 'all 0.4s ease';
+    searchBtn.style.opacity = '0';
+    searchBtn.style.transform = 'scale(0.8)';
+
+    setTimeout(() => {
+        // Esconder apenas o botão de busca
+        searchBtn.style.display = 'none';
+
+        // Mostrar formulário
+        form.style.display = 'block';
+
+        // Animar entrada do formulário
+        setTimeout(() => {
+            form.style.opacity = '1';
+            form.style.transform = 'translateY(0)';
+            input.focus();
+        }, 50);
+    }, 400);
 }
 
 // Adicionar efeito hover no input
 document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('inlineSearchInput');
+    const input = document.getElementById('inlineSearchInputCategories');
     if (input) {
         input.addEventListener('focus', function() {
             this.style.borderColor = '#667eea';

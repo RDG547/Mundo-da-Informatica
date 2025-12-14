@@ -5,6 +5,49 @@
  * Uses the same logic as home page search with API suggestions
  */
 
+// Função toast inline que sempre funciona
+function showInlineToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
+        color: ${type === 'warning' ? '#000' : 'white'};
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        animation: slideInRight 0.3s ease;
+    `;
+    toast.textContent = message;
+
+    if (!document.getElementById('toast-animations')) {
+        const style = document.createElement('style');
+        style.id = 'toast-animations';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(400px); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(400px); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchForm = document.querySelector('.category-search-form');
     const searchInput = document.querySelector('.category-search-input');
@@ -25,11 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Se não há query, prevenir submit e mostrar mensagem
         if (!query) {
             e.preventDefault();
-            if (typeof showToast === 'function') {
-                showToast('Por favor, digite algo para pesquisar.', 'warning');
-            } else {
-                alert('Por favor, digite algo para pesquisar.');
-            }
+            showInlineToast('Por favor, digite algo para pesquisar.', 'warning');
             searchInput.focus();
             return;
         }
@@ -37,9 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Se a query é muito curta, buscar sugestões ao invés de submeter
         if (query.length < 2) {
             e.preventDefault();
-            if (typeof showToast === 'function') {
-                showToast('Digite pelo menos 2 caracteres para pesquisar.', 'warning');
-            }
+            showInlineToast('Digite pelo menos 2 caracteres para pesquisar.', 'warning');
             searchInput.focus();
             return;
         }

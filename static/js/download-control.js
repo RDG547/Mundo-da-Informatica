@@ -272,8 +272,28 @@ function confirmClearHistory() {
                 modal.remove();
                 showToast(data.message || 'Histórico limpo com sucesso!', 'success');
                 
-                // Recarregar a página para atualizar o histórico
-                setTimeout(() => window.location.reload(), 1000);
+                // Limpar histórico visualmente sem reload
+                const historyGrid = document.querySelector('.download-history-grid');
+                const historySection = document.querySelector('.profile-section');
+                const clearButton = document.querySelector('button[onclick="confirmClearHistory()"]');
+                
+                if (historyGrid) {
+                    historyGrid.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">Nenhum download registrado ainda.</p>';
+                }
+                
+                // Remover botão de limpar
+                if (clearButton) {
+                    clearButton.remove();
+                }
+                
+                // Atualizar texto do header da seção
+                const historyTitle = document.querySelector('.profile-section h2');
+                if (historyTitle && historyTitle.textContent.includes('Histórico')) {
+                    const subtitle = historyTitle.nextElementSibling;
+                    if (subtitle && subtitle.tagName === 'P') {
+                        subtitle.textContent = 'Nenhum download registrado';
+                    }
+                }
             } else {
                 throw new Error(data.message);
             }

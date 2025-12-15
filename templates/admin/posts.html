@@ -410,7 +410,7 @@
                         <div class="col-md-4">
                             <div class="sidebar-card">
                                 <h5><i class="fas fa-image"></i> Imagem de Destaque</h5>
-                                <div class="image-upload-area" id="editImageUploadArea">
+                                <div class="image-upload-area" id="editImageUploadArea" onclick="document.getElementById('editPostImageFile').click()">
                                     <div class="upload-placeholder" id="editUploadPlaceholder">
                                         <i class="fas fa-cloud-upload-alt"></i>
                                         <p>Clique ou arraste uma imagem</p>
@@ -419,12 +419,12 @@
                                     <div class="image-preview-container" id="editImagePreviewContainer"
                                         style="display: none;">
                                         <img id="editImagePreview" src="" alt="Preview">
-                                        <button type="button" class="remove-image" onclick="removeEditImage()">
+                                        <button type="button" class="remove-image" onclick="event.stopPropagation(); removeEditImage()">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
                                     <input type="file" id="editPostImageFile" name="image_file" accept="image/*"
-                                        style="display: none;">
+                                        style="display: none;" onchange="handleEditImageFileChange(this)">
                                 </div>
                                 <div class="form-group mt-3">
                                     <label class="form-label">ou URL da Imagem</label>
@@ -618,57 +618,58 @@
         }
     };
 
-    // Função para preview de imagem no modal de edição
-    window.previewEditImage = function (file) {
-        if (file && file.type.match('image.*')) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const preview = document.getElementById('editImagePreview');
-                const previewContainer = document.getElementById('editImagePreviewContainer');
-                const placeholder = document.getElementById('editUploadPlaceholder');
-
-                if (preview && previewContainer && placeholder) {
-                    preview.src = e.target.result;
-                    previewContainer.style.display = 'block';
-                    placeholder.style.display = 'none';
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    // Função para preview de imagem no modal de edição
-    window.previewEditImage = function (file) {
-        const preview = document.getElementById('editImagePreview');
-        const previewContainer = document.getElementById('editImagePreviewContainer');
-        const placeholder = document.getElementById('editUploadPlaceholder');
-        const urlInput = document.getElementById('editPostImageUrl');
-
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                if (preview) preview.src = e.target.result;
-                if (previewContainer) previewContainer.style.display = 'block';
-                if (placeholder) placeholder.style.display = 'none';
-                if (urlInput) urlInput.value = ''; // Limpa URL se houver arquivo
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    // Função para remover imagem no modal de edição
+    // Função para remover imagem no modal de edição - MESMA LÓGICA DO MODAL DE NOVO POST
     window.removeEditImage = function () {
+        const uploadArea = document.getElementById('editImageUploadArea');
+        const preview = uploadArea?.querySelector('.image-preview-container');
+        const placeholder = uploadArea?.querySelector('.upload-placeholder');
         const fileInput = document.getElementById('editPostImageFile');
-        const urlInput = document.getElementById('editPostImageUrl');
-        const preview = document.getElementById('editImagePreview');
-        const previewContainer = document.getElementById('editImagePreviewContainer');
-        const placeholder = document.getElementById('editUploadPlaceholder');
 
-        if (fileInput) fileInput.value = '';
-        if (urlInput) urlInput.value = '';
-        if (preview) preview.src = '';
-        if (previewContainer) previewContainer.style.display = 'none';
-        if (placeholder) placeholder.style.display = 'flex';
+        if (preview && placeholder && fileInput) {
+            preview.style.display = 'none';
+            placeholder.style.display = 'block';
+            fileInput.value = '';
+        }
+    };
+
+    // Função chamada pelo onchange do input file
+    window.handleEditImageFileChange = function(input) {
+        if (input.files && input.files[0]) {
+            window.handleEditImageFile(input.files[0]);
+        }
+    };
+
+    // Handle image file - MESMA LÓGICA DO MODAL DE NOVO POST
+    window.handleEditImageFile = function(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor, selecione apenas arquivos de imagem.');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) { // 5MB
+            alert('A imagem deve ter no máximo 5MB.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            showEditImagePreview(e.target.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Show image preview - MESMA LÓGICA DO MODAL DE NOVO POST
+    window.showEditImagePreview = function(src) {
+        const uploadArea = document.getElementById('editImageUploadArea');
+        const preview = uploadArea?.querySelector('.image-preview-container');
+        const placeholder = uploadArea?.querySelector('.upload-placeholder');
+        const img = uploadArea?.querySelector('#editImagePreview');
+
+        if (img && preview && placeholder) {
+            img.src = src;
+            placeholder.style.display = 'none';
+            preview.style.display = 'block';
+        }
     };
 
     // ========================================
@@ -1374,13 +1375,19 @@
     }
 
     #editPostModal .upload-placeholder p,
-    #editPostModal .upload-placeholder span {
+    #editPostModal .upload-placeholder span,
+    #editPostModal .upload-placeholder i {
         pointer-events: none;
     }
 
     #editPostModal .image-preview-container {
         position: relative;
         width: 100%;
+        pointer-events: none;
+    }
+
+    #editPostModal .image-preview-container .remove-image {
+        pointer-events: auto;
     }
 
     #editPostModal .image-preview-container img {
@@ -1696,58 +1703,7 @@
 
 <script>
     // Funções para gerenciar upload de imagem vs URL
-
-    // Alternar entre URL e Upload no modal de edição
-    document.addEventListener('DOMContentLoaded', function () {
-        const editUrlOption = document.getElementById('editImageUrlOption');
-        const editUploadOption = document.getElementById('editImageUploadOption');
-
-        if (editUrlOption) {
-            editUrlOption.addEventListener('click', function () {
-                document.getElementById('editImageUrlField').style.display = 'block';
-                document.getElementById('editImageUploadField').style.display = 'none';
-                document.getElementById('editPostImageFile').value = '';
-            });
-        }
-
-        if (editUploadOption) {
-            editUploadOption.addEventListener('click', function () {
-                document.getElementById('editImageUrlField').style.display = 'none';
-                document.getElementById('editImageUploadField').style.display = 'block';
-                document.getElementById('editPostImageUrl').value = '';
-            });
-        }
-
-        // Preview de imagem ao selecionar arquivo (modal de edição)
-        const editImageFile = document.getElementById('editPostImageFile');
-        if (editImageFile) {
-            editImageFile.addEventListener('change', function (e) {
-                const file = e.target.files[0];
-                if (file) {
-                    // Validar tamanho (máx 5MB)
-                    if (file.size > 5 * 1024 * 1024) {
-                        alert('A imagem é muito grande. Tamanho máximo: 5MB');
-                        e.target.value = '';
-                        return;
-                    }
-
-                    // Validar tipo
-                    if (!file.type.startsWith('image/')) {
-                        alert('Por favor, selecione apenas arquivos de imagem');
-                        e.target.value = '';
-                        return;
-                    }
-
-                    // Mostrar preview
-                    const reader = new FileReader();
-                    reader.onload = function (event) {
-                        document.getElementById('editPreviewImg').src = event.target.result;
-                        document.getElementById('editImagePreview').style.display = 'block';
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-        }
+    // REMOVIDO: código duplicado consolidado em um único DOMContentLoaded abaixo
 
         // Preview de imagem ao digitar URL (modal de edição)
         const editImageUrl = document.getElementById('editPostImageUrl');
@@ -1939,8 +1895,11 @@
         if (urlInput) urlInput.value = '';
     };
 
-    // Adicionar evento de input no editor de edição
+    // CONSOLIDADO: Todos os eventos do modal de edição em um único DOMContentLoaded
     document.addEventListener('DOMContentLoaded', function () {
+        console.log('Inicializando eventos do modal de edição...');
+
+        // Editor de conteúdo
         const editContentEditor = document.getElementById('editPostContentEditor');
         if (editContentEditor) {
             editContentEditor.addEventListener('input', syncEditEditorContent);
@@ -1949,9 +1908,10 @@
                 const text = (e.originalEvent || e).clipboardData.getData('text/plain');
                 document.execCommand('insertText', false, text);
             });
+            console.log('Editor de conteúdo inicializado');
         }
 
-        // Adicionar contador de caracteres no título do modal de edição
+        // Contador de caracteres do título
         const editTitleInput = document.getElementById('editPostTitle');
         if (editTitleInput) {
             editTitleInput.addEventListener('input', function () {
@@ -1960,46 +1920,85 @@
                     counter.textContent = this.value.length;
                 }
             });
+            console.log('Contador de título inicializado');
         }
 
-        // Setup da área de upload de imagem no modal de edição
-        const editImageUploadArea = document.getElementById('editImageUploadArea');
-        const editImageFileInput = document.getElementById('editPostImageFile');
+        // Setup da área de upload de imagem - USANDO MESMA LÓGICA DO MODAL DE NOVO POST
+        const editUploadArea = document.getElementById('editImageUploadArea');
+        const editFileInput = document.getElementById('editPostImageFile');
+        const editPreview = editUploadArea?.querySelector('.image-preview-container');
+        const editPlaceholder = editUploadArea?.querySelector('.upload-placeholder');
+        const editRemoveBtn = editUploadArea?.querySelector('.remove-image');
 
-        if (editImageUploadArea && editImageFileInput) {
-            editImageUploadArea.addEventListener('click', function (e) {
-                // Prevenir clique se for no botão de remover
+        console.log('=== SETUP UPLOAD EDITAR POST ===');
+        console.log('editUploadArea:', editUploadArea);
+        console.log('editFileInput:', editFileInput);
+        console.log('editPreview:', editPreview);
+        console.log('editPlaceholder:', editPlaceholder);
+
+        if (editUploadArea && editFileInput) {
+            console.log('✓ Elementos encontrados, adicionando eventos...');
+
+            // Click to upload - MESMA LÓGICA DO MODAL DE NOVO POST
+            editUploadArea.addEventListener('click', (e) => {
+                console.log('CLIQUE na área de upload!');
+                console.log('Target:', e.target);
+                console.log('Closest remove-image:', e.target.closest('.remove-image'));
+
                 if (e.target.closest('.remove-image')) {
+                    console.log('Ignorando - é botão remover');
                     return;
                 }
-                console.log('Clicou na área de upload - abrindo seletor de arquivo');
-                editImageFileInput.click();
+
+                console.log('Abrindo seletor de arquivo...');
+                editFileInput.click();
             });
 
-            editImageUploadArea.addEventListener('dragover', function (e) {
+            // Drag and drop - MESMA LÓGICA DO MODAL DE NOVO POST
+            editUploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                this.classList.add('dragover');
+                editUploadArea.classList.add('drag-over');
+                console.log('Drag over');
             });
 
-            editImageUploadArea.addEventListener('dragleave', function () {
-                this.classList.remove('dragover');
+            editUploadArea.addEventListener('dragleave', () => {
+                editUploadArea.classList.remove('drag-over');
+                console.log('Drag leave');
             });
 
-            editImageUploadArea.addEventListener('drop', function (e) {
+            editUploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
-                this.classList.remove('dragover');
+                editUploadArea.classList.remove('drag-over');
+                console.log('Drop!');
+
                 const files = e.dataTransfer.files;
                 if (files.length > 0) {
-                    editImageFileInput.files = files;
-                    previewEditImage(files[0]);
+                    console.log('Arquivo arrastado:', files[0]);
+                    window.handleEditImageFile(files[0]);
                 }
             });
 
-            editImageFileInput.addEventListener('change', function (e) {
-                if (this.files && this.files[0]) {
-                    previewEditImage(this.files[0]);
+            // File input change - MESMA LÓGICA DO MODAL DE NOVO POST
+            editFileInput.addEventListener('change', (e) => {
+                console.log('File input change!');
+                console.log('Arquivos:', e.target.files);
+
+                if (e.target.files.length > 0) {
+                    console.log('Processando arquivo:', e.target.files[0]);
+                    window.handleEditImageFile(e.target.files[0]);
                 }
             });
+
+            // Remove image - MESMA LÓGICA DO MODAL DE NOVO POST
+            editRemoveBtn?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                console.log('Removendo imagem');
+                window.removeEditImage();
+            });
+
+            console.log('✓ Todos os eventos adicionados com sucesso!');
+        } else {
+            console.error('✗ ERRO: Elementos não encontrados!');
         }
     });
 

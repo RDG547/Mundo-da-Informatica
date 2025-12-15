@@ -98,10 +98,10 @@
                                         <p>Clique ou arraste uma imagem</p>
                                         <span class="file-types">JPG, PNG até 5MB</span>
                                     </div>
-                                    <input type="file" id="postImage" name="image_file" accept="image/*" style="display: none;">
+                                    <input type="file" id="postImage" name="image_file" accept="image/*" style="display: none;" aria-label="Selecionar imagem do post">
                                     <div class="image-preview" style="display: none;">
                                         <img id="previewImg" src="" alt="Preview">
-                                        <button type="button" class="remove-image" id="removeImage">
+                                        <button type="button" class="remove-image" id="removeImage" aria-label="Remover imagem">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
@@ -165,7 +165,7 @@
                                     <input type="number" id="postFileSize" name="file_size"
                                            class="form-control modern-input"
                                            placeholder="0" step="0.1" min="0">
-                                    <select class="form-select unit-select" id="fileSizeUnit">
+                                    <select class="form-select unit-select" id="fileSizeUnit" aria-label="Unidade de medida do tamanho do arquivo">
                                         <option value="MB">MB</option>
                                         <option value="GB">GB</option>
                                         <option value="KB">KB</option>

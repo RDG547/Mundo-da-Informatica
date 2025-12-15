@@ -45,12 +45,12 @@
                 <div class="search-bar-advanced">
                     <div class="search-input-container">
                         <input type="text" placeholder="Pesquisar posts..." id="searchPosts" class="search-input">
-                        <button class="search-btn"><i class="fas fa-search"></i></button>
-                        <button class="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
+                        <button class="search-btn" aria-label="Buscar posts"><i class="fas fa-search"></i></button>
+                        <button class="search-clear" onclick="clearSearch()" aria-label="Limpar busca"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterCategory" class="form-select">
+                    <select id="filterCategory" class="form-select" aria-label="Filtrar por categoria">
                         <option value="">Todas as categorias</option>
                         {% for category in categories %}
                         <option value="{{ category.id }}">{{ category.name }}</option>
@@ -58,7 +58,7 @@
                     </select>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterStatus" class="form-select">
+                    <select id="filterStatus" class="form-select" aria-label="Filtrar por status">
                         <option value="">Todos os Status</option>
                         <option value="active">Ativos</option>
                         <option value="featured">Em Destaque</option>
@@ -66,7 +66,7 @@
                     </select>
                 </div>
                 <div class="sort-dropdown">
-                    <select id="sortBy" class="form-select">
+                    <select id="sortBy" class="form-select" aria-label="Ordenar por">
                         <option value="date">Ordenar por Data</option>
                         <option value="title">Ordenar por Título</option>
                         <option value="views">Ordenar por Visualizações</option>
@@ -82,7 +82,7 @@
             <thead>
                 <tr>
                     <th style="width: 40px">
-                        <input type="checkbox" id="selectAllPosts" class="form-check-input">
+                        <input type="checkbox" id="selectAllPosts" class="form-check-input" aria-label="Selecionar todos os posts">
                     </th>
                     <th data-sort="title">
                         <i class="fas fa-heading"></i> Título
@@ -226,7 +226,7 @@
     <!-- Enhanced Footer -->
     <div class="admin-card-footer">
         <div class="bulk-actions">
-            <select id="bulkActionSelect" class="form-select">
+            <select id="bulkActionSelect" class="form-select" aria-label="Ações em lote">
                 <option value="">Ações em massa</option>
                 <option value="delete">Excluir selecionados</option>
                 <option value="feature">Marcar como destaque</option>
@@ -419,12 +419,12 @@
                                     <div class="image-preview-container" id="editImagePreviewContainer"
                                         style="display: none;">
                                         <img id="editImagePreview" src="" alt="Preview">
-                                        <button type="button" class="remove-image" onclick="event.stopPropagation(); removeEditImage()">
+                                        <button type="button" class="remove-image" onclick="event.stopPropagation(); removeEditImage()" aria-label="Remover imagem">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
                                     <input type="file" id="editPostImageFile" name="image_file" accept="image/*"
-                                        style="display: none;" onchange="handleEditImageFileChange(this)">
+                                        style="display: none;" onchange="handleEditImageFileChange(this)" aria-label="Selecionar imagem do post">
                                 </div>
                                 <div class="form-group mt-3">
                                     <label class="form-label">ou URL da Imagem</label>

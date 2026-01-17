@@ -2637,11 +2637,12 @@ def create_pix_checkout():
         data = request.get_json()
         plan_type = data.get('plan')
 
-        debug_log(f'PIX Checkout - Dados recebidos: {data}')
-        debug_log(f'PIX Checkout - Plano: {plan_type}')
+        print(f'[PIX] Dados recebidos: {data}')
+        print(f'[PIX] Plano: {plan_type}')
+        print(f'[PIX] User ID: {current_user.id}')
 
         if plan_type not in ['premium', 'vip']:
-            debug_log(f'PIX Checkout - Plano inválido: {plan_type}')
+            print(f'[PIX] ERRO - Plano inválido: {plan_type}')
             return jsonify({'error': 'Plano inválido'}), 400
 
         # Define preços em centavos
@@ -2651,37 +2652,53 @@ def create_pix_checkout():
         }
 
         amount = prices.get(plan_type)
+        print(f'[PIX] Amount: {amount}')
 
         # Gerar ID único para o PIX
         pix_id = f'{plan_type}_{current_user.id}_{int(datetime.utcnow().timestamp())}'
+        print(f'[PIX] PIX ID gerado: {pix_id}')
 
         # Criar transação pendente IMEDIATAMENTE para redirecionamento rápido
-        transaction = Transaction(
-            user_id=current_user.id,
-            payment_gateway='abacatepay',
-            abacatepay_billing_id=pix_id,
-            plan_type=plan_type,
-            amount=amount,
-            currency='brl',
-            status='processing'  # Status temporário até API responder
-        )
-        db.session.add(transaction)
-        db.session.commit()
+        try:
+            transaction = Transaction(
+                user_id=current_user.id,
+                payment_gateway='abacatepay',
+                abacatepay_billing_id=pix_id,
+                plan_type=plan_type,
+                amount=amount,
+                currency='brl',
+                status='processing'  # Status temporário até API responder
+            )
+            print(f'[PIX] Transaction object criado')
 
-        debug_log(f'Transação criada com ID: {transaction.id}, billing_id: {pix_id}')
+            db.session.add(transaction)
+            print(f'[PIX] Transaction adicionado à sessão')
+
+            db.session.commit()
+            print(f'[PIX] Commit realizado - Transaction ID: {transaction.id}')
+
+        except Exception as db_error:
+            db.session.rollback()
+            print(f'[PIX] ERRO DATABASE: {str(db_error)}')
+            import traceback
+            print(traceback.format_exc())
+            return jsonify({'error': 'Erro ao salvar transação'}), 500
 
         # Retornar imediatamente para redirecionamento rápido
         # O processamento da API será feito em background
+        redirect_url = url_for('pix_checkout_page', billing_id=pix_id, _external=True)
+        print(f'[PIX] Redirect URL: {redirect_url}')
+
         return jsonify({
             'billing_id': pix_id,
             'transaction_id': transaction.id,
-            'redirect_url': url_for('pix_checkout_page', billing_id=pix_id, _external=True)
+            'redirect_url': redirect_url
         })
 
     except Exception as e:
-        debug_log(f'Erro ao criar PIX: {str(e)}')
+        print(f'[PIX] ERRO GERAL: {str(e)}')
         import traceback
-        debug_log(traceback.format_exc())
+        print(traceback.format_exc())
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
 

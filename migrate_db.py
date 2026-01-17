@@ -56,6 +56,37 @@ def migrate():
             migrations_applied = True
             print("✓ week_reset_date column added")
 
+        # Verificar se tabela transactions existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")
+        transactions_table_exists = cursor.fetchone() is not None
+
+        if not transactions_table_exists:
+            print("Creating transactions table...")
+            cursor.execute("""
+                CREATE TABLE transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    payment_gateway VARCHAR(20) NOT NULL DEFAULT 'stripe',
+                    stripe_session_id VARCHAR(255) UNIQUE,
+                    stripe_customer_id VARCHAR(255),
+                    stripe_subscription_id VARCHAR(255),
+                    stripe_payment_intent_id VARCHAR(255),
+                    abacatepay_billing_id VARCHAR(255) UNIQUE,
+                    abacatepay_payment_url TEXT,
+                    abacatepay_qr_code TEXT,
+                    abacatepay_pix_code TEXT,
+                    plan_type VARCHAR(20) NOT NULL,
+                    amount INTEGER NOT NULL,
+                    currency VARCHAR(3) DEFAULT 'brl',
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    paid_at DATETIME,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            """)
+            migrations_applied = True
+            print("✓ transactions table created")
+
         if migrations_applied:
             conn.commit()
             print("\n✅ All migrations completed successfully!")
@@ -64,6 +95,8 @@ def migrate():
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
         conn.rollback()
     finally:
         conn.close()

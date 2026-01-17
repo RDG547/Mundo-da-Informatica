@@ -7,16 +7,31 @@ window.initializePlansPage = function () {
     const plansContainer = document.querySelector('.plans-section');
     if (!plansContainer) return;
 
+    // Prevenir inicialização duplicada
+    if (window.plansPageInitialized) {
+        console.log('Plans page already initialized, skipping');
+        return;
+    }
+    window.plansPageInitialized = true;
+
     const stripePublicKey = plansContainer.dataset.stripeKey;
     const checkoutPlan = plansContainer.dataset.checkoutPlan;
     let stripe = null;
+    let stripeInitialized = false;
 
     // Function to initialize Stripe when ready
     const initializeStripe = () => {
+        // Evitar múltiplas inicializações
+        if (stripeInitialized) {
+            console.log('Stripe already initialized, skipping');
+            return;
+        }
+
         if (stripePublicKey && stripePublicKey !== 'None') {
             try {
                 if (typeof Stripe !== 'undefined') {
                     stripe = Stripe(stripePublicKey);
+                    stripeInitialized = true;
                     console.log('Stripe initialized successfully');
 
                     // Auto-checkout if plan is specified
@@ -45,15 +60,19 @@ window.initializePlansPage = function () {
             document.head.appendChild(stripeScript);
         } else {
             // Script is loading, wait for it
-            const checkStripe = setInterval(() => {
+            let checkStripe;
+            let timeoutId;
+
+            checkStripe = setInterval(() => {
                 if (typeof Stripe !== 'undefined') {
                     clearInterval(checkStripe);
+                    clearTimeout(timeoutId);
                     initializeStripe();
                 }
             }, 100);
 
             // Timeout after 5 seconds
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
                 clearInterval(checkStripe);
                 if (typeof Stripe === 'undefined') {
                     console.error('Stripe.js loading timeout');
@@ -102,6 +121,89 @@ window.initializePlansPage = function () {
             });
     };
 
+    // Payment Method Modal
+    let paymentMethodModal = null;
+    let selectedPlan = null;
+
+    window.showPaymentMethodModal = function (plan) {
+        selectedPlan = plan;
+        console.log('Modal de pagamento aberto para plano:', selectedPlan);
+        if (!paymentMethodModal) {
+            paymentMethodModal = document.getElementById('paymentMethodModal');
+        }
+        if (paymentMethodModal) {
+            paymentMethodModal.style.display = "block";
+            document.body.style.overflow = "hidden";
+        }
+    };
+
+    window.closePaymentMethodModal = function () {
+        if (paymentMethodModal) {
+            paymentMethodModal.style.display = "none";
+            document.body.style.overflow = "auto";
+        }
+        // Não limpar selectedPlan aqui - será limpo após o pagamento
+    };
+
+    window.selectPaymentMethod = function (method) {
+        if (!selectedPlan) {
+            console.error('Nenhum plano selecionado');
+            alert('Erro: Nenhum plano selecionado. Por favor, tente novamente.');
+            return;
+        }
+
+        console.log('Método de pagamento selecionado:', method);
+        console.log('Plano selecionado:', selectedPlan);
+
+        // Salvar o plano antes de fechar o modal
+        const planToCheckout = selectedPlan;
+
+        window.closePaymentMethodModal();
+
+        if (method === 'credit_card') {
+            // Prosseguir com Stripe
+            window.checkout(planToCheckout);
+        } else if (method === 'pix') {
+            // Prosseguir com Abacate Pay (PIX)
+            checkoutPix(planToCheckout);
+        }
+
+        // Limpar após iniciar o checkout
+        selectedPlan = null;
+    };
+
+    function checkoutPix(plan) {
+        console.log('checkoutPix chamado com plano:', plan);
+
+        const payload = { plan: plan };
+        console.log('Payload enviado:', payload);
+
+        fetch('/create-pix-checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Resposta recebida:', data);
+
+                // Verificar se há redirect_url (mesmo com erro)
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else if (data.error && typeof data.error === 'string') {
+                    alert(data.error);
+                } else {
+                    alert('Erro ao criar pagamento PIX. Por favor, tente novamente.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Erro ao criar pagamento PIX. Por favor, tente novamente.');
+            });
+    }
+
     // FAQ Toggle
     window.toggleFAQ = function (element) {
         const faqItem = element.parentElement;
@@ -120,11 +222,27 @@ window.initializePlansPage = function () {
 
     // Downgrade Modal Logic
     let modal = null;
+    let targetPlan = 'free'; // Plano de destino padrão
 
-    window.openDowngradeModal = function () {
+    window.openDowngradeModal = function (plan = 'free') {
+        targetPlan = plan; // Salvar plano de destino
+
         if (!modal) {
             modal = document.getElementById('downgradeModal');
         }
+
+        // Atualizar mensagens do modal baseado no plano
+        const messageEl = document.getElementById('downgradeMessage');
+        const warningEl = document.getElementById('downgradeWarning');
+
+        if (plan === 'free') {
+            if (messageEl) messageEl.textContent = 'Tem certeza que deseja voltar para o plano grátis?';
+            if (warningEl) warningEl.textContent = 'Você perderá acesso imediato aos benefícios exclusivos do seu plano atual, como downloads ilimitados, suporte prioritário e área VIP.';
+        } else if (plan === 'premium') {
+            if (messageEl) messageEl.textContent = 'Tem certeza que deseja fazer downgrade para o plano Premium?';
+            if (warningEl) warningEl.textContent = 'Você perderá acesso aos benefícios exclusivos do plano VIP, como downloads ilimitados e área VIP exclusiva.';
+        }
+
         if (modal) {
             modal.style.display = "block";
             document.body.style.overflow = "hidden"; // Prevent scrolling
@@ -145,7 +263,10 @@ window.initializePlansPage = function () {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({
+                target_plan: targetPlan
+            })
         })
             .then(response => response.json())
             .then(data => {
@@ -214,6 +335,9 @@ window.initializePlansPage = function () {
     window.onclick = function (event) {
         if (modal && event.target == modal) {
             window.closeDowngradeModal();
+        }
+        if (paymentMethodModal && event.target == paymentMethodModal) {
+            window.closePaymentMethodModal();
         }
     };
 };

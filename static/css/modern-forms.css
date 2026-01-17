@@ -738,14 +738,14 @@
         font-size: 0.85rem;
     }
 
-    /* Grid Adjustments */
-    .row {
+    /* Grid Adjustments - EXCETO para o modal de novo post que tem layout próprio */
+    .row:not(#addPostModal .row) {
         margin: 0 -0.5rem;
     }
 
-    .col-md-4,
-    .col-md-6,
-    .col-md-8 {
+    .col-md-4:not(#addPostModal .col-md-4),
+    .col-md-6:not(#addPostModal .col-md-6),
+    .col-md-8:not(#addPostModal .col-md-8) {
         padding: 0 0.5rem;
         width: 100%;
         flex: 0 0 100%;

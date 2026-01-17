@@ -80,71 +80,37 @@
     </div>
 
     <div class="col-md-4">
-        <div class="admin-card slide-in-up">
+        <div class="admin-card slide-in-up mb-4">
             <div class="admin-card-header">
                 <h2 class="admin-card-title">Configurações de Backup</h2>
             </div>
             <div class="admin-card-body">
                 <form id="backupSettingsForm">
-                    <div class="form-group">
-                        <label>O que incluir no backup?</label>
-                        <div class="form-check mt-2">
-                            <input type="checkbox" id="includeDatabase" name="includeDatabase" class="form-check-input" checked>
-                            <label for="includeDatabase" class="form-check-label">Banco de dados</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="includeUploads" name="includeUploads" class="form-check-input" checked>
-                            <label for="includeUploads" class="form-check-label">Arquivos de upload</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="includeConfig" name="includeConfig" class="form-check-input" checked>
-                            <label for="includeConfig" class="form-check-label">Arquivos de configuração</label>
-                        </div>
+                    <div class="form-group mb-3">
+                        <label class="d-flex align-items-center justify-content-between cursor-pointer">
+                            <span>Backup Automático</span>
+                            <div class="form-check form-switch">
+                                <input type="checkbox" name="auto_backup" class="form-check-input" {% if backup_config is defined and backup_config.auto_backup %}checked{% endif %}>
+                            </div>
+                        </label>
                     </div>
-
-                    <div class="form-group mt-3">
-                        <label for="backupCompression">Compressão</label>
-                        <select id="backupCompression" name="backupCompression" class="form-select">
-                            <option value="zip" selected>ZIP (padrão)</option>
-                            <option value="tar.gz">TAR.GZ (menor tamanho)</option>
-                            <option value="none">Sem compressão</option>
+                    <div class="form-group mb-3">
+                        <label for="backupFrequency">Frequência</label>
+                        <select name="frequency" id="backupFrequency" class="form-control">
+                            <option value="daily" {% if backup_config is defined and backup_config.frequency == 'daily' %}selected{% endif %}>Diário</option>
+                            <option value="weekly" {% if backup_config is defined and backup_config.frequency == 'weekly' %}selected{% endif %}>Semanal</option>
+                            <option value="monthly" {% if backup_config is defined and backup_config.frequency == 'monthly' %}selected{% endif %}>Mensal</option>
                         </select>
                     </div>
-
-                    <div class="form-group mt-3">
-                        <label>Backups automáticos</label>
-                        <div class="form-check mt-2">
-                            <input type="checkbox" id="enableAutoBackup" name="enableAutoBackup" class="form-check-input" checked>
-                            <label for="enableAutoBackup" class="form-check-label">Ativar backups automáticos</label>
-                        </div>
-
-                        <div id="autoBackupOptions" class="mt-3">
-                            <div class="form-group">
-                                <label for="autoBackupFrequency">Frequência</label>
-                                <select id="autoBackupFrequency" name="autoBackupFrequency" class="form-select">
-                                    <option value="daily">Diário</option>
-                                    <option value="weekly" selected>Semanal</option>
-                                    <option value="monthly">Mensal</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group mt-3">
-                                <label for="autoBackupRetention">Manter backups por</label>
-                                <select id="autoBackupRetention" name="autoBackupRetention" class="form-select">
-                                    <option value="7">7 dias</option>
-                                    <option value="30" selected>30 dias</option>
-                                    <option value="90">90 dias</option>
-                                    <option value="365">1 ano</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div class="form-group mb-3">
+                        <label for="backupRetention">Manter últimos</label>
+                        <select name="retention" id="backupRetention" class="form-control">
+                            <option value="5" {% if backup_config is defined and backup_config.retention == 5 %}selected{% endif %}>5 backups</option>
+                            <option value="10" {% if backup_config is defined and backup_config.retention == 10 %}selected{% endif %}>10 backups</option>
+                            <option value="30" {% if backup_config is defined and backup_config.retention == 30 %}selected{% endif %}>30 backups</option>
+                        </select>
                     </div>
-
-                    <div class="form-actions mt-4">
-                        <button type="button" class="btn-admin btn-admin-primary" id="saveBackupSettings">
-                            <i class="fas fa-save"></i> Salvar Configurações
-                        </button>
-                    </div>
+                    <button type="submit" class="btn-admin btn-admin-primary w-100">Salvar Configurações</button>
                 </form>
             </div>
         </div>
@@ -154,29 +120,37 @@
                 <h2 class="admin-card-title">Informações</h2>
             </div>
             <div class="admin-card-body">
-                <div class="alert alert-primary">
-                    <i class="fas fa-info-circle"></i>
-                    <div>
-                        <h4>Backup do Sistema</h4>
-                        <p>É recomendado realizar backups regularmente para garantir a segurança dos seus dados.</p>
-                    </div>
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Backup do Sistema</strong>
+                    <p class="mb-0 mt-1 small">É recomendado realizar backups regularmente para garantir a segurança dos seus dados.</p>
                 </div>
 
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <div>
-                        <h4>Restauração</h4>
-                        <p>A restauração substituirá os dados atuais. Certifique-se de fazer um backup antes de restaurar.</p>
-                    </div>
+                <div class="alert alert-warning mb-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Restauração</strong>
+                    <p class="mb-0 mt-1 small">A restauração substituirá os dados atuais. Certifique-se de fazer um backup antes de restaurar.</p>
                 </div>
 
                 <div class="mt-4">
                     <h4>Estatísticas</h4>
-                    <ul class="list-stats">
-                        <li><strong>Último backup:</strong> 20/05/2023 12:30</li>
-                        <li><strong>Próximo backup automático:</strong> 27/05/2023 03:00</li>
-                        <li><strong>Espaço usado:</strong> 30.4 MB (3 backups)</li>
-                        <li><strong>Espaço disponível:</strong> 985 MB</li>
+                    <ul class="list-stats p-0 m-0" style="list-style: none;">
+                        <li class="d-flex justify-content-between py-2 border-bottom">
+                            <strong>Último backup:</strong>
+                            <span class="text-muted">Desconhecido</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-2 border-bottom">
+                            <strong>Próximo backup:</strong>
+                            <span class="text-muted">Aguardando agendamento</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-2 border-bottom">
+                            <strong>Total usado:</strong>
+                            <span class="text-muted">Calculando...</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-2">
+                            <strong>Disponível:</strong>
+                            <span class="text-muted">Calculando...</span>
+                        </li>
                     </ul>
                 </div>
             </div>

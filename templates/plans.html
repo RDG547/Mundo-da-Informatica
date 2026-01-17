@@ -80,7 +80,7 @@
                     {% elif current_user.plan == 'free' %}
                     <div class="plan-badge current-plan-free"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% else %}
-                    <button class="plan-btn downgrade-btn" onclick="openDowngradeModal()">Voltar ao plano
+                    <button class="plan-btn downgrade-btn" onclick="openDowngradeModal('free')">Voltar ao plano
                         grátis</button>
                     {% endif %}
                 </div>
@@ -137,14 +137,14 @@
                 </div>
 
                 <div class="plan-cta">
-                    {% if current_user.is_authenticated and current_user.plan == 'premium' %}
-                    <div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>
-                    {% else %}
-                    {% if current_user.is_authenticated %}
-                    <button class="plan-btn" onclick="checkout('premium')">Assinar Premium</button>
-                    {% else %}
+                    {% if not current_user.is_authenticated %}
                     <a href="{{ url_for('register', plan='premium') }}" class="plan-btn">Assinar Premium</a>
-                    {% endif %}
+                    {% elif current_user.plan == 'premium' %}
+                    <div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>
+                    {% elif current_user.plan == 'vip' %}
+                    <button class="plan-btn downgrade-btn" onclick="openDowngradeModal('premium')">Fazer Downgrade</button>
+                    {% else %}
+                    <button class="plan-btn" onclick="showPaymentMethodModal('premium')">Assinar Premium</button>
                     {% endif %}
                 </div>
             </div>
@@ -199,14 +199,12 @@
                 </div>
 
                 <div class="plan-cta">
-                    {% if current_user.is_authenticated and current_user.plan == 'vip' %}
+                    {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('register', plan='vip') }}" class="plan-btn">Assinar VIP</a>
+                    {% elif current_user.plan == 'vip' %}
                     <div class="plan-badge current-plan-vip"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% else %}
-                    {% if current_user.is_authenticated %}
-                    <button class="plan-btn" onclick="checkout('vip')">Assinar VIP</button>
-                    {% else %}
-                    <a href="{{ url_for('register', plan='vip') }}" class="plan-btn">Assinar VIP</a>
-                    {% endif %}
+                    <button class="plan-btn" onclick="showPaymentMethodModal('vip')">Assinar VIP</button>
                     {% endif %}
                 </div>
             </div>
@@ -290,14 +288,42 @@
     </div>
 </section>
 
+<!-- Payment Method Modal -->
+<div id="paymentMethodModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closePaymentMethodModal()">&times;</span>
+        <h2>Escolha o Método de Pagamento</h2>
+        <p>Como você gostaria de pagar sua assinatura?</p>
+
+        <div class="payment-methods-grid">
+            <div class="payment-method-card" onclick="selectPaymentMethod('credit_card')">
+                <div class="payment-icon">
+                    <i class="fas fa-credit-card"></i>
+                </div>
+                <h4>Cartão de Crédito</h4>
+                <p>Pagamento via Stripe</p>
+                <div class="payment-badge">Recorrente</div>
+            </div>
+
+            <div class="payment-method-card" onclick="selectPaymentMethod('pix')">
+                <div class="payment-icon pix-icon">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <h4>PIX</h4>
+                <p>Pagamento instantâneo</p>
+                <div class="payment-badge pix-badge">À Vista</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Downgrade Modal -->
 <div id="downgradeModal" class="modal">
     <div class="modal-content">
         <span class="close-modal" onclick="closeDowngradeModal()">&times;</span>
         <h2>Confirmar Alteração de Plano</h2>
-        <p>Tem certeza que deseja voltar para o plano grátis?</p>
-        <p class="warning-text">Você perderá acesso imediato aos benefícios exclusivos do seu plano atual, como
-            downloads ilimitados, suporte prioritário e área VIP.</p>
+        <p id="downgradeMessage">Tem certeza que deseja alterar seu plano?</p>
+        <p class="warning-text" id="downgradeWarning">Você perderá acesso imediato aos benefícios exclusivos do seu plano atual.</p>
         <div class="modal-actions">
             <button class="btn-cancel" onclick="closeDowngradeModal()">Cancelar</button>
             <button class="btn-confirm" onclick="confirmDowngrade()">Confirmar</button>
@@ -314,6 +340,72 @@
 <script src="{{ url_for('static', filename='js/plans.js') }}"></script>
 
 <style>
+    /* Payment Method Modal Styles */
+    .payment-methods-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .payment-method-card {
+        padding: 2rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .payment-method-card:hover {
+        border-color: var(--primary-color, #4CAF50);
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .payment-icon {
+        font-size: 3rem;
+        color: var(--primary-color, #4CAF50);
+        margin-bottom: 1rem;
+    }
+
+    .pix-icon {
+        color: #32BCAD;
+    }
+
+    .payment-method-card h4 {
+        font-size: 1.3rem;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .payment-method-card p {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .payment-badge {
+        display: inline-block;
+        padding: 0.4rem 1rem;
+        background: var(--primary-color, #4CAF50);
+        color: white;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .pix-badge {
+        background: #32BCAD;
+    }
+
+    @media (max-width: 768px) {
+        .payment-methods-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
     /* Downgrade Button Style */
     .downgrade-btn {
         background-color: transparent;

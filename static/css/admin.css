@@ -1717,8 +1717,8 @@ body.modal-open {
 }
 
 .modal-content.modal-xl {
-    max-width: 1140px !important;
-    width: 95%;
+    max-width: 1200px !important;
+    width: 90%;
 }
 
 /* Notificações */
@@ -2257,3 +2257,23 @@ button,
 .form-select {
     cursor: pointer;
 }
+
+/* FIX: Dropdown Transparency Issue */
+.dropdown-menu {
+    background-color: var(--admin-card-bg, #ffffff) !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
+    border: 1px solid var(--admin-border-color, rgba(0,0,0,0.1)) !important;
+    z-index: 9999 !important;
+}
+
+/* Override for navbar.css specific logic if needed */
+.dropdown:hover .dropdown-menu,
+.dropdown-center:hover .dropdown-menu,
+.dropup:hover .dropdown-menu,
+.dropend:hover .dropdown-menu,
+.dropdown-menu.show {
+    background-color: var(--admin-card-bg, #ffffff) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+

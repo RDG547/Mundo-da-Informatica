@@ -1,4 +1,180 @@
 <!-- Modal de Adicionar Post -->
+<style>
+    /* Modal sizing */
+    #addPostModal {
+        z-index: 9999 !important;
+    }
+
+    #addPostModal .modal-content {
+        width: 90% !important;
+        max-width: 1200px !important;
+        margin: 2rem auto !important;
+    }
+
+    #addPostModal .modal-body {
+        padding: 2rem !important;
+    }
+
+    /* Form Steps Container */
+    #addPostModal .form-steps {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin: 0 auto 3rem auto !important;
+        padding: 0 !important;
+        max-width: 600px !important;
+        position: relative !important;
+    }
+
+    /* Linha de fundo conectando os steps */
+    #addPostModal .form-steps::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 20px !important;
+        left: 20px !important;
+        right: 20px !important;
+        height: 3px !important;
+        background: #e9ecef !important;
+        z-index: 1 !important;
+    }
+
+    /* Cada step individual */
+    #addPostModal .form-steps .step {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        position: relative !important;
+        z-index: 2 !important;
+        cursor: pointer !important;
+        flex: 0 0 auto !important;
+        transition: all 0.3s ease !important;
+    }
+
+    /* Número do step */
+    #addPostModal .form-steps .step-number {
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 50% !important;
+        background: #e9ecef !important;
+        color: #6c757d !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        border: 3px solid #fff !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.3s ease !important;
+        position: relative !important;
+        z-index: 3 !important;
+    }
+
+    /* Step ativo */
+    #addPostModal .form-steps .step.active .step-number {
+        background: var(--admin-primary, #3a86ff) !important;
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(58, 134, 255, 0.4) !important;
+        transform: scale(1.1) !important;
+    }
+
+    /* Step completado */
+    #addPostModal .form-steps .step.completed .step-number {
+        background: #28a745 !important;
+        color: white !important;
+    }
+
+    /* Hover effect */
+    #addPostModal .form-steps .step:hover .step-number {
+        transform: scale(1.15) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    /* Título do step */
+    #addPostModal .form-steps .step-title {
+        margin-top: 0.75rem !important;
+        font-size: 0.85rem !important;
+        color: #6c757d !important;
+        text-align: center !important;
+        font-weight: 500 !important;
+        white-space: nowrap !important;
+        transition: all 0.3s ease !important;
+    }
+
+    #addPostModal .form-steps .step.active .step-title {
+        color: var(--admin-primary, #3a86ff) !important;
+        font-weight: 600 !important;
+    }
+
+    #addPostModal .form-steps .step.completed .step-title {
+        color: #28a745 !important;
+    }
+
+    #addPostModal .form-steps .step:hover .step-title {
+        color: var(--admin-primary, #3a86ff) !important;
+    }
+
+    /* Step Content */
+    #addPostModal .step-content {
+        display: none !important;
+    }
+
+    #addPostModal .step-content.active {
+        display: block !important;
+        animation: fadeIn 0.3s ease !important;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* CRÍTICO: Forçar layout de 2 colunas funcionar - MÁXIMA ESPECIFICIDADE */
+    #addPostModal .step-content .row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        margin-left: -15px !important;
+        margin-right: -15px !important;
+    }
+
+    /* Mobile primeiro - 100% de largura */
+    #addPostModal .step-content div.col-md-4,
+    #addPostModal .step-content div.col-md-6,
+    #addPostModal .step-content div.col-md-8 {
+        position: relative !important;
+        width: 100% !important;
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* DESKTOP: Forçar 2 colunas em telas >= 768px com MÁXIMA PRIORIDADE */
+    @media screen and (min-width: 768px) {
+        #addPostModal .step-content div.col-md-4 {
+            flex: 0 0 33.333333% !important;
+            max-width: 33.333333% !important;
+            width: 33.333333% !important;
+        }
+
+        #addPostModal .step-content div.col-md-6 {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+            width: 50% !important;
+        }
+
+        #addPostModal .step-content div.col-md-8 {
+            flex: 0 0 66.666667% !important;
+            max-width: 66.666667% !important;
+            width: 66.666667% !important;
+        }
+    }
+</style>
 <div class="modal" id="addPostModal">
     <div class="modal-content modal-xl">
         <div class="modal-header">
@@ -28,8 +204,8 @@
             <form id="addPostForm" action="{{ url_for('admin_create_post') }}" method="POST" enctype="multipart/form-data">
                 <!-- Step 1: Informações Básicas -->
                 <div class="step-content active" data-step="1">
-                    <div class="row">
-                        <div class="col-md-8">
+                    <div class="row" style="display: flex !important; flex-wrap: wrap !important;">
+                        <div class="col-md-8" style="flex: 0 0 66.666667%; max-width: 66.666667%; padding: 0 15px;">
                             <div class="form-group">
                                 <label for="postTitle" class="form-label">
                                     <i class="fas fa-heading"></i> Título do Post
@@ -89,7 +265,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-4">
+                        <div class="col-md-4" style="flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px;">
                             <div class="sidebar-card">
                                 <h5><i class="fas fa-image"></i> Imagem de Destaque</h5>
                                 <div class="image-upload-area" id="imageUploadArea">
@@ -134,8 +310,8 @@
 
                 <!-- Step 2: Detalhes -->
                 <div class="step-content" data-step="2">
-                    <div class="row">
-                        <div class="col-md-6">
+                    <div class="row" style="display: flex !important; flex-wrap: wrap !important;">
+                        <div class="col-md-6" style="flex: 0 0 50%; max-width: 50%; padding: 0 15px;">
                             <div class="form-group">
                                 <label for="postDownloadLink" class="form-label">
                                     <i class="fas fa-download"></i> Link de Download
@@ -183,7 +359,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-6" style="flex: 0 0 50%; max-width: 50%; padding: 0 15px;">
                             <div class="form-group">
                                 <label for="postTags" class="form-label">
                                     <i class="fas fa-tags"></i> Tags
@@ -233,8 +409,8 @@
 
                 <!-- Step 3: SEO & Publicação -->
                 <div class="step-content" data-step="3">
-                    <div class="row">
-                        <div class="col-md-8">
+                    <div class="row" style="display: flex !important; flex-wrap: wrap !important;">
+                        <div class="col-md-4" style="flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px;">
                             <h5><i class="fas fa-search"></i> Otimização para Mecanismos de Busca</h5>
 
                             <div class="form-group">
@@ -275,7 +451,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-4">
+                        <div class="col-md-4" style="flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px;">
                             <div class="sidebar-card">
                                 <h5><i class="fas fa-calendar"></i> Publicação</h5>
 

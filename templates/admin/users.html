@@ -124,7 +124,7 @@
                         <i class="fas fa-chart-line"></i> Rastreamento
                         <i class="fas fa-sort sort-icon"></i>
                     </th>
-                    <th data-sort="actions">
+                    <th data-sort="actions" style="text-align: right; padding-right: 1.5rem;">
                         Ações
                         <i class="fas fa-sort sort-icon"></i>
                     </th>
@@ -141,13 +141,7 @@
                     <td>
                         <div class="user-cell">
                             <div class="user-avatar">
-                                {% if user.avatar %}
-                                <img src="{{ user.avatar }}" alt="{{ user.username }}" class="avatar-img">
-                                {% else %}
-                                <div class="avatar-placeholder">
-                                    {{ user.username[0].upper() if user.username else 'U' }}
-                                </div>
-                                {% endif %}
+                                <img src="{{ get_image_url(user.profile_image, folder='profiles', default='default_profile.jpg') }}" alt="{{ user.username }}" class="avatar-img">
                             </div>
                             <div class="user-info">
                                 <div class="username">{{ user.username }}</div>
@@ -191,11 +185,15 @@
                             <div class="email-address">{{ user.email }}</div>
                             <div class="email-status">
                                 {% if user.is_verified %}
-                                <span class="verification-badge verified">
+                                <span class="verification-badge verified clickable-badge"
+                                      onclick="toggleUserVerification({{ user.id }}, true)"
+                                      title="Clique para desverificar">
                                     <i class="fas fa-check-circle"></i> Verificado
                                 </span>
                                 {% else %}
-                                <span class="verification-badge unverified">
+                                <span class="verification-badge unverified clickable-badge"
+                                      onclick="toggleUserVerification({{ user.id }}, false)"
+                                      title="Clique para verificar">
                                     <i class="fas fa-exclamation-circle"></i> Não verificado
                                 </span>
                                 {% endif %}
@@ -203,20 +201,40 @@
                         </div>
                     </td>
                     <td>
-                        <div class="role-cell">
+                        <div class="role-cell role-dropdown-container">
                             {% if user.role == 'admin' %}
-                            <span class="role-badge role-admin">
+                            <span class="role-badge role-admin clickable-badge"
+                                  data-user-id="{{ user.id }}"
+                                  onclick="toggleRoleDropdown(this, event)"
+                                  title="Clique para alterar cargo">
                                 <i class="fas fa-crown"></i> Administrador
                             </span>
                             {% elif user.role == 'editor' %}
-                            <span class="role-badge role-editor">
+                            <span class="role-badge role-editor clickable-badge"
+                                  data-user-id="{{ user.id }}"
+                                  onclick="toggleRoleDropdown(this, event)"
+                                  title="Clique para alterar cargo">
                                 <i class="fas fa-edit"></i> Editor
                             </span>
                             {% else %}
-                            <span class="role-badge role-user">
+                            <span class="role-badge role-user clickable-badge"
+                                  data-user-id="{{ user.id }}"
+                                  onclick="toggleRoleDropdown(this, event)"
+                                  title="Clique para alterar cargo">
                                 <i class="fas fa-user"></i> Usuário
                             </span>
                             {% endif %}
+                            <div class="role-dropdown-menu">
+                                <div class="dropdown-item" onclick="changeUserRole({{ user.id }}, 'user', event)">
+                                    <i class="fas fa-user"></i> Usuário
+                                </div>
+                                <div class="dropdown-item" onclick="changeUserRole({{ user.id }}, 'editor', event)">
+                                    <i class="fas fa-edit"></i> Editor
+                                </div>
+                                <div class="dropdown-item" onclick="changeUserRole({{ user.id }}, 'admin', event)">
+                                    <i class="fas fa-crown"></i> Administrador
+                                </div>
+                            </div>
                             <div class="permissions-info">
                                 <small class="text-muted">
                                     {% if user.role == 'admin' %}
@@ -235,16 +253,6 @@
                             {% if user.date_joined %}
                             <div class="join-date">{{ user.date_joined.strftime('%d/%m/%Y') }}</div>
                             <small class="join-time text-muted">{{ user.date_joined.strftime('%H:%M') }}</small>
-                            <small class="date-relative text-muted">
-                                {% set meses = [
-                                'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-                                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'] %}
-                                Membro desde {% if user.date_joined %}
-                                {{ meses[user.date_joined.month - 1] }} de {{ user.date_joined.year }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </small>
                             {% else %}
                             <span class="text-muted">-</span>
                             {% endif %}
@@ -253,11 +261,15 @@
                     <td>
                         <div class="status-cell">
                             {% if user.is_active %}
-                            <span class="badge badge-success">
+                            <span class="badge badge-success clickable-badge"
+                                  onclick="toggleUserStatus('{{ user.id }}')"
+                                  title="Clique para desativar">
                                 <i class="fas fa-check-circle"></i> Ativo
                             </span>
                             {% else %}
-                            <span class="badge badge-danger">
+                            <span class="badge badge-danger clickable-badge"
+                                  onclick="toggleUserStatus('{{ user.id }}')"
+                                  title="Clique para ativar">
                                 <i class="fas fa-ban"></i> Inativo
                             </span>
                             {% endif %}
@@ -298,7 +310,7 @@
                             </div>
                         </div>
                     </td>
-                    <td class="actions">
+                    <td class="actions-cell">
                         <div class="action-buttons">
                             <a href="{{ url_for('profile', user_id=user.id) }}" class="btn-action btn-view"
                                 title="Ver Perfil" target="_blank">
@@ -310,10 +322,6 @@
                             </a>
                             {% if user.role != 'admin' or (users | selectattr('role', 'equalto', 'admin') | list |
                             length) > 1 %}
-                            <a href="#" class="btn-action btn-permissions" title="Permissões"
-                                data-user-id="{{ user.id }}">
-                                <i class="fas fa-key"></i>
-                            </a>
                             <a href="#" class="btn-action btn-delete" title="Excluir" data-user-id="{{ user.id }}"
                                 data-user-name="{{ user.username }}">
                                 <i class="fas fa-trash"></i>
@@ -331,10 +339,6 @@
                                     <a href="#" class="dropdown-item" onclick="sendWelcomeEmail('{{ user.id }}')">
                                         <i class="fas fa-envelope"></i> Enviar Boas-vindas
                                     </a>
-                                    <a href="#" class="dropdown-item" onclick="toggleUserStatus('{{ user.id }}')">
-                                        <i class="fas fa-toggle-{{ 'off' if user.is_active else 'on' }}"></i>
-                                        {{ 'Desativar' if user.is_active else 'Ativar' }}
-                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -348,9 +352,6 @@
                             <i class="fas fa-users fa-3x text-muted mb-3"></i>
                             <h4 class="text-muted">Nenhum usuário encontrado</h4>
                             <p class="text-muted">Comece criando o primeiro usuário do sistema.</p>
-                            <button class="btn-admin btn-admin-primary" data-modal="addUserModal">
-                                <i class="fas fa-user-plus"></i> Criar Primeiro Usuário
-                            </button>
                         </div>
                     </td>
                 </tr>
@@ -358,6 +359,22 @@
             </tbody>
         </table>
     </div>
+<style>
+    /* Correction for action buttons alignment */
+    .actions-cell {
+        text-align: right;
+        padding-right: 1.5rem !important;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .action-buttons {
+        display: inline-flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+        align-items: center;
+    }
+</style>
 
     <!-- Enhanced Footer -->
     <div class="admin-card-footer">
@@ -707,8 +724,54 @@
 
                 <div class="row">
                     <div class="col-12">
-                        <h5><i class="fas fa-download"></i> Controle de Downloads</h5>
-                        <p class="text-muted mb-3">Gerencie os limites e contadores de download do usuário</p>
+                        <h5><i class="fas fa-shield-alt"></i> Permissões de Downloads</h5>
+                        <p class="text-muted mb-3">Configure se o usuário pode fazer downloads e os limites personalizados</p>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Importante:</strong> Se o usuário tiver um plano ativo (Premium ou VIP), os limites do plano prevalecerão sobre as configurações manuais abaixo.
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch" style="padding-left: 2.5rem;">
+                                    <input type="checkbox" id="canDownload" name="can_download" class="form-check-input" checked style="width: 3rem; height: 1.5rem;">
+                                    <label for="canDownload" class="form-check-label" style="margin-left: 0.5rem; font-weight: 600;">
+                                        <i class="fas fa-download"></i> Permitir Downloads
+                                    </label>
+                                    <small class="d-block mt-1 text-muted">Desabilite para bloquear totalmente os downloads deste usuário</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="customDailyLimit" class="form-label">
+                                        <i class="fas fa-calendar-day"></i> Limite Diário Personalizado
+                                    </label>
+                                    <input type="number" id="customDailyLimit" name="custom_daily_limit" class="form-control modern-input" min="0" max="1000" placeholder="Padrão: 1">
+                                    <small class="form-text">Deixe vazio para usar limite padrão do plano</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="customWeeklyLimit" class="form-label">
+                                        <i class="fas fa-calendar-week"></i> Limite Semanal Personalizado
+                                    </label>
+                                    <input type="number" id="customWeeklyLimit" name="custom_weekly_limit" class="form-control modern-input" min="0" max="10000" placeholder="Padrão: 15">
+                                    <small class="form-text">Deixe vazio para usar limite padrão do plano</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row">
+                    <div class="col-12">
+                        <h5><i class="fas fa-chart-line"></i> Estatísticas de Downloads Atuais</h5>
+                        <p class="text-muted mb-3">Visualize e ajuste os contadores atuais de download</p>
 
                         <div class="row">
                             <div class="col-md-6">
@@ -1054,17 +1117,46 @@
         position: absolute;
         top: 100%;
         right: 0;
-        background: white;
-        border: 1px solid var(--admin-border-color);
+        background: white !important;
+        background-color: #ffffff !important;
+        background-image: none !important;
+        border: 1px solid var(--admin-border-color, #dee2e6);
         border-radius: 8px;
-        box-shadow: var(--admin-shadow);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         min-width: 180px;
-        z-index: 1000;
+        z-index: 99999;
         display: none;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .dropdown-menu.show {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    /* Overlay para bloquear interação quando dropdown aberto */
+    .dropdown-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9998;
+        background: rgba(0, 0, 0, 0.05);
+        display: none;
+    }
+
+    .dropdown-overlay.show {
+        display: block;
     }
 
     .dropdown-item {
         display: flex;
+        background: white !important;
+        background-color: #ffffff !important;
         align-items: center;
         gap: 0.5rem;
         padding: 0.5rem 1rem;
@@ -1073,13 +1165,13 @@
         font-size: 0.9rem;
         transition: all 0.2s ease;
         border: none;
-        background: none;
         width: 100%;
         text-align: left;
     }
 
     .dropdown-item:hover {
-        background: #f8f9fa;
+        background: #f8f9fa !important;
+        background-color: #f8f9fa !important;
         color: var(--admin-primary);
         text-decoration: none;
     }
@@ -1087,6 +1179,66 @@
     .dropdown-item i {
         width: 16px;
         text-align: center;
+    }
+
+    /* Clickable Badges */
+    .clickable-badge {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+
+    .clickable-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        filter: brightness(1.1);
+    }
+
+    .clickable-badge:active {
+        transform: translateY(0);
+    }
+
+    /* Role Dropdown */
+    .role-dropdown-container {
+        position: relative;
+    }
+
+    .role-dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: white !important;
+        background-color: #ffffff !important;
+        background-image: none !important;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        min-width: 160px;
+        z-index: 99999;
+        display: none;
+        margin-top: 0.25rem;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    .role-dropdown-menu.show {
+        display: block !important;
+    }
+
+    .role-dropdown-menu .dropdown-item {
+        background: white !important;
+        background-color: #ffffff !important;
+        padding: 0.625rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .role-dropdown-menu .dropdown-item:hover {
+        background: #f8f9fa !important;
+        background-color: #f8f9fa !important;
+        color: var(--admin-primary);
     }
 
     /* Modal Styles for Edit User */
@@ -1185,23 +1337,41 @@
     /* Notification Styles */
     .notification {
         position: fixed;
-        top: 20px;
+        bottom: 20px;
         right: 20px;
         background: white;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        padding: 1rem;
+        padding: 0.75rem 1rem;
         z-index: 10000;
-        min-width: 300px;
+        max-width: 350px;
+        min-width: 250px;
+        font-size: 0.9rem;
         animation: slideInRight 0.3s ease;
     }
 
     .notification.success {
         border-left: 4px solid #28a745;
+        color: #155724;
+        background-color: #d4edda;
+    }
+
+    .notification.info {
+        border-left: 4px solid #17a2b8;
+        color: #0c5460;
+        background-color: #d1ecf1;
+    }
+
+    .notification.warning {
+        border-left: 4px solid #ffc107;
+        color: #856404;
+        background-color: #fff3cd;
     }
 
     .notification.error {
         border-left: 4px solid #dc3545;
+        color: #721c24;
+        background-color: #f8d7da;
     }
 
     .notification-content {
@@ -1350,10 +1520,242 @@
         width: 90% !important;
         z-index: 10000 !important;
         position: relative !important;
-    }
 </style>
 
 <script>
+    // ============================================
+    // FUNÇÕES GLOBAIS (Disponíveis para onclick)
+    // ============================================
+
+    // ID do usuário atual logado
+    const CURRENT_USER_ID = '{{ session.get("user_id") }}';
+
+    // Função para mostrar notificações
+    function showNotification(message, type = 'info') {
+        // Criar elemento de notificação
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+
+        // Adicionar ao body
+        document.body.appendChild(notification);
+
+        // Remover após 5 segundos
+        setTimeout(() => {
+            notification.classList.add('fade-out');
+            setTimeout(() => notification.remove(), 300);
+        }, 5000);
+    }
+
+    // Toggle dropdown de cargo
+    window.toggleRoleDropdown = function(badgeElement, event) {
+        event.stopPropagation();
+
+        const container = badgeElement.closest('.role-dropdown-container');
+        const dropdown = container.querySelector('.role-dropdown-menu');
+
+        // Fechar outros dropdowns de cargo
+        document.querySelectorAll('.role-dropdown-menu').forEach(menu => {
+            if (menu !== dropdown) {
+                menu.classList.remove('show');
+            }
+        });
+
+        // Toggle do dropdown atual
+        dropdown.classList.toggle('show');
+    };
+
+    // Mudar cargo do usuário
+    window.changeUserRole = async function(userId, newRole, event) {
+        event.stopPropagation();
+
+        // Fechar dropdown
+        document.querySelectorAll('.role-dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+        });
+
+        try {
+            const response = await fetch(`/admin/users/${userId}/permissions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ role: newRole })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification(data.message, 'success');
+
+                // Atualizar badge na tabela
+                const row = document.querySelector(`[data-id="${userId}"]`);
+                if (row) {
+                    const roleCell = row.querySelector('.role-cell');
+                    const roleBadge = roleCell.querySelector('.role-badge');
+                    const permissionsInfo = roleCell.querySelector('.permissions-info small');
+
+                    // Atualizar classe e conteúdo do badge
+                    roleBadge.className = 'role-badge clickable-badge';
+
+                    if (newRole === 'admin') {
+                        roleBadge.classList.add('role-admin');
+                        roleBadge.innerHTML = '<i class="fas fa-crown"></i> Administrador';
+                        permissionsInfo.textContent = 'Acesso total ao sistema';
+                    } else if (newRole === 'editor') {
+                        roleBadge.classList.add('role-editor');
+                        roleBadge.innerHTML = '<i class="fas fa-edit"></i> Editor';
+                        permissionsInfo.textContent = 'Pode criar e editar posts';
+                    } else {
+                        roleBadge.classList.add('role-user');
+                        roleBadge.innerHTML = '<i class="fas fa-user"></i> Usuário';
+                        permissionsInfo.textContent = 'Acesso básico';
+                    }
+                }
+            } else {
+                showNotification(data.message || 'Erro ao atualizar cargo', 'error');
+            }
+        } catch (error) {
+            showNotification('Erro ao atualizar cargo do usuário', 'error');
+            console.error('Erro:', error);
+        }
+    };
+
+    // Toggle status do usuário
+    window.toggleUserStatus = async function (userId) {
+        const row = document.querySelector(`[data-id="${userId}"]`);
+        if (!row) {
+            showNotification('Erro: Linha do usuário não encontrada', 'error');
+            return;
+        }
+
+        const currentStatus = row.getAttribute('data-status');
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        const isActive = newStatus === 'active';
+
+        // Verificar se está tentando desativar a si mesmo (PRIORIDADE 1)
+        if (userId === CURRENT_USER_ID && !isActive) {
+            showNotification('Você não pode desativar sua própria conta!', 'error');
+            return;
+        }
+
+        // Verificar se o usuário alvo é admin (PRIORIDADE 2)
+        const targetRole = row.getAttribute('data-role');
+        if (targetRole === 'admin' && userId !== CURRENT_USER_ID && !isActive) {
+            showNotification('Você não pode desativar outro administrador!', 'error');
+            return;
+        }
+
+        try {
+            // Buscar dados do usuário primeiro
+            const userData = await fetch(`/admin/users/${userId}/data`).then(r => r.json());
+
+            // Fazer requisição para atualizar no backend
+            const response = await fetch(`/admin/users/${userId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'user_id': userId,
+                    'username': userData.username,
+                    'email': userData.email,
+                    'role': userData.role,
+                    'plan': userData.plan,
+                    'is_active': isActive ? 'true' : 'false'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Atualizar interface
+                row.setAttribute('data-status', newStatus);
+
+                const badge = row.querySelector('.status-cell .badge');
+                if (isActive) {
+                    badge.innerHTML = '<i class="fas fa-check-circle"></i> Ativo';
+                    badge.className = 'badge badge-success clickable-badge';
+                    badge.setAttribute('onclick', `toggleUserStatus('${userId}')`);
+                    badge.setAttribute('title', 'Clique para desativar');
+                    row.classList.remove('inactive-row');
+                } else {
+                    badge.innerHTML = '<i class="fas fa-ban"></i> Inativo';
+                    badge.className = 'badge badge-danger clickable-badge';
+                    badge.setAttribute('onclick', `toggleUserStatus('${userId}')`);
+                    badge.setAttribute('title', 'Clique para ativar');
+                    row.classList.add('inactive-row');
+                }
+
+                const notificationType = isActive ? 'success' : 'info';
+                showNotification(`Usuário ${isActive ? 'ativado' : 'desativado'}!`, notificationType);
+                if (typeof updateStats === 'function') updateStats();
+            } else {
+                showNotification(data.message || 'Erro ao atualizar status', 'error');
+            }
+        } catch (error) {
+            showNotification('Erro ao atualizar status do usuário', 'error');
+            console.error('Erro:', error);
+        }
+    };
+
+    // Toggle verificação do usuário
+    window.toggleUserVerification = async function(userId, currentlyVerified) {
+        try {
+            const response = await fetch(`/admin/users/${userId}/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    verify: !currentlyVerified
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Usar cor verde para verificado e amarelo para desverificado
+                const notificationType = !currentlyVerified ? 'success' : 'warning';
+                const notificationIcon = !currentlyVerified ? '✓' : '⚠';
+                showNotification(`${notificationIcon} ${data.message}`, notificationType);
+
+                // Atualizar badge na linha da tabela
+                const row = document.querySelector(`[data-id="${userId}"]`);
+                if (row) {
+                    const emailCell = row.querySelector('.email-cell');
+                    const verifiedBadge = emailCell.querySelector('.verification-badge');
+
+                    if (verifiedBadge) {
+                        if (!currentlyVerified) {
+                            verifiedBadge.innerHTML = '<i class="fas fa-check-circle"></i> Verificado';
+                            verifiedBadge.className = 'verification-badge verified clickable-badge';
+                            verifiedBadge.setAttribute('onclick', `toggleUserVerification(${userId}, true)`);
+                            verifiedBadge.setAttribute('title', 'Clique para desverificar');
+                        } else {
+                            verifiedBadge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Não verificado';
+                            verifiedBadge.className = 'verification-badge unverified clickable-badge';
+                            verifiedBadge.setAttribute('onclick', `toggleUserVerification(${userId}, false)`);
+                            verifiedBadge.setAttribute('title', 'Clique para verificar');
+                        }
+                    }
+                }
+
+                // Atualizar stats
+                if (typeof updateStats === 'function') updateStats();
+            } else {
+                showNotification(data.message || 'Erro ao atualizar verificação', 'error');
+            }
+        } catch (error) {
+            showNotification('Erro ao atualizar verificação do usuário', 'error');
+            console.error('Erro:', error);
+        }
+    };
+
+    // ============================================
+    // CÓDIGO QUE RODA APÓS DOM CARREGAR
+    // ============================================
+
     document.addEventListener('DOMContentLoaded', function () {
         console.log('DOM carregado, inicializando JavaScript de usuários...'); // Debug
 
@@ -1424,28 +1826,6 @@
             }
         };
 
-        window.toggleUserStatus = function (userId) {
-            const row = document.querySelector(`[data-id="${userId}"]`);
-            const currentStatus = row.getAttribute('data-status');
-            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-
-            row.setAttribute('data-status', newStatus);
-
-            const badge = row.querySelector('.status-cell .badge');
-            if (newStatus === 'active') {
-                badge.innerHTML = '<i class="fas fa-check-circle"></i> Ativo';
-                badge.className = 'badge badge-success';
-                row.classList.remove('inactive-row');
-            } else {
-                badge.innerHTML = '<i class="fas fa-ban"></i> Inativo';
-                badge.className = 'badge badge-danger';
-                row.classList.add('inactive-row');
-            }
-
-            showNotification(`Usuário ${newStatus === 'active' ? 'ativado' : 'desativado'}!`, 'success');
-            updateStats();
-        };
-
         // Função para editar usuário
         window.editUser = function (userId) {
             console.log('Editando usuário:', userId); // Debug
@@ -1511,6 +1891,23 @@
                 document.getElementById('editRole').value = user.role;
                 document.getElementById('editPlan').value = user.plan || 'free';
                 document.getElementById('editIsActive').checked = user.is_active;
+
+                // Preencher novos campos de permissões de download
+                const canDownloadField = document.getElementById('canDownload');
+                if (canDownloadField) {
+                    canDownloadField.checked = user.can_download !== false; // true por padrão
+                }
+
+                const customDailyLimitField = document.getElementById('customDailyLimit');
+                if (customDailyLimitField) {
+                    customDailyLimitField.value = user.custom_daily_limit || '';
+                }
+
+                const customWeeklyLimitField = document.getElementById('customWeeklyLimit');
+                if (customWeeklyLimitField) {
+                    customWeeklyLimitField.value = user.custom_weekly_limit || '';
+                }
+
                 console.log('Dados preenchidos no modal'); // Debug
             } catch (error) {
                 console.error('Erro ao preencher dados:', error);
@@ -1664,12 +2061,114 @@
         // Dropdown "Mais opções" functionality
         document.addEventListener('click', function (e) {
             // Fechar todos os dropdowns quando clicar fora
-            if (!e.target.closest('.action-dropdown')) {
+            if (!e.target.closest('.action-dropdown') && !e.target.closest('.role-dropdown-container')) {
                 document.querySelectorAll('.dropdown-menu').forEach(menu => {
                     menu.style.display = 'none';
                 });
+                document.querySelectorAll('.role-dropdown-menu').forEach(menu => {
+                    menu.classList.remove('show');
+                });
             }
         });
+
+        // Toggle dropdown de cargo
+        window.toggleRoleDropdown = function(badgeElement, event) {
+            event.stopPropagation();
+
+            const container = badgeElement.closest('.role-dropdown-container');
+            const dropdown = container.querySelector('.role-dropdown-menu');
+
+            // Fechar outros dropdowns de cargo
+            document.querySelectorAll('.role-dropdown-menu').forEach(menu => {
+                if (menu !== dropdown) {
+                    menu.classList.remove('show');
+                }
+            });
+
+            // Toggle do dropdown atual
+            dropdown.classList.toggle('show');
+        };
+
+        // Mudar cargo do usuário
+        window.changeUserRole = async function(userId, newRole, event) {
+            event.stopPropagation();
+
+            // Fechar dropdown
+            document.querySelectorAll('.role-dropdown-menu').forEach(menu => {
+                menu.classList.remove('show');
+            });
+
+            try {
+                const response = await fetch(`/admin/users/${userId}/permissions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ role: newRole })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification(data.message, 'success');
+
+                    // Atualizar badge na tabela
+                    const row = document.querySelector(`[data-id="${userId}"]`);
+                    if (row) {
+                        const roleCell = row.querySelector('.role-cell');
+                        const roleBadge = roleCell.querySelector('.role-badge');
+                        const permissionsInfo = roleCell.querySelector('.permissions-info small');
+
+                        // Atualizar classe e conteúdo do badge
+                        roleBadge.className = 'role-badge clickable-badge';
+
+                        if (newRole === 'admin') {
+                            roleBadge.classList.add('role-admin');
+                            roleBadge.innerHTML = '<i class="fas fa-crown"></i> Administrador';
+                            permissionsInfo.textContent = 'Acesso total ao sistema';
+                        } else if (newRole === 'editor') {
+                            roleBadge.classList.add('role-editor');
+                            roleBadge.innerHTML = '<i class="fas fa-edit"></i> Editor';
+                            permissionsInfo.textContent = 'Pode criar e editar posts';
+                        } else {
+                            roleBadge.classList.add('role-user');
+                            roleBadge.innerHTML = '<i class="fas fa-user"></i> Usuário';
+                            permissionsInfo.textContent = 'Acesso básico';
+                        }
+                    }
+                } else {
+                    showNotification(data.message || 'Erro ao atualizar cargo', 'error');
+                }
+            } catch (error) {
+                showNotification('Erro ao atualizar cargo do usuário', 'error');
+                console.error('Erro:', error);
+            }
+        };
+
+        // Criar overlay para dropdowns
+        let dropdownOverlay = document.createElement('div');
+        dropdownOverlay.className = 'dropdown-overlay';
+        document.body.appendChild(dropdownOverlay);
+
+        // Função para fechar todos os dropdowns
+        function closeAllDropdowns() {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.style.display = 'none';
+                menu.classList.remove('show');
+            });
+            dropdownOverlay.classList.remove('show');
+        }
+
+        // Dropdown "Mais opções" functionality
+        document.addEventListener('click', function (e) {
+            // Fechar todos os dropdowns quando clicar fora
+            if (!e.target.closest('.action-dropdown')) {
+                closeAllDropdowns();
+            }
+        });
+
+        // Click no overlay fecha dropdowns
+        dropdownOverlay.addEventListener('click', closeAllDropdowns);
 
         // Adicionar event listeners para botões "Mais opções"
         document.querySelectorAll('.btn-more').forEach(btn => {
@@ -1681,12 +2180,14 @@
                 const isVisible = dropdown.style.display === 'block';
 
                 // Fechar todos os outros dropdowns
-                document.querySelectorAll('.dropdown-menu').forEach(menu => {
-                    menu.style.display = 'none';
-                });
+                closeAllDropdowns();
 
                 // Toggle do dropdown atual
-                dropdown.style.display = isVisible ? 'none' : 'block';
+                if (!isVisible) {
+                    dropdown.style.display = 'block';
+                    dropdown.classList.add('show');
+                    dropdownOverlay.classList.add('show');
+                }
             });
         });
 
@@ -1971,22 +2472,6 @@
                     document.body.appendChild(form);
                     form.submit();
                 }
-            });
-        });
-
-        // Permissions button functionality
-        const permissionsButtons = document.querySelectorAll('.btn-permissions');
-        console.log('Botões de permissões encontrados:', permissionsButtons.length); // Debug
-
-        permissionsButtons.forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                console.log('Botão de permissões clicado!'); // Debug
-
-                const userId = this.getAttribute('data-user-id');
-                console.log('User ID para permissões:', userId); // Debug
-
-                showNotification('Funcionalidade de permissões em desenvolvimento', 'info');
             });
         });
 

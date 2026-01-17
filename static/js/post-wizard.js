@@ -78,18 +78,27 @@ document.addEventListener('DOMContentLoaded', function() {
         currentStep = step;
     }
 
+    // Permitir clicar nos números das etapas para navegar
+    document.querySelectorAll('.form-steps .step').forEach(stepEl => {
+        stepEl.style.cursor = 'pointer';
+        stepEl.addEventListener('click', function() {
+            const targetStep = parseInt(this.getAttribute('data-step'));
+            if (targetStep && targetStep >= 1 && targetStep <= totalSteps) {
+                saveDraft();
+                showStep(targetStep);
+            }
+        });
+    });
+
     // Botão Próximo
     nextBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
 
-        if (validateStep(currentStep)) {
-            if (currentStep < totalSteps) {
-                saveDraft();
-                showStep(currentStep + 1);
-            }
-        } else {
-            scrollToFirstInvalidField();
+        // Permitir navegação sem validação - apenas salvar rascunho
+        if (currentStep < totalSteps) {
+            saveDraft();
+            showStep(currentStep + 1);
         }
     });
 
@@ -104,12 +113,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Botão Salvar (submeter formulário)
+    // Botão Salvar (submeter formulário) - VALIDAÇÃO APENAS AQUI
     saveBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
 
-        if (validateStep(currentStep)) {
+        // Validar TODOS os steps antes de salvar
+        if (validateAllSteps()) {
             // Sincronizar editor com textarea antes de enviar
             if (richEditor && hiddenTextarea) {
                 hiddenTextarea.value = richEditor.innerHTML;
@@ -122,9 +132,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.submit();
             }
         } else {
-            scrollToFirstInvalidField();
+            // Ir para o primeiro step com erro
+            for (let step = 1; step <= totalSteps; step++) {
+                if (!validateStep(step)) {
+                    showStep(step);
+                    scrollToFirstInvalidField();
+                    alert('Por favor, preencha todos os campos obrigatórios antes de concluir.');
+                    break;
+                }
+            }
         }
     });
+
+    // Validar todos os steps
+    function validateAllSteps() {
+        let allValid = true;
+        for (let step = 1; step <= totalSteps; step++) {
+            if (!validateStep(step)) {
+                allValid = false;
+            }
+        }
+        return allValid;
+    }
 
     // Validação de cada step
     function validateStep(step) {

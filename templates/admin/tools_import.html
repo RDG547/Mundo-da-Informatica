@@ -285,54 +285,30 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>20/05/2023 15:42</td>
-                    <td>Usuários</td>
-                    <td>usuarios_maio.csv</td>
-                    <td>admin</td>
-                    <td>125</td>
-                    <td><span class="status-badge status-success">Concluído</span></td>
-                    <td class="actions">
-                        <a href="#" class="btn-action btn-view" title="Ver Detalhes">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="#" class="btn-action btn-download" title="Baixar Log">
-                            <i class="fas fa-download"></i>
-                        </a>
+                {% if import_history %}
+                    {% for item in import_history %}
+                    <tr>
+                        <td>{{ item.date }}</td>
+                        <td>{{ item.type }}</td>
+                        <td>{{ item.file }}</td>
+                        <td>{{ item.user }}</td>
+                        <td>{{ item.records }}</td>
+                        <td><span class="status-badge status-success">Concluído</span></td>
+                        <td class="actions">
+                            <a href="#" class="btn-action btn-view" title="Ver Detalhes">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr class="empty-state">
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: #6c757d;">
+                        <i class="fas fa-history fa-2x" style="margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>Nenhum histórico de importação encontrado.</p>
                     </td>
                 </tr>
-                <tr>
-                    <td>15/05/2023 10:15</td>
-                    <td>Posts</td>
-                    <td>artigos_novos.xlsx</td>
-                    <td>admin</td>
-                    <td>47</td>
-                    <td><span class="status-badge status-success">Concluído</span></td>
-                    <td class="actions">
-                        <a href="#" class="btn-action btn-view" title="Ver Detalhes">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="#" class="btn-action btn-download" title="Baixar Log">
-                            <i class="fas fa-download"></i>
-                        </a>
-                    </td>
-                </tr>
-                <tr>
-                    <td>10/05/2023 09:30</td>
-                    <td>Categorias</td>
-                    <td>categorias.json</td>
-                    <td>editor</td>
-                    <td>15</td>
-                    <td><span class="status-badge status-warning">Parcial</span></td>
-                    <td class="actions">
-                        <a href="#" class="btn-action btn-view" title="Ver Detalhes">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="#" class="btn-action btn-download" title="Baixar Log">
-                            <i class="fas fa-download"></i>
-                        </a>
-                    </td>
-                </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>

@@ -552,6 +552,9 @@
 {% include 'admin/components/modal_post.html' %}
 
 {% block scripts %}
+<!-- Post Wizard Script - MESMO DO DASHBOARD -->
+<script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
+
 <script>
     // ========================================
     // FUNÇÕES GLOBAIS DO MODAL DE EDIÇÃO
@@ -974,7 +977,7 @@
         });
 
         // Atualizar preview SEO no modal de edição
-        function updateEditSeoPreview() {
+        window.updateEditSeoPreview = function() {
             const title = document.getElementById('editPostTitle');
             const content = document.getElementById('editPostContentEditor');
             const seoTitle = document.getElementById('editSeoPreviewTitle');
@@ -1205,8 +1208,8 @@
 </script>
 
 <style>
-    /* Form Steps Navigation */
-    .form-steps {
+    /* Form Steps Navigation - APENAS PARA MODAL DE EDIÇÃO */
+    #editPostModal .form-steps {
         display: flex;
         justify-content: center;
         align-items: flex-start;
@@ -1216,7 +1219,7 @@
         gap: 0;
     }
 
-    .form-steps::before {
+    #editPostModal .form-steps::before {
         content: '';
         position: absolute;
         top: 20px;
@@ -1229,7 +1232,7 @@
         z-index: 0;
     }
 
-    .form-steps .step {
+    #editPostModal .form-steps .step {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1240,36 +1243,38 @@
         max-width: 200px;
     }
 
-    .form-steps .step-number {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: #e0e0e0;
-        color: #666;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 1.1rem;
+    #editPostModal .form-steps .step-number {
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 50% !important;
+        background: #e0e0e0 !important;
+        color: #666 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 600 !important;
+        font-size: 1.1rem !important;
         transition: all 0.3s ease;
-        border: 3px solid #fff;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 3px solid #fff !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
         background-clip: padding-box;
+        position: relative;
+        z-index: 10;
     }
 
-    .form-steps .step.active .step-number {
-        background: var(--admin-primary);
-        color: white;
+    #editPostModal .form-steps .step.active .step-number {
+        background: var(--admin-primary) !important;
+        color: white !important;
         transform: scale(1.1);
-        box-shadow: 0 4px 12px rgba(58, 134, 255, 0.3);
+        box-shadow: 0 4px 12px rgba(58, 134, 255, 0.3) !important;
     }
 
-    .form-steps .step.completed .step-number {
-        background: #28a745;
-        color: white;
+    #editPostModal .form-steps .step.completed .step-number {
+        background: #28a745 !important;
+        color: white !important;
     }
 
-    .form-steps .step-title {
+    #editPostModal .form-steps .step-title {
         font-size: 0.85rem;
         color: #666;
         text-align: center;
@@ -1277,46 +1282,46 @@
         white-space: nowrap;
     }
 
-    .form-steps .step.active .step-title {
+    #editPostModal .form-steps .step.active .step-title {
         color: var(--admin-primary);
         font-weight: 600;
     }
 
-    .form-steps .step.completed .step-title {
+    #editPostModal .form-steps .step.completed .step-title {
         color: #28a745;
     }
 
-    /* Step Content */
-    .step-content {
+    /* Step Content - APENAS PARA MODAL DE EDIÇÃO */
+    #editPostModal .step-content {
         display: none;
     }
 
-    .step-content.active {
+    #editPostModal .step-content.active {
         display: block;
         animation: fadeIn 0.3s ease;
     }
 
-    /* Melhorar espaçamento dos campos no modal */
-    .step-content .row {
+    /* Melhorar espaçamento dos campos no MODAL DE EDIÇÃO APENAS */
+    #editPostModal .step-content .row {
         width: 100%;
         margin: 0;
     }
 
-    .step-content .col-md-8,
-    .step-content .col-md-4,
-    .step-content .col-md-6 {
+    #editPostModal .step-content .col-md-8,
+    #editPostModal .step-content .col-md-4,
+    #editPostModal .step-content .col-md-6 {
         padding-left: 15px;
         padding-right: 15px;
     }
 
-    .step-content .form-group {
+    #editPostModal .step-content .form-group {
         width: 100%;
         margin-bottom: 1.5rem;
     }
 
-    .step-content .form-control,
-    .step-content .form-select,
-    .step-content .rich-editor {
+    #editPostModal .step-content .form-control,
+    #editPostModal .step-content .form-select,
+    #editPostModal .step-content .rich-editor {
         width: 100% !important;
         max-width: 100%;
     }
@@ -1702,42 +1707,6 @@
 </style>
 
 <script>
-    // Funções para gerenciar upload de imagem vs URL
-    // REMOVIDO: código duplicado consolidado em um único DOMContentLoaded abaixo
-
-        // Preview de imagem ao digitar URL (modal de edição)
-        const editImageUrl = document.getElementById('editPostImageUrl');
-        if (editImageUrl) {
-            const updatePreview = function () {
-                const url = editImageUrl.value.trim();
-                const previewImg = document.getElementById('editPreviewImg');
-                const previewContainer = document.getElementById('editImagePreview');
-
-                if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-                    previewImg.src = url;
-                    previewContainer.style.display = 'block';
-
-                    // Verificar se a imagem carrega
-                    previewImg.onerror = function () {
-                        previewContainer.style.display = 'none';
-                    };
-
-                    previewImg.onload = function () {
-                        previewContainer.style.display = 'block';
-                    };
-                } else if (!url) {
-                    previewContainer.style.display = 'none';
-                }
-            };
-
-            editImageUrl.addEventListener('input', updatePreview);
-            editImageUrl.addEventListener('change', updatePreview);
-            editImageUrl.addEventListener('paste', function (e) {
-                setTimeout(updatePreview, 100);
-            });
-        }
-    });
-
     // Preview de imagem no modal de edição
     function previewEditImage(file) {
         if (!file) return;
@@ -1782,6 +1751,9 @@
     if (editPostForm) {
         editPostForm.addEventListener('submit', function (e) {
             e.preventDefault();
+
+            // Sincronizar conteúdo do editor antes de enviar
+            syncEditEditorContent();
 
             const formData = new FormData(this);
             const postId = document.getElementById('editPostId').value;
@@ -2015,16 +1987,6 @@
             editContent.addEventListener('input', updateEditSeoPreview);
         }
     });
-
-    // Atualizar formulário de edição para sincronizar antes do submit
-    const editPostForm = document.getElementById('editPostForm');
-    if (editPostForm) {
-        const originalSubmitHandler = editPostForm.onsubmit;
-        editPostForm.addEventListener('submit', function (e) {
-            // Sincronizar conteúdo antes de enviar
-            syncEditEditorContent();
-        }, true);
-    }
 
 </script>
 

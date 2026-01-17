@@ -267,28 +267,21 @@ function openLiveChat() {
 // Initialize FAQ functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, checking for FAQ elements');
-    if (document.querySelector('.faq-section') || document.querySelector('.faq-item')) {
+    if (!window.faqInitialized && (document.querySelector('.faq-section') || document.querySelector('.faq-item'))) {
         console.log('FAQ elements found, initializing');
+        window.faqInitialized = true;
         initializeFAQ();
         initializeFAQSearch();
-    }
-});
-
-// Handle page refresh and navigation
-window.addEventListener('load', function() {
-    console.log('Window loaded, checking for FAQ elements');
-    if (document.querySelector('.faq-section') || document.querySelector('.faq-item')) {
-        console.log('FAQ elements found on load, reinitializing');
-        initializeFAQ();
     }
 });
 
 // Handle dynamic content loading
 document.addEventListener('pageLoaded', function() {
     console.log('Page loaded event, checking for FAQ elements');
-    if (document.querySelector('.faq-section') || document.querySelector('.faq-item')) {
+    if (!window.faqInitialized && (document.querySelector('.faq-section') || document.querySelector('.faq-item'))) {
         setTimeout(() => {
             console.log('Delayed FAQ initialization');
+            window.faqInitialized = true;
             initializeFAQ();
             initializeFAQSearch();
         }, 100);

@@ -82,6 +82,10 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
 
+# Configuração do Abacate Pay
+app.config['ABACATEPAY_API_KEY'] = os.environ.get('ABACATEPAY_API_KEY', 'abc_prod_QUeb3CYeWdLghPg02rFpQU1N')
+app.config['ABACATEPAY_API_URL'] = 'https://api.abacatepay.com/v1'
+
 # Configuração do Cloudinary
 cloudinary.config(
     cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
@@ -976,6 +980,11 @@ class User(db.Model, UserMixin):
     weekly_downloads = db.Column(db.Integer, default=0)  # Contador de downloads da semana
     week_reset_date = db.Column(db.DateTime)  # Data de reset semanal (domingo 00:00)
 
+    # Permissões de download personalizadas
+    can_download = db.Column(db.Boolean, default=True)  # Permite ou bloqueia downloads totalmente
+    custom_daily_limit = db.Column(db.Integer, nullable=True)  # Limite diário personalizado (None = usar padrão do plano)
+    custom_weekly_limit = db.Column(db.Integer, nullable=True)  # Limite semanal personalizado (None = usar padrão do plano)
+
     def set_password(self, password):
         """Gera hash da senha fornecida"""
         self.password_hash = generate_password_hash(password)
@@ -1090,11 +1099,20 @@ class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
+    # Gateway de pagamento ('stripe' ou 'abacatepay')
+    payment_gateway = db.Column(db.String(20), default='stripe', nullable=False)
+
     # Dados do Stripe
-    stripe_session_id = db.Column(db.String(255), unique=True, nullable=False)  # checkout.session.id
+    stripe_session_id = db.Column(db.String(255), unique=True, nullable=True)  # checkout.session.id
     stripe_customer_id = db.Column(db.String(255), nullable=True)  # customer ID do Stripe
     stripe_subscription_id = db.Column(db.String(255), nullable=True)  # subscription ID do Stripe
     stripe_payment_intent_id = db.Column(db.String(255), nullable=True)  # payment_intent ID
+
+    # Dados do Abacate Pay
+    abacatepay_billing_id = db.Column(db.String(255), unique=True, nullable=True)  # ID da cobrança
+    abacatepay_payment_url = db.Column(db.Text, nullable=True)  # URL de pagamento
+    abacatepay_qr_code = db.Column(db.Text, nullable=True)  # QR Code PIX em base64
+    abacatepay_pix_code = db.Column(db.Text, nullable=True)  # Código PIX copia-e-cola
 
     # Dados da transação
     plan_type = db.Column(db.String(20), nullable=False)  # 'premium' ou 'vip'
@@ -1110,7 +1128,7 @@ class Transaction(db.Model):
     user = db.relationship('User', backref=db.backref('transactions', lazy=True, cascade="all, delete"))
 
     def __repr__(self):
-        return f"Transaction(user_id={self.user_id}, plan={self.plan_type}, status={self.status})"
+        return f"Transaction(user_id={self.user_id}, plan={self.plan_type}, gateway={self.payment_gateway}, status={self.status})"
 
 # Adicionar o modelo Comment depois de definir User
 class Comment(db.Model):
@@ -2509,6 +2527,9 @@ def create_checkout_session():
         data = request.get_json()
         plan_type = data.get('plan')
 
+        debug_log(f'Stripe Checkout - Dados recebidos: {data}')
+        debug_log(f'Stripe Checkout - Plano: {plan_type}')
+
         # Define prices (Replace with your actual Stripe Price IDs from env)
         prices = {
             'premium': os.environ.get('STRIPE_PRICE_PREMIUM', 'price_premium_placeholder'),
@@ -2517,7 +2538,8 @@ def create_checkout_session():
 
         price_id = prices.get(plan_type)
         if not price_id:
-             return jsonify({'error': 'Plano inválido'}), 400
+            debug_log(f'Stripe Checkout - Plano inválido: {plan_type}')
+            return jsonify({'error': 'Plano inválido'}), 400
 
         checkout_session = stripe.checkout.Session.create(
             line_items=[
@@ -2527,6 +2549,7 @@ def create_checkout_session():
                 },
             ],
             mode='subscription',
+            payment_method_types=['card'],  # Apenas cartão de crédito
             success_url=url_for('checkout_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=url_for('checkout_cancel', _external=True),
             customer_email=current_user.email,
@@ -2603,6 +2626,294 @@ def checkout_success():
 def checkout_cancel():
     flash('O processo de assinatura foi cancelado.', 'info')
     return redirect(url_for('plans'))
+
+@app.route('/create-pix-checkout', methods=['POST'])
+@login_required
+def create_pix_checkout():
+    """
+    Cria um QR Code PIX via Abacate Pay - Redirecionamento Assíncrono
+    """
+    try:
+        data = request.get_json()
+        plan_type = data.get('plan')
+
+        debug_log(f'PIX Checkout - Dados recebidos: {data}')
+        debug_log(f'PIX Checkout - Plano: {plan_type}')
+
+        if plan_type not in ['premium', 'vip']:
+            debug_log(f'PIX Checkout - Plano inválido: {plan_type}')
+            return jsonify({'error': 'Plano inválido'}), 400
+
+        # Define preços em centavos
+        prices = {
+            'premium': 2990,  # R$ 29,90
+            'vip': 4990       # R$ 49,90
+        }
+
+        amount = prices.get(plan_type)
+
+        # Gerar ID único para o PIX
+        pix_id = f'{plan_type}_{current_user.id}_{int(datetime.utcnow().timestamp())}'
+
+        # Criar transação pendente IMEDIATAMENTE para redirecionamento rápido
+        transaction = Transaction(
+            user_id=current_user.id,
+            payment_gateway='abacatepay',
+            abacatepay_billing_id=pix_id,
+            plan_type=plan_type,
+            amount=amount,
+            currency='brl',
+            status='processing'  # Status temporário até API responder
+        )
+        db.session.add(transaction)
+        db.session.commit()
+
+        debug_log(f'Transação criada com ID: {transaction.id}, billing_id: {pix_id}')
+
+        # Retornar imediatamente para redirecionamento rápido
+        # O processamento da API será feito em background
+        return jsonify({
+            'billing_id': pix_id,
+            'transaction_id': transaction.id,
+            'redirect_url': url_for('pix_checkout_page', billing_id=pix_id, _external=True)
+        })
+
+    except Exception as e:
+        debug_log(f'Erro ao criar PIX: {str(e)}')
+        import traceback
+        debug_log(traceback.format_exc())
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
+@app.route('/process-pix-async/<billing_id>', methods=['POST'])
+@login_required
+def process_pix_async(billing_id):
+    """
+    Processa a criação do QR Code PIX em background
+    """
+    try:
+        import requests
+
+        transaction = Transaction.query.filter_by(
+            abacatepay_billing_id=billing_id,
+            user_id=current_user.id
+        ).first()
+
+        if not transaction:
+            return jsonify({'error': 'Transação não encontrada'}), 404
+
+        # Se já foi processado, retornar sucesso
+        if transaction.status in ['pending', 'completed']:
+            return jsonify({
+                'status': 'success',
+                'qr_code': transaction.abacatepay_qr_code,
+                'pix_code': transaction.abacatepay_pix_code
+            })
+
+        # Se foi cancelado, retornar erro
+        if transaction.status == 'cancelled':
+            return jsonify({'error': 'Transação foi cancelada'}), 400
+
+        plan_type = transaction.plan_type
+        amount = transaction.amount
+
+        # Configuração API Abacate Pay
+        api_key = app.config['ABACATEPAY_API_KEY']
+        api_url = app.config['ABACATEPAY_API_URL']
+
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        # Payload para criar PIX QR Code
+        payload = {
+            'amount': amount,
+            'expiresIn': 3600,
+            'description': f'Plano {plan_type.upper()}',
+            'customer': {
+                'name': current_user.username,
+                'cellphone': '+5511999999999',
+                'email': current_user.email,
+                'taxId': '11144477735'
+            },
+            'metadata': {
+                'externalId': billing_id,
+                'user_id': str(current_user.id),
+                'plan': plan_type
+            }
+        }
+
+        debug_log(f'Processando PIX async para billing_id: {billing_id}')
+
+        try:
+            response = requests.post(
+                f'{api_url}/pixQrCode/create',
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                pix_data = result.get('data', {})
+                pix_charge_id = pix_data.get('id')
+                pix_code = pix_data.get('brCode')
+                qr_code_base64 = pix_data.get('brCodeBase64')
+
+                # Atualizar transação com os dados do QR Code
+                # IMPORTANTE: Manter o billing_id original para não quebrar o polling
+                transaction.abacatepay_qr_code = qr_code_base64
+                transaction.abacatepay_pix_code = pix_code
+                transaction.status = 'pending'
+                db.session.commit()
+
+                debug_log(f'PIX QR Code criado com sucesso: {pix_charge_id}')
+
+                return jsonify({
+                    'status': 'success',
+                    'qr_code': qr_code_base64,
+                    'pix_code': pix_code
+                })
+            else:
+                debug_log(f'Erro API Abacate Pay: {response.status_code}')
+                transaction.status = 'failed'
+                db.session.commit()
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Erro ao processar pagamento'
+                }), 400
+
+        except Exception as e:
+            debug_log(f'Erro ao processar PIX async: {str(e)}')
+            transaction.status = 'failed'
+            db.session.commit()
+            return jsonify({
+                'status': 'error',
+                'message': str(e)
+            }), 500
+
+    except Exception as e:
+        debug_log(f'Erro geral no process_pix_async: {str(e)}')
+        import traceback
+        debug_log(traceback.format_exc())
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+        import traceback
+        debug_log(traceback.format_exc())
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
+@app.route('/pix-checkout/<billing_id>')
+@login_required
+def pix_checkout_page(billing_id):
+    """
+    Página de checkout PIX com QR Code
+    """
+    transaction = Transaction.query.filter_by(
+        abacatepay_billing_id=billing_id,
+        user_id=current_user.id
+    ).first_or_404()
+
+    return render_template('pix_checkout.html',
+                         transaction=transaction,
+                         billing_id=billing_id)
+
+@app.route('/pix-checkout-error/<int:transaction_id>')
+@login_required
+def pix_checkout_error(transaction_id):
+    """
+    Página de erro de checkout PIX
+    """
+    transaction = Transaction.query.filter_by(
+        id=transaction_id,
+        user_id=current_user.id
+    ).first_or_404()
+
+    return render_template('pix_checkout_error.html', transaction=transaction)
+
+@app.route('/pix-checkout-success')
+@login_required
+def pix_checkout_success():
+    """
+    Página de sucesso após pagamento PIX
+    """
+    billing_id = request.args.get('billing_id')
+
+    if billing_id:
+        transaction = Transaction.query.filter_by(
+            abacatepay_billing_id=billing_id,
+            user_id=current_user.id
+        ).first()
+
+        if transaction and transaction.status == 'completed':
+            flash(f'Assinatura {transaction.plan_type.upper()} realizada com sucesso via PIX!', 'success')
+        else:
+            flash('Aguardando confirmação do pagamento PIX. Você receberá uma notificação quando for processado.', 'info')
+    else:
+        flash('Pagamento PIX em processamento.', 'info')
+
+    return redirect(url_for('plans'))
+
+@app.route('/cancel-pix-transaction/<billing_id>', methods=['POST'])
+@login_required
+def cancel_pix_transaction(billing_id):
+    """
+    Cancela uma transação PIX quando o usuário abandona a página
+    """
+    try:
+        transaction = Transaction.query.filter_by(
+            abacatepay_billing_id=billing_id,
+            user_id=current_user.id
+        ).first()
+
+        if not transaction:
+            return jsonify({'status': 'not_found'}), 404
+
+        # Cancelar apenas se ainda está em processamento ou pendente
+        if transaction.status in ['processing', 'pending']:
+            transaction.status = 'cancelled'
+            db.session.commit()
+            debug_log(f'Transação {billing_id} cancelada pelo usuário ao sair da página')
+            return jsonify({'status': 'cancelled'}), 200
+
+        return jsonify({'status': transaction.status}), 200
+
+    except Exception as e:
+        debug_log(f'Erro ao cancelar transação: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/check-pix-payment/<billing_id>')
+@login_required
+def check_pix_payment(billing_id):
+    """
+    Verifica o status do pagamento PIX
+    """
+    try:
+        transaction = Transaction.query.filter_by(
+            abacatepay_billing_id=billing_id,
+            user_id=current_user.id
+        ).first()
+
+        if not transaction:
+            return jsonify({'status': 'not_found'}), 404
+
+        # Se a transação foi cancelada, parar polling
+        if transaction.status == 'cancelled':
+            return jsonify({
+                'status': 'cancelled',
+                'paid': False,
+                'stop_polling': True
+            })
+
+        return jsonify({
+            'status': transaction.status,
+            'paid': transaction.status == 'completed',
+            'stop_polling': False
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/stripe-webhook', methods=['POST'])
 def stripe_webhook():
@@ -2683,6 +2994,112 @@ def stripe_webhook():
     except Exception as e:
         debug_log(f'Erro ao processar webhook: {str(e)}')
         return jsonify({'error': str(e)}), 500
+
+@app.route('/abacatepay-webhook', methods=['POST'])
+def abacatepay_webhook():
+    """
+    Webhook do Abacate Pay para processar eventos de pagamento PIX.
+
+    Configure este endpoint no Dashboard do Abacate Pay.
+
+    Eventos importantes:
+    - billing.paid: Cobrança paga com sucesso
+    - billing.failed: Falha no pagamento
+    - billing.refunded: Pagamento estornado
+    """
+    try:
+        payload = request.get_json()
+
+        debug_log(f'Webhook Abacate Pay recebido: {payload}')
+
+        # Extrair dados do evento
+        event_type = payload.get('event')  # Ex: 'billing.paid'
+        billing_data = payload.get('data', {})
+        billing_id = billing_data.get('id')
+
+        if not billing_id:
+            debug_log('ERRO: billing_id não encontrado no webhook')
+            return jsonify({'error': 'Missing billing_id'}), 400
+
+        # Buscar transação
+        transaction = Transaction.query.filter_by(abacatepay_billing_id=billing_id).first()
+
+        if not transaction:
+            debug_log(f'ERRO: Transação não encontrada para billing_id: {billing_id}')
+            return jsonify({'error': 'Transaction not found'}), 404
+
+        # Processar evento
+        if event_type == 'billing.paid':
+            handle_abacatepay_payment_success(transaction, billing_data)
+        elif event_type == 'billing.failed':
+            handle_abacatepay_payment_failed(transaction, billing_data)
+        elif event_type == 'billing.refunded':
+            handle_abacatepay_payment_refunded(transaction, billing_data)
+
+        return jsonify({'status': 'success'}), 200
+
+    except Exception as e:
+        debug_log(f'Erro ao processar webhook Abacate Pay: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+def handle_abacatepay_payment_success(transaction, billing_data):
+    """Processa pagamento PIX bem-sucedido"""
+    debug_log(f'Pagamento PIX confirmado: {transaction.abacatepay_billing_id}')
+
+    try:
+        user = User.query.get(transaction.user_id)
+        if not user:
+            debug_log(f'ERRO: Usuário {transaction.user_id} não encontrado')
+            return
+
+        # Verificar se já foi processado
+        if transaction.status == 'completed':
+            debug_log(f'Transação já processada: {transaction.abacatepay_billing_id}')
+            return
+
+        # ATIVAR PLANO PREMIUM/VIP
+        user.plan = transaction.plan_type
+        user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
+
+        # Atualizar transação
+        transaction.status = 'completed'
+        transaction.paid_at = datetime.utcnow()
+
+        db.session.commit()
+
+        debug_log(f'Plano {transaction.plan_type} ativado para usuário {user.id} via PIX')
+
+    except Exception as e:
+        debug_log(f'Erro ao processar pagamento PIX: {str(e)}')
+        db.session.rollback()
+
+def handle_abacatepay_payment_failed(transaction, billing_data):
+    """Processa falha no pagamento PIX"""
+    debug_log(f'Pagamento PIX falhou: {transaction.abacatepay_billing_id}')
+
+    try:
+        transaction.status = 'failed'
+        db.session.commit()
+    except Exception as e:
+        debug_log(f'Erro ao processar falha PIX: {str(e)}')
+        db.session.rollback()
+
+def handle_abacatepay_payment_refunded(transaction, billing_data):
+    """Processa estorno de pagamento PIX"""
+    debug_log(f'Pagamento PIX estornado: {transaction.abacatepay_billing_id}')
+
+    try:
+        user = User.query.get(transaction.user_id)
+        if user and user.plan != 'free':
+            # Reverter para plano gratuito
+            user.plan = 'free'
+            user.subscription_end_date = None
+
+        transaction.status = 'refunded'
+        db.session.commit()
+    except Exception as e:
+        debug_log(f'Erro ao processar estorno PIX: {str(e)}')
+        db.session.rollback()
 
 def handle_checkout_completed(session):
     """Processa checkout completado - ATIVA O PLANO AUTOMATICAMENTE"""
@@ -4162,13 +4579,16 @@ def admin_export_comments():
     )
 
 # Rota para criar um novo post
-@app.route("/admin/posts/create", methods=['POST'])
+@app.route("/admin/posts/create", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def admin_create_post():
     """
     Rota para criação de novos posts pelo painel administrativo
     """
+    # Se for GET, redirecionar para a página de posts
+    if request.method == 'GET':
+        return redirect(url_for('admin_posts'))
     try:
         # Extrair dados do formulário
         title = request.form.get('title')
@@ -4433,6 +4853,7 @@ def admin_delete_user(user_id):
 
 # Rota para a página de posts
 @app.route("/admin/posts")
+@app.route("/admin/posts/")
 @login_required
 @admin_required
 def admin_posts():
@@ -5472,10 +5893,13 @@ def admin_user_data(user_id):
         'date_joined': user.date_joined.isoformat() if user.date_joined else None,
         'daily_downloads': user.daily_downloads or 0,
         'weekly_downloads': user.weekly_downloads or 0,
-        'daily_limit': daily_limit,
-        'weekly_limit': weekly_limit,
+        'daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') and user.custom_daily_limit else daily_limit,
+        'weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') and user.custom_weekly_limit else weekly_limit,
         'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else None,
-        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else None
+        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else None,
+        'can_download': user.can_download if hasattr(user, 'can_download') else True,
+        'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
+        'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
     })
 
 @app.route("/admin/users/<int:user_id>/update", methods=['POST'])
@@ -5486,13 +5910,18 @@ def admin_update_user(user_id):
     try:
         user = User.query.get_or_404(user_id)
 
-        # Obter dados do formulário
-        username = request.form.get('username', '').strip()
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        role = request.form.get('role', 'user')
-        plan = request.form.get('plan', 'free')
-        is_active = request.form.get('is_active') == 'true'
+        # Obter dados do formulário (permitir atualização parcial)
+        username = request.form.get('username', user.username).strip()
+        name = request.form.get('name', user.name or '').strip()
+        email = request.form.get('email', user.email).strip()
+        role = request.form.get('role', user.role)
+        plan = request.form.get('plan', user.plan)
+        is_active = request.form.get('is_active') == 'true' if 'is_active' in request.form else user.is_active
+
+        # Novos campos de permissões de download
+        can_download = request.form.get('can_download') == 'on' or request.form.get('can_download') == 'true' if 'can_download' in request.form else (user.can_download if hasattr(user, 'can_download') else True)
+        custom_daily_limit = request.form.get('custom_daily_limit', '').strip()
+        custom_weekly_limit = request.form.get('custom_weekly_limit', '').strip()
 
         # Validações
         if not username:
@@ -5518,7 +5947,10 @@ def admin_update_user(user_id):
             'email': user.email,
             'role': user.role,
             'plan': user.plan,
-            'is_active': user.is_active
+            'is_active': user.is_active,
+            'can_download': user.can_download if hasattr(user, 'can_download') else True,
+            'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
+            'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
         }
 
         user.username = username
@@ -5527,6 +5959,11 @@ def admin_update_user(user_id):
         user.role = role
         user.plan = plan
         user.is_active = is_active
+
+        # Atualizar permissões de download
+        user.can_download = can_download
+        user.custom_daily_limit = int(custom_daily_limit) if custom_daily_limit else None
+        user.custom_weekly_limit = int(custom_weekly_limit) if custom_weekly_limit else None
 
         db.session.commit()
 
@@ -5544,7 +5981,10 @@ def admin_update_user(user_id):
                     'email': email,
                     'role': role,
                     'plan': plan,
-                    'is_active': is_active
+                    'is_active': is_active,
+                    'can_download': can_download,
+                    'custom_daily_limit': user.custom_daily_limit,
+                    'custom_weekly_limit': user.custom_weekly_limit
                 }
             }
         )
@@ -5694,6 +6134,83 @@ def admin_update_download_limits(user_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao atualizar limites: {str(e)}'})
 
+@app.route("/admin/users/<int:user_id>/verify", methods=['POST'])
+@login_required
+@admin_required
+def admin_verify_user(user_id):
+    """Verificar ou desverificar email do usuário"""
+    try:
+        user = User.query.get_or_404(user_id)
+        data = request.get_json()
+
+        verify = data.get('verify', True)
+        user.is_verified = verify
+
+        db.session.commit()
+
+        # Log da atividade
+        log_admin_activity(
+            user_id=current_user.id,
+            action='verify_user' if verify else 'unverify_user',
+            description=f'{"Verificou" if verify else "Desverificou"} o email de {user.username}',
+            metadata={
+                'target_user_id': user_id,
+                'verified': verify
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'message': f'Email {"verificado" if verify else "desverificado"} com sucesso!'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao atualizar verificação: {str(e)}'})
+
+@app.route("/admin/users/<int:user_id>/permissions", methods=['POST'])
+@login_required
+@admin_required
+def admin_update_permissions(user_id):
+    """Atualizar permissões (role) do usuário"""
+    try:
+        user = User.query.get_or_404(user_id)
+        data = request.get_json()
+
+        new_role = data.get('role', 'user')
+
+        # Validar role
+        if new_role not in ['user', 'admin']:
+            return jsonify({'success': False, 'message': 'Função inválida'})
+
+        # Prevenir que o admin remova seu próprio acesso admin
+        if user.id == current_user.id and new_role != 'admin':
+            return jsonify({'success': False, 'message': 'Você não pode remover suas próprias permissões de admin'})
+
+        old_role = user.role
+        user.role = new_role
+
+        db.session.commit()
+
+        # Log da atividade
+        log_admin_activity(
+            user_id=current_user.id,
+            action='update_user_permissions',
+            description=f'Alterou permissões de {user.username} de {old_role} para {new_role}',
+            metadata={
+                'target_user_id': user_id,
+                'old_role': old_role,
+                'new_role': new_role
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'message': f'Permissões atualizadas! Usuário agora é {new_role}'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao atualizar permissões: {str(e)}'})
+
 @app.route("/admin/newsletter")
 @login_required
 @admin_required
@@ -5777,9 +6294,30 @@ def admin_newsletter():
 @login_required
 def downgrade_plan():
     try:
-        current_user.plan = 'free'
+        data = request.get_json()
+        target_plan = data.get('target_plan', 'free') if data else 'free'
+
+        # Validar plano de destino
+        if target_plan not in ['free', 'premium', 'vip']:
+            return jsonify({'success': False, 'message': 'Plano inválido.'}), 400
+
+        # Verificar se é realmente um downgrade
+        plan_hierarchy = {'free': 0, 'premium': 1, 'vip': 2}
+        current_level = plan_hierarchy.get(current_user.plan, 0)
+        target_level = plan_hierarchy.get(target_plan, 0)
+
+        if target_level >= current_level:
+            return jsonify({'success': False, 'message': 'Isso não é um downgrade.'}), 400
+
+        # Realizar downgrade
+        current_user.plan = target_plan
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Seu plano foi alterado para Grátis com sucesso.'})
+
+        # Mensagem personalizada
+        plan_names = {'free': 'Grátis', 'premium': 'Premium', 'vip': 'VIP'}
+        message = f'Seu plano foi alterado para {plan_names[target_plan]} com sucesso.'
+
+        return jsonify({'success': True, 'message': message})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao alterar plano: {str(e)}'}), 500
@@ -6721,6 +7259,11 @@ def check_download_history_access(user):
 
 def check_user_download_limit(user):
     """Verifica se o usuário atingiu o limite de downloads (diários para Free, semanais para Premium)"""
+
+    # Verificar se o usuário tem permissão para fazer downloads
+    if hasattr(user, 'can_download') and not user.can_download:
+        return False, 0, 0, None, 'blocked'
+
     if user.role == 'admin' or user.role == 'editor':
         return True, float('inf'), float('inf'), None, 'unlimited'  # Sem limites
 
@@ -6732,9 +7275,10 @@ def check_user_download_limit(user):
     if user.plan == 'vip':
         return True, float('inf'), float('inf'), None, 'unlimited'
 
-    # PREMIUM: 15 downloads semanais (reset domingo 00:00 Brasília)
+    # PREMIUM: 15 downloads semanais (reset domingo 00:00 Brasília) - ou limite personalizado
     elif user.plan == 'premium':
-        limit = 15
+        # Usar limite personalizado se definido, caso contrário usar padrão
+        limit = user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') and user.custom_weekly_limit else 15
 
         # Calcular próximo domingo às 00:00 (horário Brasília)
         days_until_sunday = (6 - now_brasilia.weekday()) % 7  # 0=segunda, 6=domingo
@@ -6762,9 +7306,10 @@ def check_user_download_limit(user):
 
         return can_download, remaining, limit, reset_time, 'weekly'
 
-    # FREE: 1 download diário (reset meia-noite Brasília)
+    # FREE: 1 download diário (reset meia-noite Brasília) - ou limite personalizado
     else:
-        limit = 1
+        # Usar limite personalizado se definido, caso contrário usar padrão
+        limit = user.custom_daily_limit if hasattr(user, 'custom_daily_limit') and user.custom_daily_limit else 1
 
         # Calcular próxima meia-noite (horário Brasília)
         next_midnight = (now_brasilia + timedelta(days=1)).replace(

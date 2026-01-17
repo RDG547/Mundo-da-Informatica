@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .pix-checkout-container {
+        max-width: 600px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .pix-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .pix-icon {
+        font-size: 4rem;
+        color: #32BCAD;
+        margin-bottom: 1rem;
+    }
+
+    .pix-title {
+        font-size: 2rem;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .pix-subtitle {
+        color: #666;
+        font-size: 1.1rem;
+    }
+
+    .plan-info {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+
+    .plan-info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.8rem;
+    }
+
+    .plan-info-label {
+        color: #666;
+        font-weight: 500;
+    }
+
+    .plan-info-value {
+        color: #333;
+        font-weight: 600;
+    }
+
+    .plan-price {
+        font-size: 1.5rem;
+        color: var(--primary-color, #4CAF50);
+    }
+
+    .qr-code-container {
+        text-align: center;
+        padding: 2rem;
+        background: #fff;
+        border: 2px dashed #32BCAD;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+
+    .qr-code-loading {
+        font-size: 3rem;
+        color: #32BCAD;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .qr-code-image {
+        max-width: 300px;
+        margin: 0 auto;
+    }
+
+    .pix-code-container {
+        margin-bottom: 2rem;
+    }
+
+    .pix-code-label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .pix-code-box {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .pix-code-input {
+        flex: 1;
+        padding: 1rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 0.9rem;
+        background: #f8f9fa;
+    }
+
+    .copy-btn {
+        padding: 1rem 2rem;
+        background: #32BCAD;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .copy-btn:hover {
+        background: #2aa799;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(50, 188, 173, 0.3);
+    }
+
+    .copy-btn.copied {
+        background: #4CAF50;
+    }
+
+    .payment-status {
+        text-align: center;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+
+    .status-pending {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        color: #856404;
+    }
+
+    .status-completed {
+        background: #d4edda;
+        border: 2px solid #28a745;
+        color: #155724;
+    }
+
+    .status-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .instructions {
+        background: #f0f8ff;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #2196F3;
+    }
+
+    .instructions h4 {
+        color: #2196F3;
+        margin-bottom: 1rem;
+    }
+
+    .instructions ol {
+        margin-left: 1.5rem;
+        color: #555;
+    }
+
+    .instructions li {
+        margin-bottom: 0.5rem;
+        line-height: 1.6;
+    }
+
+    .back-btn {
+        display: block;
+        width: 100%;
+        padding: 1rem;
+        background: #6c757d;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        border-radius: 8px;
+        margin-top: 2rem;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .back-btn:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pix-checkout-container">
+    <div class="pix-header">
+        <div class="pix-icon">
+            <i class="fas fa-qrcode"></i>
+        </div>
+        <h1 class="pix-title">Pagamento via PIX</h1>
+        <p class="pix-subtitle">Escaneie o QR Code ou copie o código PIX</p>
+    </div>
+
+    <div class="plan-info">
+        <div class="plan-info-row">
+            <span class="plan-info-label">Plano:</span>
+            <span class="plan-info-value">{{ transaction.plan_type.upper() }}</span>
+        </div>
+        <div class="plan-info-row">
+            <span class="plan-info-label">Período:</span>
+            <span class="plan-info-value">Mensal</span>
+        </div>
+        <div class="plan-info-row">
+            <span class="plan-info-label">Valor:</span>
+            <span class="plan-info-value plan-price">R$ {{ '%.2f' | format(transaction.amount / 100) }}</span>
+        </div>
+    </div>
+
+    <div class="payment-status status-pending" id="paymentStatus">
+        <div class="status-icon">
+            <i class="fas fa-hourglass-half"></i>
+        </div>
+        <strong>Aguardando Pagamento</strong>
+        <p>Escaneie o QR Code ou use o código PIX para pagar</p>
+    </div>
+
+    <div class="qr-code-container" id="qrCodeContainer">
+        {% if transaction.status == 'processing' %}
+            <div class="qr-code-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <p style="color: #32BCAD; margin-top: 1rem;">
+                <strong>Gerando QR Code de pagamento...</strong><br>
+                Aguarde alguns instantes enquanto preparamos seu código PIX.
+            </p>
+        {% elif transaction.abacatepay_qr_code %}
+            <img src="{{ transaction.abacatepay_qr_code }}" class="qr-code-image" alt="QR Code PIX">
+        {% else %}
+            <div class="qr-code-loading">
+                <i class="fas fa-exclamation-triangle" style="color: #dc3545;"></i>
+            </div>
+            <p style="color: #dc3545; margin-top: 1rem;">
+                <strong>QR Code não disponível</strong><br>
+                Tente recarregar a página ou entre em contato com o suporte.
+            </p>
+            <button onclick="location.reload()" class="retry-btn" style="margin-top: 1rem; padding: 0.8rem 1.5rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                <i class="fas fa-sync"></i> Recarregar
+            </button>
+        {% endif %}
+    </div>
+
+    <div class="pix-code-container" id="pixCodeContainer" {% if transaction.abacatepay_pix_code %}{% else %}style="display: none;"{% endif %}>
+        <div class="pix-code-label">
+            <i class="fas fa-copy"></i> Código PIX Copia e Cola
+        </div>
+        <div class="pix-code-box">
+            <input type="text" class="pix-code-input" id="pixCode" value="{{ transaction.abacatepay_pix_code or '' }}" readonly>
+            <button class="copy-btn" onclick="copyPixCode()">
+                <i class="fas fa-copy"></i> Copiar
+            </button>
+        </div>
+    </div>
+
+    <div class="instructions">
+        <h4><i class="fas fa-info-circle"></i> Como pagar</h4>
+        <ol>
+            <li>Abra o aplicativo do seu banco</li>
+            <li>Escolha a opção PIX</li>
+            <li>Escaneie o QR Code acima OU copie e cole o código PIX</li>
+            <li>Confirme o pagamento</li>
+            <li>Pronto! Seu plano será ativado automaticamente</li>
+        </ol>
+    </div>
+
+    <a href="{{ url_for('plans') }}" class="back-btn">
+        <i class="fas fa-arrow-left"></i> Voltar aos Planos
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const billingId = '{{ billing_id }}';
+    let checkInterval;
+    let checkCount = 0;
+    const MAX_CHECKS = 100; // Máximo de 100 verificações (aproximadamente 8 minutos)
+    let pixProcessed = false;
+    let pageAbandoned = false;
+    let pixProcessing = false; // Flag para prevenir múltiplas chamadas
+
+    // Processar PIX em background
+    async function processPixAsync() {
+        // Prevenir múltiplas chamadas
+        if (pixProcessing || pixProcessed) {
+            console.log('PIX já está sendo processado ou foi processado');
+            return;
+        }
+
+        pixProcessing = true;
+
+        try {
+            const response = await fetch(`/process-pix-async/${billingId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success' && data.qr_code && data.pix_code) {
+                pixProcessed = true;
+
+                // Atualizar QR Code
+                const qrContainer = document.getElementById('qrCodeContainer');
+                qrContainer.innerHTML = `
+                    <img src="${data.qr_code}" class="qr-code-image" alt="QR Code PIX">
+                `;
+
+                // Atualizar código PIX
+                const pixCodeContainer = document.getElementById('pixCodeContainer');
+                const pixCodeInput = document.getElementById('pixCode');
+                pixCodeInput.value = data.pix_code;
+                pixCodeContainer.style.display = 'block';
+
+                console.log('PIX processado com sucesso');
+            } else if (data.status === 'error') {
+                // Mostrar erro
+                const qrContainer = document.getElementById('qrCodeContainer');
+                qrContainer.innerHTML = `
+                    <div class="qr-code-loading">
+                        <i class="fas fa-exclamation-triangle" style="color: #dc3545;"></i>
+                    </div>
+                    <p style="color: #dc3545; margin-top: 1rem;">
+                        <strong>Erro ao processar pagamento</strong><br>
+                        ${data.message || 'Tente novamente ou use outra forma de pagamento.'}
+                    </p>
+                    <a href="{{ url_for('plans') }}" class="retry-btn" style="margin-top: 1rem; padding: 0.8rem 1.5rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; display: inline-block; text-decoration: none;">
+                        <i class="fas fa-arrow-left"></i> Voltar aos Planos
+                    </a>
+                `;
+            }
+        } catch (error) {
+            console.error('Erro ao processar PIX:', error);
+        } finally {
+            pixProcessing = false;
+        }
+    }
+
+    // Cancelar transação ao sair da página
+    async function cancelTransaction() {
+        if (pageAbandoned || pixProcessed) return;
+
+        pageAbandoned = true;
+
+        try {
+            // Usar fetch com keepalive para garantir envio mesmo ao sair
+            await fetch(`/cancel-pix-transaction/${billingId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ cancelled: true }),
+                keepalive: true // Importante: mantém a requisição mesmo se a página fechar
+            });
+
+            console.log('Transação PIX cancelada');
+        } catch (error) {
+            // Tentar com sendBeacon como fallback
+            try {
+                const blob = new Blob(
+                    [JSON.stringify({ cancelled: true })],
+                    { type: 'application/json' }
+                );
+                navigator.sendBeacon(`/cancel-pix-transaction/${billingId}`, blob);
+            } catch (e) {
+                console.error('Erro ao cancelar transação:', error);
+            }
+        }
+    }
+
+    // Verificar status do pagamento
+    async function checkPaymentStatus() {
+        // CRÍTICO: Verificar se ainda estamos na página de checkout
+        if (!window.location.pathname.includes('/pix-checkout/')) {
+            console.log('Não estamos mais na página de checkout - parando polling');
+            clearInterval(checkInterval);
+            cancelTransaction();
+            return;
+        }
+
+        checkCount++;
+
+        // Parar após limite de verificações
+        if (checkCount > MAX_CHECKS) {
+            clearInterval(checkInterval);
+            console.log('Limite de verificações atingido');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/check-pix-payment/${billingId}`);
+
+            // Se receber 429 (Too Many Requests), aumentar intervalo
+            if (response.status === 429) {
+                clearInterval(checkInterval);
+                console.log('Rate limit atingido, ajustando intervalo...');
+                // Reiniciar com intervalo maior (10 segundos)
+                checkInterval = setInterval(checkPaymentStatus, 10000);
+                return;
+            }
+
+            const data = await response.json();
+
+            // Se a transação foi cancelada, parar polling
+            if (data.stop_polling || data.status === 'cancelled') {
+                clearInterval(checkInterval);
+                console.log('Polling interrompido - transação cancelada');
+                return;
+            }
+
+            if (data.paid) {
+                clearInterval(checkInterval);
+                showPaymentSuccess();
+            }
+        } catch (error) {
+            console.error('Erro ao verificar pagamento:', error);
+        }
+    }
+
+    // Mostrar sucesso do pagamento
+    function showPaymentSuccess() {
+        const statusDiv = document.getElementById('paymentStatus');
+        statusDiv.className = 'payment-status status-completed';
+        statusDiv.innerHTML = `
+            <div class="status-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <strong>Pagamento Confirmado!</strong>
+            <p>Seu plano foi ativado com sucesso. Redirecionando...</p>
+        `;
+
+        setTimeout(() => {
+            window.location.href = '{{ url_for("pix_checkout_success", billing_id=billing_id) }}';
+        }, 2000);
+    }
+
+    // Copiar código PIX
+    function copyPixCode() {
+        const pixCodeInput = document.getElementById('pixCode');
+        pixCodeInput.select();
+        pixCodeInput.setSelectionRange(0, 99999); // Para mobile
+
+        navigator.clipboard.writeText(pixCodeInput.value).then(() => {
+            const btn = event.target.closest('.copy-btn');
+            const originalHTML = btn.innerHTML;
+
+            btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+            btn.classList.add('copied');
+
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    // Inicializar
+    window.addEventListener('load', () => {
+        // Processar PIX em background se estiver em status 'processing'
+        {% if transaction.status == 'processing' %}
+        processPixAsync();
+        {% endif %}
+
+        // Verificar pagamento a cada 5 segundos
+        checkInterval = setInterval(checkPaymentStatus, 5000);
+    });
+
+    // Detectar abandono da página com múltiplos eventos
+    let cancelTimeout;
+
+    // Função unificada de limpeza
+    function cleanupAndCancel() {
+        if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+        }
+        cancelTransaction();
+    }
+
+    // beforeunload - quando usuário está saindo
+    window.addEventListener('beforeunload', () => {
+        cleanupAndCancel();
+    });
+
+    // pagehide - mais confiável para mobile
+    window.addEventListener('pagehide', () => {
+        cleanupAndCancel();
+    });
+
+    // visibilitychange - quando a página fica oculta
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            // Página ficou oculta - agendar cancelamento
+            cancelTimeout = setTimeout(() => {
+                if (document.hidden && !pixProcessed) {
+                    cleanupAndCancel();
+                }
+            }, 3000); // Cancela após 3 segundos oculto
+        } else {
+            // Página voltou a ficar visível - cancelar timeout
+            if (cancelTimeout) {
+                clearTimeout(cancelTimeout);
+            }
+        }
+    });
+</script>
+{% endblock %}

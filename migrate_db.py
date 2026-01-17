@@ -67,25 +67,73 @@ def migrate():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     payment_gateway VARCHAR(20) NOT NULL DEFAULT 'stripe',
-                    stripe_session_id VARCHAR(255) UNIQUE,
-                    stripe_customer_id VARCHAR(255),
-                    stripe_subscription_id VARCHAR(255),
-                    stripe_payment_intent_id VARCHAR(255),
-                    abacatepay_billing_id VARCHAR(255) UNIQUE,
-                    abacatepay_payment_url TEXT,
-                    abacatepay_qr_code TEXT,
-                    abacatepay_pix_code TEXT,
+                    stripe_session_id VARCHAR(255) NULL,
+                    stripe_customer_id VARCHAR(255) NULL,
+                    stripe_subscription_id VARCHAR(255) NULL,
+                    stripe_payment_intent_id VARCHAR(255) NULL,
+                    abacatepay_billing_id VARCHAR(255) NULL,
+                    abacatepay_payment_url TEXT NULL,
+                    abacatepay_qr_code TEXT NULL,
+                    abacatepay_pix_code TEXT NULL,
                     plan_type VARCHAR(20) NOT NULL,
                     amount INTEGER NOT NULL,
                     currency VARCHAR(3) DEFAULT 'brl',
                     status VARCHAR(20) DEFAULT 'pending',
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    paid_at DATETIME,
+                    paid_at DATETIME NULL,
                     FOREIGN KEY (user_id) REFERENCES user (id)
                 )
             """)
             migrations_applied = True
             print("✓ transactions table created")
+        else:
+            # Se a tabela já existe mas foi criada errada, precisamos recriar
+            print("Checking if transactions table needs to be recreated...")
+            cursor.execute("PRAGMA table_info(transactions)")
+            trans_columns = {col[1]: col for col in cursor.fetchall()}
+
+            # Verificar se stripe_session_id está como NOT NULL (notnull=1)
+            if 'stripe_session_id' in trans_columns and trans_columns['stripe_session_id'][3] == 1:
+                print("Recreating transactions table with correct NULL constraints...")
+
+                # Backup dos dados existentes
+                cursor.execute("SELECT * FROM transactions")
+                existing_data = cursor.fetchall()
+
+                # Dropar e recriar
+                cursor.execute("DROP TABLE transactions")
+                cursor.execute("""
+                    CREATE TABLE transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        payment_gateway VARCHAR(20) NOT NULL DEFAULT 'stripe',
+                        stripe_session_id VARCHAR(255) NULL,
+                        stripe_customer_id VARCHAR(255) NULL,
+                        stripe_subscription_id VARCHAR(255) NULL,
+                        stripe_payment_intent_id VARCHAR(255) NULL,
+                        abacatepay_billing_id VARCHAR(255) NULL,
+                        abacatepay_payment_url TEXT NULL,
+                        abacatepay_qr_code TEXT NULL,
+                        abacatepay_pix_code TEXT NULL,
+                        plan_type VARCHAR(20) NOT NULL,
+                        amount INTEGER NOT NULL,
+                        currency VARCHAR(3) DEFAULT 'brl',
+                        status VARCHAR(20) DEFAULT 'pending',
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        paid_at DATETIME NULL,
+                        FOREIGN KEY (user_id) REFERENCES user (id)
+                    )
+                """)
+
+                # Restaurar dados se houver
+                if existing_data:
+                    cursor.executemany(
+                        "INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        existing_data
+                    )
+
+                migrations_applied = True
+                print("✓ transactions table recreated with correct constraints")
 
         if migrations_applied:
             conn.commit()

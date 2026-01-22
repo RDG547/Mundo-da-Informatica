@@ -164,6 +164,10 @@
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .mission-card::before {
@@ -201,16 +205,22 @@
     color: white;
 }
 
+.mission-content {
+    text-align: center;
+}
+
 .mission-content h3 {
     font-size: 1.4rem;
     font-weight: 600;
     color: #2d3748;
     margin-bottom: 1rem;
+    text-align: center;
 }
 
 .mission-content p {
     color: #718096;
     line-height: 1.6;
+    text-align: center;
 }
 
 /* Services Section */
@@ -1266,6 +1276,305 @@
         font-size: 1.2rem;
     }
 }
+
+/* ==========================================
+   MODAL DE CONTRIBUIÇÃO
+   ========================================== */
+
+.contribute-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease;
+}
+
+.contribute-modal.active {
+    display: block;
+}
+
+.contribute-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+.contribute-modal-content {
+    position: relative;
+    background: white;
+    max-width: 900px;
+    width: 90%;
+    max-height: 90vh;
+    margin: 2rem auto;
+    border-radius: 20px;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.contribute-modal-close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.contribute-modal-close:hover {
+    background: rgba(255, 0, 0, 0.1);
+    color: #e53e3e;
+    transform: rotate(90deg);
+}
+
+.contribute-modal-header {
+    text-align: center;
+    padding: 3rem 2rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px 20px 0 0;
+}
+
+.contribute-modal-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 2.5rem;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.contribute-modal-header h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.contribute-modal-header p {
+    font-size: 1.1rem;
+    opacity: 0.95;
+}
+
+.contribute-modal-body {
+    padding: 2rem;
+}
+
+.contribute-option {
+    background: #f7fafc;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.contribute-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    border-color: #667eea;
+}
+
+.contribute-option.highlight {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-color: #667eea;
+}
+
+.contribute-option-icon {
+    flex-shrink: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.8rem;
+}
+
+.contribute-option.highlight .contribute-option-icon {
+    animation: pulse 2s infinite;
+}
+
+.contribute-option-content {
+    flex: 1;
+}
+
+.contribute-option-content h3 {
+    font-size: 1.4rem;
+    color: #2d3748;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.contribute-option-content p {
+    color: #718096;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.contribute-option-content ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.contribute-option-content ul li {
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.contribute-option-content ul li i {
+    color: #48bb78;
+    font-size: 0.9rem;
+}
+
+.contribute-cta-buttons {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.contribute-modal-footer {
+    background: #f7fafc;
+    padding: 2rem;
+    text-align: center;
+    border-radius: 0 0 20px 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.contribute-modal-footer p {
+    color: #718096;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.contribute-modal-footer p i {
+    color: #3182ce;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Responsividade do Modal */
+@media (max-width: 768px) {
+    .contribute-modal-content {
+        width: 95%;
+        margin: 1rem auto;
+        max-height: 95vh;
+    }
+
+    .contribute-modal-header {
+        padding: 2rem 1.5rem 1.5rem;
+    }
+
+    .contribute-modal-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .contribute-modal-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+    }
+
+    .contribute-modal-body {
+        padding: 1.5rem;
+    }
+
+    .contribute-option {
+        flex-direction: column;
+        padding: 1.5rem;
+    }
+
+    .contribute-option-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.5rem;
+    }
+
+    .contribute-option-content h3 {
+        font-size: 1.2rem;
+    }
+
+    .contribute-cta-buttons {
+        flex-direction: column;
+    }
+
+    .contribute-cta-buttons .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
 
 /* Counter Animation */
 .stat-number {

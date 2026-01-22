@@ -335,9 +335,9 @@
                             <h3>Pronto para contribuir?</h3>
                             <p>Sua experiência e conhecimento podem ajudar milhares de profissionais</p>
                             <div class="cta-buttons">
-                                <a href="{{ url_for('contact') }}" class="btn btn-gradient primary">
+                                <button class="btn btn-gradient primary" id="openContributeModal">
                                     <i class="fas fa-handshake"></i> Quero Contribuir
-                                </a>
+                                </button>
                                 <a href="{{ url_for('register') }}" class="btn btn-gradient secondary">
                                     <i class="fas fa-user-plus"></i> Criar Conta
                                 </a>
@@ -378,4 +378,97 @@
     </div>
 </div>
 
+<!-- Modal de Contribuição -->
+<div id="contributeModal" class="contribute-modal">
+    <div class="contribute-modal-overlay"></div>
+    <div class="contribute-modal-content">
+        <button class="contribute-modal-close" id="closeContributeModal">
+            <i class="fas fa-times"></i>
+        </button>
+
+        <div class="contribute-modal-header">
+            <div class="contribute-modal-icon">
+                <i class="fas fa-heart"></i>
+            </div>
+            <h2>Como Você Pode Contribuir</h2>
+            <p>Existem várias formas de ajudar a comunidade a crescer!</p>
+        </div>
+
+        <div class="contribute-modal-body">
+            <div class="contribute-option">
+                <div class="contribute-option-icon">
+                    <i class="fas fa-share-alt"></i>
+                </div>
+                <div class="contribute-option-content">
+                    <h3>Compartilhe Conhecimento</h3>
+                    <p>Compartilhe recursos, tutoriais e experiências com a comunidade. Seu conhecimento pode ajudar outros profissionais!</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Publique recursos técnicos</li>
+                        <li><i class="fas fa-check"></i> Compartilhe suas experiências</li>
+                        <li><i class="fas fa-check"></i> Ajude outros usuários</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="contribute-option">
+                <div class="contribute-option-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="contribute-option-content">
+                    <h3>Participe da Comunidade</h3>
+                    <p>Engaje-se com outros membros, participe de discussões e ajude a construir uma comunidade mais forte.</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Responda dúvidas nos comentários</li>
+                        <li><i class="fas fa-check"></i> Compartilhe nas redes sociais</li>
+                        <li><i class="fas fa-check"></i> Dê feedback sobre recursos</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="contribute-option">
+                <div class="contribute-option-icon">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="contribute-option-content">
+                    <h3>Contribua com Conteúdo</h3>
+                    <p>Envie BIOS, drivers, esquemas e softwares que possam beneficiar outros profissionais da área.</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Arquivos de BIOS atualizados</li>
+                        <li><i class="fas fa-check"></i> Drivers e firmwares</li>
+                        <li><i class="fas fa-check"></i> Esquemas técnicos</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="contribute-option highlight">
+                <div class="contribute-option-icon">
+                    <i class="fas fa-heart"></i>
+                </div>
+                <div class="contribute-option-content">
+                    <h3>Apoio Financeiro (Opcional)</h3>
+                    <p>Se desejar, você pode apoiar financeiramente para nos ajudar a manter e melhorar a plataforma.</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Assinatura Premium ou VIP</li>
+                        <li><i class="fas fa-check"></i> Doações pontuais</li>
+                        <li><i class="fas fa-check"></i> Patrocínio de recursos</li>
+                    </ul>
+                    <div class="contribute-cta-buttons">
+                        <a href="{{ url_for('plans') }}" class="btn btn-gradient primary">
+                            <i class="fas fa-crown"></i> Ver Planos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="contribute-modal-footer">
+            <p><i class="fas fa-info-circle"></i> Qualquer forma de contribuição é valiosa e muito apreciada!</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/about-modal.js') }}"></script>
 {% endblock %}

@@ -17,6 +17,10 @@ import shutil
 import uuid
 import stripe
 from stripe import error as stripe_error
+
+# Para compatibilidade, criar alias
+SignatureVerificationError = stripe_error.SignatureVerificationError
+
 import pytz
 import bleach
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
@@ -849,6 +853,18 @@ def increment_post_downloads(post_id):
 @app.before_request
 def before_request():
     """Executado antes de cada requisição"""
+    # Atualizar last_login do usuário autenticado
+    if current_user.is_authenticated:
+        # Atualizar a cada request, mas apenas se passou mais de 5 minutos desde a última atualização
+        # para evitar sobrecarga no banco de dados
+        if current_user.last_login is None or (datetime.utcnow() - current_user.last_login).total_seconds() > 300:
+            try:
+                current_user.last_login = datetime.utcnow()
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"Erro ao atualizar last_login: {e}")
+
     # Verificar modo de manutenção
     try:
         maintenance_mode = SiteConfig.get_value('maintenance_mode', False)
@@ -3003,7 +3019,7 @@ def stripe_webhook():
         debug_log(f'Erro no payload do webhook: {str(e)}')
         return jsonify({'error': 'Invalid payload'}), 400
 
-    except stripe_error.SignatureVerificationError as e:
+    except SignatureVerificationError as e:
         # Assinatura inválida
         debug_log(f'Erro na verificação da assinatura: {str(e)}')
         return jsonify({'error': 'Invalid signature'}), 400
@@ -5303,6 +5319,34 @@ def admin_create_category():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao criar categoria: {str(e)}'}), 500
+
+@app.route("/admin/categories/<int:category_id>/edit", methods=['GET'])
+@login_required
+@admin_required
+def admin_get_category(category_id):
+    """
+    Buscar dados de uma categoria para edição
+    """
+    try:
+        category = Category.query.get_or_404(category_id)
+
+        return jsonify({
+            'success': True,
+            'category': {
+                'id': category.id,
+                'name': category.name,
+                'slug': category.slug,
+                'description': category.description or '',
+                'icon': category.icon or 'fas fa-folder',
+                'color': getattr(category, 'color', '#4a90e2'),
+                'order': category.order or 0,
+                'is_active': category.is_active,
+                'is_featured': getattr(category, 'featured', False) or getattr(category, 'is_featured', False),
+                'show_in_menu': getattr(category, 'show_in_menu', True),
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao buscar categoria: {str(e)}'}), 500
 
 @app.route("/admin/categories/<int:category_id>/update", methods=['PUT', 'POST'])
 @login_required

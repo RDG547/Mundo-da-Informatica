@@ -1716,7 +1716,8 @@ body.modal-open {
     max-width: 800px;
 }
 
-.modal-content.modal-xl {
+.modal-content.modal-xl,
+.modal-large .modal-content {
     max-width: 1200px !important;
     width: 90%;
 }

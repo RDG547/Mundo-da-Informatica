@@ -2422,14 +2422,10 @@ footer {
 .stat-number {
     font-size: 4rem;
     font-weight: 800;
-    color: var(--primary-color);
+    color: white;
     line-height: 1;
     transition: var(--transition-normal);
     margin-bottom: 0.5rem;
-    background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
 }
 
 .stat-plus {
@@ -2437,9 +2433,9 @@ footer {
     top: 0;
     right: -15px;
     font-size: 2.5rem;
-    color: var(--secondary-color);
+    color: white;
     font-weight: 800;
-    opacity: 0.8;
+    opacity: 0.9;
 }
 
 .stat-item:hover .stat-number {
@@ -2610,6 +2606,8 @@ footer {
     flex: 1;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    text-align: center;
 }
 
 .category-showcase-card h3 {
@@ -2618,13 +2616,15 @@ footer {
     color: var(--dark-color);
     position: relative;
     padding-bottom: 1rem;
+    text-align: center;
 }
 
 .category-showcase-card h3::after {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 0;
+    left: 50%;
+    transform: translateX(-50%);
     width: 50px;
     height: 3px;
     background-color: var(--primary-color);
@@ -2635,10 +2635,11 @@ footer {
     color: var(--gray-color);
     margin-bottom: 1.5rem;
     flex: 1;
+    text-align: center;
 }
 
 .explore-btn {
-    align-self: flex-start;
+    align-self: center;
     padding: 0.75rem 1.5rem;
     background-color: transparent;
     color: var(--primary-color);

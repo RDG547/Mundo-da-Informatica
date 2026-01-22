@@ -1,7 +1,8 @@
 /* Modern Forms Styles */
 
 /* Modal Extra Large */
-.modal-xl .modal-content {
+.modal-xl .modal-content,
+.modal-large .modal-content {
     max-width: 1200px;
     width: 95vw;
 }
@@ -610,7 +611,8 @@
 /* Enhanced Responsive Design */
 
 /* Extra Large Modal Responsive */
-.modal-xl .modal-content {
+.modal-xl .modal-content,
+.modal-large .modal-content {
     max-width: 1200px;
     width: 95vw;
     max-height: 90vh;
@@ -627,6 +629,7 @@
 /* Tablet Styles */
 @media (max-width: 1024px) {
     .modal-xl .modal-content,
+    .modal-large .modal-content,
     .modal-lg .modal-content {
         width: 95vw;
         margin: 1rem auto;
@@ -665,6 +668,7 @@
 /* Mobile Styles */
 @media (max-width: 768px) {
     .modal-xl .modal-content,
+    .modal-large .modal-content,
     .modal-lg .modal-content,
     .modal .modal-content {
         width: 95vw;
@@ -921,6 +925,7 @@
 /* Small Mobile Styles */
 @media (max-width: 480px) {
     .modal-xl .modal-content,
+    .modal-large .modal-content,
     .modal-lg .modal-content,
     .modal .modal-content {
         width: 98vw;

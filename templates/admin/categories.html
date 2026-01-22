@@ -437,8 +437,8 @@
 </div>
 
 <!-- Modal de Adicionar Categoria -->
-<div class="modal" id="addCategoryModal">
-    <div class="modal-content modal-xl">
+<div class="modal modal-large" id="addCategoryModal">
+    <div class="modal-content">
         <div class="modal-header">
             <div class="modal-title-container">
                 <h3><i class="fas fa-folder-plus"></i> Criar Nova Categoria</h3>
@@ -617,49 +617,182 @@
 </div>
 
 <!-- Modal de Editar Categoria -->
-<div class="modal" id="editCategoryModal">
+<div class="modal modal-large" id="editCategoryModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Editar Categoria</h3>
-            <button class="close-modal">&times;</button>
+            <div class="modal-header-content">
+                <div class="modal-icon">
+                    <i class="fas fa-edit"></i>
+                </div>
+                <div class="modal-title-wrapper">
+                    <h3 class="modal-title">Editar Categoria</h3>
+                    <p class="modal-subtitle">Atualize as informações da categoria</p>
+                </div>
+            </div>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
         </div>
         <div class="modal-body">
-            <form id="editCategoryForm">
+            <form id="editCategoryForm" class="modern-form">
                 <input type="hidden" id="editCategoryId">
 
-                <div class="form-group">
-                    <label for="editCategoryName">Nome da Categoria</label>
-                    <input type="text" id="editCategoryName" class="form-control" required>
-                </div>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-section">
+                            <h5 class="section-title"><i class="fas fa-info-circle"></i> Informações Básicas</h5>
 
-                <div class="form-group">
-                    <label for="editCategorySlug">Slug</label>
-                    <input type="text" id="editCategorySlug" class="form-control">
-                    <small class="form-text">Alterar o slug pode quebrar links existentes.</small>
-                </div>
+                            <div class="form-group">
+                                <label for="editCategoryName" class="form-label required">Nome da Categoria</label>
+                                <input type="text" id="editCategoryName" name="name"
+                                       class="form-control modern-input"
+                                       placeholder="Ex: Downloads, Tutoriais, Ferramentas..."
+                                       required>
+                                <div class="form-text">Nome visível da categoria no site</div>
+                            </div>
 
-                <div class="form-group">
-                    <label for="editCategoryColor">Cor</label>
-                    <div class="color-picker-container">
-                        <input type="color" id="editCategoryColor" class="color-picker" value="#3a86ff">
-                        <input type="text" id="editCategoryColorText" class="color-text" value="#3a86ff">
+                            <div class="form-group">
+                                <label for="editCategorySlug" class="form-label">Slug (URL amigável)</label>
+                                <div class="input-with-prefix">
+                                    <span class="input-prefix">/categoria/</span>
+                                    <input type="text" id="editCategorySlug" name="slug"
+                                           class="form-control modern-input with-prefix"
+                                           placeholder="downloads-ferramentas">
+                                </div>
+                                <div class="form-text text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Alterar o slug pode quebrar links existentes
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="editCategoryDescription" class="form-label">Descrição</label>
+                                <textarea id="editCategoryDescription" name="description"
+                                          class="form-control modern-input"
+                                          rows="4"
+                                          placeholder="Descreva o conteúdo desta categoria..."></textarea>
+                                <div class="form-text">Breve descrição que aparecerá na listagem de categorias</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="editCategoryOrder" class="form-label">Ordem de Exibição</label>
+                                <input type="number" id="editCategoryOrder" name="order"
+                                       class="form-control modern-input"
+                                       placeholder="0" min="0" value="0">
+                                <div class="form-text">Ordem numérica para exibição (0 = primeiro)</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label for="editCategoryDescription">Descrição (opcional)</label>
-                    <textarea id="editCategoryDescription" class="form-control" rows="3"></textarea>
-                </div>
+                    <div class="col-md-4">
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-palette"></i> Aparência</h5>
 
-                <div class="form-check mt-3">
-                    <input type="checkbox" id="editCategoryFeatured" class="form-check-input">
-                    <label for="editCategoryFeatured" class="form-check-label">Destacar na página inicial</label>
+                            <div class="form-group">
+                                <label for="editCategoryColor" class="form-label">Cor da Categoria</label>
+                                <div class="color-picker-modern">
+                                    <input type="color" id="editCategoryColor" name="color" value="#4a90e2">
+                                    <div class="color-preview" id="editColorPreview"></div>
+                                    <input type="text" id="editCategoryColorText" class="color-input" value="#4a90e2">
+                                </div>
+                                <div class="color-presets">
+                                    <div class="preset-colors">
+                                        <button type="button" class="color-preset" data-color="#4a90e2" style="background: #4a90e2"></button>
+                                        <button type="button" class="color-preset" data-color="#e74c3c" style="background: #e74c3c"></button>
+                                        <button type="button" class="color-preset" data-color="#2ecc71" style="background: #2ecc71"></button>
+                                        <button type="button" class="color-preset" data-color="#f39c12" style="background: #f39c12"></button>
+                                        <button type="button" class="color-preset" data-color="#9b59b6" style="background: #9b59b6"></button>
+                                        <button type="button" class="color-preset" data-color="#1abc9c" style="background: #1abc9c"></button>
+                                        <button type="button" class="color-preset" data-color="#34495e" style="background: #34495e"></button>
+                                        <button type="button" class="color-preset" data-color="#e67e22" style="background: #e67e22"></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="editCategoryIcon" class="form-label">Ícone (Font Awesome)</label>
+                                <div class="icon-selector">
+                                    <input type="text" id="editCategoryIcon" name="icon"
+                                           class="form-control modern-input icon-input"
+                                           placeholder="fas fa-download" value="fas fa-folder">
+                                    <div class="icon-preview" id="editIconPreview">
+                                        <i class="fas fa-folder"></i>
+                                    </div>
+                                </div>
+                                <div class="icon-suggestions">
+                                    <button type="button" class="icon-btn" data-icon="fas fa-download"><i class="fas fa-download"></i></button>
+                                    <button type="button" class="icon-btn" data-icon="fas fa-microchip"><i class="fas fa-microchip"></i></button>
+                                    <button type="button" class="icon-btn" data-icon="fas fa-desktop"><i class="fas fa-desktop"></i></button>
+                                    <button type="button" class="icon-btn" data-icon="fas fa-code"><i class="fas fa-code"></i></button>
+                                    <button type="button" class="icon-btn" data-icon="fas fa-tools"><i class="fas fa-tools"></i></button>
+                                    <button type="button" class="icon-btn" data-icon="fas fa-cog"><i class="fas fa-cog"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-cog"></i> Configurações</h5>
+
+                            <div class="checkbox-group modern-checkboxes">
+                                <div class="form-check">
+                                    <input type="checkbox" id="editCategoryActive" name="is_active" class="form-check-input" checked>
+                                    <label for="editCategoryActive" class="form-check-label">
+                                        <i class="fas fa-toggle-on"></i> Categoria Ativa
+                                    </label>
+                                    <small>Visível no site público</small>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="editCategoryFeatured" name="featured" class="form-check-input">
+                                    <label for="editCategoryFeatured" class="form-check-label">
+                                        <i class="fas fa-star"></i> Destacar na Página Inicial
+                                    </label>
+                                    <small>Aparece em destaque no menu</small>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="editCategoryShowInMenu" name="show_in_menu" class="form-check-input" checked>
+                                    <label for="editCategoryShowInMenu" class="form-check-label">
+                                        <i class="fas fa-bars"></i> Exibir no Menu
+                                    </label>
+                                    <small>Incluir no menu de navegação</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sidebar-card">
+                            <h5><i class="fas fa-eye"></i> Preview</h5>
+                            <div class="category-preview">
+                                <div class="preview-category" id="editCategoryPreview">
+                                    <div class="category-icon" id="editPreviewIcon">
+                                        <i class="fas fa-folder"></i>
+                                    </div>
+                                    <div class="category-info">
+                                        <div class="category-name" id="editPreviewName">Nome da Categoria</div>
+                                        <div class="category-description" id="editPreviewDesc">Descrição da categoria</div>
+                                        <div class="category-stats">
+                                            <span class="post-count">0 posts</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
-            <button class="btn-admin btn-admin-primary" id="updateCategoryBtn">Atualizar</button>
+            <div class="footer-left">
+                <button type="button" class="btn-admin btn-admin-outline" id="resetEditForm">
+                    <i class="fas fa-undo"></i> Restaurar
+                </button>
+            </div>
+            <div class="footer-right">
+                <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn-admin btn-admin-primary" id="updateCategoryBtn">
+                    <i class="fas fa-save"></i> Atualizar Categoria
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1702,6 +1835,96 @@
             document.getElementById('editCategoryColorText')
         );
 
+        // Presets de cor para modal de adição
+        document.querySelectorAll('#addCategoryModal .color-preset').forEach(preset => {
+            preset.addEventListener('click', function() {
+                const color = this.getAttribute('data-color');
+                document.getElementById('categoryColor').value = color;
+                document.getElementById('categoryColorText').value = color;
+            });
+        });
+
+        // Presets de cor para modal de edição
+        document.querySelectorAll('#editCategoryModal .color-preset').forEach(preset => {
+            preset.addEventListener('click', function() {
+                const color = this.getAttribute('data-color');
+                document.getElementById('editCategoryColor').value = color;
+                document.getElementById('editCategoryColorText').value = color;
+            });
+        });
+
+        // Sugestões de ícone para modal de adição
+        document.querySelectorAll('#addCategoryModal .icon-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const icon = this.getAttribute('data-icon');
+                const iconInput = document.getElementById('categoryIcon');
+                const iconPreview = document.getElementById('iconPreview');
+                iconInput.value = icon;
+                if (iconPreview) {
+                    iconPreview.innerHTML = `<i class="${icon}"></i>`;
+                }
+            });
+        });
+
+        // Sugestões de ícone para modal de edição
+        document.querySelectorAll('#editCategoryModal .icon-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const icon = this.getAttribute('data-icon');
+                const iconInput = document.getElementById('editCategoryIcon');
+                const iconPreview = document.getElementById('editIconPreview');
+                iconInput.value = icon;
+                if (iconPreview) {
+                    iconPreview.innerHTML = `<i class="${icon}"></i>`;
+                }
+            });
+        });
+
+        // Atualizar preview ao digitar ícone - modal de adição
+        document.getElementById('categoryIcon').addEventListener('input', function() {
+            const iconPreview = document.getElementById('iconPreview');
+            if (iconPreview) {
+                iconPreview.innerHTML = `<i class="${this.value}"></i>`;
+            }
+        });
+
+        // Atualizar preview ao digitar ícone - modal de edição
+        document.getElementById('editCategoryIcon').addEventListener('input', function() {
+            const iconPreview = document.getElementById('editIconPreview');
+            if (iconPreview) {
+                iconPreview.innerHTML = `<i class="${this.value}"></i>`;
+            }
+        });
+
+        // Atualizar preview de nome e descrição - modal de adição
+        document.getElementById('categoryName').addEventListener('input', function() {
+            const previewName = document.getElementById('previewName');
+            if (previewName) {
+                previewName.textContent = this.value || 'Nome da Categoria';
+            }
+        });
+
+        document.getElementById('categoryDescription').addEventListener('input', function() {
+            const previewDesc = document.getElementById('previewDesc');
+            if (previewDesc) {
+                previewDesc.textContent = this.value || 'Descrição da categoria';
+            }
+        });
+
+        // Atualizar preview de nome e descrição - modal de edição
+        document.getElementById('editCategoryName').addEventListener('input', function() {
+            const previewName = document.getElementById('editPreviewName');
+            if (previewName) {
+                previewName.textContent = this.value || 'Nome da Categoria';
+            }
+        });
+
+        document.getElementById('editCategoryDescription').addEventListener('input', function() {
+            const previewDesc = document.getElementById('editPreviewDesc');
+            if (previewDesc) {
+                previewDesc.textContent = this.value || 'Descrição da categoria';
+            }
+        });
+
         // Gerar slug a partir do nome da categoria
         document.getElementById('categoryName').addEventListener('input', function() {
             const slugInput = document.getElementById('categorySlug');
@@ -1803,23 +2026,62 @@
             e.preventDefault();
 
             const categoryId = this.getAttribute('data-category-id');
-            const categoryName = this.getAttribute('data-category-name');
-            const categorySlug = this.getAttribute('data-category-slug');
-            const categoryColor = this.getAttribute('data-category-color');
 
-            // Preencher formulário de edição
-            document.getElementById('editCategoryId').value = categoryId;
-            document.getElementById('editCategoryName').value = categoryName;
-            document.getElementById('editCategorySlug').value = categorySlug;
-            document.getElementById('editCategoryColor').value = categoryColor;
-            document.getElementById('editCategoryColorText').value = categoryColor;
+            // Buscar dados completos da categoria do servidor
+            fetch(`/admin/categories/${categoryId}/edit`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.category) {
+                        const category = data.category;
 
-            // Verificar se é destaque
-            const isFeatured = document.querySelector(`.featured-toggle[data-category-id="${categoryId}"]`).checked;
-            document.getElementById('editCategoryFeatured').checked = isFeatured;
+                        // Preencher campos básicos
+                        document.getElementById('editCategoryId').value = categoryId;
+                        document.getElementById('editCategoryName').value = category.name || '';
+                        document.getElementById('editCategorySlug').value = category.slug || '';
+                        document.getElementById('editCategoryDescription').value = category.description || '';
+                        document.getElementById('editCategoryOrder').value = category.order || 0;
 
-            // Abrir modal
-            openModal('editCategoryModal');
+                        // Preencher cor
+                        const color = category.color || '#4a90e2';
+                        document.getElementById('editCategoryColor').value = color;
+                        document.getElementById('editCategoryColorText').value = color;
+
+                        // Preencher ícone
+                        const icon = category.icon || 'fas fa-folder';
+                        document.getElementById('editCategoryIcon').value = icon;
+
+                        // Atualizar preview do ícone
+                        const iconPreview = document.getElementById('editIconPreview');
+                        if (iconPreview) {
+                            iconPreview.innerHTML = `<i class="${icon}"></i>`;
+                        }
+
+                        // Preencher checkboxes de configuração
+                        document.getElementById('editCategoryActive').checked = category.is_active || false;
+                        document.getElementById('editCategoryFeatured').checked = category.is_featured || false;
+                        document.getElementById('editCategoryShowInMenu').checked = category.show_in_menu !== false;
+
+                        // Atualizar preview
+                        if (document.getElementById('editPreviewName')) {
+                            document.getElementById('editPreviewName').textContent = category.name || 'Nome da Categoria';
+                        }
+                        if (document.getElementById('editPreviewDesc')) {
+                            document.getElementById('editPreviewDesc').textContent = category.description || 'Descrição da categoria';
+                        }
+                        if (document.getElementById('editPreviewIcon')) {
+                            document.getElementById('editPreviewIcon').innerHTML = `<i class="${icon}"></i>`;
+                        }
+
+                        // Abrir modal
+                        openModal('editCategoryModal');
+                    } else {
+                        showNotification('Erro ao carregar dados da categoria', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar categoria:', error);
+                    showNotification('Erro ao carregar categoria. Tente novamente.', 'error');
+                });
         }
 
         // Handler para clique no botão excluir
@@ -2013,40 +2275,50 @@
             }
 
             const categoryId = document.getElementById('editCategoryId').value;
-            const name = document.getElementById('editCategoryName').value;
-            const slug = document.getElementById('editCategorySlug').value;
-            const color = document.getElementById('editCategoryColor').value;
-            const isFeatured = document.getElementById('editCategoryFeatured').checked;
 
-            // Simulação - em um ambiente real, enviaria para a API
-            console.log('Atualizar categoria:', { categoryId, name, slug, color, isFeatured });
+            // Coletar todos os dados do formulário
+            const categoryData = {
+                name: document.getElementById('editCategoryName').value,
+                slug: document.getElementById('editCategorySlug').value,
+                description: document.getElementById('editCategoryDescription').value,
+                icon: document.getElementById('editCategoryIcon').value,
+                color: document.getElementById('editCategoryColor').value,
+                order: parseInt(document.getElementById('editCategoryOrder').value) || 0,
+                is_active: document.getElementById('editCategoryActive').checked,
+                featured: document.getElementById('editCategoryFeatured').checked,
+                show_in_menu: document.getElementById('editCategoryShowInMenu').checked
+            };
 
-            // Atualizar na interface
-            const row = document.querySelector(`.btn-edit[data-category-id="${categoryId}"]`).closest('tr');
+            console.log('Atualizar categoria:', { categoryId, ...categoryData });
 
-            // Atualizar dados na linha
-            row.querySelector('.category-name').innerHTML = `
-                <span class="category-color" style="background-color: ${color};"></span>
-                ${name}
-            `;
+            // Enviar para o servidor
+            fetch(`/admin/categories/${categoryId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(categoryData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
 
-            row.querySelector('td:nth-child(3)').textContent = slug;
-            row.querySelector('.featured-toggle').checked = isFeatured;
+                    // Fechar modal
+                    closeModal('editCategoryModal');
 
-            // Atualizar atributos nos botões
-            const editBtn = row.querySelector('.btn-edit');
-            editBtn.setAttribute('data-category-name', name);
-            editBtn.setAttribute('data-category-slug', slug);
-            editBtn.setAttribute('data-category-color', color);
-
-            // Fechar modal
-            closeModal('editCategoryModal');
-
-            // Mostrar notificação
-            showNotification('Categoria atualizada com sucesso!', 'success');
-
-            // Atualizar estatísticas
-            updateCategoryStats();
+                    // Recarregar a página para mostrar as alterações
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                showNotification('Erro ao atualizar categoria. Tente novamente.', 'error');
+            });
         });
 
         // Confirmar exclusão

@@ -16,5 +16,5 @@ reportAttributeAccessIssue = "warning"
 reportArgumentType = "warning"
 
 # Configurações específicas do Python
-pythonVersion = "3.11"
+pythonVersion = "3.14"
 typeCheckingMode = "basic"

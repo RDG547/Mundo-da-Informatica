@@ -273,23 +273,33 @@ window.initializePlansPage = function () {
                 if (data.success) {
                     window.closeDowngradeModal();
 
-                    // Update UI
-                    // Free Plan
+                    // Update UI baseado no plano de destino
                     const freeCta = document.querySelector('.plan-card.free .plan-cta');
-                    if (freeCta) {
-                        freeCta.innerHTML = '<div class="plan-badge current-plan-free"><i class="fas fa-check-circle"></i> Plano Atual</div>';
-                    }
-
-                    // Premium Plan
                     const premiumCta = document.querySelector('.plan-card.premium .plan-cta');
-                    if (premiumCta) {
-                        premiumCta.innerHTML = '<button class="plan-btn" onclick="checkout(\'premium\')">Assinar Premium</button>';
-                    }
-
-                    // VIP Plan
                     const vipCta = document.querySelector('.plan-card.vip .plan-cta');
-                    if (vipCta) {
-                        vipCta.innerHTML = '<button class="plan-btn" onclick="checkout(\'vip\')">Assinar VIP</button>';
+
+                    if (targetPlan === 'free') {
+                        // Downgrade para Free
+                        if (freeCta) {
+                            freeCta.innerHTML = '<div class="plan-badge current-plan-free"><i class="fas fa-check-circle"></i> Plano Atual</div>';
+                        }
+                        if (premiumCta) {
+                            premiumCta.innerHTML = '<button class="plan-btn" onclick="showPaymentMethodModal(\'premium\')">Assinar Premium</button>';
+                        }
+                        if (vipCta) {
+                            vipCta.innerHTML = '<button class="plan-btn" onclick="showPaymentMethodModal(\'vip\')">Assinar VIP</button>';
+                        }
+                    } else if (targetPlan === 'premium') {
+                        // Downgrade para Premium (vindo do VIP)
+                        if (freeCta) {
+                            freeCta.innerHTML = '<button class="plan-btn downgrade-btn" onclick="openDowngradeModal(\'free\')">Voltar ao plano grátis</button>';
+                        }
+                        if (premiumCta) {
+                            premiumCta.innerHTML = '<div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>';
+                        }
+                        if (vipCta) {
+                            vipCta.innerHTML = '<button class="plan-btn" onclick="showPaymentMethodModal(\'vip\')">Assinar VIP</button>';
+                        }
                     }
 
                     // Show success toast

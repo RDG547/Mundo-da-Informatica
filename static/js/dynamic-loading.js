@@ -135,15 +135,8 @@ window.DynamicLoader = class DynamicLoader {
         this.showLoading();
 
         try {
-            let content;
-
-            // Check cache first
-            if (this.cache.has(url)) {
-                content = this.cache.get(url);
-            } else {
-                content = await this.fetchPageContent(url);
-                this.cache.set(url, content);
-            }
+            // Always fetch fresh content to avoid stale CSS/JS issues
+            const content = await this.fetchPageContent(url);
 
             this.updatePage(content, url);
             this.updateUrl(url);
@@ -234,6 +227,7 @@ window.DynamicLoader = class DynamicLoader {
             } else {
                 // Smooth transition for public pages
                 mainContainer.style.opacity = '0';
+                mainContainer.style.transition = 'opacity 0.15s ease-in-out';
 
                 setTimeout(() => {
                     console.log('[DYNAMIC-LOADING] 📄 Atualizando conteúdo da página');
@@ -245,12 +239,14 @@ window.DynamicLoader = class DynamicLoader {
                     this.applyInlineStyles(pageData.inlineStyles);
                     this.executeContentScripts(mainContainer);
 
-                    // Wait a bit for scripts to load before reinitializing
-                    setTimeout(() => {
-                        this.reinitializeComponents();
-                    }, 300);
+                    // Reinicializa componentes imediatamente
+                    this.reinitializeComponents();
 
-                    mainContainer.style.opacity = '1';
+                    // Mostra o conteúdo após um breve delay para CSS aplicar
+                    requestAnimationFrame(() => {
+                        mainContainer.style.opacity = '1';
+                    });
+
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }, 150);
             }
@@ -280,6 +276,16 @@ window.DynamicLoader = class DynamicLoader {
 
     reinitializeComponents() {
         console.log('[DYNAMIC-LOADING] 🔄 Reinicializando componentes...');
+
+        // CRÍTICO: Garantir que o scroll está sempre habilitado ao navegar
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+
+        // Fechar qualquer modal aberto
+        const contributeModal = document.getElementById('contributeModal');
+        if (contributeModal) {
+            contributeModal.classList.remove('active');
+        }
 
         // Limpa TODOS os atributos de inicialização para permitir reinicialização
         document.querySelectorAll('[data-suggestions-initialized]').forEach(el => {
@@ -368,16 +374,11 @@ window.DynamicLoader = class DynamicLoader {
             }, 500);
         }
 
-
-
-
-
-
-
-
-
-
-
+        // Re-initialize posts list page functionality
+        if (window.location.pathname === '/posts') {
+            console.log('[DYNAMIC-LOADING] 📚 Reinicializando posts list page');
+            this.initializeCategoryPage();
+        }
 
         // Re-initialize post page functionality
         const currentPath = window.location.pathname;
@@ -404,10 +405,25 @@ window.DynamicLoader = class DynamicLoader {
             this.initializeHomePage();
         }
 
+        // Re-initialize About page functionality
+        if (currentPath === '/about' || currentPath === '/sobre') {
+            console.log('[DYNAMIC-LOADING] ℹ️ Reinicializando about page');
+            this.initializeAboutPage();
+        }
+
         // Re-initialize Plans page functionality
-        if ((currentPath === '/planos' || currentPath === '/plans') && typeof window.initializePlansPage === 'function') {
+        if (currentPath === '/planos' || currentPath === '/plans') {
             console.log('[DYNAMIC-LOADING] 💳 Reinicializando plans page');
-            window.initializePlansPage();
+            // Force activate Plans CSS
+            const plansCSS = document.getElementById('plans-css');
+            if (plansCSS) {
+                plansCSS.media = 'all';
+            }
+            // Reset flag para permitir reinicialização
+            window.plansPageInitialized = false;
+            if (typeof window.initializePlansPage === 'function') {
+                window.initializePlansPage();
+            }
         }
 
         // Re-initialize download buttons (CRITICAL for download limit checks)
@@ -470,29 +486,49 @@ window.DynamicLoader = class DynamicLoader {
         const categoryCSS = document.getElementById('category-css');
         const profileCSS = document.getElementById('profile-css');
         const plansCSS = document.getElementById('plans-css');
+        const postDetailCSS = document.getElementById('post-detail-css');
+        const adminCSS = document.getElementById('admin-css');
 
+        // Desativar todos os CSS específicos de página
         if (faqCSS) faqCSS.media = 'print';
         if (contactCSS) contactCSS.media = 'print';
         if (aboutCSS) aboutCSS.media = 'print';
         if (categoryCSS) categoryCSS.media = 'print';
         if (profileCSS) profileCSS.media = 'print';
         if (plansCSS) plansCSS.media = 'print';
+        if (postDetailCSS) postDetailCSS.media = 'print';
+        if (adminCSS) adminCSS.media = 'print';
 
         // Determine which page-specific CSS to activate based on URL
         if (path === '/faq' && faqCSS) {
             faqCSS.media = 'all';
+            console.log('[DYNAMIC-LOADING] 🎨 FAQ CSS ativado');
         } else if ((path === '/contact' || path === '/contato') && contactCSS) {
             contactCSS.media = 'all';
+            console.log('[DYNAMIC-LOADING] 🎨 Contact CSS ativado');
         } else if ((path === '/about' || path === '/sobre') && aboutCSS) {
             aboutCSS.media = 'all';
-        } else if ((path.startsWith('/categoria/') || path === '/categorias') && categoryCSS) {
+            console.log('[DYNAMIC-LOADING] 🎨 About CSS ativado');
+        } else if ((path.startsWith('/categoria/') || path === '/categorias' || path === '/posts') && categoryCSS) {
             categoryCSS.media = 'all';
-        } else if (path.startsWith('/profile') && profileCSS) {
-            profileCSS.media = 'all';
-            console.log('Profile CSS activated:', profileCSS);
+            console.log('[DYNAMIC-LOADING] 🎨 Category CSS ativado');
+        } else if (path.startsWith('/profile')) {
+            if (profileCSS) profileCSS.media = 'all';
+            if (adminCSS) adminCSS.media = 'all'; // Profile também usa admin.css
+            console.log('[DYNAMIC-LOADING] 🎨 Profile CSS ativado');
         } else if ((path === '/plans' || path === '/planos') && plansCSS) {
             plansCSS.media = 'all';
+            console.log('[DYNAMIC-LOADING] 🎨 Plans CSS ativado');
+        } else if (path.startsWith('/post/') || this.isPostPage(path)) {
+            if (postDetailCSS) postDetailCSS.media = 'all';
+            console.log('[DYNAMIC-LOADING] 🎨 Post Detail CSS ativado');
         }
+    }
+
+    // Helper para detectar páginas de post (categoria/slug)
+    isPostPage(path) {
+        const parts = path.split('/').filter(p => p);
+        return parts.length === 2 && !['admin', 'profile', 'categoria', 'api'].includes(parts[0]);
     }
 
     loadPageScripts(scripts) {
@@ -588,6 +624,12 @@ window.DynamicLoader = class DynamicLoader {
     }
 
     initializeFAQ() {
+        // Force activate FAQ CSS
+        const faqCSS = document.getElementById('faq-css');
+        if (faqCSS) {
+            faqCSS.media = 'all';
+        }
+
         // Initialize FAQ functionality
         setTimeout(() => {
             const faqSearch = document.getElementById('faq-search');
@@ -627,10 +669,85 @@ window.DynamicLoader = class DynamicLoader {
                     });
                 }
             });
+
+            // Initialize Contribute Modal for FAQ page
+            this.initializeContributeModalFAQ();
         }, 100);
     }
 
+    initializeContributeModalFAQ() {
+        const modal = document.getElementById('contributeModal');
+        const openBtn = document.getElementById('openContributeModalFAQ');
+        const closeBtn = document.getElementById('closeContributeModal');
+        const overlay = modal?.querySelector('.contribute-modal-overlay');
+
+        if (!modal || !openBtn) return;
+
+        // Remove event listeners anteriores se existirem
+        const newOpenBtn = openBtn.cloneNode(true);
+        const newCloseBtn = closeBtn?.cloneNode(true);
+
+        openBtn.parentNode?.replaceChild(newOpenBtn, openBtn);
+
+        if (closeBtn && newCloseBtn) {
+            closeBtn.parentNode?.replaceChild(newCloseBtn, closeBtn);
+        }
+
+        // Função para abrir o modal
+        const openModal = () => {
+            if (modal) {
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        };
+
+        // Função para fechar o modal
+        const closeModal = () => {
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        };
+
+        // Event listeners
+        newOpenBtn.addEventListener('click', openModal);
+
+        if (newCloseBtn) {
+            newCloseBtn.addEventListener('click', closeModal);
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', closeModal);
+        }
+
+        // Fechar com ESC
+        const escHandler = (e) => {
+            if (e.key === 'Escape' && modal?.classList.contains('active')) {
+                closeModal();
+            }
+        };
+
+        document.removeEventListener('keydown', escHandler);
+        document.addEventListener('keydown', escHandler);
+
+        // Restaurar scroll quando clicar em links dentro do modal
+        const modalLinks = modal.querySelectorAll('a[href]');
+        modalLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                // Restaurar scroll antes da navegação
+                document.body.style.overflow = '';
+                closeModal();
+            });
+        });
+    }
+
     initializeContactForm() {
+        // Force activate Contact CSS
+        const contactCSS = document.getElementById('contact-css');
+        if (contactCSS) {
+            contactCSS.media = 'all';
+        }
+
         // Initialize contact form functionality
         setTimeout(() => {
             const messageTextarea = document.getElementById('message');
@@ -883,6 +1000,12 @@ window.DynamicLoader = class DynamicLoader {
     }
 
     initializeAboutPage() {
+        // Force activate about CSS
+        const aboutCSS = document.getElementById('about-css');
+        if (aboutCSS) {
+            aboutCSS.media = 'all';
+        }
+
         // Initialize About page functionality
         setTimeout(() => {
             // Initialize statistics counter animation
@@ -936,10 +1059,99 @@ window.DynamicLoader = class DynamicLoader {
                     });
                 });
             }
+
+            // Initialize Contribute Modal
+            this.initializeContributeModal();
         }, 100);
     }
 
+    initializeContributeModal() {
+        const modal = document.getElementById('contributeModal');
+        const openBtn = document.getElementById('openContributeModal');
+        const closeBtn = document.getElementById('closeContributeModal');
+        const overlay = modal?.querySelector('.contribute-modal-overlay');
+
+        if (!modal) return;
+
+        // Limpar estado anterior do modal (garantir que scroll esteja liberado)
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+
+        // Função para abrir o modal
+        const openModal = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        };
+
+        // Função para fechar o modal
+        const closeModal = () => {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        };
+
+        // Limpar e adicionar event listener no botão de abrir
+        if (openBtn) {
+            // Clonar para remover listeners antigos
+            const newOpenBtn = openBtn.cloneNode(true);
+            openBtn.parentNode?.replaceChild(newOpenBtn, openBtn);
+            newOpenBtn.addEventListener('click', openModal);
+        }
+
+        // Limpar e adicionar event listener no botão de fechar
+        if (closeBtn) {
+            const newCloseBtn = closeBtn.cloneNode(true);
+            closeBtn.parentNode?.replaceChild(newCloseBtn, closeBtn);
+            newCloseBtn.addEventListener('click', closeModal);
+        }
+
+        // Overlay - clonar para limpar listeners
+        if (overlay) {
+            const newOverlay = overlay.cloneNode(true);
+            overlay.parentNode?.replaceChild(newOverlay, overlay);
+            newOverlay.addEventListener('click', closeModal);
+        }
+
+        // Fechar com ESC - usar handler global único
+        if (!window._contributeModalEscHandler) {
+            window._contributeModalEscHandler = (e) => {
+                if (e.key === 'Escape') {
+                    const activeModal = document.getElementById('contributeModal');
+                    if (activeModal?.classList.contains('active')) {
+                        activeModal.classList.remove('active');
+                        document.body.style.overflow = '';
+                    }
+                }
+            };
+            document.addEventListener('keydown', window._contributeModalEscHandler);
+        }
+
+        // Restaurar scroll quando clicar em links dentro do modal
+        const modalContent = document.querySelector('.contribute-modal-content');
+        if (modalContent) {
+            const modalLinks = modalContent.querySelectorAll('a[href]');
+            modalLinks.forEach(link => {
+                // Clonar para limpar listeners antigos
+                const newLink = link.cloneNode(true);
+                link.parentNode?.replaceChild(newLink, link);
+
+                newLink.addEventListener('click', function(e) {
+                    // Restaurar scroll IMEDIATAMENTE antes de qualquer navegação
+                    document.body.style.overflow = '';
+                    modal.classList.remove('active');
+                });
+            });
+        }
+    }
+
     initializeCategoryPage() {
+        // Force activate category CSS
+        const categoryCSS = document.getElementById('category-css');
+        if (categoryCSS) {
+            categoryCSS.media = 'all';
+        }
+
         // Initialize Category page functionality
         setTimeout(() => {
             // Initialize category search functionality
@@ -1098,8 +1310,12 @@ window.DynamicLoader = class DynamicLoader {
     initializeProfilePage() {
         // Force activate profile CSS
         const profileCSS = document.getElementById('profile-css');
+        const adminCSS = document.getElementById('admin-css');
         if (profileCSS) {
             profileCSS.media = 'all';
+        }
+        if (adminCSS) {
+            adminCSS.media = 'all';
         }
 
         // Initialize Profile page functionality

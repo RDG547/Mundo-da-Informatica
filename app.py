@@ -25,6 +25,7 @@ import pytz
 import bleach
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
+from user_agents import parse as parse_ua
 
 # Importar correções de compatibilidade Flask 3.x (módulo opcional)
 try:
@@ -87,7 +88,7 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
 
 # Configuração do Abacate Pay
-app.config['ABACATEPAY_API_KEY'] = os.environ.get('ABACATEPAY_API_KEY', 'abc_prod_QUeb3CYeWdLghPg02rFpQU1N')
+app.config['ABACATEPAY_API_KEY'] = os.environ.get('ABACATEPAY_API_KEY')
 app.config['ABACATEPAY_API_URL'] = 'https://api.abacatepay.com/v1'
 
 # Configuração do Cloudinary
@@ -2564,17 +2565,17 @@ def create_checkout_session():
                     'quantity': 1,
                 },
             ],
+            ui_mode='embedded',  # Modo embutido
             mode='subscription',
             payment_method_types=['card'],  # Apenas cartão de crédito
-            success_url=url_for('checkout_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=url_for('checkout_cancel', _external=True),
+            return_url=url_for('checkout_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
             customer_email=current_user.email,
             metadata={
                 'user_id': str(current_user.id),
                 'plan': plan_type
             }
         )
-        return jsonify({'id': checkout_session.id})
+        return jsonify({'clientSecret': checkout_session.client_secret})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -3965,7 +3966,7 @@ def initialize_db():
 
 # Rota de login
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")  # Limitar tentativas de login
+@limiter.limit("30 per minute")  # Limitar tentativas de login
 def login():
     # Se o usuário já estiver logado, redirecione para a página inicial
     if current_user.is_authenticated:
@@ -4026,10 +4027,14 @@ def login():
 
         # Atualizar a data do último login e dados de rastreamento
         user.last_login = datetime.utcnow()
-        # Capturar dados de rastreamento (sanitizado)
+        # Capturar dados de rastreamento (sanitizado) e parseado corretamente
+        user_agent = parse_ua(request.user_agent.string)
         user.ip_address = request.remote_addr or 'unknown'
-        user.browser = request.user_agent.browser or 'unknown'
-        user.operating_system = request.user_agent.platform or 'unknown'
+        user.browser = f"{user_agent.browser.family} {user_agent.browser.version_string}"
+        user.operating_system = f"{user_agent.os.family} {user_agent.os.version_string}"
+        # Fallback safe
+        if len(user.browser) > 50: user.browser = user.browser[:50]
+        if len(user.operating_system) > 50: user.operating_system = user.operating_system[:50]
         user.referrer = (request.referrer or 'Direct Access')[:500]  # Limitar tamanho
         db.session.commit()
 
@@ -4057,7 +4062,7 @@ def login():
 
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])
-@limiter.limit("3 per hour")  # Limitar criação de contas
+@limiter.limit("10 per minute")  # Limitar criação de contas
 def register():
     # Se o usuário já estiver logado, redirecione para a página inicial
     if current_user.is_authenticated:
@@ -5943,6 +5948,52 @@ def admin_user_data(user_id):
         daily_limit = 1
         weekly_limit = 7
 
+    # Calcular uso atual
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Ajuste para início da semana (segunda-feira)
+    week_start = today_start - timedelta(days=today_start.weekday())
+
+    # Simulação de dados de uso (idealmente viriam de uma tabela de logs de download)
+    # Como não temos uma tabela específica de user_downloads no modelo visível,
+    # vamos retornar os limites e zerar os contadores por enquanto ou usar campos do usuário se existirem.
+    # Assumindo que existem campos ou retornando 0 para implementação futura.
+
+    return jsonify({
+        'id': user.id,
+        'username': user.username,
+        'daily_limit': user.custom_daily_limit if user.custom_daily_limit is not None else daily_limit,
+        'weekly_limit': user.custom_weekly_limit if user.custom_weekly_limit is not None else weekly_limit,
+        'daily_downloads': 0, # Implementar lógica real se necessário
+        'weekly_downloads': 0, # Implementar lógica real se necessário
+        'download_reset_date': (today_start + timedelta(days=1)).isoformat(),
+        'week_reset_date': (week_start + timedelta(days=7)).isoformat()
+    })
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_user_delete(user_id):
+    """Rota para excluir um usuário"""
+    user = User.query.get_or_404(user_id)
+
+    # Prevenir auto-exclusão
+    if user.id == current_user.id:
+        flash('Você não pode excluir sua própria conta.', 'danger')
+        return redirect(url_for('admin_users'))
+
+    try:
+        # Excluir downloads associados? O cascade deve cuidar disso se configurado
+        # Excluir usuário
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'Usuário {user.username} excluído com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Erro ao excluir usuário {user.id}: {e}")
+        flash('Erro ao excluir usuário. Pode haver registros associados.', 'danger')
+
+    return redirect(url_for('admin_users'))
+
     return jsonify({
         'id': user.id,
         'username': user.username,
@@ -7667,4 +7718,13 @@ if __name__ == '__main__':
 
     # Usar variável de ambiente para debug - segurança
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+
+    # Verificação de segurança para ambiente Render
+    if os.environ.get('RENDER'):
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("WARNING: You are running 'python app.py' in a production Render environment.")
+        print("This uses the Werkzeug development server which is NOT suitable for production.")
+        print("Please update your Render Start Command to: 'gunicorn app:app'")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
     app.run(debug=debug_mode, host=args.host, port=args.port)

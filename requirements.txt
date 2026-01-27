@@ -55,3 +55,4 @@ mediafire
 
 # Cloud Storage
 cloudinary==1.44.1
+user-agents==2.2.0

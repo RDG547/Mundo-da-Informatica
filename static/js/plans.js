@@ -85,6 +85,7 @@ window.initializePlansPage = function () {
     }
 
     // Checkout Function
+    // Checkout Function
     window.checkout = function (plan) {
         if (!stripe) {
             alert('Erro: Configuração de pagamento não encontrada. Por favor, contate o suporte.');
@@ -107,18 +108,46 @@ window.initializePlansPage = function () {
             .then(function (session) {
                 if (session.error) {
                     alert(session.error);
+                } else if (session.clientSecret) {
+                    // Initialize Embedded Checkout
+                    stripe.initEmbeddedCheckout({
+                        clientSecret: session.clientSecret
+                    }).then(function (checkout) {
+                        // Open Modal
+                        const modal = document.getElementById('stripeEmbeddedCheckoutModal');
+                        if (modal) {
+                            modal.style.display = 'block';
+                            document.body.style.overflow = 'hidden';
+
+                            // Mount Checkout
+                            checkout.mount('#checkout-element');
+
+                            // Save instance for cleanup
+                            window.currentStripeCheckout = checkout;
+                        }
+                    });
                 } else {
-                    return stripe.redirectToCheckout({ sessionId: session.id });
-                }
-            })
-            .then(function (result) {
-                if (result.error) {
-                    alert(result.error.message);
+                    alert('Erro inesperado: Sessão inválida.');
                 }
             })
             .catch(function (error) {
                 console.error('Error:', error);
+                alert('Erro ao iniciar pagamento. Tente novamente.');
             });
+    };
+
+    window.closeStripeEmbeddedModal = function () {
+        const modal = document.getElementById('stripeEmbeddedCheckoutModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+
+            // Unmount and destroy checkout instance if exists
+            if (window.currentStripeCheckout) {
+                window.currentStripeCheckout.destroy();
+                window.currentStripeCheckout = null;
+            }
+        }
     };
 
     // Payment Method Modal

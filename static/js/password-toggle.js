@@ -3,8 +3,15 @@
  * Solução simples e direta para alternar visibilidade de senhas
  */
 
-(function() {
+(function () {
     'use strict';
+
+    // Evitar múltiplas inicializações
+    if (window.passwordToggleInitialized) {
+        console.log('🔐 Password toggle script already initialized, skipping...');
+        return;
+    }
+    window.passwordToggleInitialized = true;
 
     console.log('🔐 Password toggle script loading...');
 
@@ -47,7 +54,7 @@
         console.log('⚙️ Configurando eventos...');
 
         // Event delegation - um único listener no documento
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             // Verificar se clicou no botão ou no ícone dentro dele
             const toggleBtn = e.target.closest('.password-toggle');
 
@@ -73,7 +80,7 @@
 
     // Executar imediatamente ou aguardar DOM
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             console.log('📄 DOM carregado');
             setupEvents();
         });

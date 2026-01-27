@@ -13,13 +13,13 @@
                 </div>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }}">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
                 {% endwith %}
 
                 <form method="POST" action="{{ url_for('register') }}" class="register-form" id="registerForm">
@@ -28,8 +28,8 @@
                         <div class="input-with-icon">
                             <i class="fas fa-user"></i>
                             <input type="text" id="name" name="name" required>
-                            <div class="input-feedback"></div>
                         </div>
+                        <div class="input-feedback"></div>
                     </div>
 
                     <div class="form-group">
@@ -37,8 +37,8 @@
                         <div class="input-with-icon">
                             <i class="fas fa-user-tag"></i>
                             <input type="text" id="username" name="username" required>
-                            <div class="input-feedback"></div>
                         </div>
+                        <div class="input-feedback"></div>
                     </div>
 
                     <div class="form-group">
@@ -46,8 +46,8 @@
                         <div class="input-with-icon">
                             <i class="fas fa-envelope"></i>
                             <input type="email" id="email" name="email" required>
-                            <div class="input-feedback"></div>
                         </div>
+                        <div class="input-feedback"></div>
                     </div>
 
                     <div class="form-group">
@@ -58,8 +58,8 @@
                             <span class="password-toggle" data-target="password" style="cursor: pointer;">
                                 <i class="fas fa-eye"></i>
                             </span>
-                            <div class="input-feedback"></div>
                         </div>
+                        <div class="input-feedback"></div>
                         <div class="password-strength">
                             <div class="strength-meter">
                                 <div class="strength-meter-fill" id="strengthMeter"></div>
@@ -76,13 +76,14 @@
                             <span class="password-toggle" data-target="confirm_password" style="cursor: pointer;">
                                 <i class="fas fa-eye"></i>
                             </span>
-                            <div class="input-feedback"></div>
                         </div>
+                        <div class="input-feedback"></div>
                     </div>
 
                     <div class="form-check">
                         <input type="checkbox" id="terms" name="terms" required>
-                        <label for="terms">Eu concordo com os <a href="{{ url_for('terms_of_service') }}">Termos de Uso</a> e <a href="{{ url_for('privacy_policy') }}">Política de Privacidade</a></label>
+                        <label for="terms">Eu concordo com os <a href="{{ url_for('terms_of_service') }}">Termos de
+                                Uso</a> e <a href="{{ url_for('privacy_policy') }}">Política de Privacidade</a></label>
                         <div class="input-feedback terms-feedback"></div>
                     </div>
 
@@ -133,6 +134,7 @@
             opacity: 0;
             transform: translateY(20px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -196,13 +198,15 @@
     .input-with-icon input[type="password"],
     .input-with-icon input[type="text"].has-toggle {
         padding-right: 3.5rem;
-    }    .input-with-icon input:focus {
+    }
+
+    .input-with-icon input:focus {
         outline: none;
         border-color: var(--primary-color);
         box-shadow: 0 0 0 3px rgba(58, 134, 255, 0.1);
     }
 
-    .input-with-icon input:focus + i {
+    .input-with-icon input:focus+i {
         color: var(--primary-color);
     }
 
@@ -333,6 +337,7 @@
             opacity: 0;
             transform: translateY(-10px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -434,8 +439,10 @@
 
 <script>
     // Validação do formulário e verificação de força da senha
-    document.addEventListener('DOMContentLoaded', function() {
+    // Validação do formulário e verificação de força da senha
+    function initRegisterForm() {
         const registerForm = document.getElementById('registerForm');
+        if (!registerForm) return;
         const name = document.getElementById('name');
         const username = document.getElementById('username');
         const email = document.getElementById('email');
@@ -447,11 +454,11 @@
         const strengthText = document.getElementById('strengthText');
 
         // Validação em tempo real
-        name.addEventListener('blur', function() {
+        name.addEventListener('blur', function () {
             validateField(this, this.value.trim() === '', 'Este campo é obrigatório');
         });
 
-        username.addEventListener('blur', function() {
+        username.addEventListener('blur', function () {
             if (this.value.trim() === '') {
                 validateField(this, true, 'Este campo é obrigatório');
             } else if (this.value.trim().length < 4) {
@@ -463,7 +470,7 @@
             }
         });
 
-        email.addEventListener('blur', function() {
+        email.addEventListener('blur', function () {
             if (this.value.trim() === '') {
                 validateField(this, true, 'Este campo é obrigatório');
             } else if (!isValidEmail(this.value.trim())) {
@@ -473,7 +480,7 @@
             }
         });
 
-        password.addEventListener('input', function() {
+        password.addEventListener('input', function () {
             checkPasswordStrength(this.value);
 
             // Verificar se as senhas coincidem quando alteradas
@@ -486,7 +493,7 @@
             }
         });
 
-        password.addEventListener('blur', function() {
+        password.addEventListener('blur', function () {
             if (this.value.trim() === '') {
                 validateField(this, true, 'Este campo é obrigatório');
             } else if (this.value.trim().length < 6) {
@@ -496,7 +503,7 @@
             }
         });
 
-        confirmPassword.addEventListener('blur', function() {
+        confirmPassword.addEventListener('blur', function () {
             if (this.value.trim() === '') {
                 validateField(this, true, 'Este campo é obrigatório');
             } else if (this.value !== password.value) {
@@ -506,7 +513,7 @@
             }
         });
 
-        termsCheckbox.addEventListener('change', function() {
+        termsCheckbox.addEventListener('change', function () {
             const feedbackEl = document.querySelector('.terms-feedback');
             if (!this.checked) {
                 feedbackEl.textContent = 'Você precisa aceitar os termos';
@@ -518,7 +525,7 @@
         });
 
         // Envio do formulário
-        registerForm.addEventListener('submit', function(e) {
+        registerForm.addEventListener('submit', function (e) {
             // Impedir envio se houver erros
             if (!validateForm()) {
                 e.preventDefault();
@@ -669,7 +676,15 @@
             // Define a largura do medidor
             strengthMeter.style.width = score + '%';
         }
-    });
+    }
+
+    // Inicializar imediatamente se o DOM já estiver pronto (navegação dinâmica)
+    // ou aguardar o evento se for carregamento inicial
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initRegisterForm);
+    } else {
+        initRegisterForm();
+    }
 
     // Função para alternar visibilidade da senha
     function togglePassword(passwordFieldId) {

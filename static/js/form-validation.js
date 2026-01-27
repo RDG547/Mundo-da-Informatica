@@ -11,7 +11,7 @@
  * @returns {boolean} - true se válido, false se inválido
  */
 function validateField(field, condition, errorMessage) {
-    const feedbackElement = field.parentElement.querySelector('.input-feedback');
+    const feedbackElement = field.closest('.form-group').querySelector('.input-feedback');
 
     if (condition) {
         field.classList.add('input-error');
@@ -32,7 +32,7 @@ function validateField(field, condition, errorMessage) {
  */
 function clearFieldError(field) {
     field.classList.remove('input-error');
-    const feedbackElement = field.parentElement.querySelector('.input-feedback');
+    const feedbackElement = field.closest('.form-group').querySelector('.input-feedback');
     if (feedbackElement) {
         feedbackElement.textContent = '';
         feedbackElement.classList.remove('show');

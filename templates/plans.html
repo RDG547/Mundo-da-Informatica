@@ -142,7 +142,8 @@
                     {% elif current_user.plan == 'premium' %}
                     <div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% elif current_user.plan == 'vip' %}
-                    <button class="plan-btn downgrade-btn" onclick="openDowngradeModal('premium')">Fazer Downgrade</button>
+                    <button class="plan-btn downgrade-btn" onclick="openDowngradeModal('premium')">Fazer
+                        Downgrade</button>
                     {% else %}
                     <button class="plan-btn" onclick="showPaymentMethodModal('premium')">Assinar Premium</button>
                     {% endif %}
@@ -317,13 +318,24 @@
     </div>
 </div>
 
+<!-- Stripe Embedded Checkout Modal -->
+<div id="stripeEmbeddedCheckoutModal" class="modal">
+    <div class="modal-content modal-large">
+        <span class="close-modal" onclick="closeStripeEmbeddedModal()">&times;</span>
+        <div id="checkout-element">
+            <!-- Stripe will be mounted here -->
+        </div>
+    </div>
+</div>
+
 <!-- Downgrade Modal -->
 <div id="downgradeModal" class="modal">
     <div class="modal-content">
         <span class="close-modal" onclick="closeDowngradeModal()">&times;</span>
         <h2>Confirmar Alteração de Plano</h2>
         <p id="downgradeMessage">Tem certeza que deseja alterar seu plano?</p>
-        <p class="warning-text" id="downgradeWarning">Você perderá acesso imediato aos benefícios exclusivos do seu plano atual.</p>
+        <p class="warning-text" id="downgradeWarning">Você perderá acesso imediato aos benefícios exclusivos do seu
+            plano atual.</p>
         <div class="modal-actions">
             <button class="btn-cancel" onclick="closeDowngradeModal()">Cancelar</button>
             <button class="btn-confirm" onclick="confirmDowngrade()">Confirmar</button>
@@ -443,6 +455,14 @@
         position: relative;
         box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
         animation: modalFadeIn 0.3s ease;
+    }
+
+    .modal-large {
+        margin: 50px auto;
+        max-width: 1000px;
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
     }
 
     @keyframes modalFadeIn {

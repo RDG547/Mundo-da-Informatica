@@ -24,8 +24,15 @@ def create_admin_user():
                 existing_user.role = 'admin'
                 db.session.commit()
                 print("✅ Role atualizada para 'admin'")
+
+            # Reativar usuário se estiver inativo
+            if not existing_user.is_active:
+                existing_user.is_active = True
+                db.session.commit()
+                print("✅ Usuário reativado com sucesso")
+
             else:
-                print("✅ Usuário já é admin")
+                print("✅ Usuário já é admin e está ativo")
             return
 
         # Criar novo usuário admin

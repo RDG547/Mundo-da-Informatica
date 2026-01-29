@@ -312,7 +312,7 @@ function initNotifications() {
 /**
  * Mostra uma notificação ao usuário
  */
-function showNotification(message, type = 'info', duration = 8000) {
+function showNotification(message, type = 'info', duration = 10000) {
     const notification = document.createElement('div');
     notification.className = `notification ${type} slide-in-right`;
 

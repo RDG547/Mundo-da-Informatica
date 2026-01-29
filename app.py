@@ -5961,12 +5961,20 @@ def admin_user_data(user_id):
     return jsonify({
         'id': user.id,
         'username': user.username,
+        'name': user.name or '',
+        'email': user.email,
+        'role': user.role,
+        'plan': user.plan,
+        'is_active': user.is_active,
         'daily_limit': user.custom_daily_limit if user.custom_daily_limit is not None else daily_limit,
         'weekly_limit': user.custom_weekly_limit if user.custom_weekly_limit is not None else weekly_limit,
-        'daily_downloads': 0, # Implementar lógica real se necessário
-        'weekly_downloads': 0, # Implementar lógica real se necessário
-        'download_reset_date': (today_start + timedelta(days=1)).isoformat(),
-        'week_reset_date': (week_start + timedelta(days=7)).isoformat()
+        'daily_downloads': user.daily_downloads or 0,
+        'weekly_downloads': user.weekly_downloads or 0,
+        'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else (today_start + timedelta(days=1)).isoformat(),
+        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else (week_start + timedelta(days=7)).isoformat(),
+        'can_download': user.can_download if hasattr(user, 'can_download') else True,
+        'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
+        'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
     })
 
 @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
@@ -5994,25 +6002,6 @@ def admin_user_delete(user_id):
 
     return redirect(url_for('admin_users'))
 
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'name': user.name,
-        'email': user.email,
-        'role': user.role,
-        'plan': user.plan,
-        'is_active': user.is_active,
-        'date_joined': user.date_joined.isoformat() if user.date_joined else None,
-        'daily_downloads': user.daily_downloads or 0,
-        'weekly_downloads': user.weekly_downloads or 0,
-        'daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') and user.custom_daily_limit else daily_limit,
-        'weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') and user.custom_weekly_limit else weekly_limit,
-        'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else None,
-        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else None,
-        'can_download': user.can_download if hasattr(user, 'can_download') else True,
-        'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
-        'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
-    })
 
 @app.route("/admin/users/<int:user_id>/update", methods=['POST'])
 @login_required
@@ -6036,6 +6025,10 @@ def admin_update_user(user_id):
         custom_weekly_limit = request.form.get('custom_weekly_limit', '').strip()
 
         # Validações
+        # Validações de segurança
+        if user_id == current_user.id and not is_active:
+            return jsonify({'success': False, 'message': 'Você não pode desativar sua própria conta.'})
+
         if not username:
             return jsonify({'success': False, 'message': 'Nome de usuário é obrigatório'})
 

@@ -742,7 +742,7 @@
         font-size: 0.85rem;
     }
 
-    /* Grid Adjustments - EXCETO para o modal de novo post que tem layout próprio */
+    /* Grid Adjustments - Exceto para o modal de novo post que tem layout próprio */
     .row:not(#addPostModal .row) {
         margin: 0 -0.5rem;
     }

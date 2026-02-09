@@ -427,40 +427,7 @@
             });
         };
 
-        // Função para mostrar notificações
-        function showNotification(message, type) {
-            // Check if toast container exists
-            let container = document.querySelector('.toast-container');
-            if (!container) {
-                container = document.createElement('div');
-                container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-                document.body.appendChild(container);
-            }
-
-            // Simple alert fallback if no toast library
-            // Since we use custom notification in the previous code, let's try to keep it simple
-            // Using standard Bootstrap toast structure or simple custom div
-            const notification = document.createElement('div');
-            notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
-            notification.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-
-            // Allow styling to position it fixed
-            notification.style.position = 'fixed';
-            notification.style.bottom = '20px';
-            notification.style.right = '20px';
-            notification.style.zIndex = '9999';
-
-            document.body.appendChild(notification);
-
-            // Auto-fechar após 5 segundos
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => notification.remove(), 500);
-            }, 5000);
-        }
+        // showNotification global é definida em admin.js
     });
 </script>
 {% endblock %}

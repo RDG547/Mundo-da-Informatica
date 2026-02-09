@@ -375,6 +375,59 @@
     }
 }
 
+/* Correção para o Modal de Novo Post - garantir layout de 2 colunas sem rolagem */
+#addPostModal .modal-body {
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
+#addPostModal .step-content .row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+#addPostModal .step-content .col-md-8 {
+    flex: 0 0 65% !important;
+    max-width: 65% !important;
+    width: 65% !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+}
+
+#addPostModal .step-content .col-md-4 {
+    flex: 0 0 35% !important;
+    max-width: 35% !important;
+    width: 35% !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+}
+
+#addPostModal .step-content .col-md-6 {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+    width: 50% !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+}
+
+@media (max-width: 992px) {
+    #addPostModal .step-content .row {
+        flex-wrap: wrap !important;
+    }
+
+    #addPostModal .step-content .col-md-8,
+    #addPostModal .step-content .col-md-4,
+    #addPostModal .step-content .col-md-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 10px !important;
+    }
+}
+
 /* Animações adicionais */
 @keyframes fadeIn {
     from {

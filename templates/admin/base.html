@@ -103,62 +103,40 @@
     {% block scripts %}{% endblock %}
 
     <script>
-        // Inicializar notificações flash
+        // Inicializar notificações flash (apenas as que existem no carregamento da página)
         document.addEventListener('DOMContentLoaded', function() {
-            // Adicionar evento de clique para fechar notificações
-            document.querySelectorAll('.notification-close').forEach(button => {
-                button.addEventListener('click', function() {
-                    const notification = this.closest('.notification');
-                    notification.classList.add('slide-out-right');
-                    setTimeout(() => notification.remove(), 300);
-                });
-            });
+            // Capturar referências das notificações flash existentes no momento do carregamento
+            const flashNotifications = Array.from(document.querySelectorAll('.notification'));
 
-            // Auto-fechar notificações após 8 segundos
-            setTimeout(() => {
-                document.querySelectorAll('.notification').forEach(notification => {
-                    notification.classList.add('slide-out-right');
-                    setTimeout(() => notification.remove(), 300);
-                });
-            }, 8000);
-        });
-
-        // Função global para mostrar notificações
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type} slide-in-right`;
-
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
-                    <span>${message}</span>
-                </div>
-                <button class="notification-close">&times;</button>
-            `;
-
-            document.body.appendChild(notification);
-
-            // Adicionar evento para fechar notificação
-            notification.querySelector('.notification-close').addEventListener('click', () => {
-                notification.classList.add('slide-out-right');
-                setTimeout(() => notification.remove(), 300);
-            });
-
-            // Auto-fechar após 8 segundos
-            setTimeout(() => {
-                if (document.body.contains(notification)) {
-                    notification.classList.add('slide-out-right');
-                    setTimeout(() => notification.remove(), 300);
+            // Adicionar evento de clique para fechar notificações flash
+            flashNotifications.forEach(notification => {
+                const closeBtn = notification.querySelector('.notification-close');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function() {
+                        notification.classList.add('slide-out-right');
+                        setTimeout(() => notification.remove(), 300);
+                    });
                 }
-            }, 8000);
-        }
+            });
 
-        // Funções openModal e closeModal estão em admin.js (window.openModal e window.closeModal)
+            // Auto-fechar APENAS notificações flash após 8 segundos
+            // Usa as referências capturadas no load para não afetar notificações criadas dinamicamente
+            if (flashNotifications.length > 0) {
+                setTimeout(() => {
+                    flashNotifications.forEach(notification => {
+                        if (document.body.contains(notification)) {
+                            notification.classList.add('slide-out-right');
+                            setTimeout(() => notification.remove(), 300);
+                        }
+                    });
+                }, 5000);
+            }
 
-        // Carregamento otimizado - sem delays desnecessários
-        document.addEventListener('DOMContentLoaded', function() {
             console.log('Painel admin carregado com sucesso');
         });
+
+        // showNotification global é definida em admin.js (com duração configurável de 5s padrão)
+        // Não redefinir aqui para evitar sobrescrever a versão com parâmetro duration
     </script>
 </body>
 </html>

@@ -19,7 +19,7 @@ import stripe
 from stripe import error as stripe_error
 
 # Para compatibilidade, criar alias
-SignatureVerificationError = stripe_error.SignatureVerificationError
+SignatureVerificationError = stripe_error.SignatureVerificationError  # type: ignore[attr-defined]
 
 import pytz
 import bleach
@@ -869,7 +869,7 @@ def before_request():
     # Verificar modo de manutenção
     try:
         maintenance_mode = SiteConfig.get_value('maintenance_mode', False)
-        if maintenance_mode and not (current_user.is_authenticated and current_user.role == 'admin'):
+        if maintenance_mode and not (current_user.is_authenticated and current_user.role in ('admin', 'editor')):
             # Permitir acesso apenas a rotas específicas durante manutenção
             allowed_routes = ['static', 'admin', 'login', 'maintenance']
             if not request.endpoint or not any(request.endpoint.startswith(route) for route in allowed_routes):
@@ -1253,6 +1253,16 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or current_user.role != 'admin':
+            flash('Você não tem permissão para acessar esta página.', 'danger')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Decorador para rotas que requerem acesso de editor OU administrador
+def editor_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role not in ('admin', 'editor'):
             flash('Você não tem permissão para acessar esta página.', 'danger')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
@@ -2126,9 +2136,9 @@ def add_post_comment_by_slug(category, slug):
 
 @app.route('/<string:category>/<string:slug>/comments/<int:comment_id>', methods=['DELETE'])
 @login_required
-@admin_required
+@editor_required
 def delete_comment_by_slug(category, slug, comment_id):
-    """Deleta um comentário (apenas admins)"""
+    """Deleta um comentário (admins e editores)"""
     try:
         # Buscar post pelo slug
         post = Post.query.filter_by(slug=slug).first_or_404()
@@ -2163,8 +2173,8 @@ def edit_comment_by_slug(category, slug, comment_id):
         # Buscar comentário
         comment = Comment.query.filter_by(id=comment_id, post_id=post.id).first_or_404()
 
-        # Verificar permissão: apenas o autor ou admin pode editar
-        if comment.user_id != current_user.id and current_user.role != 'admin':
+        # Verificar permissão: apenas o autor, admin ou editor pode editar
+        if comment.user_id != current_user.id and current_user.role not in ('admin', 'editor'):
             return jsonify({
                 'success': False,
                 'message': 'Você não tem permissão para editar este comentário.'
@@ -3574,7 +3584,7 @@ def search_suggestions():
 
 @app.route('/admin/posts/<int:post_id>/toggle-active', methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_toggle_post_active(post_id):
     """Ativar/Desativar um post"""
     post = Post.query.get_or_404(post_id)
@@ -3600,7 +3610,7 @@ def admin_toggle_post_active(post_id):
 
 @app.route('/admin/posts/<int:post_id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_delete_post(post_id):
     """Excluir um post"""
     post = Post.query.get_or_404(post_id)
@@ -3625,7 +3635,7 @@ def admin_delete_post(post_id):
 
 @app.route('/admin/posts/<int:post_id>/duplicate', methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_duplicate_post(post_id):
     """Duplicar um post"""
     original_post = Post.query.get_or_404(post_id)
@@ -3685,7 +3695,7 @@ def admin_duplicate_post(post_id):
 
 @app.route('/admin/posts/<int:post_id>/data')
 @login_required
-@admin_required
+@editor_required
 def admin_post_data(post_id):
     """Retorna dados do post em JSON para edição"""
     post = Post.query.get_or_404(post_id)
@@ -3708,7 +3718,7 @@ def admin_post_data(post_id):
 
 @app.route('/admin/posts/<int:post_id>/update', methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_update_post(post_id):
     """Atualiza dados do post"""
     try:
@@ -3819,7 +3829,7 @@ def admin_update_post(post_id):
 
 @app.route('/admin/posts/<int:post_id>/toggle-featured', methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_toggle_featured(post_id):
     """Alternar status de destaque do post"""
     post = Post.query.get_or_404(post_id)
@@ -4045,13 +4055,13 @@ def login():
         try:
             parsed = url_parse(next_page) if next_page else None
             if not next_page or (parsed and parsed.netloc != ''):
-                if user.role == 'admin':
+                if user.role in ('admin', 'editor'):
                     next_page = url_for('admin_dashboard')
                 else:
                     next_page = url_for('home')
         except (ValueError, TypeError, AttributeError):
             # Fallback se houver problema com url_parse
-            if user.role == 'admin':
+            if user.role in ('admin', 'editor'):
                 next_page = url_for('admin_dashboard')
             else:
                 next_page = url_for('home')
@@ -4231,7 +4241,7 @@ def reset_password(token):
 @app.route('/admin')
 @app.route('/admin/dashboard')
 @login_required
-@admin_required
+@editor_required
 def admin_dashboard():
     """
     Painel de controle administrativo
@@ -4496,7 +4506,7 @@ def admin_dashboard():
 # Rota para exportar posts
 @app.route("/admin/posts/export")
 @login_required
-@admin_required
+@editor_required
 def admin_export_posts():
     """Exportar posts para CSV"""
     import csv
@@ -4573,7 +4583,7 @@ def admin_export_subscribers():
 # Rota para exportar comentários
 @app.route("/admin/comments/export")
 @login_required
-@admin_required
+@editor_required
 def admin_export_comments():
     """Exportar comentários para CSV"""
     import csv
@@ -4619,7 +4629,7 @@ def admin_export_comments():
 # Rota para criar um novo post
 @app.route("/admin/posts/create", methods=['GET', 'POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_create_post():
     """
     Rota para criação de novos posts pelo painel administrativo
@@ -4893,7 +4903,7 @@ def admin_delete_user(user_id):
 @app.route("/admin/posts")
 @app.route("/admin/posts/")
 @login_required
-@admin_required
+@editor_required
 def admin_posts():
     """
     Página para gerenciar posts
@@ -5013,7 +5023,7 @@ def admin_posts():
 # Adicionar as demais rotas administrativas
 @app.route("/admin/analytics")
 @login_required
-@admin_required
+@editor_required
 def admin_analytics():
     """
     Página de estatísticas com dados reais do banco de dados
@@ -5143,7 +5153,7 @@ def admin_analytics():
 
 @app.route("/admin/categories")
 @login_required
-@admin_required
+@editor_required
 def admin_categories():
     """
     Página para gerenciar categorias com dados reais e estatísticas detalhadas
@@ -5242,7 +5252,7 @@ def admin_categories():
 
 @app.route("/admin/categories/create", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_create_category():
     """
     Criar uma nova categoria
@@ -5327,7 +5337,7 @@ def admin_create_category():
 
 @app.route("/admin/categories/<int:category_id>/edit", methods=['GET'])
 @login_required
-@admin_required
+@editor_required
 def admin_get_category(category_id):
     """
     Buscar dados de uma categoria para edição
@@ -5355,7 +5365,7 @@ def admin_get_category(category_id):
 
 @app.route("/admin/categories/<int:category_id>/update", methods=['PUT', 'POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_update_category(category_id):
     """
     Atualizar uma categoria existente
@@ -5429,7 +5439,7 @@ def admin_update_category(category_id):
 
 @app.route("/admin/categories/<int:category_id>/delete", methods=['DELETE', 'POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_delete_category(category_id):
     """
     Excluir uma categoria
@@ -5478,7 +5488,7 @@ def admin_delete_category(category_id):
 
 @app.route("/admin/categories/<int:category_id>/toggle-featured", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_toggle_category_featured(category_id):
     """
     Alternar status de destaque de uma categoria
@@ -5512,7 +5522,7 @@ def admin_toggle_category_featured(category_id):
 
 @app.route("/admin/categories/<int:category_id>/toggle-status", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_toggle_category_status(category_id):
     """
     Alternar status ativo/inativo de uma categoria
@@ -5546,7 +5556,7 @@ def admin_toggle_category_status(category_id):
 
 @app.route("/admin/categories/stats", methods=['GET'])
 @login_required
-@admin_required
+@editor_required
 def admin_categories_stats():
     """
     Retornar estatísticas atualizadas das categorias
@@ -5567,7 +5577,7 @@ def admin_categories_stats():
 
 @app.route("/admin/categories/bulk-action", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_categories_bulk_action():
     """
     Executar ações em massa em categorias
@@ -5662,7 +5672,7 @@ def admin_categories_bulk_action():
 
 @app.route("/admin/posts/<int:post_id>/toggle-status", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_toggle_post_status(post_id):
     """
     Alternar status ativo/inativo de um post
@@ -5696,7 +5706,7 @@ def admin_toggle_post_status(post_id):
 
 @app.route("/admin/comments")
 @login_required
-@admin_required
+@editor_required
 def admin_comments():
     """
     Página para gerenciar comentários
@@ -5767,7 +5777,7 @@ def admin_comments():
 
 @app.route("/admin/comments/<int:comment_id>/approve", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_approve_comment(comment_id):
     """Aprovar um comentário"""
     comment = Comment.query.get_or_404(comment_id)
@@ -5797,7 +5807,7 @@ def admin_approve_comment(comment_id):
 
 @app.route("/admin/comments/<int:comment_id>/reject", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_reject_comment(comment_id):
     """Rejeitar um comentário"""
     comment = Comment.query.get_or_404(comment_id)
@@ -5827,7 +5837,7 @@ def admin_reject_comment(comment_id):
 
 @app.route("/admin/comments/<int:comment_id>/delete", methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_delete_comment(comment_id):
     """Excluir um comentário"""
     comment = Comment.query.get_or_404(comment_id)
@@ -6658,6 +6668,7 @@ def admin_save_settings():
 
 @app.route("/admin/profile")
 @login_required
+@editor_required
 def admin_profile():
     """
     Página de perfil do usuário
@@ -7152,7 +7163,7 @@ def remove_profile_image():
 # Rota para atualizar a imagem de perfil do admin
 @app.route('/admin/update-profile-image', methods=['POST'])
 @login_required
-@admin_required
+@editor_required
 def admin_update_profile_image():
     if 'profile_image' not in request.files:
         flash('Nenhum arquivo selecionado', 'error')
@@ -7222,6 +7233,7 @@ def admin_remove_profile_image():
 
 @app.route('/admin/update-profile', methods=['POST'])
 @login_required
+@editor_required
 def admin_update_profile():
     # Atualiza os dados básicos do perfil
     if request.method == 'POST':

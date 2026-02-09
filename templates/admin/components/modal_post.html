@@ -6,13 +6,74 @@
     }
 
     #addPostModal .modal-content {
-        width: 90% !important;
-        max-width: 1200px !important;
+        width: 95% !important;
+        max-width: 1100px !important;
         margin: 2rem auto !important;
+        max-height: 90vh !important;
+        overflow: hidden !important;
     }
 
     #addPostModal .modal-body {
         padding: 2rem !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        max-height: calc(90vh - 140px) !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Prevenir rolagem horizontal no modal */
+    #addPostModal .modal-body {
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Forçar layout de 2 colunas no modal de novo post - CORREÇÃO CRÍTICA */
+    #addPostModal .step-content .row {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        margin: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    #addPostModal .step-content .col-md-8 {
+        flex: 0 0 65% !important;
+        max-width: 65% !important;
+        width: 65% !important;
+        padding: 0 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    #addPostModal .step-content .col-md-4 {
+        flex: 0 0 35% !important;
+        max-width: 35% !important;
+        width: 35% !important;
+        padding: 0 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    #addPostModal .step-content .col-md-6 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+        width: 50% !important;
+        padding: 0 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Mobile: empilhar colunas em telas pequenas */
+    @media (max-width: 992px) {
+        #addPostModal .step-content .row {
+            flex-wrap: wrap !important;
+        }
+
+        #addPostModal .step-content .col-md-8,
+        #addPostModal .step-content .col-md-4,
+        #addPostModal .step-content .col-md-6 {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 10px !important;
+        }
     }
 
     /* Form Steps Container */
@@ -133,47 +194,6 @@
             transform: translateY(0);
         }
     }
-
-    /* CRÍTICO: Forçar layout de 2 colunas funcionar - MÁXIMA ESPECIFICIDADE */
-    #addPostModal .step-content .row {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        margin-left: -15px !important;
-        margin-right: -15px !important;
-    }
-
-    /* Mobile primeiro - 100% de largura */
-    #addPostModal .step-content div.col-md-4,
-    #addPostModal .step-content div.col-md-6,
-    #addPostModal .step-content div.col-md-8 {
-        position: relative !important;
-        width: 100% !important;
-        padding-left: 15px !important;
-        padding-right: 15px !important;
-        flex: 0 0 100% !important;
-        max-width: 100% !important;
-    }
-
-    /* DESKTOP: Forçar 2 colunas em telas >= 768px com MÁXIMA PRIORIDADE */
-    @media screen and (min-width: 768px) {
-        #addPostModal .step-content div.col-md-4 {
-            flex: 0 0 33.333333% !important;
-            max-width: 33.333333% !important;
-            width: 33.333333% !important;
-        }
-
-        #addPostModal .step-content div.col-md-6 {
-            flex: 0 0 50% !important;
-            max-width: 50% !important;
-            width: 50% !important;
-        }
-
-        #addPostModal .step-content div.col-md-8 {
-            flex: 0 0 66.666667% !important;
-            max-width: 66.666667% !important;
-            width: 66.666667% !important;
-        }
-    }
 </style>
 <div class="modal" id="addPostModal">
     <div class="modal-content modal-xl">
@@ -204,8 +224,8 @@
             <form id="addPostForm" action="{{ url_for('admin_create_post') }}" method="POST" enctype="multipart/form-data">
                 <!-- Step 1: Informações Básicas -->
                 <div class="step-content active" data-step="1">
-                    <div class="row" style="display: flex !important; flex-wrap: wrap !important;">
-                        <div class="col-md-8" style="flex: 0 0 66.666667%; max-width: 66.666667%; padding: 0 15px;">
+                    <div class="row" style="display: flex !important; flex-wrap: nowrap !important; margin: 0 !important; width: 100% !important; box-sizing: border-box !important;">
+                        <div class="col-md-8" style="flex: 0 0 65% !important; max-width: 65% !important; width: 65% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <div class="form-group">
                                 <label for="postTitle" class="form-label">
                                     <i class="fas fa-heading"></i> Título do Post
@@ -265,7 +285,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-4" style="flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px;">
+                        <div class="col-md-4" style="flex: 0 0 35% !important; max-width: 35% !important; width: 35% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <div class="sidebar-card">
                                 <h5><i class="fas fa-image"></i> Imagem de Destaque</h5>
                                 <div class="image-upload-area" id="imageUploadArea">
@@ -310,8 +330,8 @@
 
                 <!-- Step 2: Detalhes -->
                 <div class="step-content" data-step="2">
-                    <div class="row" style="display: flex !important; flex-wrap: wrap !important;">
-                        <div class="col-md-6" style="flex: 0 0 50%; max-width: 50%; padding: 0 15px;">
+                    <div class="row" style="display: flex !important; flex-wrap: nowrap !important; margin: 0 !important; width: 100% !important; box-sizing: border-box !important;">
+                        <div class="col-md-6" style="flex: 0 0 50% !important; max-width: 50% !important; width: 50% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <div class="form-group">
                                 <label for="postDownloadLink" class="form-label">
                                     <i class="fas fa-download"></i> Link de Download
@@ -359,7 +379,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6" style="flex: 0 0 50%; max-width: 50%; padding: 0 15px;">
+                        <div class="col-md-6" style="flex: 0 0 50% !important; max-width: 50% !important; width: 50% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <div class="form-group">
                                 <label for="postTags" class="form-label">
                                     <i class="fas fa-tags"></i> Tags
@@ -409,8 +429,8 @@
 
                 <!-- Step 3: SEO & Publicação -->
                 <div class="step-content" data-step="3">
-                    <div class="row" style="display: flex !important; flex-wrap: wrap !important;">
-                        <div class="col-md-4" style="flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px;">
+                    <div class="row" style="display: flex !important; flex-wrap: nowrap !important; margin: 0 !important; width: 100% !important; box-sizing: border-box !important;">
+                        <div class="col-md-6" style="flex: 0 0 50% !important; max-width: 50% !important; width: 50% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <h5><i class="fas fa-search"></i> Otimização para Mecanismos de Busca</h5>
 
                             <div class="form-group">
@@ -451,7 +471,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-4" style="flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px;">
+                        <div class="col-md-6" style="flex: 0 0 50% !important; max-width: 50% !important; width: 50% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <div class="sidebar-card">
                                 <h5><i class="fas fa-calendar"></i> Publicação</h5>
 

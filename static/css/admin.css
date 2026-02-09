@@ -1735,7 +1735,7 @@ body.modal-open {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    z-index: 2100;
+    z-index: 999999 !important;
     min-width: 300px;
     max-width: 450px;
     border: 1px solid var(--admin-border-color);

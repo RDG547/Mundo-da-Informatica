@@ -401,41 +401,7 @@
             else return (bytes / 1048576).toFixed(1) + ' MB';
         }
 
-        // Mostrar notificações
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.className = 'notification ' + type;
-
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-                    <div>
-                        <p>${message}</p>
-                    </div>
-                </div>
-                <button class="notification-close">×</button>
-            `;
-
-            document.body.appendChild(notification);
-
-            // Animar entrada
-            setTimeout(() => notification.classList.add('show'), 10);
-
-            // Configurar fechamento
-            const closeBtn = notification.querySelector('.notification-close');
-            closeBtn.addEventListener('click', () => {
-                notification.classList.remove('show');
-                setTimeout(() => notification.remove(), 300);
-            });
-
-            // Auto-fechar após 5 segundos
-            setTimeout(() => {
-                if (document.body.contains(notification)) {
-                    notification.classList.remove('show');
-                    setTimeout(() => notification.remove(), 300);
-                }
-            }, 5000);
-        }
+        // showNotification global é definida em admin.js
     });
 </script>
 {% endblock %}

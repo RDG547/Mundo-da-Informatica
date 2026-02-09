@@ -1348,89 +1348,10 @@
         pointer-events: none;
     }
 
-    /* Notification Styles */
-    .notification {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        padding: 0.75rem 1rem;
-        z-index: 10000;
-        max-width: 350px;
-        min-width: 250px;
-        font-size: 0.9rem;
-        animation: slideInRight 0.3s ease;
-    }
-
-    .notification.success {
-        border-left: 4px solid #28a745;
-        color: #155724;
-        background-color: #d4edda;
-    }
-
-    .notification.info {
-        border-left: 4px solid #17a2b8;
-        color: #0c5460;
-        background-color: #d1ecf1;
-    }
-
-    .notification.warning {
-        border-left: 4px solid #ffc107;
-        color: #856404;
-        background-color: #fff3cd;
-    }
-
-    .notification.error {
-        border-left: 4px solid #dc3545;
-        color: #721c24;
-        background-color: #f8d7da;
-    }
-
-    .notification-content {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .notification-close {
-        position: absolute;
-        top: 0.5rem;
-        right: 0.5rem;
-        background: none;
-        border: none;
-        font-size: 1.2rem;
-        cursor: pointer;
-        color: #6c757d;
-    }
-
+    /* Notification Styles - Complementos para página de usuários */
+    /* Estilos base de notificação estão em admin.css */
     .notification.fade-out {
-        animation: slideOutRight 0.3s ease;
-    }
-
-    @keyframes slideInRight {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-
-    @keyframes slideOutRight {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
+        animation: slideOutRight 0.3s ease forwards;
     }
 
     /* Download Controls Styles */
@@ -1544,22 +1465,8 @@
     // ID do usuário atual logado
     const CURRENT_USER_ID = '{{ session.get("user_id") }}';
 
-    // Função para mostrar notificações
-    function showNotification(message, type = 'info') {
-        // Criar elemento de notificação
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-
-        // Adicionar ao body
-        document.body.appendChild(notification);
-
-        // Remover após 10 segundos (aumentado para dar mais tempo de leitura)
-        setTimeout(() => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, 10000);
-    }
+    // showNotification é definida globalmente em admin.js (10s padrão, duração configurável)
+    // Não redefinir aqui para manter o padrão consistente do projeto
 
     // Toggle dropdown de cargo - Portal approach
     window.toggleRoleDropdown = function (badgeElement, event) {

@@ -56,6 +56,15 @@ def migrate():
             migrations_applied = True
             print("✓ week_reset_date column added")
 
+        # Coluna position na tabela favorites (para drag-and-drop)
+        cursor.execute("PRAGMA table_info(favorites)")
+        fav_columns = [info[1] for info in cursor.fetchall()]
+        if 'position' not in fav_columns:
+            print("Adding position column to favorites...")
+            cursor.execute("ALTER TABLE favorites ADD COLUMN position INTEGER DEFAULT 0")
+            migrations_applied = True
+            print("✓ position column added to favorites")
+
         # Verificar se tabela transactions existe
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")
         transactions_table_exists = cursor.fetchone() is not None

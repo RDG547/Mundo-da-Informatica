@@ -190,7 +190,7 @@
                     <div class="posts-grid" style="margin-top: 1.5rem;">
                         <div class="row" id="favorites-container">
                             {% for post in favorite_posts[:6] %}
-                            <div class="col-md-6 col-lg-4 mb-3 favorite-post-item">
+                            <div class="col-md-6 col-lg-4 mb-3 favorite-post-item" data-post-id="{{ post.id }}" draggable="true">
                                 <div class="post-card" style="position: relative;">
                                     <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
                                         title="Remover dos favoritos">
@@ -250,7 +250,7 @@
                             {% endfor %}
                             {% if favorite_posts|length > 6 %}
                             {% for post in favorite_posts[6:] %}
-                            <div class="col-md-6 col-lg-4 mb-3 favorite-post-item extra-favorites" style="display: none;">
+                            <div class="col-md-6 col-lg-4 mb-3 favorite-post-item extra-favorites" style="display: none;" data-post-id="{{ post.id }}" draggable="true">
                                 <div class="post-card" style="position: relative;">
                                     <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
                                         title="Remover dos favoritos">

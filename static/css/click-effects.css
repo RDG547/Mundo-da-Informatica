@@ -167,12 +167,18 @@ input[type="datetime-local"],
 input[type="month"],
 input[type="time"],
 input[type="week"],
-textarea,
+textarea {
+    cursor: text !important;
+}
+
 select,
 .form-control,
 .form-select,
-.modern-input,
 .modern-select {
+    cursor: pointer !important;
+}
+
+.modern-input {
     cursor: text !important;
 }
 
@@ -188,7 +194,12 @@ input[type="datetime-local"]:active,
 input[type="month"]:active,
 input[type="time"]:active,
 input[type="week"]:active,
-textarea:active,
+textarea:active {
+    transform: none !important;
+    box-shadow: 0 0 0 0.2rem rgba(58, 134, 255, 0.25) !important;
+    cursor: text !important;
+}
+
 select:active,
 .form-control:active,
 .form-select:active,
@@ -196,7 +207,6 @@ select:active,
 .modern-select:active {
     transform: none !important;
     box-shadow: 0 0 0 0.2rem rgba(58, 134, 255, 0.25) !important;
-    cursor: text !important;
 }
 
 /* Efeito especial para links que não são botões */

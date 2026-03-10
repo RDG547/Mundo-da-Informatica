@@ -1102,6 +1102,7 @@ class Favorite(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=False)
     date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    position = db.Column(db.Integer, default=0)
 
     # Relacionamentos
     user = db.relationship('User', backref=db.backref('favorites', lazy=True, cascade="all, delete"))
@@ -6739,7 +6740,7 @@ def profile(user_id=None):
     # Buscar favoritos do usuário
     favorite_posts = []
     if hasattr(user, 'id') and current_user.is_authenticated and current_user.id == user.id:
-        favorites = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.date_added.desc()).all()
+        favorites = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.position.asc(), Favorite.date_added.desc()).all()
         favorite_posts = [fav.post for fav in favorites if fav.post and fav.post.is_active]
 
     # Buscar histórico de downloads baseado no plano
@@ -6816,7 +6817,7 @@ def get_user_favorites_api():
         user = current_user
 
         # Buscar favoritos do usuário
-        favorites = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.date_added.desc()).all()
+        favorites = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.position.asc(), Favorite.date_added.desc()).all()
 
         posts_data = []
         for favorite in favorites[:6]:  # Limitar a 6 posts para a página de perfil
@@ -6847,6 +6848,28 @@ def get_user_favorites_api():
         print(f"[ERRO] Ao buscar favoritos: {str(e)}")
         import traceback
         traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/reorder-favorites', methods=['POST'])
+@login_required
+def reorder_favorites_api():
+    """Reordena os favoritos do usuário"""
+    try:
+        data = request.get_json()
+        order = data.get('order', [])
+        if not order or not isinstance(order, list):
+            return jsonify({'success': False, 'message': 'Ordem inválida'}), 400
+
+        for idx, post_id in enumerate(order):
+            post_id = int(post_id)
+            fav = Favorite.query.filter_by(user_id=current_user.id, post_id=post_id).first()
+            if fav:
+                fav.position = idx
+
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # Rota para obter histórico de downloads (API JSON)

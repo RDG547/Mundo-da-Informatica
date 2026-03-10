@@ -345,7 +345,7 @@ async function reloadFavoritesSection() {
             const postUrl = post.category_slug ? `/${post.category_slug}/${post.slug}` : `/post/${post.id}`;
 
             postsHTML += `
-                <div class="col-md-6 col-lg-4 mb-3">
+                <div class="col-md-6 col-lg-4 mb-3 favorite-post-item" data-post-id="${post.id}" draggable="true">
                     <div class="post-card" style="position: relative;">
                         <button onclick="removeFavorite(${post.id})" class="favorite-remove-badge" title="Remover dos favoritos">
                             <i class="fas fa-times"></i>
@@ -417,6 +417,10 @@ async function reloadFavoritesSection() {
             // Reinicializar botões de download após atualizar o HTML
             if (typeof window.setupDownloadButtons === 'function') {
                 window.setupDownloadButtons();
+            }
+            // Reinicializar drag-and-drop
+            if (typeof window.setupFavoritesDragDrop === 'function') {
+                window.setupFavoritesDragDrop();
             }
         }, 10);
 
@@ -910,6 +914,187 @@ window.toggleAllFavorites = function(button) {
         text.textContent = 'Ver menos';
     }
 };
+
+// ============================================
+// Sistema de Drag-and-Drop para Favoritos
+// ============================================
+(function initFavoritesDragDrop() {
+    let draggedItem = null;
+    let placeholder = null;
+
+    function setupDragDrop() {
+        const container = document.getElementById('favorites-container');
+        if (!container) return;
+
+        const items = container.querySelectorAll('.favorite-post-item[draggable="true"]');
+        if (items.length < 2) return;
+
+        // Adicionar cursor de arrasto e estilos
+        items.forEach(item => {
+            if (item.dataset.dragInitialized) return;
+            item.dataset.dragInitialized = 'true';
+            item.style.cursor = 'grab';
+
+            item.addEventListener('dragstart', function(e) {
+                draggedItem = this;
+                this.style.opacity = '0.4';
+                this.style.cursor = 'grabbing';
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', this.dataset.postId);
+            });
+
+            item.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+                this.style.cursor = 'grab';
+                draggedItem = null;
+                if (placeholder && placeholder.parentNode) {
+                    placeholder.parentNode.removeChild(placeholder);
+                }
+                placeholder = null;
+                // Remover todos os indicadores visuais
+                container.querySelectorAll('.favorite-post-item').forEach(el => {
+                    el.style.borderLeft = '';
+                    el.style.borderRight = '';
+                });
+            });
+
+            item.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (!draggedItem || draggedItem === this) return;
+
+                // Indicar posição de drop
+                const rect = this.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                container.querySelectorAll('.favorite-post-item').forEach(el => {
+                    el.style.borderLeft = '';
+                    el.style.borderRight = '';
+                });
+
+                if (e.clientX < midX) {
+                    this.style.borderLeft = '3px solid var(--primary-color, #4a90e2)';
+                } else {
+                    this.style.borderRight = '3px solid var(--primary-color, #4a90e2)';
+                }
+            });
+
+            item.addEventListener('dragleave', function() {
+                this.style.borderLeft = '';
+                this.style.borderRight = '';
+            });
+
+            item.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if (!draggedItem || draggedItem === this) return;
+
+                const rect = this.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+
+                if (e.clientX < midX) {
+                    container.insertBefore(draggedItem, this);
+                } else {
+                    container.insertBefore(draggedItem, this.nextSibling);
+                }
+
+                this.style.borderLeft = '';
+                this.style.borderRight = '';
+
+                // Salvar nova ordem
+                saveOrder();
+            });
+        });
+
+        // Touch support para mobile
+        let touchItem = null;
+        let touchClone = null;
+        let touchStartX, touchStartY;
+
+        items.forEach(item => {
+            if (item.dataset.touchInitialized) return;
+            item.dataset.touchInitialized = 'true';
+
+            item.addEventListener('touchstart', function(e) {
+                if (e.target.closest('button, a, .btn')) return;
+                touchItem = this;
+                const touch = e.touches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+            }, { passive: true });
+
+            item.addEventListener('touchmove', function(e) {
+                if (!touchItem) return;
+                const touch = e.touches[0];
+                const dx = Math.abs(touch.clientX - touchStartX);
+                const dy = Math.abs(touch.clientY - touchStartY);
+                if (dx > 10 && dx > dy) {
+                    e.preventDefault();
+                    if (!touchClone) {
+                        touchClone = touchItem.cloneNode(true);
+                        touchClone.style.position = 'fixed';
+                        touchClone.style.zIndex = '99999';
+                        touchClone.style.opacity = '0.8';
+                        touchClone.style.pointerEvents = 'none';
+                        touchClone.style.width = touchItem.offsetWidth + 'px';
+                        document.body.appendChild(touchClone);
+                        touchItem.style.opacity = '0.3';
+                    }
+                    touchClone.style.left = (touch.clientX - touchItem.offsetWidth / 2) + 'px';
+                    touchClone.style.top = (touch.clientY - 30) + 'px';
+                }
+            }, { passive: false });
+
+            item.addEventListener('touchend', function(e) {
+                if (!touchItem || !touchClone) {
+                    touchItem = null;
+                    return;
+                }
+                touchClone.remove();
+                touchClone = null;
+                touchItem.style.opacity = '1';
+
+                const touch = e.changedTouches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const dropTarget = target ? target.closest('.favorite-post-item') : null;
+
+                if (dropTarget && dropTarget !== touchItem) {
+                    const rect = dropTarget.getBoundingClientRect();
+                    const midX = rect.left + rect.width / 2;
+                    if (touch.clientX < midX) {
+                        container.insertBefore(touchItem, dropTarget);
+                    } else {
+                        container.insertBefore(touchItem, dropTarget.nextSibling);
+                    }
+                    saveOrder();
+                }
+                touchItem = null;
+            });
+        });
+    }
+
+    function saveOrder() {
+        const container = document.getElementById('favorites-container');
+        if (!container) return;
+        const items = container.querySelectorAll('.favorite-post-item[data-post-id]');
+        const order = Array.from(items).map(item => parseInt(item.dataset.postId));
+
+        fetch('/api/reorder-favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: order })
+        }).catch(function(err) {
+            console.error('[FAVORITES] Erro ao salvar ordem:', err);
+        });
+    }
+
+    // Inicializar
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupDragDrop);
+    } else {
+        setupDragDrop();
+    }
+    document.addEventListener('contentLoaded', setupDragDrop);
+    window.setupFavoritesDragDrop = setupDragDrop;
+})();
 
 // Inicializar quando a página carregar
 if (document.readyState === 'loading') {

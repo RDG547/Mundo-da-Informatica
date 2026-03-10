@@ -1135,16 +1135,20 @@
                 allBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     modal.style.display = 'none';
-                    // Usar iframes ocultos com delay para evitar bloqueio de popup
-                    files.forEach(function(f, i) {
-                        setTimeout(function() {
-                            var iframe = document.createElement('iframe');
-                            iframe.style.display = 'none';
-                            iframe.src = '/download/' + postId + '?type=' + encodeURIComponent(f.type);
-                            document.body.appendChild(iframe);
-                            setTimeout(function() { iframe.remove(); }, 30000);
-                        }, i * 2000);
+                    // Abrir uma nova aba com página que dispara todos os downloads
+                    var downloadUrls = files.map(function(f) {
+                        return '/download/' + postId + '?type=' + encodeURIComponent(f.type);
                     });
+                    var w = window.open('', '_blank');
+                    if (w) {
+                        w.document.write('<!DOCTYPE html><html><head><title>Baixando...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5;flex-direction:column;gap:12px;}</style></head><body>');
+                        w.document.write('<h2>Iniciando downloads...</h2><p>Aguarde, os downloads serão iniciados automaticamente.</p>');
+                        w.document.write('<script>var urls=' + JSON.stringify(downloadUrls) + ';');
+                        w.document.write('urls.forEach(function(url,i){setTimeout(function(){var a=document.createElement("a");a.href=url;a.style.display="none";document.body.appendChild(a);a.click();},i*2000);});');
+                        w.document.write('setTimeout(function(){document.body.innerHTML="<h2>Downloads iniciados!</h2><p>Você pode fechar esta aba.</p>";setTimeout(function(){window.close();},3000);},urls.length*2000+1000);');
+                        w.document.write('<\/script></body></html>');
+                        w.document.close();
+                    }
                 });
                 optionsDiv.appendChild(allBtn);
             }

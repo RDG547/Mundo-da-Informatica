@@ -1141,6 +1141,137 @@ section {
     padding: 0;
 }
 
+/* ============================================
+   Paginação da Homepage
+   ============================================ */
+.home-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.home-page-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    height: 42px;
+    padding: 0 0.5rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    color: #4a5568;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    user-select: none;
+}
+
+.home-page-btn:hover:not(:disabled):not(.active) {
+    border-color: var(--primary-color, #4a90e2);
+    color: var(--primary-color, #4a90e2);
+    background: rgba(74, 144, 226, 0.06);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.15);
+}
+
+.home-page-btn.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+.home-page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f7fafc;
+}
+
+.home-page-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 42px;
+    color: #a0aec0;
+    font-weight: 700;
+    letter-spacing: 2px;
+    user-select: none;
+}
+
+.home-page-prev,
+.home-page-next {
+    min-width: 46px;
+}
+
+/* Animação de slide para paginação AJAX */
+#recent-posts-container {
+    overflow: hidden;
+    position: relative;
+}
+
+#recent-posts-grid {
+    transition: none;
+}
+
+#recent-posts-grid.slide-out-left {
+    animation: slideOutLeft 0.3s ease forwards;
+}
+
+#recent-posts-grid.slide-out-right {
+    animation: slideOutRight 0.3s ease forwards;
+}
+
+#recent-posts-grid.slide-in-left {
+    animation: slideInLeft 0.3s ease forwards;
+}
+
+#recent-posts-grid.slide-in-right {
+    animation: slideInRight 0.3s ease forwards;
+}
+
+@keyframes slideOutLeft {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-100%); opacity: 0; }
+}
+
+@keyframes slideOutRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes slideInLeft {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .home-pagination {
+        gap: 0.35rem;
+    }
+    .home-page-btn {
+        min-width: 36px;
+        height: 36px;
+        font-size: 0.85rem;
+        border-radius: 10px;
+    }
+    .home-page-prev,
+    .home-page-next {
+        min-width: 40px;
+    }
+}
+
 .post-card {
     background-color: white;
     border-radius: var(--radius-lg);

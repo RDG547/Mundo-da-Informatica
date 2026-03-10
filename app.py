@@ -1679,7 +1679,7 @@ def home():
     try:
         page = request.args.get('page', 1, type=int)
         posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())
-        posts_paginated = posts_query.paginate(page=page, per_page=6, error_out=False)
+        posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
         posts = posts_paginated.items
         featured = Post.query.filter_by(featured=True).limit(4).all()
 
@@ -1704,7 +1704,7 @@ def home():
         # Tentar inicializar o banco de dados novamente (já estamos no contexto da rota)
         initialize_db()
         # Tentar novamente após inicialização
-        posts = Post.query.order_by(Post.date_posted.desc()).limit(6).all()
+        posts = Post.query.order_by(Post.date_posted.desc()).limit(8).all()
         featured = Post.query.filter_by(featured=True).limit(4).all()
 
         # Estatísticas reais para fallback
@@ -3448,6 +3448,76 @@ def posts():
 def api_posts():
     posts = Post.query.order_by(Post.date_posted.desc()).limit(10).all()
     return jsonify([post.to_dict() for post in posts])
+
+@app.route('/api/recent-posts')
+def api_recent_posts():
+    """API para paginação AJAX dos posts recentes na homepage"""
+    page = request.args.get('page', 1, type=int)
+    posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())
+    posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
+
+    favorite_post_ids = []
+    if current_user.is_authenticated:
+        favorite_post_ids = [f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()]
+
+    posts_data = []
+    for post in posts_paginated.items:
+        dl_files = post.get_metadata('download_files') or []
+        cat_slug = generate_slug(post.category_str) if post.category_str else ''
+        post_link = f'/{cat_slug}/{post.slug}' if post.slug and cat_slug else f'/post/{post.id}'
+        img_url = ''
+        if post.image_url:
+            if post.image_url.startswith('http'):
+                img_url = post.image_url
+            else:
+                img_url = f'/static/uploads/posts/{post.image_url}'
+        else:
+            img_url = '/static/images/posts/default.jpg'
+
+        cat_icon = 'fas fa-folder'
+        icon_map = {'BIOS': 'fas fa-microchip', 'Esquemas': 'fas fa-project-diagram', 'Drivers': 'fas fa-cogs',
+                    'Softwares': 'fas fa-laptop-code', 'Impressoras': 'fas fa-print', 'Cursos': 'fas fa-graduation-cap',
+                    'Datasheet': 'fas fa-file-alt'}
+        if post.category and post.category.icon:
+            cat_icon = post.category.icon
+        elif post.category_str in icon_map:
+            cat_icon = icon_map[post.category_str]
+
+        posts_data.append({
+            'id': post.id,
+            'title': post.title,
+            'content': post.content[:500] if post.content else '',
+            'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
+            'views': post.views or 0,
+            'image_url': img_url,
+            'download_link': post.download_link,
+            'category_str': post.category_str or 'Geral',
+            'category_icon': cat_icon,
+            'post_url': post_link,
+            'featured': post.featured,
+            'download_files': dl_files,
+            'is_favorited': post.id in favorite_post_ids
+        })
+
+    pages = []
+    for p in posts_paginated.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2):
+        pages.append(p)
+
+    return jsonify({
+        'success': True,
+        'posts': posts_data,
+        'pagination': {
+            'page': posts_paginated.page,
+            'pages': posts_paginated.pages,
+            'total': posts_paginated.total,
+            'has_prev': posts_paginated.has_prev,
+            'has_next': posts_paginated.has_next,
+            'prev_num': posts_paginated.prev_num,
+            'next_num': posts_paginated.next_num,
+            'iter_pages': pages
+        },
+        'is_authenticated': current_user.is_authenticated
+    })
 
 @app.route('/api/debug/posts')
 def api_debug_posts():

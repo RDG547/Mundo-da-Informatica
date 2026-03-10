@@ -1,6 +1,12 @@
 {% extends "admin/base.html" %}
 
 {% block content %}
+<style>
+    .page-loading { opacity: 0; transition: opacity 0.3s ease-in; }
+    .page-loaded { opacity: 1; }
+</style>
+
+<div class="page-loading" id="pageContent">
 <!-- Enhanced Header -->
 <div class="admin-header slide-in-up">
     <div class="header-content">
@@ -546,6 +552,7 @@
         </div>
     </div>
 </div>
+</div><!-- Fecha page-loading -->
 {% endblock %}
 
 <!-- Modal de Novo Post -->
@@ -554,6 +561,13 @@
 {% block scripts %}
 <!-- Post Wizard Script - MESMO DO DASHBOARD -->
 <script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
+
+<script>
+    window.addEventListener('load', function() {
+        var el = document.getElementById('pageContent');
+        if (el) { el.classList.remove('page-loading'); el.classList.add('page-loaded'); }
+    });
+</script>
 
 <script>
     // ========================================

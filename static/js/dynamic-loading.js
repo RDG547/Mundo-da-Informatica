@@ -242,13 +242,15 @@ if (typeof window.DynamicLoader !== 'undefined') {
                         // Reinicializa componentes imediatamente
                         this.reinitializeComponents();
 
-                        // Mostra o conteúdo após um breve delay para CSS aplicar
+                        // Double rAF ensures the browser has painted with styles applied
                         requestAnimationFrame(() => {
-                            mainContainer.style.opacity = '1';
+                            requestAnimationFrame(() => {
+                                mainContainer.style.opacity = '1';
+                            });
                         });
 
                         window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }, 150);
+                    }, 100);
                 }
             }
 
@@ -836,6 +838,25 @@ if (typeof window.DynamicLoader !== 'undefined') {
                             }
                         });
                     });
+                }
+
+                // Initialize particles for legal pages during SPA navigation
+                const legalSection = document.querySelector('.legal-page-section');
+                if (legalSection && typeof InteractiveParticles !== 'undefined') {
+                    // Remove any existing particle canvas to avoid duplicates
+                    const existingCanvas = legalSection.querySelector('canvas');
+                    if (existingCanvas) existingCanvas.remove();
+
+                    legalSection.id = 'legal-particles-container';
+                    new InteractiveParticles('legal-particles-container', {
+                        particleCount: 70,
+                        particleSize: 3.5,
+                        particleSpeed: 0.4,
+                        connectionDistance: 130,
+                        mouseRadius: 200,
+                        mouseRepel: true
+                    });
+                    console.log('[DYNAMIC-LOADING] ✨ Legal page particles initialized');
                 }
 
                 // Add animation to sections on scroll

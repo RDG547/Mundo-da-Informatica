@@ -155,6 +155,27 @@ window.featureData = {
         icon: 'fas fa-book-open',
         title: 'Tutoriais em Vídeo',
         text: 'Tutoriais passo a passo em vídeo para resolver problemas comuns: substituição de componentes, instalação de drivers, configuração de sistemas. Acompanhe procedimentos reais de manutenção e reparo com explicações detalhadas.'
+    },
+    // Datasheet Features
+    'datasheet-ics': {
+        icon: 'fas fa-microchip',
+        title: 'Circuitos Integrados',
+        text: 'Datasheets completos de circuitos integrados (ICs) das principais famílias: microcontroladores, amplificadores operacionais, reguladores de tensão, conversores AD/DA, drivers de potência e muito mais. Inclui pinagens, características elétricas, diagramas de aplicação típica e condições de operação.'
+    },
+    'datasheet-transistores': {
+        icon: 'fas fa-bolt',
+        title: 'Transistores',
+        text: 'Documentação técnica de transistores BJT (NPN/PNP), MOSFETs (canal N/P), IGBTs e transistores de potência. Inclui parâmetros como ganho (hFE), tensão máxima (VCES), corrente de coletor, potência dissipada, curvas características e equivalentes.'
+    },
+    'datasheet-capacitores': {
+        icon: 'fas fa-battery-half',
+        title: 'Capacitores',
+        text: 'Especificações técnicas de capacitores ceramâmicos, eletrolíticos, de filme, tântalo e supercapacitores. Informações sobre capacitância, tolerância, tensão nominal, ESR, temperatura de operação e dimensões físicas dos componentes.'
+    },
+    'datasheet-semicondutores': {
+        icon: 'fas fa-atom',
+        title: 'Semicondutores',
+        text: 'Datasheets de diodos (retificadores, Zener, Schottky, LED), tiristores (SCR, TRIAC, DIAC), varistores e outros semicondutores. Inclui características elétricas, encapsulamentos, curvas I-V e recomendações de uso em circuitos.'
     }
 };
 

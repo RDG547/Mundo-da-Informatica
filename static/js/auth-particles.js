@@ -63,7 +63,8 @@ class InteractiveParticles {
     resizeCanvas() {
         const rect = this.container.getBoundingClientRect();
         this.canvas.width = rect.width;
-        this.canvas.height = rect.height;
+        // Use scrollHeight for containers taller than viewport (e.g., legal pages)
+        this.canvas.height = Math.max(rect.height, this.container.scrollHeight);
     }
 
     createParticles() {

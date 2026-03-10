@@ -20,6 +20,8 @@
                 <i class="fas fa-print"></i>
                 {% elif category == 'Cursos' %}
                 <i class="fas fa-graduation-cap"></i>
+                {% elif category == 'Datasheet' %}
+                <i class="fas fa-file-alt"></i>
                 {% else %}
                 <i class="fas fa-folder"></i>
                 {% endif %}
@@ -41,6 +43,8 @@
                 {% elif category == 'Cursos' %}
                 Cursos especializados em manutenção de hardware, eletrônica e reparação de equipamentos para
                 profissionais.
+                {% elif category == 'Datasheet' %}
+                Datasheets técnicos completos de componentes eletrônicos, semicondutores e circuitos integrados para consulta e referência.
                 {% else %}
                 Encontre todos os recursos especializados em {{ category }} organizados por subcategorias para sua
                 conveniência.
@@ -78,6 +82,9 @@
                             {% elif category == 'Cursos' %}
                             <i class="fas fa-info-circle"></i>
                             Sobre Cursos
+                            {% elif category == 'Datasheet' %}
+                            <i class="fas fa-info-circle"></i>
+                            Sobre Datasheet
                             {% else %}
                             <i class="fas fa-info-circle"></i>
                             Sobre {{ category }}
@@ -210,6 +217,26 @@
                                 <span>Tutoriais</span>
                             </div>
                         </div>
+                        {% elif category == 'Datasheet' %}
+                        <p>Nossa biblioteca de datasheets inclui documentação técnica completa de componentes eletrônicos, com especificações detalhadas, pinagens e características elétricas.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="datasheet-ics" style="cursor: pointer;">
+                                <i class="fas fa-microchip"></i>
+                                <span>Circuitos Integrados</span>
+                            </div>
+                            <div class="feature-item" data-feature="datasheet-transistores" style="cursor: pointer;">
+                                <i class="fas fa-bolt"></i>
+                                <span>Transistores</span>
+                            </div>
+                            <div class="feature-item" data-feature="datasheet-capacitores" style="cursor: pointer;">
+                                <i class="fas fa-battery-half"></i>
+                                <span>Capacitores</span>
+                            </div>
+                            <div class="feature-item" data-feature="datasheet-semicondutores" style="cursor: pointer;">
+                                <i class="fas fa-atom"></i>
+                                <span>Semicondutores</span>
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -277,9 +304,9 @@
                                 </div>
                                 <div class="post-description-section">
                                     <div class="post-description-title">Descrição</div>
-                                    <div class="post-description-text">{{ ((post.short_description or
-                                        post.content)|striptags)[:150] }}{% if ((post.short_description or
-                                        post.content)|striptags)|length > 150 %}...{% endif %}</div>
+                                    <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ ((post.short_description or
+                                        post.content)|striptags)[:300] }}{% if ((post.short_description or
+                                        post.content)|striptags)|length > 300 %}...{% endif %}</div>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                     {% if post.download_link %}
@@ -289,7 +316,7 @@
                                     </a>
                                     {% endif %}
                                     <a href="{{ post_url(post) }}" class="btn"
-                                        style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap;">Ver
+                                        style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver
                                         Detalhes</a>
                                     {% if current_user.is_authenticated %}
                                     <button data-post-id="{{ post.id }}" onclick="toggleFavorite({{ post.id }})"

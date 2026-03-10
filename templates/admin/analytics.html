@@ -165,7 +165,12 @@
                     {% if analytics.popular_posts %}
                         {% for post in analytics.popular_posts %}
                         <tr>
-                            <td>{{ post.title }}</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <img src="{{ post.image_url or url_for('static', filename='images/posts/default.jpg') }}" alt="{{ post.title }}" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+                                    <span>{{ post.title }}</span>
+                                </div>
+                            </td>
                             <td>{{ post.category_str or 'N/A' }}</td>
                             <td>{{ post.views }}</td>
                             <td>{{ post.downloads }}</td>

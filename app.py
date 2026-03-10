@@ -585,6 +585,10 @@ def get_default_category_data():
         'Cursos': {
             'icon': 'fas fa-graduation-cap',
             'description': 'Materiais educativos e cursos técnicos para aprimoramento profissional em informática, eletrônica e tecnologia.'
+        },
+        'Datasheet': {
+            'icon': 'fas fa-file-alt',
+            'description': 'Datasheets técnicos de componentes eletrônicos, circuitos integrados e semicondutores para consulta e referência profissional.'
         }
     }
 
@@ -3953,7 +3957,8 @@ def initialize_db():
                 Category(name='Drivers', slug='drivers', description='Drivers para diversos dispositivos', is_active=True, order=3),
                 Category(name='Softwares', slug='softwares', description='Programas e aplicativos úteis', is_active=True, order=4),
                 Category(name='Impressoras', slug='impressoras', description='Drivers e softwares para impressoras', is_active=True, order=5),
-                Category(name='Cursos', slug='cursos', description='Cursos e materiais de estudo', is_active=True, order=6)
+                Category(name='Cursos', slug='cursos', description='Cursos e materiais de estudo', is_active=True, order=6),
+                Category(name='Datasheet', slug='datasheet', description='Datasheets técnicos de componentes eletrônicos', is_active=True, order=7)
             ]
 
             for category in default_categories:

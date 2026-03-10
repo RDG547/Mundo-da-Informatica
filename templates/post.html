@@ -276,7 +276,7 @@
                         {% for related in related_posts %}
                         <a href="{{ post_url(related) }}" class="related-post-item">
                             <div class="related-post-image">
-                                <img src="{{ url_for('static', filename='images/' + related.image_url) }}" alt="{{ related.title }}">
+                                <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="{{ related.title }}">
                             </div>
                             <div class="related-post-content">
                                 <h4>{{ related.title }}</h4>
@@ -298,6 +298,14 @@
 
 <!-- Help CTA Section -->
 {% include 'components/help-cta.html' %}
+
+<!-- Image Lightbox -->
+<div class="image-lightbox" id="imageLightbox">
+    <div class="lightbox-content">
+        <span class="lightbox-close" id="lightboxClose">&times;</span>
+        <img src="" alt="" id="lightboxImage" style="max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain;">
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -305,6 +313,47 @@
 <script src="{{ url_for('static', filename='js/comments.js') }}"></script>
 <!-- Script de favoritos -->
 <script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+
+<!-- Lightbox para imagem do post -->
+<script>
+(function() {
+    const thumbnail = document.querySelector('.post-thumbnail-container');
+    const lightbox = document.getElementById('imageLightbox');
+    const lightboxImg = document.getElementById('lightboxImage');
+    const lightboxClose = document.getElementById('lightboxClose');
+
+    if (thumbnail && lightbox) {
+        thumbnail.addEventListener('click', function() {
+            const img = this.querySelector('.post-thumbnail-image');
+            if (img) {
+                lightboxImg.src = img.src;
+                lightboxImg.alt = img.alt;
+                lightbox.style.display = 'flex';
+                requestAnimationFrame(function() {
+                    lightbox.classList.add('active');
+                });
+                document.body.style.overflow = 'hidden';
+            }
+        });
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            setTimeout(function() {
+                lightbox.style.display = 'none';
+                document.body.style.overflow = '';
+            }, 300);
+        }
+
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox) closeLightbox();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && lightbox.classList.contains('active')) closeLightbox();
+        });
+    }
+})();
+</script>
 
 <!-- Estilos para mensagens de feedback -->
 <style>

@@ -357,6 +357,10 @@
     color: #fff;
 }
 
+.datasheet-card .service-icon {
+    background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+}
+
 .service-header h3 {
     font-size: 1.4rem;
     font-weight: 600;

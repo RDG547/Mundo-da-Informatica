@@ -50,6 +50,8 @@
                         <i class="fas fa-print"></i>
                     {% elif post.category_str == 'Cursos' %}
                         <i class="fas fa-graduation-cap"></i>
+                    {% elif post.category_str == 'Datasheet' %}
+                        <i class="fas fa-file-alt"></i>
                     {% else %}
                         <i class="fas fa-folder"></i>
                     {% endif %}
@@ -63,7 +65,7 @@
                     </div>
                     <div class="post-description-section">
                         <div class="post-description-title">Descrição</div>
-                        <div class="post-description-text">{{ (post.content|striptags)[:150] }}{% if (post.content|striptags)|length > 150 %}...{% endif %}</div>
+                        <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ (post.content|striptags)[:300] }}{% if (post.content|striptags)|length > 300 %}...{% endif %}</div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                         {% if post.download_link %}
@@ -71,7 +73,7 @@
                             <i class="fas fa-download"></i> Download
                         </a>
                         {% endif %}
-                        <a href="{{ post_url(post) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap;">Ver Detalhes</a>
+                        <a href="{{ post_url(post) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                         {% if current_user.is_authenticated %}
                         <button data-post-id="{{ post.id }}" onclick="toggleFavorite({{ post.id }})" class="favorite-btn-card {% if post.id in favorite_post_ids %}favorited{% endif %}" title="{% if post.id in favorite_post_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}">
                             <i class="{% if post.id in favorite_post_ids %}fas{% else %}far{% endif %} fa-star"></i>

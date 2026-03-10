@@ -1,6 +1,12 @@
 {% extends "admin/base.html" %}
 
 {% block content %}
+<style>
+    .page-loading { opacity: 0; transition: opacity 0.3s ease-in; }
+    .page-loaded { opacity: 1; }
+</style>
+
+<div class="page-loading" id="pageContent">
 <div class="admin-header slide-in-up">
     <div class="header-content">
         <div class="header-main">
@@ -818,9 +824,16 @@
         </div>
     </div>
 </div>
+</div><!-- Fecha page-loading -->
 {% endblock %}
 
 {% block scripts %}
+<script>
+    window.addEventListener('load', function() {
+        var el = document.getElementById('pageContent');
+        if (el) { el.classList.remove('page-loading'); el.classList.add('page-loaded'); }
+    });
+</script>
 <style>
     /* Estilos específicos para a página de categorias */
     .category-name {

@@ -1752,7 +1752,7 @@ def all_categories():
 def category(category):
     page = request.args.get('page', 1, type=int)
     # Alterar category para category_str na consulta
-    posts = Post.query.filter_by(category_str=category).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
+    posts = Post.query.filter_by(category_str=category, is_active=True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
 
     # Obter subcategorias disponíveis - alterar category para category_str
     subcategories = db.session.query(Post.subcategory).filter(Post.category_str == category, Post.subcategory != None).distinct().all()
@@ -3525,8 +3525,8 @@ def _serialize_posts(posts_list, favorite_post_ids):
             img_url = '/static/images/posts/default.jpg'
 
         cat_icon = 'fas fa-folder'
-        if post.category and post.category.icon:
-            cat_icon = post.category.icon
+        if post.category_rel and post.category_rel.icon:
+            cat_icon = post.category_rel.icon
         elif post.category_str in icon_map:
             cat_icon = icon_map[post.category_str]
 

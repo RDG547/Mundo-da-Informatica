@@ -3975,22 +3975,35 @@ def initialize_db():
 
             print("✅ Configurações iniciais do site adicionadas!")
 
-        # Adicionar categorias padrão se não existirem
-        if Category.query.count() == 0:
-            default_categories = [
-                Category(name='BIOS', slug='bios', description='Atualizações e tutoriais de BIOS', is_active=True, order=1),
-                Category(name='Esquemas', slug='esquemas', description='Esquemas elétricos de notebooks e placas-mãe', is_active=True, order=2),
-                Category(name='Drivers', slug='drivers', description='Drivers para diversos dispositivos', is_active=True, order=3),
-                Category(name='Softwares', slug='softwares', description='Programas e aplicativos úteis', is_active=True, order=4),
-                Category(name='Impressoras', slug='impressoras', description='Drivers e softwares para impressoras', is_active=True, order=5),
-                Category(name='Cursos', slug='cursos', description='Cursos e materiais de estudo', is_active=True, order=6),
-                Category(name='Datasheet', slug='datasheet', description='Datasheets técnicos de componentes eletrônicos', is_active=True, order=7)
-            ]
+        # Adicionar categorias padrão que não existirem
+        default_categories = [
+            {'name': 'BIOS', 'slug': 'bios', 'description': 'Atualizações e tutoriais de BIOS', 'order': 1},
+            {'name': 'Esquemas', 'slug': 'esquemas', 'description': 'Esquemas elétricos de notebooks e placas-mãe', 'order': 2},
+            {'name': 'Drivers', 'slug': 'drivers', 'description': 'Drivers para diversos dispositivos', 'order': 3},
+            {'name': 'Softwares', 'slug': 'softwares', 'description': 'Programas e aplicativos úteis', 'order': 4},
+            {'name': 'Impressoras', 'slug': 'impressoras', 'description': 'Drivers e softwares para impressoras', 'order': 5},
+            {'name': 'Cursos', 'slug': 'cursos', 'description': 'Cursos e materiais de estudo', 'order': 6},
+            {'name': 'Datasheet', 'slug': 'datasheet', 'description': 'Datasheets técnicos de componentes eletrônicos', 'order': 7},
+        ]
 
-            for category in default_categories:
-                db.session.add(category)
+        existing_slugs = {c.slug for c in Category.query.with_entities(Category.slug).all()}
+        added_count = 0
+        for cat_data in default_categories:
+            if cat_data['slug'] not in existing_slugs:
+                db.session.add(Category(
+                    name=cat_data['name'],
+                    slug=cat_data['slug'],
+                    description=cat_data['description'],
+                    is_active=True,
+                    order=cat_data['order']
+                ))
+                added_count += 1
+                print(f"  ➕ Categoria '{cat_data['name']}' adicionada")
 
-            print("✅ Categorias padrão adicionadas!")
+        if added_count > 0:
+            print(f"✅ {added_count} categoria(s) padrão adicionada(s)!")
+        else:
+            print("✅ Todas as categorias padrão já existem.")
 
         # Salvar todas as configurações
         db.session.commit()

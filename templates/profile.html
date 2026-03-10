@@ -190,7 +190,7 @@
                                         title="Remover dos favoritos">
                                         <i class="fas fa-times"></i>
                                     </button>
-                                    <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left" style="text-decoration:none;color:inherit;">
+                                    <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left">
                                         <i class="fas fa-tag"></i> {{ post.category_str or 'Geral' }}
                                     </a>
                                     <div class="post-image">
@@ -238,7 +238,7 @@
                                         title="Remover dos favoritos">
                                         <i class="fas fa-times"></i>
                                     </button>
-                                    <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left" style="text-decoration:none;color:inherit;">
+                                    <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left">
                                         <i class="fas fa-tag"></i> {{ post.category_str or 'Geral' }}
                                     </a>
                                     <div class="post-image">
@@ -371,7 +371,7 @@
                                         <span>{{ download._brasilia_time.strftime('%d/%m/%Y às %H:%M') }}</span>
                                     </div>
                                     {% if download.post._category_cache %}
-                                    <a href="{{ url_for('category', category=download.post._category_cache.name) }}" class="download-card-category" style="text-decoration:none;color:inherit;">
+                                    <a href="{{ url_for('category', category=download.post._category_cache.name) }}" class="download-card-category">
                                         <i class="fas fa-folder"></i>
                                         {{ download.post._category_cache.name }}
                                     </a>

@@ -396,7 +396,7 @@ async function reloadDownloadHistorySection() {
                 : `<span>${download.post_title}</span>`;
 
             const categoryHtml = download.category_name
-                ? `<a href="/categoria/${encodeURIComponent(download.category_name)}" class="download-card-category" style="text-decoration:none;color:inherit;"><i class="fas fa-folder"></i> ${download.category_name}</a>`
+                ? `<a href="/categoria/${encodeURIComponent(download.category_name)}" class="download-card-category"><i class="fas fa-folder"></i> ${download.category_name}</a>`
                 : '';
 
             const viewBtnHtml = download.category_slug
@@ -611,7 +611,7 @@ function removeDownload(downloadId) {
 
     modalContent.innerHTML = `
         <div style="text-align: center;">
-            <div style="font-size: 3rem; color: #ff6b6b; margin-bottom: 1rem;">
+            <div style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;">
                 <i class="fas fa-trash-alt"></i>
             </div>
             <h3 style="margin-bottom: 1rem; color: #333;">Remover Download</h3>

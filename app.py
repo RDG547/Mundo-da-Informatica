@@ -7770,6 +7770,57 @@ def test_password_toggle():
     """Página de teste para debug do botão password toggle"""
     return render_template('test_password_toggle.html')
 
+# Sincronizar categorias padrão (roda tanto com python app.py quanto com gunicorn)
+def ensure_default_categories():
+    """Garante que todas as categorias padrão existam no banco de dados"""
+    default_categories = [
+        {'name': 'BIOS', 'slug': 'bios', 'description': 'Atualizações e tutoriais de BIOS', 'order': 1},
+        {'name': 'Esquemas', 'slug': 'esquemas', 'description': 'Esquemas elétricos de notebooks e placas-mãe', 'order': 2},
+        {'name': 'Drivers', 'slug': 'drivers', 'description': 'Drivers para diversos dispositivos', 'order': 3},
+        {'name': 'Softwares', 'slug': 'softwares', 'description': 'Programas e aplicativos úteis', 'order': 4},
+        {'name': 'Impressoras', 'slug': 'impressoras', 'description': 'Drivers e softwares para impressoras', 'order': 5},
+        {'name': 'Cursos', 'slug': 'cursos', 'description': 'Cursos e materiais de estudo', 'order': 6},
+        {'name': 'Datasheet', 'slug': 'datasheet', 'description': 'Datasheets técnicos de componentes eletrônicos', 'order': 7},
+    ]
+    try:
+        existing_slugs = {c.slug for c in Category.query.with_entities(Category.slug).all()}
+        added_count = 0
+        for cat_data in default_categories:
+            if cat_data['slug'] not in existing_slugs:
+                db.session.add(Category(
+                    name=cat_data['name'],
+                    slug=cat_data['slug'],
+                    description=cat_data['description'],
+                    is_active=True,
+                    order=cat_data['order']
+                ))
+                added_count += 1
+                print(f"  ➕ Categoria '{cat_data['name']}' adicionada")
+        if added_count > 0:
+            db.session.commit()
+            print(f"✅ {added_count} categoria(s) padrão adicionada(s)!")
+    except Exception as e:
+        db.session.rollback()
+        print(f"⚠️ Erro ao verificar categorias padrão: {e}")
+
+with app.app_context():
+    try:
+        db.create_all()
+        ensure_default_categories()
+        # Garantir que colunas novas existam em tabelas existentes
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                cols = [row[1] for row in conn.execute(text("PRAGMA table_info(favorites)"))]
+                if 'position' not in cols:
+                    conn.execute(text("ALTER TABLE favorites ADD COLUMN position INTEGER DEFAULT 0"))
+                    conn.commit()
+                    print("  ➕ Coluna 'position' adicionada à tabela favorites")
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"⚠️ Erro na inicialização automática: {e}")
+
 # Criar o script de upgrade de banco de dados se ele não existir
 if __name__ == '__main__':
     # Verificar se o script de atualização do banco de dados existe

@@ -884,6 +884,32 @@ function initializeProfilePage() {
 
 // Toggle para expandir/colapsar favoritos - GLOBAL
 window.loadMoreFavorites = function(button) {
+    const isExpanded = button.classList.contains('expanded');
+    const icon = button.querySelector('i');
+    const text = button.querySelector('.toggle-text');
+
+    if (isExpanded) {
+        // Collapse: hide all extra favorites
+        const extraFavorites = document.querySelectorAll('.extra-favorites');
+        extraFavorites.forEach(function(item) {
+            item.style.display = 'none';
+            item.style.opacity = '';
+            item.style.transform = '';
+            item.style.transition = '';
+        });
+        button.classList.remove('expanded');
+        icon.className = 'fas fa-chevron-down';
+        text.textContent = 'Ver mais';
+
+        // Scroll back to favorites section
+        var favSection = document.getElementById('favorites-section');
+        if (favSection) {
+            favSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+    }
+
+    // Expand: show next batch of 8
     const hiddenFavorites = document.querySelectorAll('.extra-favorites[style*="display: none"]');
     const batchSize = 8;
     const toShow = Array.from(hiddenFavorites).slice(0, batchSize);
@@ -893,7 +919,6 @@ window.loadMoreFavorites = function(button) {
             item.style.display = 'flex';
             item.style.opacity = '0';
             item.style.transform = 'translateY(20px)';
-            // Force reflow
             void item.offsetWidth;
             item.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
             item.style.opacity = '1';
@@ -901,11 +926,13 @@ window.loadMoreFavorites = function(button) {
         }, i * 60);
     });
 
-    // Check if there are still hidden items after this batch
-    const remainingHidden = hiddenFavorites.length - toShow.length;
+    // Check if all are now visible
+    var remainingHidden = hiddenFavorites.length - toShow.length;
     if (remainingHidden <= 0) {
-        var wrapper = document.getElementById('favorites-load-more-wrapper');
-        if (wrapper) wrapper.style.display = 'none';
+        // All shown — switch to "Ver menos"
+        button.classList.add('expanded');
+        icon.className = 'fas fa-chevron-up';
+        text.textContent = 'Ver menos';
     }
 };
 

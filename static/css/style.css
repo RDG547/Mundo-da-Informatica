@@ -1150,6 +1150,7 @@ section {
     align-items: center;
     gap: 0.5rem;
     margin-top: 2.5rem;
+    margin-bottom: 1.5rem;
     flex-wrap: wrap;
 }
 
@@ -1390,6 +1391,8 @@ section {
     line-height: 1.6;
     font-size: 0.95rem;
     text-align: center;
+    max-height: 120px;
+    overflow-y: auto;
 }
 
 .post-description-text::-webkit-scrollbar {
@@ -2421,6 +2424,56 @@ footer {
 .scroll-top:hover {
     background-color: var(--secondary-color);
     transform: translateY(-5px);
+}
+
+/* Floating Chat Button */
+.floating-chat-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: var(--transition-normal);
+    z-index: 99;
+    font-size: 1.2rem;
+}
+
+.floating-chat-btn:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.floating-chat-btn.shifted-up {
+    bottom: 90px;
+}
+
+/* Floating Beta Tag */
+.floating-beta-tag {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    background: rgba(102, 126, 234, 0.25);
+    color: rgba(102, 126, 234, 0.85);
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    z-index: 99;
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    pointer-events: none;
+    user-select: none;
 }
 
 /* Tema Escuro */

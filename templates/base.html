@@ -71,7 +71,7 @@
         request.endpoint !='category' and request.endpoint !='all_categories' %}media="print" onload="this.media='all'"
         {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}" id="profile-css" {% if
-        request.endpoint !='profile' %}media="print" {% endif %}>
+        request.endpoint !='profile' %}media="print" onload="this.media='all'" {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" id="admin-css" {% if
         request.endpoint !='profile' %}media="print" {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}" id="post-detail-css" {% if

@@ -1918,6 +1918,18 @@
     font-size: 0.7rem;
 }
 
+a.category-badge-left,
+a.category-badge-left:hover,
+a.category-badge-left:focus {
+    color: white;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.category-badge-left:hover {
+    filter: brightness(1.15);
+}
+
 /* Animação suave para favoritos extras */
 .extra-favorites {
     animation: fadeIn 0.5s ease-in-out;

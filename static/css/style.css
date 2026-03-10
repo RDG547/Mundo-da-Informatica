@@ -3231,6 +3231,16 @@ footer {
     font-weight: 500;
 }
 
+a.download-card-category {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.download-card-category:hover {
+    color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.2);
+}
+
 .download-card-actions {
     display: flex;
     gap: 0.75rem;
@@ -3260,6 +3270,7 @@ footer {
 .download-card-btn-primary:hover {
     transform: scale(1.05);
     box-shadow: 0 5px 15px rgba(var(--primary-rgb), 0.4);
+    color: white;
 }
 
 .download-card-btn-secondary {

@@ -328,9 +328,9 @@ async function reloadFavoritesSection() {
                         <button onclick="removeFavorite(${post.id})" class="favorite-remove-badge" title="Remover dos favoritos">
                             <i class="fas fa-times"></i>
                         </button>
-                        <div class="category-badge-left">
+                        <a href="/categoria/${encodeURIComponent(post.category_str)}" class="category-badge-left" style="text-decoration:none;color:inherit;">
                             <i class="fas fa-tag"></i> ${post.category_str}
-                        </div>
+                        </a>
                         <div class="post-image">
                             ${post.image_url ?
                     `<img src="${postImgUrl}" alt="${post.title}">` :

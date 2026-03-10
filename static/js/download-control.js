@@ -260,8 +260,8 @@ function confirmClearHistory() {
     modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
 
     const modalContent = document.createElement('div');
-    modalContent.className = 'modal-content';
-    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
+    modalContent.className = 'dl-modal-content';
+    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); transform: none; animation: none;';
 
     modalContent.innerHTML = `
         <div style="text-align: center;">
@@ -392,15 +392,15 @@ async function reloadDownloadHistorySection() {
                 : `<div class="download-title-thumb download-title-thumb-placeholder"><i class="fas fa-file-alt"></i></div>`;
 
             const linkHtml = download.category_slug
-                ? `<a href="/categoria/${download.category_slug}/${download.post_slug}">${download.post_title}</a>`
+                ? `<a href="/${download.category_slug}/${download.post_slug}">${download.post_title}</a>`
                 : `<span>${download.post_title}</span>`;
 
             const categoryHtml = download.category_name
-                ? `<div class="download-card-category"><i class="fas fa-folder"></i> ${download.category_name}</div>`
+                ? `<a href="/categoria/${encodeURIComponent(download.category_name)}" class="download-card-category" style="text-decoration:none;color:inherit;"><i class="fas fa-folder"></i> ${download.category_name}</a>`
                 : '';
 
             const viewBtnHtml = download.category_slug
-                ? `<a href="/categoria/${download.category_slug}/${download.post_slug}" class="download-card-btn download-card-btn-secondary"><i class="fas fa-eye"></i> Ver Post</a>`
+                ? `<a href="/${download.category_slug}/${download.post_slug}" class="download-card-btn download-card-btn-secondary"><i class="fas fa-eye"></i> Ver Post</a>`
                 : '';
 
             const downloadBtnHtml = download.download_link
@@ -522,8 +522,8 @@ function confirmClearFavorites() {
     modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
 
     const modalContent = document.createElement('div');
-    modalContent.className = 'modal-content';
-    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
+    modalContent.className = 'dl-modal-content';
+    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); transform: none; animation: none;';
 
     modalContent.innerHTML = `
         <div style="text-align: center;">
@@ -606,8 +606,8 @@ function removeDownload(downloadId) {
     modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
 
     const modalContent = document.createElement('div');
-    modalContent.className = 'modal-content';
-    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
+    modalContent.className = 'dl-modal-content';
+    modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); transform: none; animation: none;';
 
     modalContent.innerHTML = `
         <div style="text-align: center;">

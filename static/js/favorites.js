@@ -37,8 +37,8 @@ window.FavoriteManager = class FavoriteManager {
                     <h3 class="favorite-modal-title">Remover dos Favoritos?</h3>
                     <p class="favorite-modal-text">Tem certeza que deseja remover este post dos seus favoritos?</p>
                     <div class="favorite-modal-buttons">
-                        <button class="favorite-modal-btn favorite-modal-btn-cancel">Cancelar</button>
-                        <button class="favorite-modal-btn favorite-modal-btn-confirm">Remover</button>
+                        <button class="favorite-modal-btn favorite-modal-btn-cancel"><i class="fas fa-times"></i> Cancelar</button>
+                        <button class="favorite-modal-btn favorite-modal-btn-confirm"><i class="fas fa-trash"></i> Remover</button>
                     </div>
                 </div>
             </div>

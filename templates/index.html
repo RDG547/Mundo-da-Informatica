@@ -148,66 +148,102 @@
     var currentPage = parseInt(container.dataset.currentPage) || 1;
     var isLoading = false;
 
-    function stripTags(html) {
-        var tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        return tmp.textContent || tmp.innerText || '';
-    }
+    function e(tag) { return document.createElement(tag); }
+    function txt(str) { return document.createTextNode(str); }
 
-    function escapeAttr(str) {
-        return str.replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
+    function buildCard(post, isAuth) {
+        var card = e('div'); card.className = 'post-card';
 
-    function buildPostHTML(post, isAuth) {
-        var desc = stripTags(post.content);
+        // Image
+        var imgWrap = e('div'); imgWrap.className = 'post-image';
+        var img = e('img'); img.src = post.image_url; img.alt = post.title;
+        imgWrap.appendChild(img); card.appendChild(imgWrap);
+
+        // Category bar
+        var catBar = e('div'); catBar.className = 'post-category';
+        var catIcon = e('i'); catIcon.className = post.category_icon;
+        var catSpan = e('span'); catSpan.textContent = post.category_str;
+        catBar.appendChild(catIcon); catBar.appendChild(catSpan);
         var dlFiles = post.download_files || [];
-        var hasMulti = dlFiles.length > 1;
-        var badgeHTML = '';
-        if (hasMulti) {
-            badgeHTML = '<span class="download-types-badge" style="margin-left:6px;background:rgba(var(--primary-rgb),0.15);color:var(--primary-color);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">' + dlFiles.map(function(f){return f.type}).join('/') + '</span>';
+        if (dlFiles.length > 1) {
+            var badge = e('span'); badge.className = 'download-types-badge';
+            badge.style.cssText = 'margin-left:6px;background:rgba(var(--primary-rgb),0.15);color:var(--primary-color);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;';
+            badge.textContent = dlFiles.map(function(f){return f.type}).join('/');
+            catBar.appendChild(badge);
         }
-        var dlBtn = '';
+        card.appendChild(catBar);
+
+        // Content
+        var content = e('div'); content.className = 'post-content';
+        var h3 = e('h3'); var titleLink = e('a');
+        titleLink.href = post.post_url; titleLink.style.cssText = 'text-decoration:none;color:inherit;';
+        titleLink.textContent = post.title;
+        h3.appendChild(titleLink); content.appendChild(h3);
+
+        // Meta
+        var meta = e('div'); meta.className = 'post-meta';
+        var dateSpan = e('span'); dateSpan.innerHTML = '<i class="far fa-calendar-alt"></i> ' + post.date_posted;
+        var viewsSpan = e('span'); viewsSpan.innerHTML = '<i class="far fa-eye"></i> ' + post.views;
+        meta.appendChild(dateSpan); meta.appendChild(viewsSpan);
+        content.appendChild(meta);
+
+        // Description
+        var descSection = e('div'); descSection.className = 'post-description-section';
+        var descTitle = e('div'); descTitle.className = 'post-description-title'; descTitle.textContent = 'Descrição';
+        var descText = e('div'); descText.className = 'post-description-text';
+        descText.style.cssText = 'max-height:100px;overflow-y:auto;';
+        var tmpDiv = e('div'); tmpDiv.innerHTML = post.content; descText.textContent = tmpDiv.textContent;
+        descSection.appendChild(descTitle); descSection.appendChild(descText);
+        content.appendChild(descSection);
+
+        // Buttons
+        var btns = e('div'); btns.style.cssText = 'display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;';
         if (post.download_link) {
-            if (hasMulti) {
-                dlBtn = '<button type="button" class="btn btn-download download-btn multi-download-trigger" data-post-id="'+post.id+'" data-post-title="'+escapeAttr(post.title)+'" data-download-files=\''+JSON.stringify(dlFiles).replace(/'/g,"&#39;")+'\' style="flex:1;min-width:120px;"><i class="fas fa-download"></i> Download</button>';
+            if (dlFiles.length > 1) {
+                var dlBtn = e('button'); dlBtn.type = 'button';
+                dlBtn.className = 'btn btn-download download-btn multi-download-trigger';
+                dlBtn.dataset.postId = post.id; dlBtn.dataset.postTitle = post.title;
+                dlBtn.dataset.downloadFiles = JSON.stringify(dlFiles);
+                dlBtn.style.cssText = 'flex:1;min-width:120px;';
+                dlBtn.innerHTML = '<i class="fas fa-download"></i> Download';
+                btns.appendChild(dlBtn);
             } else {
-                dlBtn = '<a href="/download/'+post.id+'" class="btn btn-download download-btn" data-action="download" style="flex:1;min-width:120px;"><i class="fas fa-download"></i> Download</a>';
+                var dlA = e('a'); dlA.href = '/download/' + post.id;
+                dlA.className = 'btn btn-download download-btn'; dlA.dataset.action = 'download';
+                dlA.style.cssText = 'flex:1;min-width:120px;';
+                dlA.innerHTML = '<i class="fas fa-download"></i> Download';
+                btns.appendChild(dlA);
             }
         }
-        var favBtn = '';
+        var detailA = e('a'); detailA.href = post.post_url;
+        detailA.className = 'btn';
+        detailA.style.cssText = 'flex:1;min-width:120px;display:flex;align-items:center;justify-content:center;white-space:nowrap;gap:6px;';
+        detailA.innerHTML = '<i class="fas fa-eye"></i> Ver Detalhes';
+        btns.appendChild(detailA);
+
         if (isAuth) {
-            var favClass = post.is_favorited ? 'favorited' : '';
-            var favIcon = post.is_favorited ? 'fas' : 'far';
-            var favTitle = post.is_favorited ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
-            favBtn = '<button data-post-id="'+post.id+'" onclick="toggleFavorite('+post.id+')" class="favorite-btn-card '+favClass+'" title="'+favTitle+'"><i class="'+favIcon+' fa-star"></i></button>';
+            var favBtn = e('button'); favBtn.dataset.postId = post.id;
+            favBtn.setAttribute('onclick', 'toggleFavorite(' + post.id + ')');
+            favBtn.className = 'favorite-btn-card' + (post.is_favorited ? ' favorited' : '');
+            favBtn.title = post.is_favorited ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+            favBtn.innerHTML = '<i class="' + (post.is_favorited ? 'fas' : 'far') + ' fa-star"></i>';
+            btns.appendChild(favBtn);
         }
-        return '<div class="post-card">' +
-            '<div class="post-image"><img src="'+post.image_url+'" alt="'+escapeAttr(post.title)+'"></div>' +
-            '<div class="post-category"><i class="'+post.category_icon+'"></i><span>'+post.category_str+'</span>'+badgeHTML+'</div>' +
-            '<div class="post-content">' +
-                '<h3><a href="'+post.post_url+'" style="text-decoration:none;color:inherit;">'+post.title+'</a></h3>' +
-                '<div class="post-meta"><span><i class="far fa-calendar-alt"></i> '+post.date_posted+'</span><span><i class="far fa-eye"></i> '+post.views+'</span></div>' +
-                '<div class="post-description-section"><div class="post-description-title">Descrição</div><div class="post-description-text" style="max-height:100px;overflow-y:auto;">'+desc+'</div></div>' +
-                '<div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;">' +
-                    dlBtn +
-                    '<a href="'+post.post_url+'" class="btn" style="flex:1;min-width:120px;display:flex;align-items:center;justify-content:center;white-space:nowrap;gap:6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>' +
-                    favBtn +
-                '</div>' +
-            '</div>' +
-        '</div>';
+        content.appendChild(btns);
+        card.appendChild(content);
+        return card;
     }
 
-    function buildPaginationHTML(pagination) {
-        var html = '';
-        html += '<button class="home-page-btn home-page-prev" '+(pagination.has_prev ? '' : 'disabled')+' data-page="'+(pagination.prev_num || 1)+'"><i class="fas fa-chevron-left"></i></button>';
-        pagination.iter_pages.forEach(function(p) {
+    function buildPaginationHTML(pg) {
+        var html = '<button class="home-page-btn home-page-prev" ' + (pg.has_prev ? '' : 'disabled') + ' data-page="' + (pg.prev_num || 1) + '"><i class="fas fa-chevron-left"></i></button>';
+        pg.iter_pages.forEach(function(p) {
             if (p === null) {
                 html += '<span class="home-page-dots">...</span>';
             } else {
-                html += '<button class="home-page-btn home-page-num '+(p === pagination.page ? 'active' : '')+'" data-page="'+p+'">'+p+'</button>';
+                html += '<button class="home-page-btn home-page-num ' + (p === pg.page ? 'active' : '') + '" data-page="' + p + '">' + p + '</button>';
             }
         });
-        html += '<button class="home-page-btn home-page-next" '+(pagination.has_next ? '' : 'disabled')+' data-page="'+(pagination.next_num || pagination.pages)+'"><i class="fas fa-chevron-right"></i></button>';
+        html += '<button class="home-page-btn home-page-next" ' + (pg.has_next ? '' : 'disabled') + ' data-page="' + (pg.next_num || pg.pages) + '"><i class="fas fa-chevron-right"></i></button>';
         return html;
     }
 
@@ -218,10 +254,8 @@
         var grid = document.getElementById('recent-posts-grid');
         var direction = page > currentPage ? 'left' : 'right';
 
-        // Slide out animation
         grid.classList.add('slide-out-' + direction);
 
-        // Scroll para a seção
         var section = document.querySelector('.recent-posts');
         if (section) {
             var offset = section.getBoundingClientRect().top + window.pageYOffset - 80;
@@ -229,33 +263,33 @@
         }
 
         fetch('/api/recent-posts?page=' + page)
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
             .then(function(data) {
-                if (!data.success) throw new Error('Erro ao carregar');
+                if (!data.success) throw new Error('API error');
 
                 setTimeout(function() {
-                    // Build new content
-                    var html = '';
+                    grid.innerHTML = '';
                     data.posts.forEach(function(post) {
-                        html += buildPostHTML(post, data.is_authenticated);
+                        grid.appendChild(buildCard(post, data.is_authenticated));
                     });
-                    grid.innerHTML = html;
 
-                    // Update pagination
                     paginationEl.innerHTML = buildPaginationHTML(data.pagination);
 
-                    // Slide in from opposite side
-                    grid.className = 'posts-grid slide-in-' + direction;
+                    grid.className = 'posts-grid';
                     grid.id = 'recent-posts-grid';
+                    // Force reflow then add slide-in
+                    void grid.offsetWidth;
+                    grid.classList.add('slide-in-' + direction);
 
                     currentPage = page;
                     container.dataset.currentPage = page;
 
-                    // Update URL without reload
                     var url = page > 1 ? '/?page=' + page : '/';
                     history.replaceState(null, '', url);
 
-                    // Reinitialize download buttons
                     if (typeof window.setupDownloadButtons === 'function') {
                         window.setupDownloadButtons();
                     }
@@ -268,13 +302,14 @@
             })
             .catch(function(err) {
                 console.error('Erro na paginação:', err);
-                grid.classList.remove('slide-out-left', 'slide-out-right');
+                grid.className = 'posts-grid';
+                grid.id = 'recent-posts-grid';
                 isLoading = false;
             });
     }
 
-    paginationEl.addEventListener('click', function(e) {
-        var btn = e.target.closest('.home-page-btn');
+    paginationEl.addEventListener('click', function(ev) {
+        var btn = ev.target.closest('.home-page-btn');
         if (!btn || btn.disabled) return;
         var page = parseInt(btn.dataset.page);
         if (page) loadPage(page);

@@ -268,7 +268,7 @@
                     </div>
 
                     {% if posts and posts.items %}
-                    <div class="posts-grid">
+                    <div class="posts-grid" id="category-posts-grid" data-category="{{ category }}" data-next-page="{{ posts.next_num if posts.has_next else '' }}" data-has-next="{{ 'true' if posts.has_next else 'false' }}">
                         {% for post in posts.items %}
                         <div class="post-card">
                             <div class="post-image">
@@ -347,28 +347,12 @@
                         {% endfor %}
                     </div>
 
-                    <!-- Pagination -->
-                    {% if posts.pages > 1 %}
-                    <div class="pagination-wrapper">
-                        <nav class="pagination-nav">
-                            {% if posts.has_prev %}
-                            <a href="{{ url_for('category', category=category, page=posts.prev_num) }}"
-                                class="pagination-btn prev-btn">
-                                <i class="fas fa-chevron-left"></i> Anterior
-                            </a>
-                            {% endif %}
-
-                            <div class="pagination-info">
-                                Página {{ posts.page }} de {{ posts.pages }}
-                            </div>
-
-                            {% if posts.has_next %}
-                            <a href="{{ url_for('category', category=category, page=posts.next_num) }}"
-                                class="pagination-btn next-btn">
-                                Próxima <i class="fas fa-chevron-right"></i>
-                            </a>
-                            {% endif %}
-                        </nav>
+                    <!-- Carregar Mais -->
+                    {% if posts.has_next %}
+                    <div class="load-more-wrapper" id="load-more-wrapper">
+                        <button type="button" class="btn btn-load-more" id="load-more-btn">
+                            <i class="fas fa-plus-circle"></i> Carregar Mais
+                        </button>
                     </div>
                     {% endif %}
 
@@ -479,4 +463,153 @@
     console.log('Dados disponíveis:', Object.keys(featureData));
 </script>
 <script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+<script>
+(function() {
+    var grid = document.getElementById('category-posts-grid');
+    var btn = document.getElementById('load-more-btn');
+    var wrapper = document.getElementById('load-more-wrapper');
+    if (!grid || !btn) return;
+
+    var category = grid.dataset.category;
+    var nextPage = parseInt(grid.dataset.nextPage) || 2;
+    var hasNext = grid.dataset.hasNext === 'true';
+    var isLoading = false;
+
+    function el(tag) { return document.createElement(tag); }
+
+    function buildCard(post, isAuth) {
+        var card = el('div'); card.className = 'post-card';
+        card.style.opacity = '0'; card.style.transform = 'translateY(20px)';
+
+        var imgWrap = el('div'); imgWrap.className = 'post-image';
+        var img = el('img'); img.src = post.image_url; img.alt = post.title;
+        imgWrap.appendChild(img); card.appendChild(imgWrap);
+
+        var catBar = el('div'); catBar.className = 'post-category';
+        var catIcon = el('i'); catIcon.className = post.category_icon;
+        var catSpan = el('span'); catSpan.textContent = post.category_str;
+        catBar.appendChild(catIcon); catBar.appendChild(catSpan);
+        var dlFiles = post.download_files || [];
+        if (dlFiles.length > 1) {
+            var badge = el('span'); badge.className = 'download-types-badge';
+            badge.style.cssText = 'margin-left:6px;background:rgba(var(--primary-rgb),0.15);color:var(--primary-color);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;';
+            badge.textContent = dlFiles.map(function(f){return f.type}).join('/');
+            catBar.appendChild(badge);
+        }
+        card.appendChild(catBar);
+
+        var content = el('div'); content.className = 'post-content';
+        var h3 = el('h3'); var titleLink = el('a');
+        titleLink.href = post.post_url; titleLink.style.cssText = 'text-decoration:none;color:inherit;';
+        titleLink.textContent = post.title;
+        h3.appendChild(titleLink); content.appendChild(h3);
+
+        var meta = el('div'); meta.className = 'post-meta';
+        var dateSpan = el('span'); dateSpan.innerHTML = '<i class="far fa-calendar-alt"></i> ' + post.date_posted;
+        var viewsSpan = el('span'); viewsSpan.innerHTML = '<i class="far fa-eye"></i> ' + post.views;
+        meta.appendChild(dateSpan); meta.appendChild(viewsSpan);
+        content.appendChild(meta);
+
+        var descSection = el('div'); descSection.className = 'post-description-section';
+        var descTitle = el('div'); descTitle.className = 'post-description-title'; descTitle.textContent = 'Descrição';
+        var descText = el('div'); descText.className = 'post-description-text';
+        descText.style.cssText = 'max-height:100px;overflow-y:auto;';
+        var tmpDiv = el('div'); tmpDiv.innerHTML = post.content; descText.textContent = tmpDiv.textContent;
+        descSection.appendChild(descTitle); descSection.appendChild(descText);
+        content.appendChild(descSection);
+
+        var btns = el('div'); btns.style.cssText = 'display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;';
+        if (post.download_link) {
+            if (dlFiles.length > 1) {
+                var dlBtn = el('button'); dlBtn.type = 'button';
+                dlBtn.className = 'btn btn-download download-btn multi-download-trigger';
+                dlBtn.dataset.postId = post.id; dlBtn.dataset.postTitle = post.title;
+                dlBtn.dataset.downloadFiles = JSON.stringify(dlFiles);
+                dlBtn.style.cssText = 'flex:1;min-width:120px;';
+                dlBtn.innerHTML = '<i class="fas fa-download"></i> Download';
+                btns.appendChild(dlBtn);
+            } else {
+                var dlA = el('a'); dlA.href = '/download/' + post.id;
+                dlA.className = 'btn btn-download download-btn'; dlA.dataset.action = 'download';
+                dlA.style.cssText = 'flex:1;min-width:120px;';
+                dlA.innerHTML = '<i class="fas fa-download"></i> Download';
+                btns.appendChild(dlA);
+            }
+        }
+        var detailA = el('a'); detailA.href = post.post_url;
+        detailA.className = 'btn';
+        detailA.style.cssText = 'flex:1;min-width:120px;display:flex;align-items:center;justify-content:center;white-space:nowrap;gap:6px;';
+        detailA.innerHTML = '<i class="fas fa-eye"></i> Ver Detalhes';
+        btns.appendChild(detailA);
+
+        if (isAuth) {
+            var favBtn = el('button'); favBtn.dataset.postId = post.id;
+            favBtn.setAttribute('onclick', 'toggleFavorite(' + post.id + ')');
+            favBtn.className = 'favorite-btn-card' + (post.is_favorited ? ' favorited' : '');
+            favBtn.title = post.is_favorited ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+            favBtn.innerHTML = '<i class="' + (post.is_favorited ? 'fas' : 'far') + ' fa-star"></i>';
+            btns.appendChild(favBtn);
+        }
+        content.appendChild(btns);
+        card.appendChild(content);
+        return card;
+    }
+
+    btn.addEventListener('click', function() {
+        if (isLoading || !hasNext) return;
+        isLoading = true;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
+
+        fetch('/api/category-posts/' + encodeURIComponent(category) + '?page=' + nextPage)
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function(data) {
+                if (!data.success) throw new Error('API error');
+
+                var cards = [];
+                data.posts.forEach(function(post) {
+                    var card = buildCard(post, data.is_authenticated);
+                    grid.appendChild(card);
+                    cards.push(card);
+                });
+
+                // Animate cards in with stagger
+                cards.forEach(function(card, i) {
+                    setTimeout(function() {
+                        card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, i * 60);
+                });
+
+                hasNext = data.has_next;
+                nextPage = data.next_page || (nextPage + 1);
+                grid.dataset.nextPage = nextPage;
+                grid.dataset.hasNext = hasNext ? 'true' : 'false';
+
+                if (hasNext) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-plus-circle"></i> Carregar Mais';
+                } else {
+                    wrapper.style.display = 'none';
+                }
+
+                if (typeof window.setupDownloadButtons === 'function') {
+                    window.setupDownloadButtons();
+                }
+
+                isLoading = false;
+            })
+            .catch(function(err) {
+                console.error('Erro ao carregar mais:', err);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-plus-circle"></i> Carregar Mais';
+                isLoading = false;
+            });
+    });
+})();
+</script>
 {% endblock %}

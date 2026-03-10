@@ -1752,7 +1752,7 @@ def all_categories():
 def category(category):
     page = request.args.get('page', 1, type=int)
     # Alterar category para category_str na consulta
-    posts = Post.query.filter_by(category_str=category).order_by(Post.date_posted.desc()).paginate(page=page, per_page=12)
+    posts = Post.query.filter_by(category_str=category).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
 
     # Obter subcategorias disponíveis - alterar category para category_str
     subcategories = db.session.query(Post.subcategory).filter(Post.category_str == category, Post.subcategory != None).distinct().all()
@@ -3460,44 +3460,7 @@ def api_recent_posts():
     if current_user.is_authenticated:
         favorite_post_ids = [f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()]
 
-    posts_data = []
-    for post in posts_paginated.items:
-        dl_files = post.get_metadata('download_files') or []
-        cat_slug = generate_slug(post.category_str) if post.category_str else ''
-        post_link = f'/{cat_slug}/{post.slug}' if post.slug and cat_slug else f'/post/{post.id}'
-        img_url = ''
-        if post.image_url:
-            if post.image_url.startswith('http'):
-                img_url = post.image_url
-            else:
-                img_url = f'/static/uploads/posts/{post.image_url}'
-        else:
-            img_url = '/static/images/posts/default.jpg'
-
-        cat_icon = 'fas fa-folder'
-        icon_map = {'BIOS': 'fas fa-microchip', 'Esquemas': 'fas fa-project-diagram', 'Drivers': 'fas fa-cogs',
-                    'Softwares': 'fas fa-laptop-code', 'Impressoras': 'fas fa-print', 'Cursos': 'fas fa-graduation-cap',
-                    'Datasheet': 'fas fa-file-alt'}
-        if post.category and post.category.icon:
-            cat_icon = post.category.icon
-        elif post.category_str in icon_map:
-            cat_icon = icon_map[post.category_str]
-
-        posts_data.append({
-            'id': post.id,
-            'title': post.title,
-            'content': post.content[:500] if post.content else '',
-            'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
-            'views': post.views or 0,
-            'image_url': img_url,
-            'download_link': post.download_link,
-            'category_str': post.category_str or 'Geral',
-            'category_icon': cat_icon,
-            'post_url': post_link,
-            'featured': post.featured,
-            'download_files': dl_files,
-            'is_favorited': post.id in favorite_post_ids
-        })
+    posts_data = _serialize_posts(posts_paginated.items, favorite_post_ids)
 
     pages = []
     for p in posts_paginated.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2):
@@ -3518,6 +3481,71 @@ def api_recent_posts():
         },
         'is_authenticated': current_user.is_authenticated
     })
+
+@app.route('/api/category-posts/<string:category_name>')
+def api_category_posts(category_name):
+    """API para carregar mais posts de uma categoria"""
+    page = request.args.get('page', 1, type=int)
+    posts_query = Post.query.filter_by(category_str=category_name, is_active=True).order_by(Post.date_posted.desc())
+    posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
+
+    favorite_post_ids = []
+    if current_user.is_authenticated:
+        favorite_post_ids = [f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()]
+
+    posts_data = _serialize_posts(posts_paginated.items, favorite_post_ids)
+
+    return jsonify({
+        'success': True,
+        'posts': posts_data,
+        'has_next': posts_paginated.has_next,
+        'next_page': posts_paginated.next_num,
+        'total': posts_paginated.total,
+        'is_authenticated': current_user.is_authenticated
+    })
+
+
+def _serialize_posts(posts_list, favorite_post_ids):
+    """Serializa uma lista de posts para JSON"""
+    icon_map = {'BIOS': 'fas fa-microchip', 'Esquemas': 'fas fa-project-diagram', 'Drivers': 'fas fa-cogs',
+                'Softwares': 'fas fa-laptop-code', 'Impressoras': 'fas fa-print', 'Cursos': 'fas fa-graduation-cap',
+                'Datasheet': 'fas fa-file-alt'}
+    posts_data = []
+    for post in posts_list:
+        dl_files = post.get_metadata('download_files') or []
+        cat_slug = generate_slug(post.category_str) if post.category_str else ''
+        post_link = f'/{cat_slug}/{post.slug}' if post.slug and cat_slug else f'/post/{post.id}'
+        img_url = ''
+        if post.image_url:
+            if post.image_url.startswith('http'):
+                img_url = post.image_url
+            else:
+                img_url = f'/static/uploads/posts/{post.image_url}'
+        else:
+            img_url = '/static/images/posts/default.jpg'
+
+        cat_icon = 'fas fa-folder'
+        if post.category and post.category.icon:
+            cat_icon = post.category.icon
+        elif post.category_str in icon_map:
+            cat_icon = icon_map[post.category_str]
+
+        posts_data.append({
+            'id': post.id,
+            'title': post.title,
+            'content': post.content[:500] if post.content else '',
+            'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
+            'views': post.views or 0,
+            'image_url': img_url,
+            'download_link': post.download_link,
+            'category_str': post.category_str or 'Geral',
+            'category_icon': cat_icon,
+            'post_url': post_link,
+            'featured': post.featured,
+            'download_files': dl_files,
+            'is_favorited': post.id in favorite_post_ids
+        })
+    return posts_data
 
 @app.route('/api/debug/posts')
 def api_debug_posts():

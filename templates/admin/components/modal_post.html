@@ -11,20 +11,25 @@
         margin: 2rem auto !important;
         max-height: 90vh !important;
         overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
 
     #addPostModal .modal-body {
         padding: 2rem !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        max-height: calc(90vh - 140px) !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
         box-sizing: border-box !important;
     }
 
-    /* Prevenir rolagem horizontal no modal */
-    #addPostModal .modal-body {
-        overflow-x: hidden !important;
-        box-sizing: border-box !important;
+    #addPostModal .modal-header {
+        flex-shrink: 0 !important;
+    }
+
+    #addPostModal .modal-footer {
+        flex-shrink: 0 !important;
     }
 
     /* Forçar layout de 2 colunas no modal de novo post - CORREÇÃO CRÍTICA */
@@ -339,7 +344,7 @@
                                 </label>
                                 <div id="downloadLinksContainer">
                                     <div class="download-entry" data-index="0">
-                                        <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;">
+                                        <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px;">
                                             <select name="download_type_0" class="form-select" style="width: 120px; flex-shrink: 0;">
                                                 <option value="BIOS">BIOS</option>
                                                 <option value="EC">EC</option>
@@ -356,6 +361,14 @@
                                                 </button>
                                             </div>
                                         </div>
+                                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; margin-left: 128px;">
+                                            <input type="number" name="download_size_0" class="form-control modern-input" placeholder="Tamanho" step="0.1" min="0" style="width: 100px;">
+                                            <select name="download_size_unit_0" class="form-select" style="width: 70px;">
+                                                <option value="MB">MB</option>
+                                                <option value="GB">GB</option>
+                                                <option value="KB">KB</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                                 <button type="button" id="addDownloadEntry" class="btn btn-sm" style="margin-top: 4px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;">
@@ -366,22 +379,6 @@
                                 {% if form_errors and form_errors.download_link %}
                                     <div class="invalid-feedback" style="display: block;">{{ form_errors.download_link }}</div>
                                 {% endif %}
-                            </div>
-
-                            <div class="form-group">
-                                <label for="postFileSize" class="form-label">
-                                    <i class="fas fa-file-archive"></i> Tamanho do Arquivo
-                                </label>
-                                <div class="input-group">
-                                    <input type="number" id="postFileSize" name="file_size"
-                                           class="form-control modern-input"
-                                           placeholder="0" step="0.1" min="0">
-                                    <select class="form-select unit-select" id="fileSizeUnit" aria-label="Unidade de medida do tamanho do arquivo">
-                                        <option value="MB">MB</option>
-                                        <option value="GB">GB</option>
-                                        <option value="KB">KB</option>
-                                    </select>
-                                </div>
                             </div>
 
                             <div class="form-group">

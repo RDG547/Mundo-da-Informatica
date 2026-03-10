@@ -550,13 +550,7 @@ function initTables() {
  * Verifica atualizações do sistema
  */
 function checkForUpdates() {
-    // Simulação - Em um ambiente real, isto faria uma chamada à API
-    setTimeout(() => {
-        // 10% de chance de mostrar uma notificação de atualização
-        if (Math.random() < 0.1) {
-            showNotification('Nova atualização do sistema disponível! Clique para ver as novidades.', 'info', 10000);
-        }
-    }, 5000);
+    // Desativado - era simulação que mostrava notificações falsas
 }
 
 /**

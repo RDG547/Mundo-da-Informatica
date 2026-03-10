@@ -185,14 +185,14 @@
                             {% for df in dl_files_detail %}
                             <a href="{{ url_for('download_post', post_id=post.id) }}?type={{ df.type|urlencode }}" class="btn-download-primary download-btn" data-action="download" style="display:flex; align-items:center; justify-content:center; gap:8px;">
                                 <i class="fas fa-download"></i>
-                                <span>Download {{ df.type }}</span>
+                                <span>Download {{ df.type }}{% if df.size %} ({{ df.size }}){% endif %}</span>
                             </a>
                             {% endfor %}
                         </div>
                         {% else %}
                         <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn-download-primary download-btn" data-action="download">
                             <i class="fas fa-download"></i>
-                            <span>Fazer Download</span>
+                            <span>Fazer Download{% if dl_files_detail and dl_files_detail[0].size %} ({{ dl_files_detail[0].size }}){% endif %}</span>
                         </a>
                         {% endif %}
                         <p class="download-notice">

@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
             entry.className = 'download-entry';
             entry.setAttribute('data-index', idx);
             entry.innerHTML = `
-                <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;">
+                <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px;">
                     <select name="download_type_${idx}" class="form-select" style="width: 120px; flex-shrink: 0;">
                         <option value="BIOS">BIOS</option>
                         <option value="EC">EC</option>
@@ -322,6 +322,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             style="background: rgba(220,53,69,0.1); color: #dc3545; border: 1px solid #dc3545; border-radius: 6px; padding: 6px 10px; cursor: pointer; flex-shrink: 0;">
                         <i class="fas fa-trash"></i>
                     </button>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; margin-left: 128px;">
+                    <input type="number" name="download_size_${idx}" class="form-control modern-input" placeholder="Tamanho" step="0.1" min="0" style="width: 100px;">
+                    <select name="download_size_unit_${idx}" class="form-select" style="width: 70px;">
+                        <option value="MB">MB</option>
+                        <option value="GB">GB</option>
+                        <option value="KB">KB</option>
+                    </select>
                 </div>
             `;
             container.appendChild(entry);
@@ -374,9 +382,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const typeSelect = entry.querySelector('select');
             const urlInput = entry.querySelector('input[type="url"]');
             if (typeSelect && urlInput && urlInput.value.trim()) {
+                const sizeInput = entry.querySelector('input[type="number"]');
+                const unitSelect = entry.querySelectorAll('select')[1];
+                let size = '';
+                if (sizeInput && sizeInput.value) {
+                    const unit = unitSelect ? unitSelect.value : 'MB';
+                    size = sizeInput.value + ' ' + unit;
+                }
                 files.push({
                     type: typeSelect.value,
-                    url: urlInput.value.trim()
+                    url: urlInput.value.trim(),
+                    size: size
                 });
             }
         });

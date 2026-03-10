@@ -315,6 +315,14 @@ async function reloadFavoritesSection() {
             const excerpt = post.content.replace(/<[^>]*>/g, '').substring(0, 150);
             const excerptText = excerpt.length > 150 ? excerpt + '...' : excerpt;
 
+            function getImgUrl(path, folder) {
+                if (!path || path === 'default.jpg') return `/static/images/${folder}/default.jpg`;
+                if (path.startsWith('http://') || path.startsWith('https://')) return path;
+                return `/static/uploads/${folder}/${path}`;
+            }
+
+            const postImgUrl = getImgUrl(post.image_url, 'posts');
+
             postsHTML += `
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="post-card" style="position: relative;">
@@ -326,7 +334,7 @@ async function reloadFavoritesSection() {
                         </div>
                         <div class="post-image">
                             ${post.image_url ?
-                    `<img src="/static/images/${post.image_url}" alt="${post.title}" class="img-fluid">` :
+                    `<img src="${postImgUrl}" alt="${post.title}" class="img-fluid">` :
                     `<div class="post-placeholder"><i class="fas fa-file-alt"></i></div>`
                 }
                             ${post.featured ? '<div class="featured-badge"><i class="fas fa-star"></i></div>' : ''}

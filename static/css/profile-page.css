@@ -2169,7 +2169,7 @@
     border-radius: 10px;
 }
 
-.admin-nav-header {
+.profile-admin-sidebar .admin-nav-header {
     padding: 1.5rem;
     position: relative;
     display: flex;
@@ -2179,7 +2179,7 @@
     height: 70px;
 }
 
-.admin-nav-logo {
+.profile-admin-sidebar .admin-nav-logo {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -2191,12 +2191,12 @@
     transition: all 0.3s ease;
 }
 
-.admin-nav-logo:hover {
+.profile-admin-sidebar .admin-nav-logo:hover {
     transform: translateY(-2px);
     color: #fff;
 }
 
-.logo-text {
+.profile-admin-sidebar .logo-text {
     background: linear-gradient(90deg, #fff 20%, #e0e0e0);
     background-clip: text;
     -webkit-background-clip: text;
@@ -2206,7 +2206,7 @@
     white-space: nowrap;
 }
 
-.admin-nav-logo .admin-icon {
+.profile-admin-sidebar .admin-nav-logo .admin-icon {
     width: 28px;
     height: 28px;
     color: var(--primary-color);
@@ -2214,7 +2214,7 @@
     min-width: 28px;
 }
 
-.admin-profile {
+.profile-admin-sidebar .admin-profile {
     padding: 1.5rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
@@ -2222,7 +2222,7 @@
     gap: 1rem;
 }
 
-.admin-profile-img {
+.profile-admin-sidebar .admin-profile-img {
     width: 50px;
     height: 50px;
     border-radius: 12px;
@@ -2232,17 +2232,17 @@
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
 }
 
-.admin-profile-img img {
+.profile-admin-sidebar .admin-profile-img img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.admin-profile-img img.error {
+.profile-admin-sidebar .admin-profile-img img.error {
     display: none;
 }
 
-.profile-placeholder {
+.profile-admin-sidebar .profile-placeholder {
     position: absolute;
     inset: 0;
     display: flex;
@@ -2254,12 +2254,12 @@
     font-size: 1.1rem;
 }
 
-.admin-profile-info {
+.profile-admin-sidebar .admin-profile-info {
     flex: 1;
     min-width: 0;
 }
 
-.admin-profile-info h4 {
+.profile-admin-sidebar .admin-profile-info h4 {
     color: #fff;
     font-size: 0.95rem;
     font-weight: 600;
@@ -2269,7 +2269,7 @@
     text-overflow: ellipsis;
 }
 
-.admin-profile-info p {
+.profile-admin-sidebar .admin-profile-info p {
     color: rgba(255, 255, 255, 0.6);
     font-size: 0.8rem;
     margin: 0;
@@ -2277,16 +2277,16 @@
 }
 
 /* Navigation Sections */
-.admin-nav {
+.profile-admin-sidebar .admin-nav {
     flex: 1;
     padding: 1rem 0;
 }
 
-.nav-section {
+.profile-admin-sidebar .nav-section {
     margin-bottom: 1.5rem;
 }
 
-.nav-section-title {
+.profile-admin-sidebar .nav-section-title {
     color: rgba(255, 255, 255, 0.4);
     font-size: 0.75rem;
     font-weight: 600;
@@ -2296,7 +2296,7 @@
     margin: 0;
 }
 
-.admin-nav-item {
+.profile-admin-sidebar .admin-nav-item {
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -2310,7 +2310,7 @@
     margin: 0 0.75rem 0.4rem;
 }
 
-.admin-nav-item::before {
+.profile-admin-sidebar .admin-nav-item::before {
     content: '';
     position: absolute;
     left: 0;
@@ -2322,18 +2322,18 @@
     transition: transform 0.3s ease;
 }
 
-.admin-nav-item:hover,
-.admin-nav-item.active {
+.profile-admin-sidebar .admin-nav-item:hover,
+.profile-admin-sidebar .admin-nav-item.active {
     background: rgba(255, 255, 255, 0.05);
     color: #fff;
 }
 
-.admin-nav-item:hover::before,
-.admin-nav-item.active::before {
+.profile-admin-sidebar .admin-nav-item:hover::before,
+.profile-admin-sidebar .admin-nav-item.active::before {
     transform: scaleY(1);
 }
 
-.admin-nav-item .admin-icon {
+.profile-admin-sidebar .admin-nav-item .admin-icon {
     width: 20px;
     height: 20px;
     font-size: 1.1rem;
@@ -2342,16 +2342,16 @@
     transition: all 0.3s ease;
 }
 
-.admin-nav-item:hover .admin-icon {
+.profile-admin-sidebar .admin-nav-item:hover .admin-icon {
     opacity: 1;
     transform: scale(1.1);
 }
 
-.admin-nav-text {
+.profile-admin-sidebar .admin-nav-text {
     flex: 1;
 }
 
-.nav-badge {
+.profile-admin-sidebar .nav-badge {
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.8);
     padding: 0.25rem 0.5rem;
@@ -2368,6 +2368,15 @@
     margin-left: 280px;
     padding: 2rem;
     min-height: 100vh;
+}
+
+/* Fix post-card width inside profile page */
+.profile-main-content .post-card {
+    max-width: 100%;
+}
+
+.profile-main-content .posts-grid {
+    display: block;
 }
 
 .profile-main-content .container {

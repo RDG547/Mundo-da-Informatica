@@ -376,9 +376,22 @@ async function reloadDownloadHistorySection() {
         // Reconstrói o HTML do histórico
         let downloadsHTML = '';
         data.downloads.forEach(download => {
-            const imageHtml = download.post_image && download.post_image !== 'default.jpg'
-                ? `<img src="/static/images/${download.post_image}" alt="${download.post_title}" class="download-card-image" onerror="this.style.display='none'">`
+            function getImgUrl(path, folder) {
+                if (!path || path === 'default.jpg') return `/static/images/${folder}/default.jpg`;
+                if (path.startsWith('http://') || path.startsWith('https://')) return path;
+                return `/static/uploads/${folder}/${path}`;
+            }
+
+            const postImgUrl = getImgUrl(download.post_image, 'posts');
+            const hasImage = download.post_image && download.post_image !== 'default.jpg';
+
+            const imageHtml = hasImage
+                ? `<img src="${postImgUrl}" alt="${download.post_title}" class="download-card-image" onerror="this.style.display='none'">`
                 : `<div class="download-card-image" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;"><i class="fas fa-file-alt"></i></div>`;
+
+            const thumbHtml = hasImage
+                ? `<img src="${postImgUrl}" alt="" class="download-title-thumb" onerror="this.style.display='none'">`
+                : `<div class="download-title-thumb download-title-thumb-placeholder"><i class="fas fa-file-alt"></i></div>`;
 
             const linkHtml = download.category_slug
                 ? `<a href="/categoria/${download.category_slug}/${download.post_slug}">${download.post_title}</a>`
@@ -388,6 +401,14 @@ async function reloadDownloadHistorySection() {
                 ? `<div class="download-card-category"><i class="fas fa-folder"></i> ${download.category_name}</div>`
                 : '';
 
+            const viewBtnHtml = download.category_slug
+                ? `<a href="/categoria/${download.category_slug}/${download.post_slug}" class="download-card-btn download-card-btn-secondary"><i class="fas fa-eye"></i> Ver Post</a>`
+                : '';
+
+            const downloadBtnHtml = download.download_link
+                ? `<a href="${download.download_link}" class="download-card-btn download-card-btn-primary" target="_blank"><i class="fas fa-download"></i> Baixar</a>`
+                : '';
+
             downloadsHTML += `
                 <div class="download-card" data-download-id="${download.id}">
                     <button class="download-remove-btn" onclick="removeDownload(${download.id})" title="Remover do histórico">
@@ -395,13 +416,17 @@ async function reloadDownloadHistorySection() {
                     </button>
                     ${imageHtml}
                     <div class="download-card-body">
-                        <div class="download-card-title">${linkHtml}</div>
+                        <div class="download-card-title">${thumbHtml}${linkHtml}</div>
                         <div class="download-card-meta">
                             <div class="download-card-date">
                                 <i class="far fa-clock"></i>
                                 <span>${download.timestamp}</span>
                             </div>
                             ${categoryHtml}
+                        </div>
+                        <div class="download-card-actions">
+                            ${viewBtnHtml}
+                            ${downloadBtnHtml}
                         </div>
                     </div>
                 </div>

@@ -6866,6 +6866,7 @@ def get_download_history_api():
                     'post_title': download.post.title,
                     'post_slug': download.post.slug,
                     'post_image': download.post.image_url,
+                    'download_link': download.post.download_link,
                     'category_name': category.name if category else None,
                     'category_slug': category.slug if category else None,
                     'timestamp': brasilia_time.strftime('%d/%m/%Y às %H:%M')

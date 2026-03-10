@@ -6831,6 +6831,7 @@ def get_user_favorites_api():
                     'category_str': post.category_str or 'Geral',
                     'category_slug': Category.query.get(post.category_id).slug if post.category_id else None,
                     'download_link': post.download_link,
+                    'download_files': post.get_metadata('download_files') or [],
                     'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
                     'views': post.views or 0,
                     'downloads': post.downloads or 0,
@@ -6903,6 +6904,7 @@ def get_download_history_api():
                     'post_slug': download.post.slug,
                     'post_image': download.post.image_url,
                     'download_link': download.post.download_link,
+                    'download_files': download.post.get_metadata('download_files') or [],
                     'category_name': category.name if category else None,
                     'category_slug': category.slug if category else None,
                     'timestamp': brasilia_time.strftime('%d/%m/%Y às %H:%M')

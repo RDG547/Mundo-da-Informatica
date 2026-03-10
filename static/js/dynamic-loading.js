@@ -361,19 +361,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (window.location.pathname.startsWith('/profile')) {
                 console.log('[DYNAMIC-LOADING] 👤 Reinicializando profile page');
                 this.initializeProfilePage();
-
-                // Atualizar histórico de downloads e favoritos ao navegar para perfil
-                setTimeout(() => {
-                    console.log('[DYNAMIC-LOADING] 📊 Atualizando histórico e favoritos');
-                    if (typeof window.reloadDownloadHistorySection === 'function') {
-                        window.reloadDownloadHistorySection();
-                    } else if (typeof window.refreshDownloadHistory === 'function') {
-                        window.refreshDownloadHistory();
-                    }
-                    if (typeof window.reloadFavoritesSection === 'function') {
-                        window.reloadFavoritesSection();
-                    }
-                }, 500);
             }
 
             // Re-initialize posts list page functionality

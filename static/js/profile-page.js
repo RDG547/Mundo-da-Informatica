@@ -321,6 +321,28 @@ async function reloadFavoritesSection() {
             }
 
             const postImgUrl = getImgUrl(post.image_url, 'posts');
+            const dlFiles = post.download_files || [];
+            const hasMultiDownload = dlFiles.length > 1;
+            const badgeText = hasMultiDownload ? dlFiles.map(f => f.type).join('/') : (post.category_str || 'Geral');
+
+            let downloadBtnHtml = '';
+            if (post.download_link) {
+                if (hasMultiDownload) {
+                    downloadBtnHtml = `<button type="button" class="btn btn-download download-btn multi-download-trigger"
+                        data-post-id="${post.id}"
+                        data-post-title="${post.title}"
+                        data-download-files='${JSON.stringify(dlFiles).replace(/'/g, "&#39;")}'
+                        style="flex: 1; min-width: 120px;">
+                        <i class="fas fa-download"></i> Download
+                    </button>`;
+                } else {
+                    downloadBtnHtml = `<a href="/download/${post.id}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
+                        <i class="fas fa-download"></i> Download
+                    </a>`;
+                }
+            }
+
+            const postUrl = post.category_slug ? `/${post.category_slug}/${post.slug}` : `/post/${post.id}`;
 
             postsHTML += `
                 <div class="col-md-6 col-lg-4 mb-3">
@@ -329,7 +351,7 @@ async function reloadFavoritesSection() {
                             <i class="fas fa-times"></i>
                         </button>
                         <a href="/categoria/${encodeURIComponent(post.category_str)}" class="category-badge-left">
-                            <i class="fas fa-tag"></i> ${post.category_str}
+                            <i class="fas fa-tag"></i> ${badgeText}
                         </a>
                         <div class="post-image">
                             ${post.image_url ?
@@ -339,7 +361,7 @@ async function reloadFavoritesSection() {
                             ${post.featured ? '<div class="featured-badge"><i class="fas fa-star"></i></div>' : ''}
                         </div>
                         <div class="post-content">
-                            <h3><a href="/post/${post.id}" style="text-decoration: none; color: inherit;">${post.title}</a></h3>
+                            <h3><a href="${postUrl}" style="text-decoration: none; color: inherit;">${post.title}</a></h3>
                             <div class="post-meta">
                                 <span><i class="far fa-calendar-alt"></i> ${post.date_posted}</span>
                                 <span><i class="far fa-eye"></i> ${post.views}</span>
@@ -349,12 +371,8 @@ async function reloadFavoritesSection() {
                                 <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">${fullText}</div>
                             </div>
                             <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
-                                ${post.download_link ? `
-                                    <a href="/download/${post.id}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
-                                        <i class="fas fa-download"></i> Download
-                                    </a>
-                                ` : ''}
-                                <a href="/post/${post.id}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
+                                ${downloadBtnHtml}
+                                <a href="${postUrl}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                             </div>
                         </div>
                     </div>

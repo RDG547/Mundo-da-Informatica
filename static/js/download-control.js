@@ -396,16 +396,29 @@ async function reloadDownloadHistorySection() {
                 : `<span>${download.post_title}</span>`;
 
             const categoryHtml = download.category_name
-                ? `<a href="/categoria/${encodeURIComponent(download.category_name)}" class="download-card-category"><i class="fas fa-folder"></i> ${download.category_name}</a>`
+                ? (() => {
+                    const dlFiles = download.download_files || [];
+                    const label = (dlFiles.length > 1) ? dlFiles.map(f => f.type).join('/') : download.category_name;
+                    return `<a href="/categoria/${encodeURIComponent(download.category_name)}" class="download-card-category"><i class="fas fa-folder"></i> ${label}</a>`;
+                })()
                 : '';
 
             const viewBtnHtml = download.category_slug
                 ? `<a href="/${download.category_slug}/${download.post_slug}" class="download-card-btn download-card-btn-secondary"><i class="fas fa-eye"></i> Ver Post</a>`
                 : '';
 
-            const downloadBtnHtml = download.download_link
-                ? `<a href="${download.download_link}" class="download-card-btn download-card-btn-primary" target="_blank"><i class="fas fa-download"></i> Baixar</a>`
-                : '';
+            const dlFiles = download.download_files || [];
+            let downloadBtnHtml = '';
+            if (dlFiles.length > 1) {
+                downloadBtnHtml = `<button type="button" class="download-card-btn download-card-btn-primary multi-download-trigger"
+                    data-post-id="${download.post_id}"
+                    data-post-title="${download.post_title}"
+                    data-download-files='${JSON.stringify(dlFiles).replace(/'/g, "&#39;")}'>
+                    <i class="fas fa-download"></i> Baixar
+                </button>`;
+            } else if (download.download_link) {
+                downloadBtnHtml = `<a href="${download.download_link}" class="download-card-btn download-card-btn-primary" target="_blank"><i class="fas fa-download"></i> Baixar</a>`;
+            }
 
             downloadsHTML += `
                 <div class="download-card" data-download-id="${download.id}">
@@ -499,11 +512,11 @@ document.addEventListener('DOMContentLoaded', function() {
         subtree: true
     });
 
-    // Se estiver na página de perfil, carregar histórico automaticamente
+    // Se estiver na página de perfil, apenas inicializar botões de download
     if (window.location.pathname.includes('/profile')) {
-        console.log('[DOWNLOAD-CONTROL] Página de perfil detectada, carregando histórico');
+        console.log('[DOWNLOAD-CONTROL] Página de perfil detectada, inicializando botões');
         setTimeout(() => {
-            reloadDownloadHistorySection();
+            setupDownloadButtons();
         }, 500);
     }
 });

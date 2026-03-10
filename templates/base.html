@@ -1135,10 +1135,15 @@
                 allBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     modal.style.display = 'none';
-                    // Abrir todos sincronamente dentro do contexto do clique do usuário
-                    // para evitar bloqueio de popup
-                    files.forEach(function(f) {
-                        window.open('/download/' + postId + '?type=' + encodeURIComponent(f.type), '_blank');
+                    // Usar iframes ocultos com delay para evitar bloqueio de popup
+                    files.forEach(function(f, i) {
+                        setTimeout(function() {
+                            var iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            iframe.src = '/download/' + postId + '?type=' + encodeURIComponent(f.type);
+                            document.body.appendChild(iframe);
+                            setTimeout(function() { iframe.remove(); }, 30000);
+                        }, i * 2000);
                     });
                 });
                 optionsDiv.appendChild(allBtn);

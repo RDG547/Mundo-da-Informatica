@@ -497,12 +497,31 @@
 
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label for="editPostDownloadLink" class="form-label">
-                                    <i class="fas fa-download"></i> Link de Download
+                                <label class="form-label">
+                                    <i class="fas fa-download"></i> Links de Download
                                 </label>
-                                <input type="url" id="editPostDownloadLink" name="download_link"
-                                    class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip">
-                                <small class="form-text">Link para download do arquivo relacionado ao post</small>
+                                <div id="editDownloadLinksContainer">
+                                    <div class="download-entry" data-index="0">
+                                        <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;">
+                                            <select name="edit_download_type_0" class="form-select" style="width: 120px; flex-shrink: 0;">
+                                                <option value="BIOS">BIOS</option>
+                                                <option value="EC">EC</option>
+                                                <option value="ME">ME</option>
+                                                <option value="Outro">Outro</option>
+                                            </select>
+                                            <div class="input-group" style="flex: 1;">
+                                                <input type="url" name="edit_download_url_0" id="editPostDownloadLink"
+                                                       class="form-control modern-input"
+                                                       placeholder="https://exemplo.com/arquivo.zip">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" id="editAddDownloadEntry" class="btn btn-sm" style="margin-top: 4px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;">
+                                    <i class="fas fa-plus"></i> Adicionar outro download
+                                </button>
+                                <input type="hidden" id="editDownloadFilesData" name="download_files" value="">
+                                <input type="hidden" id="editDownloadLinkHidden" name="download_link" value="">
                             </div>
                         </div>
                     </div>
@@ -1063,6 +1082,9 @@
             document.getElementById('editPostCategory').value = post.category_id || '';
             document.getElementById('editPostDownloadLink').value = post.download_link || '';
 
+            // Populate multi-download entries
+            populateEditDownloadEntries(post);
+
             // Carregar imagem se existir
             if (post.image_url && post.image_url !== 'default.jpg') {
                 document.getElementById('editPostImageUrl').value = post.image_url;
@@ -1104,6 +1126,78 @@
             closeModal('editPostModal');
         };
 
+        // Multi-download edit functions
+        var editDownloadIdx = 1;
+
+        function populateEditDownloadEntries(post) {
+            var container = document.getElementById('editDownloadLinksContainer');
+            if (!container) return;
+
+            // Clear all entries
+            container.innerHTML = '';
+            editDownloadIdx = 0;
+
+            var files = [];
+            if (post.custom_metadata && post.custom_metadata.download_files && post.custom_metadata.download_files.length > 0) {
+                files = post.custom_metadata.download_files;
+            } else if (post.download_link) {
+                files = [{type: 'BIOS', url: post.download_link}];
+            }
+
+            if (files.length === 0) {
+                files = [{type: 'BIOS', url: ''}];
+            }
+
+            files.forEach(function(f, i) {
+                addEditDownloadEntry(f.type, f.url, i === 0);
+            });
+        }
+
+        function addEditDownloadEntry(type, url, isFirst) {
+            var container = document.getElementById('editDownloadLinksContainer');
+            var idx = editDownloadIdx++;
+            var entry = document.createElement('div');
+            entry.className = 'download-entry';
+            entry.setAttribute('data-index', idx);
+            var removeHtml = isFirst ? '' : '<button type="button" class="btn btn-sm edit-remove-dl" title="Remover" style="background:rgba(220,53,69,0.1);color:#dc3545;border:1px solid #dc3545;border-radius:6px;padding:6px 10px;cursor:pointer;flex-shrink:0;"><i class="fas fa-trash"></i></button>';
+            entry.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">' +
+                '<select name="edit_download_type_' + idx + '" class="form-select" style="width:120px;flex-shrink:0;">' +
+                '<option value="BIOS"' + (type === 'BIOS' ? ' selected' : '') + '>BIOS</option>' +
+                '<option value="EC"' + (type === 'EC' ? ' selected' : '') + '>EC</option>' +
+                '<option value="ME"' + (type === 'ME' ? ' selected' : '') + '>ME</option>' +
+                '<option value="Outro"' + (type === 'Outro' ? ' selected' : '') + '>Outro</option>' +
+                '</select>' +
+                '<div class="input-group" style="flex:1;">' +
+                '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip" value="' + (url || '') + '">' +
+                '</div>' + removeHtml + '</div>';
+            container.appendChild(entry);
+
+            var removeBtn = entry.querySelector('.edit-remove-dl');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function() { entry.remove(); });
+            }
+        }
+
+        document.getElementById('editAddDownloadEntry')?.addEventListener('click', function() {
+            addEditDownloadEntry('BIOS', '', false);
+        });
+
+        function collectEditDownloadData() {
+            var entries = document.querySelectorAll('#editDownloadLinksContainer .download-entry');
+            var files = [];
+            entries.forEach(function(entry) {
+                var sel = entry.querySelector('select');
+                var inp = entry.querySelector('input[type="url"]');
+                if (sel && inp && inp.value.trim()) {
+                    files.push({type: sel.value, url: inp.value.trim()});
+                }
+            });
+            var dataField = document.getElementById('editDownloadFilesData');
+            var linkField = document.getElementById('editDownloadLinkHidden');
+            if (dataField) dataField.value = JSON.stringify(files);
+            if (linkField && files.length > 0) linkField.value = files[0].url;
+        }
+
         // Função para salvar post
         window.savePost = function (event) {
             if (event) event.preventDefault();
@@ -1115,6 +1209,9 @@
             if (contentEditor && contentTextarea) {
                 contentTextarea.value = contentEditor.innerHTML;
             }
+
+            // Collect multi-download data
+            collectEditDownloadData();
 
             const form = document.getElementById('editPostForm');
             const formData = new FormData(form);

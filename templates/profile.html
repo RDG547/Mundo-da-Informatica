@@ -220,9 +220,20 @@
                                         </div>
                                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
+                                            {% set dl_files_fav = post.get_metadata('download_files') %}
+                                            {% if dl_files_fav and dl_files_fav|length > 1 %}
+                                            <button type="button" class="btn btn-download download-btn multi-download-trigger"
+                                                data-post-id="{{ post.id }}"
+                                                data-post-title="{{ post.title }}"
+                                                data-download-files='{{ dl_files_fav|tojson }}'
+                                                style="flex: 1; min-width: 120px;">
+                                                <i class="fas fa-download"></i> Download
+                                            </button>
+                                            {% else %}
                                             <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                                 <i class="fas fa-download"></i> Download
                                             </a>
+                                            {% endif %}
                                             {% endif %}
                                             <a href="{{ url_for('post', post_id=post.id) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                                         </div>
@@ -268,9 +279,20 @@
                                         </div>
                                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
+                                            {% set dl_files_fav2 = post.get_metadata('download_files') %}
+                                            {% if dl_files_fav2 and dl_files_fav2|length > 1 %}
+                                            <button type="button" class="btn btn-download download-btn multi-download-trigger"
+                                                data-post-id="{{ post.id }}"
+                                                data-post-title="{{ post.title }}"
+                                                data-download-files='{{ dl_files_fav2|tojson }}'
+                                                style="flex: 1; min-width: 120px;">
+                                                <i class="fas fa-download"></i> Download
+                                            </button>
+                                            {% else %}
                                             <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                                 <i class="fas fa-download"></i> Download
                                             </a>
+                                            {% endif %}
                                             {% endif %}
                                             <a href="{{ url_for('post', post_id=post.id) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                                         </div>
@@ -386,11 +408,21 @@
                                         <i class="fas fa-eye"></i> Ver Post
                                     </a>
                                     {% endif %}
+                                    {% set dl_files_hist = download.post.get_metadata('download_files') %}
+                                    {% if dl_files_hist and dl_files_hist|length > 1 %}
+                                    <button type="button" class="download-card-btn download-card-btn-primary multi-download-trigger"
+                                        data-post-id="{{ download.post.id }}"
+                                        data-post-title="{{ download.post.title }}"
+                                        data-download-files='{{ dl_files_hist|tojson }}'>
+                                        <i class="fas fa-download"></i> Baixar
+                                    </button>
+                                    {% else %}
                                     <a href="{{ download.post.download_link }}"
                                        class="download-card-btn download-card-btn-primary"
                                        target="_blank">
                                         <i class="fas fa-download"></i> Baixar
                                     </a>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

@@ -125,6 +125,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 hiddenTextarea.value = richEditor.innerHTML;
             }
 
+            // Coletar dados de multi-download antes de submeter
+            collectDownloadData();
+
             // Submeter o formulário
             const form = document.getElementById('addPostForm');
             if (form) {
@@ -284,4 +287,108 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Inicializar no step 1
     showStep(1);
+
+    // ==========================================
+    // MULTI-DOWNLOAD ENTRIES
+    // ==========================================
+    let downloadEntryIndex = 1;
+    const container = document.getElementById('downloadLinksContainer');
+    const addBtn = document.getElementById('addDownloadEntry');
+
+    if (addBtn && container) {
+        addBtn.addEventListener('click', function() {
+            const idx = downloadEntryIndex++;
+            const entry = document.createElement('div');
+            entry.className = 'download-entry';
+            entry.setAttribute('data-index', idx);
+            entry.innerHTML = `
+                <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;">
+                    <select name="download_type_${idx}" class="form-select" style="width: 120px; flex-shrink: 0;">
+                        <option value="BIOS">BIOS</option>
+                        <option value="EC">EC</option>
+                        <option value="ME">ME</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                    <div class="input-group" style="flex: 1;">
+                        <input type="url" name="download_url_${idx}"
+                               class="form-control modern-input"
+                               placeholder="https://exemplo.com/arquivo.zip"
+                               required>
+                        <button type="button" class="btn-group-item validate-link-btn" title="Validar Link">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-sm remove-download-entry" title="Remover"
+                            style="background: rgba(220,53,69,0.1); color: #dc3545; border: 1px solid #dc3545; border-radius: 6px; padding: 6px 10px; cursor: pointer; flex-shrink: 0;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(entry);
+
+            // bind remove
+            entry.querySelector('.remove-download-entry').addEventListener('click', function() {
+                entry.remove();
+            });
+
+            // bind validate
+            entry.querySelector('.validate-link-btn').addEventListener('click', function() {
+                const urlInput = entry.querySelector('input[type="url"]');
+                if (urlInput && urlInput.value) {
+                    validateDownloadLink(urlInput, this);
+                }
+            });
+        });
+    }
+
+    // Bind validate buttons on initial entry
+    container?.querySelectorAll('.validate-link-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const urlInput = btn.closest('.download-entry')?.querySelector('input[type="url"]');
+            if (urlInput && urlInput.value) {
+                validateDownloadLink(urlInput, btn);
+            }
+        });
+    });
+
+    function validateDownloadLink(urlInput, btn) {
+        try {
+            new URL(urlInput.value);
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            setTimeout(function() {
+                btn.innerHTML = '<i class="fas fa-check" style="color: #28a745;"></i>';
+                urlInput.classList.remove('is-invalid');
+                urlInput.classList.add('is-valid');
+            }, 800);
+        } catch(e) {
+            btn.innerHTML = '<i class="fas fa-times" style="color: #dc3545;"></i>';
+            urlInput.classList.add('is-invalid');
+            urlInput.classList.remove('is-valid');
+        }
+    }
+
+    function collectDownloadData() {
+        const entries = document.querySelectorAll('#downloadLinksContainer .download-entry');
+        const files = [];
+        entries.forEach(function(entry) {
+            const typeSelect = entry.querySelector('select');
+            const urlInput = entry.querySelector('input[type="url"]');
+            if (typeSelect && urlInput && urlInput.value.trim()) {
+                files.push({
+                    type: typeSelect.value,
+                    url: urlInput.value.trim()
+                });
+            }
+        });
+
+        // Set hidden fields
+        const downloadFilesData = document.getElementById('downloadFilesData');
+        const downloadLinkField = document.getElementById('postDownloadLink');
+        if (downloadFilesData) {
+            downloadFilesData.value = JSON.stringify(files);
+        }
+        if (downloadLinkField && files.length > 0) {
+            downloadLinkField.value = files[0].url;
+        }
+    }
 });

@@ -10,9 +10,19 @@
                         <i class="fas fa-eye"></i>
                     </a>
                     {% if post.download_link %}
+                    {% set dl_files_grid = post.get_metadata('download_files') %}
+                    {% if dl_files_grid and dl_files_grid|length > 1 %}
+                    <button type="button" class="action-btn download-btn multi-download-trigger"
+                        data-post-id="{{ post.id }}"
+                        data-post-title="{{ post.title }}"
+                        data-download-files='{{ dl_files_grid|tojson }}'>
+                        <i class="fas fa-download"></i>
+                    </button>
+                    {% else %}
                     <a href="{{ url_for('download_post', post_id=post.id) }}" class="action-btn download-btn" data-action="download">
                         <i class="fas fa-download"></i>
                     </a>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>

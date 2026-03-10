@@ -376,23 +376,9 @@ class ModernPostForm {
         }
     }
 
-    // Link Validation
+    // Link Validation (multi-download entries)
     initLinkValidation() {
-        const validateBtn = document.getElementById('validateLink');
-        const linkInput = document.getElementById('postDownloadLink');
-        const statusDiv = document.getElementById('linkStatus');
-
-        if (!validateBtn || !linkInput || !statusDiv) return;
-
-        validateBtn.addEventListener('click', () => {
-            this.validateLink(linkInput.value, statusDiv);
-        });
-
-        linkInput.addEventListener('blur', () => {
-            if (linkInput.value) {
-                this.validateLink(linkInput.value, statusDiv);
-            }
-        });
+        // Now handled by post-wizard.js multi-download system
     }
 
     async validateLink(url, statusDiv) {
@@ -500,6 +486,9 @@ class ModernPostForm {
             // Update hidden textarea with editor content
             this.updateHiddenTextarea();
 
+            // Collect multi-download data
+            this.collectDownloadData();
+
             // Show loading state
             const saveBtn = document.getElementById('savePostBtn');
             if (saveBtn) {
@@ -510,6 +499,22 @@ class ModernPostForm {
             // Submit the form
             document.getElementById('addPostForm').submit();
         }
+    }
+
+    collectDownloadData() {
+        const entries = document.querySelectorAll('#downloadLinksContainer .download-entry');
+        const files = [];
+        entries.forEach(entry => {
+            const typeSelect = entry.querySelector('select');
+            const urlInput = entry.querySelector('input[type="url"]');
+            if (typeSelect && urlInput && urlInput.value.trim()) {
+                files.push({ type: typeSelect.value, url: urlInput.value.trim() });
+            }
+        });
+        const downloadFilesData = document.getElementById('downloadFilesData');
+        const downloadLinkField = document.getElementById('postDownloadLink');
+        if (downloadFilesData) downloadFilesData.value = JSON.stringify(files);
+        if (downloadLinkField && files.length > 0) downloadLinkField.value = files[0].url;
     }
 
     // Utility Functions

@@ -179,10 +179,22 @@
                                 <span>Atualizado</span>
                             </div>
                         </div>
+                        {% set dl_files_detail = post.get_metadata('download_files') %}
+                        {% if dl_files_detail and dl_files_detail|length > 1 %}
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            {% for df in dl_files_detail %}
+                            <a href="{{ url_for('download_post', post_id=post.id) }}?type={{ df.type|urlencode }}" class="btn-download-primary download-btn" data-action="download" style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                                <i class="fas fa-download"></i>
+                                <span>Download {{ df.type }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
                         <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn-download-primary download-btn" data-action="download">
                             <i class="fas fa-download"></i>
                             <span>Fazer Download</span>
                         </a>
+                        {% endif %}
                         <p class="download-notice">
                             <i class="fas fa-info-circle"></i>
                             O download será iniciado diretamente no nosso site

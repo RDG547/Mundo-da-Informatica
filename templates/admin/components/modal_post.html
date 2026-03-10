@@ -333,23 +333,38 @@
                     <div class="row" style="display: flex !important; flex-wrap: nowrap !important; margin: 0 !important; width: 100% !important; box-sizing: border-box !important;">
                         <div class="col-md-6" style="flex: 0 0 50% !important; max-width: 50% !important; width: 50% !important; padding: 0 12px !important; box-sizing: border-box !important;">
                             <div class="form-group">
-                                <label for="postDownloadLink" class="form-label">
-                                    <i class="fas fa-download"></i> Link de Download
+                                <label class="form-label">
+                                    <i class="fas fa-download"></i> Links de Download
                                     <span class="required">*</span>
                                 </label>
-                                <div class="input-group">
-                                    <input type="url" id="postDownloadLink" name="download_link"
-                                           class="form-control modern-input{% if form_errors and form_errors.download_link %} is-invalid{% endif %}"
-                                           value="{{ form_data.download_link if form_data else '' }}"
-                                           placeholder="https://exemplo.com/arquivo.zip"
-                                           required>
-                                    <button type="button" class="btn-group-item" id="validateLink" title="Validar Link">
-                                        <i class="fas fa-check"></i>
-                                    </button>
+                                <div id="downloadLinksContainer">
+                                    <div class="download-entry" data-index="0">
+                                        <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;">
+                                            <select name="download_type_0" class="form-select" style="width: 120px; flex-shrink: 0;">
+                                                <option value="BIOS">BIOS</option>
+                                                <option value="EC">EC</option>
+                                                <option value="ME">ME</option>
+                                                <option value="Outro">Outro</option>
+                                            </select>
+                                            <div class="input-group" style="flex: 1;">
+                                                <input type="url" name="download_url_0"
+                                                       class="form-control modern-input"
+                                                       placeholder="https://exemplo.com/arquivo.zip"
+                                                       required>
+                                                <button type="button" class="btn-group-item validate-link-btn" title="Validar Link">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="link-status" id="linkStatus"></div>
+                                <button type="button" id="addDownloadEntry" class="btn btn-sm" style="margin-top: 4px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;">
+                                    <i class="fas fa-plus"></i> Adicionar outro download (ex: EC)
+                                </button>
+                                <input type="hidden" id="downloadFilesData" name="download_files" value="">
+                                <input type="hidden" id="postDownloadLink" name="download_link" value="">
                                 {% if form_errors and form_errors.download_link %}
-                                    <div class="invalid-feedback">{{ form_errors.download_link }}</div>
+                                    <div class="invalid-feedback" style="display: block;">{{ form_errors.download_link }}</div>
                                 {% endif %}
                             </div>
 

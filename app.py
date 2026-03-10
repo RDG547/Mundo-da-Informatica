@@ -1952,8 +1952,19 @@ def download_post(post_id):
         pass  # Não interromper o download se o log falhar
 
     # Redirecionar para o link de download real
-    if post.download_link:
-        return redirect(post.download_link)
+    download_type = request.args.get('type', '')
+    redirect_url = post.download_link
+
+    if download_type:
+        download_files = post.get_metadata('download_files')
+        if download_files and isinstance(download_files, list):
+            for f in download_files:
+                if f.get('type') == download_type:
+                    redirect_url = f.get('url', post.download_link)
+                    break
+
+    if redirect_url:
+        return redirect(redirect_url)
     else:
         flash('Link de download não disponível para este post.', 'error')
         return redirect(url_for('post', post_id=post_id))
@@ -3717,7 +3728,8 @@ def admin_post_data(post_id):
         'author_id': post.author_id,
         'views': post.views,
         'downloads': post.downloads,
-        'date_posted': post.date_posted.isoformat() if post.date_posted else None
+        'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+        'custom_metadata': post.get_metadata() or {}
     })
 
 @app.route('/admin/posts/<int:post_id>/update', methods=['POST'])
@@ -3733,6 +3745,7 @@ def admin_update_post(post_id):
         content = request.form.get('content', '').strip()
         category_id = request.form.get('category_id')
         download_link = request.form.get('download_link', '').strip()
+        download_files_json = request.form.get('download_files', '')
         image_url = request.form.get('image_url', '').strip()
         featured = request.form.get('featured') == 'true'
         is_active = request.form.get('is_active') == 'true'
@@ -3800,6 +3813,18 @@ def admin_update_post(post_id):
         post.image_url = image_url if image_url else 'default.jpg'
         post.featured = featured
         post.is_active = is_active
+
+        # Armazenar download_files no custom_metadata
+        if download_files_json:
+            try:
+                download_files = json.loads(download_files_json)
+                if isinstance(download_files, list) and len(download_files) > 0:
+                    post.set_metadata('download_files', download_files)
+                    # Atualizar download_link com o primeiro link
+                    if not download_link and download_files[0].get('url'):
+                        post.download_link = download_files[0]['url']
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         db.session.commit()
 
@@ -4648,6 +4673,7 @@ def admin_create_post():
         category_id = request.form.get('category')
         content = request.form.get('content')
         download_link = request.form.get('download_link', '')
+        download_files_json = request.form.get('download_files', '')
         # Proteção contra NaN injection
         featured_value = request.form.get('featured', '')
         if isinstance(featured_value, str) and featured_value.lower() in ('nan', 'infinity', '-infinity'):
@@ -4786,6 +4812,16 @@ def admin_create_post():
         )
 
         db.session.add(new_post)
+
+        # Armazenar download_files no custom_metadata
+        if download_files_json:
+            try:
+                download_files = json.loads(download_files_json)
+                if isinstance(download_files, list) and len(download_files) > 0:
+                    new_post.set_metadata('download_files', download_files)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         db.session.commit()
 
         flash(f'Post "{title}" criado com sucesso!', 'success')

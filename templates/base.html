@@ -993,6 +993,94 @@
     <!-- Download Control System -->
     <script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
 
+    <!-- Aviso sobre Miniaturas Ilustrativas -->
+    <div id="thumbnailDisclaimerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99998; justify-content:center; align-items:center;">
+        <div style="background:var(--card-bg, #fff); border-radius:16px; padding:28px 24px 20px; max-width:440px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; animation: modalFadeIn 0.25s ease;">
+            <div style="text-align:center; margin-bottom:16px;">
+                <i class="fas fa-image" style="font-size:2.5rem; color:var(--primary-color); opacity:0.8;"></i>
+            </div>
+            <h4 style="margin:0 0 12px; font-size:1.1rem; color:var(--text-primary, #333); text-align:center;">
+                <i class="fas fa-info-circle" style="color:var(--primary-color);"></i> Aviso Importante
+            </h4>
+            <p style="margin:0 0 16px; font-size:0.9rem; color:var(--text-secondary, #666); line-height:1.6; text-align:center;">
+                As fotos e miniaturas dos posts são <strong>meramente ilustrativas</strong> e podem não refletir a realidade do produto. Sempre preze pelo <strong>título do post</strong> para identificar o conteúdo correto. A imagem é apenas uma forma de auxílio visual, mas pode não estar 100% precisa.
+            </p>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-secondary, #888); margin-bottom:16px; justify-content:center;">
+                <input type="checkbox" id="disclaimerDontShow" style="width:16px; height:16px; cursor:pointer;">
+                <span>Não mostrar novamente</span>
+            </label>
+            <button id="disclaimerOkBtn" type="button" style="width:100%; padding:12px; border:none; border-radius:10px; background:var(--primary-color, #4a90e2); color:#fff; font-weight:600; font-size:0.95rem; cursor:pointer;">
+                Entendi
+            </button>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var disclaimerModal = document.getElementById('thumbnailDisclaimerModal');
+        var dontShowCheckbox = document.getElementById('disclaimerDontShow');
+        var okBtn = document.getElementById('disclaimerOkBtn');
+        if (!disclaimerModal) return;
+
+        var dismissed = localStorage.getItem('thumbnailDisclaimerDismissed');
+        if (dismissed !== 'true') {
+            setTimeout(function() {
+                disclaimerModal.style.display = 'flex';
+            }, 800);
+        }
+
+        function closeDisclaimer() {
+            if (dontShowCheckbox && dontShowCheckbox.checked) {
+                localStorage.setItem('thumbnailDisclaimerDismissed', 'true');
+            }
+            disclaimerModal.style.display = 'none';
+        }
+
+        okBtn.addEventListener('click', closeDisclaimer);
+        disclaimerModal.addEventListener('click', function(e) {
+            if (e.target === disclaimerModal) closeDisclaimer();
+        });
+    })();
+    </script>
+
+    <!-- Lightbox Global para Imagens dos Cards -->
+    <div id="globalImageLightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99997; justify-content:center; align-items:center; cursor:zoom-out;">
+        <span id="globalLightboxClose" style="position:absolute; top:20px; right:28px; color:#fff; font-size:2.2rem; cursor:pointer; z-index:2; line-height:1;">&times;</span>
+        <img id="globalLightboxImage" src="" alt="" style="max-width:90vw; max-height:90vh; border-radius:8px; object-fit:contain; box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+    </div>
+    <script>
+    (function() {
+        var lightbox = document.getElementById('globalImageLightbox');
+        var lightboxImg = document.getElementById('globalLightboxImage');
+        var lightboxClose = document.getElementById('globalLightboxClose');
+        if (!lightbox) return;
+
+        function closeLightbox() {
+            lightbox.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox || e.target === lightboxImg) closeLightbox();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && lightbox.style.display === 'flex') closeLightbox();
+        });
+
+        document.addEventListener('click', function(e) {
+            var cardImage = e.target.closest('.post-card .post-image img, .download-title-thumb:not(.download-title-thumb-placeholder)');
+            if (!cardImage) return;
+            if (cardImage.tagName !== 'IMG') return;
+            e.preventDefault();
+            e.stopPropagation();
+            lightboxImg.src = cardImage.src;
+            lightboxImg.alt = cardImage.alt || '';
+            lightbox.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        });
+    })();
+    </script>
+
     <!-- Multi-Download Selection Modal -->
     <div id="multiDownloadModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99999; justify-content:center; align-items:center;">
         <div style="background:var(--card-bg, #fff); border-radius:16px; padding:28px 24px 20px; max-width:380px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; animation: modalFadeIn 0.25s ease;">
@@ -1008,6 +1096,8 @@
     </div>
     <style>
         @keyframes modalFadeIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+        .post-card .post-image img { cursor: zoom-in; }
+        .download-title-thumb:not(.download-title-thumb-placeholder) { cursor: zoom-in; }
     </style>
     <script>
     (function() {
@@ -1026,10 +1116,29 @@
                 btn.className = 'btn btn-download download-btn';
                 btn.setAttribute('data-action', 'download');
                 btn.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 16px; border-radius:10px; text-decoration:none; font-weight:600; font-size:0.95rem;';
-                btn.innerHTML = '<i class="fas fa-download"></i> Download ' + f.type;
+                btn.innerHTML = '<i class="fas fa-download"></i> Download ' + f.type + (f.size ? ' <span style="font-size:0.8rem;opacity:0.7;">(' + f.size + ')</span>' : '');
                 btn.addEventListener('click', function() { modal.style.display = 'none'; });
                 optionsDiv.appendChild(btn);
             });
+            // Botão "Baixar Todos"
+            if (files.length > 1) {
+                var allBtn = document.createElement('a');
+                allBtn.href = '/download/' + postId;
+                allBtn.className = 'btn btn-download download-btn';
+                allBtn.setAttribute('data-action', 'download');
+                allBtn.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 16px; border-radius:10px; text-decoration:none; font-weight:600; font-size:0.95rem; background:linear-gradient(135deg, var(--primary-color), var(--secondary-color, #6c5ce7)); color:#fff; margin-top:4px;';
+                allBtn.innerHTML = '<i class="fas fa-download"></i> Baixar Todos';
+                allBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    modal.style.display = 'none';
+                    files.forEach(function(f, i) {
+                        setTimeout(function() {
+                            window.open('/download/' + postId + '?type=' + encodeURIComponent(f.type), '_blank');
+                        }, i * 500);
+                    });
+                });
+                optionsDiv.appendChild(allBtn);
+            }
             modal.style.display = 'flex';
         }
 

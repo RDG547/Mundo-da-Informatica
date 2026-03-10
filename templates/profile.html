@@ -145,6 +145,12 @@
                     <span class="admin-nav-text">Alterar Senha</span>
                 </a>
 
+                <a href="#" class="admin-nav-item" onclick="toggleThumbnailDisclaimer(); return false;">
+                    <i class="fas fa-image admin-icon"></i>
+                    <span class="admin-nav-text">Aviso de Miniaturas</span>
+                    <span class="nav-badge" id="disclaimerStatusBadge" style="font-size:0.65rem;"></span>
+                </a>
+
                 {% if current_user.is_admin() %}
                 <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-item">
                     <i class="fas fa-tachometer-alt admin-icon"></i>
@@ -193,6 +199,12 @@
                                     <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left">
                                         <i class="fas fa-tag"></i> {{ post.category_str or 'Geral' }}
                                     </a>
+                                    {% set dl_files_fav_badge = post.get_metadata('download_files') %}
+                                    {% if dl_files_fav_badge and dl_files_fav_badge|length > 1 %}
+                                    <span style="position:absolute; top:10px; right:40px; background:rgba(var(--primary-rgb),0.85); color:#fff; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:600; z-index:2;">
+                                        {{ dl_files_fav_badge|map(attribute='type')|join('/') }}
+                                    </span>
+                                    {% endif %}
                                     <div class="post-image">
                                         {% if post.image_url %}
                                         <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
@@ -252,6 +264,12 @@
                                     <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left">
                                         <i class="fas fa-tag"></i> {{ post.category_str or 'Geral' }}
                                     </a>
+                                    {% set dl_files_fav_badge2 = post.get_metadata('download_files') %}
+                                    {% if dl_files_fav_badge2 and dl_files_fav_badge2|length > 1 %}
+                                    <span style="position:absolute; top:10px; right:40px; background:rgba(var(--primary-rgb),0.85); color:#fff; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:600; z-index:2;">
+                                        {{ dl_files_fav_badge2|map(attribute='type')|join('/') }}
+                                    </span>
+                                    {% endif %}
                                     <div class="post-image">
                                         {% if post.image_url %}
                                         <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
@@ -397,6 +415,12 @@
                                         <i class="fas fa-folder"></i>
                                         {{ download.post._category_cache.name }}
                                     </a>
+                                    {% endif %}
+                                    {% set dl_files_hist_badge = download.post.get_metadata('download_files') %}
+                                    {% if dl_files_hist_badge and dl_files_hist_badge|length > 1 %}
+                                    <span style="background:rgba(var(--primary-rgb),0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:600;">
+                                        {{ dl_files_hist_badge|map(attribute='type')|join('/') }}
+                                    </span>
                                     {% endif %}
                                 </div>
 
@@ -875,5 +899,31 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+// Aviso de miniaturas ilustrativas - toggle
+function toggleThumbnailDisclaimer() {
+    var current = localStorage.getItem('thumbnailDisclaimerDismissed');
+    if (current === 'true') {
+        localStorage.removeItem('thumbnailDisclaimerDismissed');
+        alert('O aviso sobre miniaturas será exibido novamente na próxima visita.');
+    } else {
+        localStorage.setItem('thumbnailDisclaimerDismissed', 'true');
+        alert('O aviso sobre miniaturas não será mais exibido.');
+    }
+    updateDisclaimerBadge();
+}
+
+function updateDisclaimerBadge() {
+    var badge = document.getElementById('disclaimerStatusBadge');
+    if (!badge) return;
+    var dismissed = localStorage.getItem('thumbnailDisclaimerDismissed') === 'true';
+    badge.textContent = dismissed ? 'Oculto' : 'Ativo';
+    badge.style.background = dismissed ? 'rgba(220,53,69,0.15)' : 'rgba(40,167,69,0.15)';
+    badge.style.color = dismissed ? '#dc3545' : '#28a745';
+}
+
+document.addEventListener('DOMContentLoaded', updateDisclaimerBadge);
+</script>
 
 {% endblock %}

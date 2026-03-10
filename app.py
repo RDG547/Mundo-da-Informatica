@@ -4379,7 +4379,7 @@ def admin_dashboard():
          .filter_by(is_active=True)\
          .group_by(Category.name)\
          .order_by(db.func.sum(Post.downloads).desc())\
-         .limit(5).all()
+         .all()
 
         for cat in category_downloads:
             chart_data['downloads_by_category'].append({

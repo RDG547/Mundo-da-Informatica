@@ -65,7 +65,7 @@
                     </div>
                     <div class="post-description-section">
                         <div class="post-description-title">Descrição</div>
-                        <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ (post.content|striptags)[:300] }}{% if (post.content|striptags)|length > 300 %}...{% endif %}</div>
+                        <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ post.content|striptags }}</div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                         {% if post.download_link %}

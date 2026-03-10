@@ -383,8 +383,15 @@
                             {% endif %}
 
                             <div class="download-card-body">
-                                <!-- Título do Post -->
+                                <!-- Título do Post com Miniatura -->
                                 <div class="download-card-title">
+                                    {% if download.post.image_url and download.post.image_url != 'default.jpg' %}
+                                    <img src="{{ get_image_url(download.post.image_url, folder='posts', default='default.jpg') }}" alt="" class="download-title-thumb" onerror="this.style.display='none'">
+                                    {% else %}
+                                    <div class="download-title-thumb download-title-thumb-placeholder">
+                                        <i class="fas fa-file-alt"></i>
+                                    </div>
+                                    {% endif %}
                                     {% if download.post._category_cache %}
                                     <a href="{{ url_for('post_by_slug', category=download.post._category_cache.slug, slug=download.post.slug) }}">
                                         {{ download.post.title }}

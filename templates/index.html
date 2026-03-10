@@ -29,6 +29,25 @@
             <p>Nosso acervo é constantemente atualizado com novos recursos</p>
         </div>
 
+        <!-- Top Pagination -->
+        {% if posts_pagination and posts_pagination.pages > 1 %}
+        <div class="home-pagination" id="home-pagination-top">
+            <button class="home-page-btn home-page-prev" {% if not posts_pagination.has_prev %}disabled{% endif %} data-page="{{ posts_pagination.prev_num or 1 }}">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            {% for page_num in posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                <button class="home-page-btn home-page-num {% if page_num == posts_pagination.page %}active{% endif %}" data-page="{{ page_num }}">{{ page_num }}</button>
+                {% else %}
+                <span class="home-page-dots">...</span>
+                {% endif %}
+            {% endfor %}
+            <button class="home-page-btn home-page-next" {% if not posts_pagination.has_next %}disabled{% endif %} data-page="{{ posts_pagination.next_num or posts_pagination.pages }}">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        {% endif %}
+
         <div id="recent-posts-container" data-current-page="{{ posts_pagination.page if posts_pagination else 1 }}">
             <div class="posts-grid" id="recent-posts-grid">
                 {% for post in posts %}
@@ -72,7 +91,7 @@
                         </div>
                         <div class="post-description-section">
                             <div class="post-description-title">Descrição</div>
-                            <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ post.content|striptags }}</div>
+                            <div class="post-description-text">{{ post.content|striptags }}</div>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                             {% if post.download_link %}
@@ -142,7 +161,8 @@
 <script>
 (function() {
     var paginationEl = document.getElementById('home-pagination');
-    if (!paginationEl) return;
+    var paginationTopEl = document.getElementById('home-pagination-top');
+    if (!paginationEl && !paginationTopEl) return;
 
     var container = document.getElementById('recent-posts-container');
     var currentPage = parseInt(container.dataset.currentPage) || 1;
@@ -191,7 +211,7 @@
         var descSection = e('div'); descSection.className = 'post-description-section';
         var descTitle = e('div'); descTitle.className = 'post-description-title'; descTitle.textContent = 'Descrição';
         var descText = e('div'); descText.className = 'post-description-text';
-        descText.style.cssText = 'max-height:100px;overflow-y:auto;';
+        descText.className = 'post-description-text';
         var tmpDiv = e('div'); tmpDiv.innerHTML = post.content; descText.textContent = tmpDiv.textContent;
         descSection.appendChild(descTitle); descSection.appendChild(descText);
         content.appendChild(descSection);
@@ -276,7 +296,9 @@
                         grid.appendChild(buildCard(post, data.is_authenticated));
                     });
 
-                    paginationEl.innerHTML = buildPaginationHTML(data.pagination);
+                    var pgHTML = buildPaginationHTML(data.pagination);
+                    if (paginationEl) paginationEl.innerHTML = pgHTML;
+                    if (paginationTopEl) paginationTopEl.innerHTML = pgHTML;
 
                     grid.className = 'posts-grid';
                     grid.id = 'recent-posts-grid';
@@ -308,12 +330,14 @@
             });
     }
 
-    paginationEl.addEventListener('click', function(ev) {
+    function handlePaginationClick(ev) {
         var btn = ev.target.closest('.home-page-btn');
         if (!btn || btn.disabled) return;
         var page = parseInt(btn.dataset.page);
         if (page) loadPage(page);
-    });
+    }
+    if (paginationEl) paginationEl.addEventListener('click', handlePaginationClick);
+    if (paginationTopEl) paginationTopEl.addEventListener('click', handlePaginationClick);
 })();
 </script>
 {% endblock %}

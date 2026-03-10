@@ -883,35 +883,29 @@ function initializeProfilePage() {
 }
 
 // Toggle para expandir/colapsar favoritos - GLOBAL
-window.toggleAllFavorites = function(button) {
-    const extraFavorites = document.querySelectorAll('.extra-favorites');
-    const isExpanded = button.classList.contains('expanded');
-    const icon = button.querySelector('i');
-    const text = button.querySelector('.toggle-text');
-    const totalFavorites = document.querySelectorAll('.favorite-post-item').length;
+window.loadMoreFavorites = function(button) {
+    const hiddenFavorites = document.querySelectorAll('.extra-favorites[style*="display: none"]');
+    const batchSize = 8;
+    const toShow = Array.from(hiddenFavorites).slice(0, batchSize);
 
-    if (isExpanded) {
-        // Colapsar
-        extraFavorites.forEach(item => {
-            item.style.display = 'none';
-        });
-        button.classList.remove('expanded');
-        icon.className = 'fas fa-chevron-down';
-        text.textContent = `Ver todos os ${totalFavorites} favoritos`;
-
-        // Scroll suave para a seção de favoritos
-        const favSection = document.getElementById('favorites-section');
-        if (favSection) {
-            favSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    } else {
-        // Expandir
-        extraFavorites.forEach(item => {
+    toShow.forEach(function(item, i) {
+        setTimeout(function() {
             item.style.display = 'flex';
-        });
-        button.classList.add('expanded');
-        icon.className = 'fas fa-chevron-up';
-        text.textContent = 'Ver menos';
+            item.style.opacity = '0';
+            item.style.transform = 'translateY(20px)';
+            // Force reflow
+            void item.offsetWidth;
+            item.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            item.style.opacity = '1';
+            item.style.transform = 'translateY(0)';
+        }, i * 60);
+    });
+
+    // Check if there are still hidden items after this batch
+    const remainingHidden = hiddenFavorites.length - toShow.length;
+    if (remainingHidden <= 0) {
+        var wrapper = document.getElementById('favorites-load-more-wrapper');
+        if (wrapper) wrapper.style.display = 'none';
     }
 };
 

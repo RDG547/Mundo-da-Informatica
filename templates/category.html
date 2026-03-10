@@ -310,7 +310,7 @@
                                 </div>
                                 <div class="post-description-section">
                                     <div class="post-description-title">Descrição</div>
-                                    <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ (post.short_description or post.content)|striptags }}</div>
+                                    <div class="post-description-text">{{ (post.short_description or post.content)|striptags }}</div>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                     {% if post.download_link %}
@@ -513,7 +513,6 @@
         var descSection = el('div'); descSection.className = 'post-description-section';
         var descTitle = el('div'); descTitle.className = 'post-description-title'; descTitle.textContent = 'Descrição';
         var descText = el('div'); descText.className = 'post-description-text';
-        descText.style.cssText = 'max-height:100px;overflow-y:auto;';
         var tmpDiv = el('div'); tmpDiv.innerHTML = post.content; descText.textContent = tmpDiv.textContent;
         descSection.appendChild(descTitle); descSection.appendChild(descText);
         content.appendChild(descSection);

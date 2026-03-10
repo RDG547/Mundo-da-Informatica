@@ -2078,7 +2078,7 @@ footer {
     }
 }
 
-@keyframes slideInLeft {
+@keyframes slideInLeftGeneric {
     from {
         transform: translateX(-100px);
         opacity: 0;
@@ -2090,7 +2090,7 @@ footer {
     }
 }
 
-@keyframes slideInRight {
+@keyframes slideInRightGeneric {
     from {
         transform: translateX(100px);
         opacity: 0;
@@ -2133,11 +2133,11 @@ footer {
 }
 
 .animate-slide-left {
-    animation: slideInLeft 1s forwards;
+    animation: slideInLeftGeneric 1s forwards;
 }
 
 .animate-slide-right {
-    animation: slideInRight 1s forwards;
+    animation: slideInRightGeneric 1s forwards;
 }
 
 .animate-slide-up {

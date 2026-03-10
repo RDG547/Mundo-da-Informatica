@@ -189,7 +189,7 @@
                     </div>
                     <div class="posts-grid" style="margin-top: 1.5rem;">
                         <div class="row" id="favorites-container">
-                            {% for post in favorite_posts[:6] %}
+                            {% for post in favorite_posts[:4] %}
                             <div class="col-md-6 col-lg-4 mb-3 favorite-post-item" data-post-id="{{ post.id }}" draggable="true">
                                 <div class="post-card" style="position: relative;">
                                     <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
@@ -223,7 +223,7 @@
                                         </div>
                                         <div class="post-description-section">
                                             <div class="post-description-title">Descrição</div>
-                                            <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ post.content|striptags }}</div>
+                                            <div class="post-description-text">{{ post.content|striptags }}</div>
                                         </div>
                                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
@@ -248,8 +248,8 @@
                                 </div>
                             </div>
                             {% endfor %}
-                            {% if favorite_posts|length > 6 %}
-                            {% for post in favorite_posts[6:] %}
+                            {% if favorite_posts|length > 4 %}
+                            {% for post in favorite_posts[4:] %}
                             <div class="col-md-6 col-lg-4 mb-3 favorite-post-item extra-favorites" style="display: none;" data-post-id="{{ post.id }}" draggable="true">
                                 <div class="post-card" style="position: relative;">
                                     <button onclick="removeFavorite({{ post.id }})" class="favorite-remove-badge"
@@ -283,7 +283,7 @@
                                         </div>
                                         <div class="post-description-section">
                                             <div class="post-description-title">Descrição</div>
-                                            <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ post.content|striptags }}</div>
+                                            <div class="post-description-text">{{ post.content|striptags }}</div>
                                         </div>
                                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
@@ -311,11 +311,11 @@
                             {% endif %}
                         </div>
                     </div>
-                    {% if favorite_posts|length > 6 %}
-                    <div class="profile-card-footer" style="text-align: center; padding: 1.5rem;">
-                        <button type="button" class="btn btn-gradient primary" onclick="toggleAllFavorites(this)">
+                    {% if favorite_posts|length > 4 %}
+                    <div class="profile-card-footer" style="text-align: center; padding: 1.5rem;" id="favorites-load-more-wrapper">
+                        <button type="button" class="btn btn-gradient primary" id="favorites-load-more-btn" onclick="loadMoreFavorites(this)">
                             <i class="fas fa-chevron-down"></i>
-                            <span class="toggle-text">Ver todos os {{ favorite_posts|length }} favoritos</span>
+                            <span class="toggle-text">Ver mais</span>
                         </button>
                     </div>
                     {% endif %}

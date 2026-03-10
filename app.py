@@ -3533,7 +3533,7 @@ def _serialize_posts(posts_list, favorite_post_ids):
         posts_data.append({
             'id': post.id,
             'title': post.title,
-            'content': post.content[:500] if post.content else '',
+            'content': post.content or '',
             'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
             'views': post.views or 0,
             'image_url': img_url,

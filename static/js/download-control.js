@@ -385,9 +385,7 @@ async function reloadDownloadHistorySection() {
             const postImgUrl = getImgUrl(download.post_image, 'posts');
             const hasImage = download.post_image && download.post_image !== 'default.jpg';
 
-            const imageHtml = hasImage
-                ? `<img src="${postImgUrl}" alt="${download.post_title}" class="download-card-image" onerror="this.style.display='none'">`
-                : `<div class="download-card-image" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;"><i class="fas fa-file-alt"></i></div>`;
+            // Large image removed - only small thumb next to title
 
             const thumbHtml = hasImage
                 ? `<img src="${postImgUrl}" alt="" class="download-title-thumb" onerror="this.style.display='none'">`
@@ -414,7 +412,6 @@ async function reloadDownloadHistorySection() {
                     <button class="download-remove-btn" onclick="removeDownload(${download.id})" title="Remover do histórico">
                         <i class="fas fa-times"></i>
                     </button>
-                    ${imageHtml}
                     <div class="download-card-body">
                         <div class="download-card-title">${thumbHtml}${linkHtml}</div>
                         <div class="download-card-meta">

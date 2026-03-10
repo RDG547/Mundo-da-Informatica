@@ -196,7 +196,7 @@
                                     <div class="post-image">
                                         {% if post.image_url %}
                                         <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
-                                            alt="{{ post.title }}" class="img-fluid">
+                                            alt="{{ post.title }}">
                                         {% else %}
                                         <div class="post-placeholder">
                                             <i class="fas fa-file-alt"></i>
@@ -209,37 +209,22 @@
                                         {% endif %}
                                     </div>
                                     <div class="post-content">
-                                        <h3 class="post-title">
-                                            <a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a>
-                                        </h3>
-                                        <p class="post-excerpt">{{ (post.content|striptags)[:150] }}{% if
-                                            (post.content|striptags)|length > 150 %}...{% endif %}</p>
+                                        <h3><a href="{{ url_for('post', post_id=post.id) }}" style="text-decoration: none; color: inherit;">{{ post.title }}</a></h3>
                                         <div class="post-meta">
-                                            <span class="post-date">
-                                                <i class="fas fa-calendar"></i>
-                                                {{ post.date_posted.strftime('%d/%m/%Y') }}
-                                            </span>
-                                            <span class="post-views">
-                                                <i class="fas fa-eye"></i>
-                                                {{ post.views }}
-                                            </span>
-                                            {% if post.downloads %}
-                                            <span class="post-downloads">
-                                                <i class="fas fa-download"></i>
-                                                {{ post.downloads }}
-                                            </span>
-                                            {% endif %}
+                                            <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
+                                            <span><i class="far fa-eye"></i> {{ post.views }}</span>
                                         </div>
-                                        <div class="post-actions">
-                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-primary">
-                                                <i class="fas fa-eye"></i> Ver Post
-                                            </a>
+                                        <div class="post-description-section">
+                                            <div class="post-description-title">Descrição</div>
+                                            <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ post.content|striptags }}</div>
+                                        </div>
+                                        <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
-                                            <a href="{{ url_for('download_post', post_id=post.id) }}"
-                                                class="btn btn-success download-btn" data-action="download">
+                                            <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                                 <i class="fas fa-download"></i> Download
                                             </a>
                                             {% endif %}
+                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                                         </div>
                                     </div>
                                 </div>
@@ -259,7 +244,7 @@
                                     <div class="post-image">
                                         {% if post.image_url %}
                                         <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}"
-                                            alt="{{ post.title }}" class="img-fluid">
+                                            alt="{{ post.title }}">
                                         {% else %}
                                         <div class="post-placeholder">
                                             <i class="fas fa-file-alt"></i>
@@ -272,37 +257,22 @@
                                         {% endif %}
                                     </div>
                                     <div class="post-content">
-                                        <h3 class="post-title">
-                                            <a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a>
-                                        </h3>
-                                        <p class="post-excerpt">{{ (post.content|striptags)[:150] }}{% if
-                                            (post.content|striptags)|length > 150 %}...{% endif %}</p>
+                                        <h3><a href="{{ url_for('post', post_id=post.id) }}" style="text-decoration: none; color: inherit;">{{ post.title }}</a></h3>
                                         <div class="post-meta">
-                                            <span class="post-date">
-                                                <i class="fas fa-calendar"></i>
-                                                {{ post.date_posted.strftime('%d/%m/%Y') }}
-                                            </span>
-                                            <span class="post-views">
-                                                <i class="fas fa-eye"></i>
-                                                {{ post.views }}
-                                            </span>
-                                            {% if post.downloads %}
-                                            <span class="post-downloads">
-                                                <i class="fas fa-download"></i>
-                                                {{ post.downloads }}
-                                            </span>
-                                            {% endif %}
+                                            <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
+                                            <span><i class="far fa-eye"></i> {{ post.views }}</span>
                                         </div>
-                                        <div class="post-actions">
-                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-primary">
-                                                <i class="fas fa-eye"></i> Ver Post
-                                            </a>
+                                        <div class="post-description-section">
+                                            <div class="post-description-title">Descrição</div>
+                                            <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">{{ post.content|striptags }}</div>
+                                        </div>
+                                        <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
-                                            <a href="{{ url_for('download_post', post_id=post.id) }}"
-                                                class="btn btn-success download-btn" data-action="download">
+                                            <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                                 <i class="fas fa-download"></i> Download
                                             </a>
                                             {% endif %}
+                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                                         </div>
                                     </div>
                                 </div>
@@ -370,15 +340,8 @@
                             <button class="download-remove-btn" onclick="removeDownload({{ download.id }})" title="Remover do histórico">
                                 <i class="fas fa-times"></i>
                             </button>
-                            <!-- Imagem do Post -->
-                            {% if download.post.image_url and download.post.image_url != 'default.jpg' %}
-                            <img src="{{ get_image_url(download.post.image_url, folder='posts', default='default.jpg') }}"
-                                 alt="{{ download.post.title }}"
-                                 class="download-card-image"
-                                 onerror="this.style.display='none'">
-                            {% else %}
-                            <div class="download-card-image" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;">
-                                <i class="fas fa-file-alt"></i>
+                            {% if False %}
+                            <div class="download-card-image" style="display:none">
                             </div>
                             {% endif %}
 

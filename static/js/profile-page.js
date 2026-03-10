@@ -312,8 +312,7 @@ async function reloadFavoritesSection() {
         // Reconstrói o HTML dos favoritos
         let postsHTML = '';
         data.posts.forEach(post => {
-            const excerpt = post.content.replace(/<[^>]*>/g, '').substring(0, 150);
-            const excerptText = excerpt.length > 150 ? excerpt + '...' : excerpt;
+            const fullText = post.content.replace(/<[^>]*>/g, '');
 
             function getImgUrl(path, folder) {
                 if (!path || path === 'default.jpg') return `/static/images/${folder}/default.jpg`;
@@ -324,7 +323,7 @@ async function reloadFavoritesSection() {
             const postImgUrl = getImgUrl(post.image_url, 'posts');
 
             postsHTML += `
-                <div class="col-md-6 col-lg-4 mb-4">
+                <div class="col-md-6 col-lg-4 mb-3">
                     <div class="post-card" style="position: relative;">
                         <button onclick="removeFavorite(${post.id})" class="favorite-remove-badge" title="Remover dos favoritos">
                             <i class="fas fa-times"></i>
@@ -334,41 +333,28 @@ async function reloadFavoritesSection() {
                         </div>
                         <div class="post-image">
                             ${post.image_url ?
-                    `<img src="${postImgUrl}" alt="${post.title}" class="img-fluid">` :
+                    `<img src="${postImgUrl}" alt="${post.title}">` :
                     `<div class="post-placeholder"><i class="fas fa-file-alt"></i></div>`
                 }
                             ${post.featured ? '<div class="featured-badge"><i class="fas fa-star"></i></div>' : ''}
                         </div>
                         <div class="post-content">
-                            <h3 class="post-title">
-                                <a href="/post/${post.id}">${post.title}</a>
-                            </h3>
-                            <p class="post-excerpt">${excerptText}</p>
+                            <h3><a href="/post/${post.id}" style="text-decoration: none; color: inherit;">${post.title}</a></h3>
                             <div class="post-meta">
-                                <span class="post-date">
-                                    <i class="fas fa-calendar"></i>
-                                    ${post.date_posted}
-                                </span>
-                                <span class="post-views">
-                                    <i class="fas fa-eye"></i>
-                                    ${post.views}
-                                </span>
-                                ${post.downloads ? `
-                                    <span class="post-downloads">
-                                        <i class="fas fa-download"></i>
-                                        ${post.downloads}
-                                    </span>
-                                ` : ''}
+                                <span><i class="far fa-calendar-alt"></i> ${post.date_posted}</span>
+                                <span><i class="far fa-eye"></i> ${post.views}</span>
                             </div>
-                            <div class="post-actions">
-                                <a href="/post/${post.id}" class="btn btn-primary">
-                                    <i class="fas fa-eye"></i> Ver Post
-                                </a>
+                            <div class="post-description-section">
+                                <div class="post-description-title">Descrição</div>
+                                <div class="post-description-text" style="max-height: 100px; overflow-y: auto;">${fullText}</div>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                 ${post.download_link ? `
-                                    <a href="/download/${post.id}" class="btn btn-success">
+                                    <a href="/download/${post.id}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                         <i class="fas fa-download"></i> Download
                                     </a>
                                 ` : ''}
+                                <a href="/post/${post.id}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                             </div>
                         </div>
                     </div>

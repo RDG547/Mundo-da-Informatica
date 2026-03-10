@@ -1981,7 +1981,7 @@
     flex-direction: column;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) #1a1d25;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 /* Sidebar Profile Header Section */
@@ -2161,7 +2161,7 @@
 }
 
 .profile-admin-sidebar::-webkit-scrollbar-track {
-    background: #1a1d25;
+    background: transparent;
 }
 
 .profile-admin-sidebar::-webkit-scrollbar-thumb {
@@ -2370,13 +2370,26 @@
     min-height: 100vh;
 }
 
-/* Fix post-card width inside profile page */
-.profile-main-content .post-card {
-    max-width: 100%;
+/* Fix post-card grid inside profile page */
+.profile-main-content .posts-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 1.5rem;
 }
 
-.profile-main-content .posts-grid {
-    display: block;
+.profile-main-content .posts-grid .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin: 0;
+    width: 100%;
+}
+
+.profile-main-content .posts-grid .row > [class*="col-"] {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0;
 }
 
 .profile-main-content .container {

@@ -110,6 +110,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 return false;
             }
 
+            // DON'T INTERCEPT PROFILE LINKS - profile page has sidebar and needs full reload
+            if (url.pathname.startsWith('/profile')) {
+                return false;
+            }
+
             return true;
         }
 
@@ -1512,6 +1517,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     searchInput.removeAttribute('data-home-search-initialized');
                 }
                 window.initializeHomeSearch();
+            }
+
+            // Re-initialize hero text animation
+            if (typeof window.initHeroSplitText === 'function') {
+                window.initHeroSplitText();
             }
 
             // Re-initialize particles for hero section

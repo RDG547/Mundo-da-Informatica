@@ -74,7 +74,7 @@
             <h1 class="sidebar-profile-title">
                 {{ user.get_full_name() or user.username }}
                 {% if user.plan == 'vip' %}
-                <span style="color: #ff006e;"><i class="fas fa-crown"></i> VIP</span>
+                <span style="color: #d4a017;"><i class="fas fa-crown"></i> VIP</span>
                 {% elif user.plan == 'premium' %}
                 <span style="color: #667eea;"><i class="fas fa-star"></i> Premium</span>
                 {% else %}

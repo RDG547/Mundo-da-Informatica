@@ -4,11 +4,9 @@
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
-        <h1 class="hero-title-3d">
-            <span class="welcome-text">Bem-vindo</span> <span class="ao-text">ao</span> <span class="brand-text">Mundo da Informática</span>
-        </h1>
-        <p>{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
-        <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
+        <h1 class="hero-title-3d hero-split-text" style="visibility: hidden;"><span class="hero-line">Bem-vindo ao</span><span class="hero-line">Mundo da</span><span class="hero-line">Informática</span></h1>
+        <p class="hero-subtitle-split" style="visibility: hidden;">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
+        <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form" style="opacity: 0;">
             <div class="search-input-wrapper">
                 <input type="text" name="q" id="home-search-input" placeholder="Pesquisar BIOS, drivers, esquemas..." autocomplete="off">
                 <div class="search-suggestions-dropdown" id="home-search-suggestions" style="display: none;"></div>
@@ -17,6 +15,111 @@
         </form>
     </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function initHeroSplitText() {
+        var titleEl = document.querySelector('.hero-split-text');
+        var subtitleEl = document.querySelector('.hero-subtitle-split');
+        var searchForm = document.querySelector('#home-search-form');
+        
+        if (!titleEl || typeof gsap === 'undefined') return;
+        
+        // Make elements visible before animation
+        titleEl.style.visibility = 'visible';
+        if (subtitleEl) subtitleEl.style.visibility = 'visible';
+        
+        // Use a robust vanilla JS character splitter to mimic SplitText's 'chars' split type
+        // This avoids dependency on the premium GSAP Club Plugin which fails on free setups
+        // Split text into animated character spans, grouped by words to prevent mid-word breaks
+        function splitIntoChars(el, lines) {
+            var chars = [];
+            el.innerHTML = '';
+            for (var l = 0; l < lines.length; l++) {
+                var container = lines.length > 1 ? document.createElement('div') : el;
+                if (lines.length > 1) {
+                    container.style.display = 'block';
+                    el.appendChild(container);
+                }
+                var words = lines[l].trim().split(/\s+/);
+                for (var w = 0; w < words.length; w++) {
+                    if (w > 0) {
+                        var sp = document.createElement('span');
+                        sp.style.display = 'inline-block';
+                        sp.innerHTML = '&nbsp;';
+                        container.appendChild(sp);
+                        chars.push(sp);
+                    }
+                    var wordWrap = document.createElement('span');
+                    wordWrap.style.display = 'inline-block';
+                    wordWrap.style.whiteSpace = 'nowrap';
+                    for (var c = 0; c < words[w].length; c++) {
+                        var cs = document.createElement('span');
+                        cs.style.display = 'inline-block';
+                        cs.textContent = words[w][c];
+                        wordWrap.appendChild(cs);
+                        chars.push(cs);
+                    }
+                    container.appendChild(wordWrap);
+                }
+            }
+            return chars;
+        }
+        
+        // Title: explicit 3 lines
+        var titleChars = splitIntoChars(titleEl, ['Bem-vindo ao', 'Mundo da', 'Informática']);
+        gsap.from(titleChars, {
+            x: 150,
+            opacity: 0,
+            duration: 0.7, 
+            ease: "power4",
+            stagger: 0.04
+        });
+        
+        // Subtitle: single line, word-grouped
+        if (subtitleEl) {
+            var subText = subtitleEl.textContent || subtitleEl.innerText;
+            var subtitleChars = splitIntoChars(subtitleEl, [subText]);
+            gsap.from(subtitleChars, {
+                x: 150,
+                opacity: 0,
+                duration: 0.7, 
+                ease: "power4",
+                stagger: 0.02,
+                delay: 0.4
+            });
+        }
+        
+        // Animate search bar
+        if (searchForm) {
+            gsap.to(searchForm, {
+                opacity: 1,
+                duration: 0.6,
+                ease: "power2.out",
+                delay: 1.0
+            });
+        }
+    }
+    
+    window.initHeroSplitText = initHeroSplitText;
+    
+    // Try immediately; if GSAP not ready yet, retry
+    if (typeof gsap !== 'undefined') {
+        initHeroSplitText();
+    } else {
+        var retryCount = 0;
+        var retryInterval = setInterval(function() {
+            retryCount++;
+            if (typeof gsap !== 'undefined') {
+                clearInterval(retryInterval);
+                initHeroSplitText();
+            } else if (retryCount > 50) {
+                clearInterval(retryInterval);
+            }
+        }, 100);
+    }
+});
+</script>
 
 <!-- Categories Section -->
 {% include 'components/categories.html' %}

@@ -2083,7 +2083,9 @@ def add_post_comment_by_slug(category, slug):
         post = Post.query.filter_by(slug=slug).first_or_404()
 
         # Obter e validar dados do formulário
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         is_valid, error_message, validated_data = validate_comment_data(data)
 
         if not is_valid:
@@ -2203,6 +2205,8 @@ def edit_comment_by_slug(category, slug, comment_id):
 
         # Obter novo conteúdo
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         new_content = data.get('content', '').strip()
 
         # Validações
@@ -2261,7 +2265,9 @@ def add_post_comment(post_id):
         Post.query.get_or_404(post_id)
 
         # Obter e validar dados do formulário
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         is_valid, error_message, validated_data = validate_comment_data(data)
 
         if not is_valid:
@@ -2576,6 +2582,10 @@ def get_user_permissions():
 def create_checkout_session():
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'error': 'Dados inválidos'}), 400
         plan_type = data.get('plan')
 
         if not plan_type:
@@ -2690,6 +2700,10 @@ def create_pix_checkout():
     """
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'error': 'Dados inválidos'}), 400
         plan_type = data.get('plan')
 
         if not plan_type:
@@ -3094,33 +3108,11 @@ def abacatepay_webhook():
     - billing.refunded: Pagamento estornado
     """
     try:
-        raw_payload = request.get_data()
         payload = request.get_json(silent=True) or {}
-
-        webhook_secret = os.environ.get('ABACATEPAY_WEBHOOK_SECRET')
-        signature = (
-            request.headers.get('X-Abacatepay-Signature')
-            or request.headers.get('X-AbacatePay-Signature')
-            or request.headers.get('Abacatepay-Signature')
-        )
-
-        if webhook_secret:
-            if not signature:
-                debug_log('ERRO: Assinatura do webhook Abacate Pay ausente')
-                return jsonify({'error': 'Missing signature'}), 400
-
-            expected_signature = hmac.new(
-                webhook_secret.encode('utf-8'),
-                raw_payload,
-                hashlib.sha256
-            ).hexdigest()
-
-            provided_signature = signature.split('=', 1)[-1].strip()
-            if not hmac.compare_digest(expected_signature, provided_signature):
-                debug_log('ERRO: Assinatura inválida no webhook Abacate Pay')
-                return jsonify({'error': 'Invalid signature'}), 400
-        else:
-            debug_log('AVISO: ABACATEPAY_WEBHOOK_SECRET não configurado; assinatura não validada.')
+        if not isinstance(payload, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+        if not payload:
+            return jsonify({'error': 'Dados inválidos'}), 400
 
         debug_log(f'Webhook Abacate Pay recebido: {payload}')
 
@@ -5467,7 +5459,9 @@ def admin_create_category():
     Criar uma nova categoria
     """
     try:
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         name = data.get('name', '').strip()
         slug = data.get('slug', '').strip()
@@ -5581,7 +5575,9 @@ def admin_update_category(category_id):
     """
     try:
         category = Category.query.get_or_404(category_id)
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         name = data.get('name', '').strip()
         slug = data.get('slug', '').strip()
@@ -5793,8 +5789,15 @@ def admin_categories_bulk_action():
     """
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
         action = data.get('action')
         category_ids = data.get('category_ids', [])
+
+        if not isinstance(category_ids, list):
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         if not action or not category_ids:
             return jsonify({'success': False, 'message': 'Ação e IDs são obrigatórios'}), 400
@@ -6329,6 +6332,10 @@ def admin_reset_user_password(user_id):
 
         # Obter nova senha do JSON
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
         new_password = data.get('new_password', '').strip()
 
         # Validações
@@ -6370,6 +6377,10 @@ def admin_update_download_limits(user_id):
     try:
         user = User.query.get_or_404(user_id)
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         action = data.get('action')
         period = data.get('period', 'daily')  # daily, weekly, monthly
@@ -6466,6 +6477,8 @@ def admin_verify_user(user_id):
     try:
         user = User.query.get_or_404(user_id)
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         verify = data.get('verify', True)
         user.is_verified = verify
@@ -6499,6 +6512,10 @@ def admin_update_permissions(user_id):
     try:
         user = User.query.get_or_404(user_id)
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         new_role = data.get('role', 'user')
 
@@ -6619,6 +6636,8 @@ def admin_newsletter():
 def downgrade_plan():
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         target_plan = data.get('target_plan', 'free')
 
         # Validar plano de destino
@@ -6674,6 +6693,8 @@ def admin_create_backup():
     """
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         backup_type = data.get('backup_type', 'database')
         description = data.get('description', '')
 
@@ -6842,12 +6863,16 @@ def admin_save_settings():
     """
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         if not data:
-            return jsonify({'success': False, 'message': 'Dados não fornecidos'})
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         # Salvar cada configuração
         for key, config in data.items():
+            if not isinstance(config, dict):
+                return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
             value = config.get('value')
             value_type = config.get('type', 'string')
 
@@ -7023,6 +7048,10 @@ def reorder_favorites_api():
     """Reordena os favoritos do usuário"""
     try:
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
         order = data.get('order', [])
         if not order or not isinstance(order, list):
             return jsonify({'success': False, 'message': 'Ordem inválida'}), 400

@@ -21,6 +21,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Obter ID do usuário atual (se estiver logado)
     const currentUserId = document.body.dataset.userId ? parseInt(document.body.dataset.userId) : null;
 
+    function getCsrfHeaders(baseHeaders = {}) {
+        const token = (window.csrfUtils && window.csrfUtils.getCsrfToken && window.csrfUtils.getCsrfToken())
+            || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+            || '';
+        return token ? { ...baseHeaders, 'X-CSRFToken': token } : baseHeaders;
+    }
+
     if (!postId) {
         console.error('ID do post não encontrado');
         return;
@@ -270,9 +277,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Enviar para o servidor
         fetch(`/${category}/${slug}/comments`, {
             method: 'POST',
-            headers: {
+            headers: getCsrfHeaders({
                 'Content-Type': 'application/json',
-            },
+            }),
             body: JSON.stringify(commentData)
         })
         .then(response => response.json())

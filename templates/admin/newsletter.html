@@ -763,6 +763,7 @@
         </div>
         <div class="modal-body">
             <form id="composeForm" action="{{ url_for('admin_newsletter') }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                     <div class="col-md-8">
                         <!-- Campaign Details -->

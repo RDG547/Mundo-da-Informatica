@@ -320,6 +320,7 @@
         </div>
         <div class="modal-footer" style="justify-content: center; gap: 1rem;">
             <form id="deletePostForm" method="POST" style="display: flex; gap: 1rem; justify-content: center;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="button" class="btn-admin btn-admin-outline" id="cancelDelete">Cancelar</button>
                 <button type="submit" class="btn-admin btn-admin-danger">Excluir</button>
             </form>

@@ -97,44 +97,7 @@
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-    <script>
-        (function () {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
-            function appendCsrfToForm(form) {
-                if (!csrfToken || !form) return;
-                const method = (form.getAttribute('method') || 'GET').toUpperCase();
-                if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
-                if (form.querySelector('input[name="csrf_token"]')) return;
-
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'csrf_token';
-                input.value = csrfToken;
-                form.prepend(input);
-            }
-
-            document.addEventListener('DOMContentLoaded', function () {
-                document.querySelectorAll('form').forEach(appendCsrfToForm);
-            });
-
-            const originalFetch = window.fetch;
-            window.fetch = function (resource, options = {}) {
-                const requestOptions = { ...options };
-                const method = (requestOptions.method || 'GET').toUpperCase();
-
-                if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-                    const headers = new Headers(requestOptions.headers || {});
-                    if (!headers.has('X-CSRFToken')) {
-                        headers.set('X-CSRFToken', csrfToken);
-                    }
-                    requestOptions.headers = headers;
-                }
-
-                return originalFetch(resource, requestOptions);
-            };
-        })();
-    </script>
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modern-forms.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>

@@ -599,12 +599,20 @@ function updateDashboardStats() {
  * @returns {Promise} - Promise com a resposta
  */
 function ajaxRequest(url, method = 'GET', data = null) {
+    const csrfToken = (window.csrfUtils && window.csrfUtils.getCsrfToken && window.csrfUtils.getCsrfToken())
+        || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || '';
+
     const options = {
         method: method,
         headers: {
             'X-Requested-With': 'XMLHttpRequest'
         }
     };
+
+    if (csrfToken && method !== 'GET') {
+        options.headers['X-CSRFToken'] = csrfToken;
+    }
 
     if (data) {
         if (method === 'GET') {

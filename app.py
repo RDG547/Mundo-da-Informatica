@@ -2570,8 +2570,11 @@ def get_user_permissions():
 @login_required
 def create_checkout_session():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         plan_type = data.get('plan')
+
+        if not plan_type:
+            return jsonify({'error': 'Plano é obrigatório'}), 400
 
         debug_log(f'Stripe Checkout - Dados recebidos: {data}')
         debug_log(f'Stripe Checkout - Plano: {plan_type}')
@@ -2606,7 +2609,8 @@ def create_checkout_session():
         )
         return jsonify({'clientSecret': checkout_session.client_secret})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Erro ao criar sessão de checkout Stripe')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 @app.route('/checkout-success')
 @login_required
@@ -2680,8 +2684,11 @@ def create_pix_checkout():
     Cria um QR Code PIX via Abacate Pay - Redirecionamento Assíncrono
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         plan_type = data.get('plan')
+
+        if not plan_type:
+            return jsonify({'error': 'Plano é obrigatório'}), 400
 
         print(f'[PIX] Dados recebidos: {data}')
         print(f'[PIX] Plano: {plan_type}')
@@ -3071,9 +3078,12 @@ def abacatepay_webhook():
     - billing.refunded: Pagamento estornado
     """
     try:
-        payload = request.get_json()
+        payload = request.get_json(silent=True) or {}
 
         debug_log(f'Webhook Abacate Pay recebido: {payload}')
+
+        if not payload:
+            return jsonify({'error': 'Payload inválido'}), 400
 
         # Extrair dados do evento
         event_type = payload.get('event')  # Ex: 'billing.paid'
@@ -3103,7 +3113,8 @@ def abacatepay_webhook():
 
     except Exception as e:
         debug_log(f'Erro ao processar webhook Abacate Pay: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Erro ao processar webhook Abacate Pay')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 def handle_abacatepay_payment_success(transaction, billing_data):
     """Processa pagamento PIX bem-sucedido"""
@@ -5739,7 +5750,7 @@ def admin_categories_bulk_action():
     Executar ações em massa em categorias
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         action = data.get('action')
         category_ids = data.get('category_ids', [])
 
@@ -6275,7 +6286,7 @@ def admin_reset_user_password(user_id):
         user = User.query.get_or_404(user_id)
 
         # Obter nova senha do JSON
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         new_password = data.get('new_password', '').strip()
 
         # Validações
@@ -6316,7 +6327,7 @@ def admin_update_download_limits(user_id):
     """Atualizar limites de download do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         action = data.get('action')
         period = data.get('period', 'daily')  # daily, weekly, monthly
@@ -6412,7 +6423,7 @@ def admin_verify_user(user_id):
     """Verificar ou desverificar email do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         verify = data.get('verify', True)
         user.is_verified = verify
@@ -6445,7 +6456,7 @@ def admin_update_permissions(user_id):
     """Atualizar permissões (role) do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         new_role = data.get('role', 'user')
 
@@ -6565,8 +6576,8 @@ def admin_newsletter():
 @login_required
 def downgrade_plan():
     try:
-        data = request.get_json()
-        target_plan = data.get('target_plan', 'free') if data else 'free'
+        data = request.get_json(silent=True) or {}
+        target_plan = data.get('target_plan', 'free')
 
         # Validar plano de destino
         if target_plan not in ['free', 'premium', 'vip']:
@@ -6620,7 +6631,7 @@ def admin_create_backup():
     Criar novo backup
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         backup_type = data.get('backup_type', 'database')
         description = data.get('description', '')
 
@@ -6788,7 +6799,7 @@ def admin_save_settings():
     Salvar configurações do site
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         if not data:
             return jsonify({'success': False, 'message': 'Dados não fornecidos'})
@@ -6969,7 +6980,7 @@ def get_user_favorites_api():
 def reorder_favorites_api():
     """Reordena os favoritos do usuário"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         order = data.get('order', [])
         if not order or not isinstance(order, list):
             return jsonify({'success': False, 'message': 'Ordem inválida'}), 400

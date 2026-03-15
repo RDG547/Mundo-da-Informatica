@@ -229,9 +229,7 @@ function initializeHomeSearch() {
 
             html += `
                 <div class="suggestion-item" data-index="${index}" data-url="${item.url}">
-                    <div class="suggestion-icon">
-                        <i class="${icon}"></i>
-                    </div>
+                    ${renderSuggestionLeading(item, icon)}
                     <div class="suggestion-content">
                         <div class="suggestion-title">${highlightMatch(item.title, searchInput.value)}</div>
                         <div class="suggestion-meta">
@@ -261,6 +259,22 @@ function initializeHomeSearch() {
                 }
             });
         });
+    }
+
+    function renderSuggestionLeading(item, fallbackIcon) {
+        if (item.type === 'post' && item.image_url) {
+            return `
+                <div class="suggestion-thumb">
+                    <img src="${item.image_url}" alt="${escapeHtml(item.title)}" loading="lazy">
+                </div>
+            `;
+        }
+
+        return `
+            <div class="suggestion-icon">
+                <i class="${fallbackIcon}"></i>
+            </div>
+        `;
     }
 
     // Hide suggestions dropdown
@@ -308,6 +322,15 @@ function initializeHomeSearch() {
     // Escape regex special characters
     function escapeRegex(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 }
 

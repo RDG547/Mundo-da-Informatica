@@ -1,25 +1,29 @@
-/**
- * Sistema de Comentários - Post Page
- * Gerencia envio e exibição de comentários com atualização em tempo real
- */
+(function () {
+    if (window.CommentSystem && typeof window.CommentSystem.init === 'function') {
+        window.CommentSystem.init();
+        return;
+    }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const commentForm = document.getElementById('commentForm');
-    const commentsList = document.querySelector('.comments-list');
-    const commentsCount = document.querySelector('.comments-count');
-    const noComments = document.querySelector('.no-comments');
+    const state = {
+        postId: '',
+        pollTimer: null,
+        isLoading: false,
+        snapshot: '',
+        comments: [],
+        editId: null
+    };
 
-    // Obter o ID do post da URL
-    const postId = getPostIdFromUrl();
-
-    // Armazenar IDs dos comentários já exibidos para evitar re-renderização
-    let currentCommentIds = new Set();
-
-    // Verificar se é admin
-    const isAdmin = document.body.dataset.isAdmin === 'true';
-
-    // Obter ID do usuário atual (se estiver logado)
-    const currentUserId = document.body.dataset.userId ? parseInt(document.body.dataset.userId) : null;
+    function getElements() {
+        return {
+            post: document.querySelector('[data-post-id]'),
+            form: document.getElementById('commentForm'),
+            list: document.querySelector('.comments-list'),
+            count: document.querySelector('.comments-count'),
+            name: document.getElementById('commentName'),
+            email: document.getElementById('commentEmail'),
+            text: document.getElementById('commentText')
+        };
+    }
 
     function getCsrfHeaders(baseHeaders = {}) {
         const token = (window.csrfUtils && window.csrfUtils.getCsrfToken && window.csrfUtils.getCsrfToken())
@@ -28,317 +32,138 @@ document.addEventListener('DOMContentLoaded', function() {
         return token ? { ...baseHeaders, 'X-CSRFToken': token } : baseHeaders;
     }
 
-    if (!postId) {
-        console.error('ID do post não encontrado');
-        return;
+    function clearPolling() {
+        if (state.pollTimer) {
+            clearInterval(state.pollTimer);
+            state.pollTimer = null;
+        }
     }
 
-    // Carregar comentários ao iniciar
-    loadComments();
-
-    // Atualizar comentários automaticamente a cada 10 segundos
-    setInterval(loadComments, 10000);
-
-    // Enviar comentário - Event listener único e simples
-    if (commentForm) {
-        commentForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            submitComment();
-            return false;
-        }, false);
+    function getPostId() {
+        return String(getElements().post?.dataset.postId || '').trim();
     }
 
-    /**
-     * Extrai o ID do post da URL ou do atributo data
-     */
-    function getPostIdFromUrl() {
-        // Tentar obter do atributo data-post-id
-        const postElement = document.querySelector('[data-post-id]');
-        if (postElement) {
-            return postElement.getAttribute('data-post-id');
-        }
-
-        // Se não encontrar, tentar extrair da URL
-        const pathParts = window.location.pathname.split('/');
-        // Para URLs no formato /post/123
-        if (pathParts[1] === 'post' && pathParts[2]) {
-            return pathParts[2];
-        }
-
-        return null;
+    function getCommentsUrl(pathSuffix = '') {
+        return `/post/${state.postId}/comments${pathSuffix}`;
     }
 
-    /**
-     * Carrega os comentários do servidor
-     */
-    function loadComments() {
-        // Obter categoria e slug dos atributos data
-        const postElement = document.querySelector('[data-post-id]');
-        if (!postElement) {
-            console.error('Elemento do post não encontrado');
-            return;
-        }
-
-        const category = postElement.getAttribute('data-category');
-        const slug = postElement.getAttribute('data-slug');
-
-        if (!category || !slug) {
-            console.error('Categoria ou slug não encontrados');
-            return;
-        }
-
-        fetch(`/${category}/${slug}/comments`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    displayComments(data.comments);
-                    updateCommentsCount(data.count);
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao carregar comentários:', error);
-            });
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
-    /**
-     * Exibe os comentários na lista (sem piscar)
-     */
-    function displayComments(comments) {
-        if (!commentsList) return;
+    function isAdmin() {
+        return document.body.dataset.isAdmin === 'true';
+    }
 
-        // Criar Set com IDs dos novos comentários
-        const newCommentIds = new Set(comments.map(c => c.id));
+    function currentUserId() {
+        const raw = document.body.dataset.userId || '';
+        return raw ? Number(raw) : null;
+    }
 
-        // Remover comentários que não existem mais
-        const existingComments = commentsList.querySelectorAll('.comment-item:not([data-comment-template])');
-        existingComments.forEach(commentEl => {
-            const commentId = parseInt(commentEl.dataset.commentId);
-            if (!newCommentIds.has(commentId)) {
-                commentEl.remove();
-                currentCommentIds.delete(commentId);
-            }
-        });
+    function isAuthenticated() {
+        return document.body.dataset.authenticated === 'true';
+    }
 
-        // Remover mensagem "sem comentários" se houver comentários
-        const noCommentsMsg = commentsList.querySelector('.no-comments');
-        if (comments.length > 0 && noCommentsMsg) {
-            noCommentsMsg.remove();
+    function canEditComment(comment) {
+        return !!comment.user_id && (isAdmin() || currentUserId() === Number(comment.user_id));
+    }
+
+    function canDeleteComment(_comment) {
+        return isAdmin();
+    }
+
+    function renderAvatar(comment) {
+        if (comment.profile_image) {
+            return `<img src="${escapeHtml(comment.profile_image)}" alt="${escapeHtml(comment.author)}" class="comment-avatar-img">`;
         }
+        return '<i class="far fa-user-circle"></i>';
+    }
 
-        if (comments.length === 0) {
-            // Adicionar mensagem apenas se não existir
-            if (!noCommentsMsg) {
-                const noCommentsDiv = document.createElement('div');
-                noCommentsDiv.className = 'no-comments';
-                noCommentsDiv.innerHTML = `
-                    <i class="far fa-comments"></i>
-                    <p>Seja o primeiro a comentar!</p>
-                `;
-                commentsList.appendChild(noCommentsDiv);
-            }
-            currentCommentIds.clear();
-            return;
-        }
+    function renderCommentActions(comment) {
+        const actions = [];
 
-        // Adicionar apenas comentários novos (evita piscar)
-        comments.forEach(comment => {
-            if (!currentCommentIds.has(comment.id)) {
-                const commentElement = createCommentElement(comment);
-                // Inserir no início da lista
-                const firstComment = commentsList.querySelector('.comment-item:not([data-comment-template])');
-                if (firstComment) {
-                    commentsList.insertBefore(commentElement, firstComment);
-                } else {
-                    commentsList.appendChild(commentElement);
-                }
-                currentCommentIds.add(comment.id);
-            }
-        });
-    }    /**
-     * Cria o elemento HTML de um comentário
-     */
-    function createCommentElement(comment) {
-        const div = document.createElement('div');
-        div.className = 'comment-item animate-fade-in';
-        div.dataset.commentId = comment.id;
-
-        const avatarSrc = comment.profile_image
-            ? ((comment.profile_image.startsWith('http://') || comment.profile_image.startsWith('https://'))
-                ? comment.profile_image
-                : `/static/uploads/profiles/${comment.profile_image}`)
-            : null;
-
-        // Avatar: foto de perfil se existir, ícone caso contrário
-        let avatarHTML;
-        if (avatarSrc) {
-            avatarHTML = `<img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(comment.author)}" class="comment-avatar-img">`;
-        } else {
-            avatarHTML = `<i class="far fa-user-circle"></i>`;
-        }
-
-        // Botão de deletar apenas para admins
-        let deleteButton = '';
-        if (isAdmin) {
-            deleteButton = `
-                <button class="btn-delete-comment" onclick="deleteComment(${comment.id})" title="Deletar comentário">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            `;
-        }
-
-        // Botão de editar para autor ou admin
-        let editButton = '';
-        if (comment.user_id && (currentUserId == comment.user_id || isAdmin)) {
-            editButton = `
-                <button class="btn-edit-comment" onclick="editComment(${comment.id})" title="Editar comentário">
+        if (canEditComment(comment)) {
+            actions.push(`
+                <button type="button" class="btn-edit-comment" data-comment-edit="${comment.id}" title="Editar comentário">
                     <i class="fas fa-edit"></i>
                 </button>
-            `;
+            `);
         }
 
-        // Badge de editado
-        let editedBadge = '';
-        if (comment.is_edited) {
-            const editedTitle = comment.date_edited ? `Editado em ${comment.date_edited}` : 'Editado';
-            editedBadge = `<span class="comment-edited-badge" title="${editedTitle}">editado</span>`;
+        if (canDeleteComment(comment)) {
+            actions.push(`
+                <button type="button" class="btn-delete-comment" data-comment-delete="${comment.id}" title="Deletar comentário">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `);
         }
 
-        div.innerHTML = `
-            <div class="comment-avatar">
-                ${avatarHTML}
-            </div>
-            <div class="comment-content">
-                <div class="comment-header">
-                    <h4 class="comment-author">${escapeHtml(comment.author)}</h4>
-                    <span class="comment-date">${comment.date} ${editedBadge}</span>
-                    <div class="comment-actions">
-                        ${editButton}
-                        ${deleteButton}
-                    </div>
+        if (!actions.length) {
+            return '';
+        }
+
+        return `<div class="comment-actions">${actions.join('')}</div>`;
+    }
+
+    function renderCommentItem(comment) {
+        const editedBadge = comment.is_edited
+            ? `<span class="comment-edited-badge" title="${escapeHtml(comment.date_edited || 'Editado')}">editado</span>`
+            : '';
+
+        return `
+            <div class="comment-item animate-fade-in" data-comment-id="${comment.id}">
+                <div class="comment-avatar">
+                    ${renderAvatar(comment)}
                 </div>
-                <p class="comment-text" data-original-content="${escapeHtml(comment.content)}">${escapeHtml(comment.content)}</p>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <h4 class="comment-author">${escapeHtml(comment.author)}</h4>
+                        <span class="comment-date">${escapeHtml(comment.date)} ${editedBadge}</span>
+                        ${renderCommentActions(comment)}
+                    </div>
+                    <p class="comment-text">${escapeHtml(comment.content)}</p>
+                </div>
             </div>
         `;
-
-        return div;
     }
 
-    /**
-     * Envia um novo comentário
-     */
-    function submitComment() {
-        const name = document.getElementById('commentName')?.value.trim();
-        const email = document.getElementById('commentEmail')?.value.trim();
-        const content = document.getElementById('commentText').value.trim();
-        const submitBtn = commentForm.querySelector('button[type="submit"]');
+    function renderComments(comments) {
+        const { list, count } = getElements();
+        if (!list) return;
 
-        // Validações básicas
-        if (!content) {
-            showMessage('Por favor, preencha o campo de comentário.', 'error');
-            return false;
+        state.editId = null;
+        state.comments = Array.isArray(comments) ? comments.slice() : [];
+        state.snapshot = JSON.stringify(state.comments);
+
+        if (!state.comments.length) {
+            list.innerHTML = `
+                <div class="no-comments">
+                    <i class="far fa-comments"></i>
+                    <p>Seja o primeiro a comentar!</p>
+                </div>
+            `;
+        } else {
+            list.innerHTML = state.comments.map(renderCommentItem).join('');
         }
 
-        // Para usuários não logados, validar nome e email
-        const isLoggedIn = document.getElementById('commentName')?.type === 'hidden';
-        if (!isLoggedIn && (!name || !email)) {
-            showMessage('Por favor, preencha seu nome e email.', 'error');
-            return;
-        }
-
-        // Desabilitar botão durante envio
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-
-        // Preparar dados
-        const commentData = { content: content };
-        if (name) commentData.name = name;
-        if (email) commentData.email = email;
-
-        // Obter categoria e slug dos atributos data
-        const postElement = document.querySelector('[data-post-id]');
-        if (!postElement) {
-            showMessage('❌ Erro: informações do post não encontradas.', 'error');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Comentário';
-            return;
-        }
-
-        const category = postElement.getAttribute('data-category');
-        const slug = postElement.getAttribute('data-slug');
-
-        if (!category || !slug) {
-            showMessage('❌ Erro: categoria ou slug não encontrados.', 'error');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Comentário';
-            return;
-        }
-
-        // Enviar para o servidor
-        fetch(`/${category}/${slug}/comments`, {
-            method: 'POST',
-            headers: getCsrfHeaders({
-                'Content-Type': 'application/json',
-            }),
-            body: JSON.stringify(commentData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Mensagem diferente dependendo se foi aprovado ou não
-                if (data.comment && data.comment.is_approved) {
-                    showMessage('✅ Comentário publicado com sucesso!', 'success');
-                    // Recarregar comentários imediatamente para mostrar o novo
-                    setTimeout(() => {
-                        loadComments();
-                    }, 300);
-                } else {
-                    showMessage('📝 Comentário enviado! Aguardando aprovação do administrador.', 'info');
-                }
-
-                // Limpar formulário
-                commentForm.reset();
-            } else {
-                showMessage(data.message || 'Erro ao enviar comentário.', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao enviar comentário:', error);
-            showMessage('❌ Erro ao enviar comentário. Tente novamente.', 'error');
-        })
-        .finally(() => {
-            // Reabilitar botão
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
-        });
-
-        // Prevenir qualquer ação padrão do formulário
-        return false;
-    }
-
-    /**
-     * Atualiza o contador de comentários
-     */
-    function updateCommentsCount(count) {
-        if (commentsCount) {
-            commentsCount.textContent = `(${count})`;
+        if (count) {
+            count.textContent = `(${state.comments.length})`;
         }
     }
 
-    /**
-     * Exibe mensagem de feedback
-     * Usa a função global showNotification se disponível
-     */
     function showMessage(message, type) {
-        // Tenta usar a função global showNotification se disponível (de admin.js)
         if (typeof window.showNotification === 'function') {
-            window.showNotification(message, type, 7000);
+            window.showNotification(message, type || 'info', 7000);
             return;
         }
 
-        // Fallback: implementação local para páginas sem admin.js
         const existingMessages = document.querySelectorAll('.comment-message');
-        existingMessages.forEach(msg => msg.remove());
+        existingMessages.forEach((msg) => msg.remove());
 
         const messageDiv = document.createElement('div');
         messageDiv.className = `comment-message comment-message-${type}`;
@@ -346,249 +171,314 @@ document.addEventListener('DOMContentLoaded', function() {
         let icon = 'info-circle';
         if (type === 'success') icon = 'check-circle';
         else if (type === 'error') icon = 'exclamation-circle';
-        else if (type === 'info') icon = 'info-circle';
+        else if (type === 'warning') icon = 'exclamation-triangle';
 
         messageDiv.innerHTML = `
             <i class="fas fa-${icon}"></i>
-            <span>${message}</span>
+            <span>${escapeHtml(message)}</span>
         `;
 
         const commentFormCard = document.querySelector('.comment-form-card');
         if (commentFormCard) {
             commentFormCard.insertBefore(messageDiv, commentFormCard.firstChild);
-
             setTimeout(() => {
                 messageDiv.classList.add('fade-out');
                 setTimeout(() => messageDiv.remove(), 300);
-            }, 7000);
+            }, 6000);
         }
     }
 
-    /**
-     * Escapa HTML para prevenir XSS
-     */
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    async function fetchComments(forceRender = false) {
+        if (!state.postId || state.isLoading) return;
+        state.isLoading = true;
 
-    /**
-     * Deleta um comentário (apenas para admins)
-     */
-    window.deleteComment = function(commentId) {
-        if (!confirm('Tem certeza que deseja deletar este comentário?')) {
-            return;
-        }
-
-        const postElement = document.querySelector('[data-post-id]');
-        if (!postElement) {
-            alert('Erro: informações do post não encontradas.');
-            return;
-        }
-
-        const category = postElement.getAttribute('data-category');
-        const slug = postElement.getAttribute('data-slug');
-
-        if (!category || !slug) {
-            alert('Erro: categoria ou slug não encontrados.');
-            return;
-        }
-
-        fetch(`/${category}/${slug}/comments/${commentId}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
+        try {
+            const response = await fetch(getCommentsUrl(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Erro ao carregar comentários.');
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('✅ Comentário deletado com sucesso!', 'success');
-                // Remover do DOM imediatamente
-                const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
-                if (commentEl) {
-                    commentEl.remove();
-                    currentCommentIds.delete(commentId);
-                }
-                // Recarregar para atualizar contador
-                setTimeout(() => loadComments(), 500);
+
+            const nextSnapshot = JSON.stringify(data.comments || []);
+            if (forceRender || nextSnapshot !== state.snapshot) {
+                renderComments(data.comments || []);
+            } else if (getElements().count) {
+                getElements().count.textContent = `(${data.count || 0})`;
+            }
+        } catch (error) {
+            console.error('Erro ao carregar comentários:', error);
+        } finally {
+            state.isLoading = false;
+        }
+    }
+
+    async function submitComment() {
+        const { form, name, email, text } = getElements();
+        if (!form || !text) return;
+
+        const content = (text.value || '').trim();
+        const submitBtn = form.querySelector('button[type="submit"]');
+
+        if (!content) {
+            showMessage('Por favor, preencha o campo de comentário.', 'error');
+            return;
+        }
+
+        if (!isAuthenticated()) {
+            if (!(name?.value || '').trim() || !(email?.value || '').trim()) {
+                showMessage('Por favor, preencha seu nome e email.', 'error');
+                return;
+            }
+        }
+
+        const payload = { content };
+        if (name && name.type !== 'hidden') payload.name = (name.value || '').trim();
+        if (email && email.type !== 'hidden') payload.email = (email.value || '').trim();
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        }
+
+        try {
+            const response = await fetch(getCommentsUrl(), {
+                method: 'POST',
+                headers: getCsrfHeaders({
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }),
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Erro ao enviar comentário.');
+            }
+
+            if (data.comment && data.comment.is_approved) {
+                renderComments([
+                    data.comment,
+                    ...state.comments.filter((comment) => Number(comment.id) !== Number(data.comment.id))
+                ]);
+                showMessage('Comentário publicado com sucesso!', 'success');
+                fetchComments(true);
             } else {
-                showMessage('❌ Erro ao deletar comentário.', 'error');
+                showMessage(data.message || 'Comentário enviado! Aguarde aprovação.', 'info');
             }
-        })
-        .catch(error => {
-            console.error('Erro ao deletar comentário:', error);
-            showMessage('❌ Erro ao deletar comentário.', 'error');
-        });
-    };
 
-    /**
-     * Edita um comentário (apenas para autor ou admin)
-     */
-    window.editComment = function(commentId) {
-        const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
-        if (!commentEl) return;
-
-        const textEl = commentEl.querySelector('.comment-text');
-        const originalContent = textEl.dataset.originalContent || textEl.textContent;
-
-        // Verificar se já está em modo de edição
-        if (commentEl.classList.contains('editing')) {
-            return;
+            form.reset();
+        } catch (error) {
+            console.error('Erro ao enviar comentário:', error);
+            showMessage(error.message || 'Erro ao enviar comentário.', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+            }
         }
+    }
 
-        // Marcar como editando
-        commentEl.classList.add('editing');
-
-        // Criar formulário de edição inline
-        const editForm = document.createElement('div');
-        editForm.className = 'edit-comment-form';
-        editForm.innerHTML = `
-            <textarea class="edit-comment-textarea" maxlength="1000" rows="3">${originalContent}</textarea>
-            <div class="edit-comment-actions">
-                <button type="button" class="btn-save-edit">
-                    <i class="fas fa-check"></i> Salvar
-                </button>
-                <button type="button" class="btn-cancel-edit">
-                    <i class="fas fa-times"></i> Cancelar
-                </button>
+    function buildEditForm(comment) {
+        return `
+            <div class="edit-comment-form">
+                <textarea class="edit-comment-textarea" maxlength="1000" rows="3">${escapeHtml(comment.content)}</textarea>
+                <div class="edit-comment-actions">
+                    <button type="button" class="btn-save-edit" data-comment-save="${comment.id}">
+                        <i class="fas fa-check"></i> Salvar
+                    </button>
+                    <button type="button" class="btn-cancel-edit" data-comment-cancel="${comment.id}">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
             </div>
         `;
+    }
 
-        // Substituir texto pelo formulário
+    function startEditing(commentId) {
+        const comment = state.comments.find((item) => Number(item.id) === Number(commentId));
+        const target = document.querySelector(`[data-comment-id="${commentId}"]`);
+        if (!comment || !target || state.editId === Number(commentId)) return;
+
+        cancelEditing();
+        state.editId = Number(commentId);
+
+        const textEl = target.querySelector('.comment-text');
+        if (!textEl) return;
         textEl.style.display = 'none';
-        textEl.parentElement.insertBefore(editForm, textEl.nextSibling);
+        textEl.insertAdjacentHTML('afterend', buildEditForm(comment));
+        target.classList.add('editing');
+        const textarea = target.querySelector('.edit-comment-textarea');
+        if (textarea) textarea.focus();
+    }
 
-        const textarea = editForm.querySelector('.edit-comment-textarea');
-        const btnSave = editForm.querySelector('.btn-save-edit');
-        const btnCancel = editForm.querySelector('.btn-cancel-edit');
+    function cancelEditing() {
+        const activeEditing = document.querySelector('.comment-item.editing');
+        if (!activeEditing) {
+            state.editId = null;
+            return;
+        }
 
-        // Focar no textarea
-        textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        activeEditing.classList.remove('editing');
+        const textEl = activeEditing.querySelector('.comment-text');
+        const formEl = activeEditing.querySelector('.edit-comment-form');
+        if (formEl) formEl.remove();
+        if (textEl) textEl.style.display = '';
+        state.editId = null;
+    }
 
-        // Cancelar edição
-        btnCancel.addEventListener('click', function() {
-            editForm.remove();
-            textEl.style.display = '';
-            commentEl.classList.remove('editing');
-        });
+    async function saveEdit(commentId) {
+        const target = document.querySelector(`[data-comment-id="${commentId}"]`);
+        const textarea = target?.querySelector('.edit-comment-textarea');
+        if (!target || !textarea) return;
 
-        // Salvar edição
-        btnSave.addEventListener('click', function() {
-            const newContent = textarea.value.trim();
+        const content = (textarea.value || '').trim();
+        if (!content) {
+            showMessage('O comentário não pode estar vazio.', 'error');
+            return;
+        }
 
-            if (!newContent) {
-                showMessage('❌ O comentário não pode estar vazio.', 'error');
-                return;
-            }
-
-            if (newContent.length < 3) {
-                showMessage('❌ O comentário deve ter pelo menos 3 caracteres.', 'error');
-                return;
-            }
-
-            if (newContent === originalContent) {
-                // Nenhuma mudança
-                editForm.remove();
-                textEl.style.display = '';
-                commentEl.classList.remove('editing');
-                return;
-            }
-
-            // Desabilitar botões durante o envio
-            btnSave.disabled = true;
-            btnCancel.disabled = true;
-            textarea.disabled = true;
-
-            const postElement = document.querySelector('[data-post-id]');
-            if (!postElement) {
-                showMessage('❌ Erro: informações do post não encontradas.', 'error');
-                btnSave.disabled = false;
-                btnCancel.disabled = false;
-                textarea.disabled = false;
-                return;
-            }
-
-            const category = postElement.getAttribute('data-category');
-            const slug = postElement.getAttribute('data-slug');
-
-            if (!category || !slug) {
-                showMessage('❌ Erro: categoria ou slug não encontrados.', 'error');
-                btnSave.disabled = false;
-                btnCancel.disabled = false;
-                textarea.disabled = false;
-                return;
-            }
-
-            fetch(`/${category}/${slug}/comments/${commentId}`, {
+        try {
+            const response = await fetch(getCommentsUrl(`/${commentId}`), {
                 method: 'PUT',
-                headers: {
+                headers: getCsrfHeaders({
                     'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ content: newContent })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => Promise.reject(err));
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    showMessage('✅ Comentário editado com sucesso!', 'success');
-                    const savedContent = data.comment?.content ?? newContent;
-
-                    // Atualizar o conteúdo no DOM
-                    textEl.textContent = savedContent;
-                    textEl.dataset.originalContent = savedContent;
-
-                    // Adicionar/atualizar badge de editado
-                    const commentHeader = commentEl.querySelector('.comment-header');
-                    const dateSpan = commentHeader.querySelector('.comment-date');
-                    let editedBadge = dateSpan.querySelector('.comment-edited-badge');
-
-                    if (!editedBadge) {
-                        editedBadge = document.createElement('span');
-                        editedBadge.className = 'comment-edited-badge';
-                        dateSpan.appendChild(document.createTextNode(' '));
-                        dateSpan.appendChild(editedBadge);
-                    }
-
-                    editedBadge.textContent = 'editado';
-                    if (data.comment && data.comment.date_edited) {
-                        editedBadge.title = `Editado em ${data.comment.date_edited}`;
-                    }
-
-                    // Remover formulário e mostrar texto
-                    editForm.remove();
-                    textEl.style.display = '';
-                    commentEl.classList.remove('editing');
-                } else {
-                    showMessage('❌ Erro ao editar comentário.', 'error');
-                    // Re-habilitar botões
-                    btnSave.disabled = false;
-                    btnCancel.disabled = false;
-                    textarea.disabled = false;
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao editar comentário:', error);
-                showMessage(error.error || '❌ Erro ao editar comentário.', 'error');
-                // Re-habilitar botões
-                btnSave.disabled = false;
-                btnCancel.disabled = false;
-                textarea.disabled = false;
+                    'X-Requested-With': 'XMLHttpRequest'
+                }),
+                credentials: 'same-origin',
+                body: JSON.stringify({ content })
             });
-        });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Erro ao editar comentário.');
+            }
 
-        // Permitir salvar com Ctrl+Enter
-        textarea.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'Enter') {
-                btnSave.click();
+            const updatedComment = data.comment || {};
+            state.comments = state.comments.map((comment) => (
+                Number(comment.id) === Number(commentId)
+                    ? { ...comment, ...updatedComment }
+                    : comment
+            ));
+            renderComments(state.comments);
+            cancelEditing();
+            showMessage('Comentário editado com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao editar comentário:', error);
+            showMessage(error.message || 'Erro ao editar comentário.', 'error');
+        }
+    }
+
+    async function deleteComment(commentId) {
+        if (!window.confirm('Tem certeza que deseja deletar este comentário?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(getCommentsUrl(`/${commentId}`), {
+                method: 'DELETE',
+                headers: getCsrfHeaders({
+                    'X-Requested-With': 'XMLHttpRequest'
+                }),
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Erro ao deletar comentário.');
+            }
+
+            state.comments = state.comments.filter((comment) => Number(comment.id) !== Number(commentId));
+            renderComments(state.comments);
+            showMessage('Comentário deletado com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao deletar comentário:', error);
+            showMessage(error.message || 'Erro ao deletar comentário.', 'error');
+        }
+    }
+
+    function bindForm() {
+        const { form } = getElements();
+        if (!form || form.dataset.commentsBound === 'true') return;
+
+        form.dataset.commentsBound = 'true';
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            submitComment();
+        });
+    }
+
+    function bindList() {
+        const { list } = getElements();
+        if (!list || list.dataset.commentsBound === 'true') return;
+
+        list.dataset.commentsBound = 'true';
+        list.addEventListener('click', (event) => {
+            const editButton = event.target.closest('[data-comment-edit]');
+            if (editButton) {
+                startEditing(Number(editButton.dataset.commentEdit));
+                return;
+            }
+
+            const deleteButton = event.target.closest('[data-comment-delete]');
+            if (deleteButton) {
+                deleteComment(Number(deleteButton.dataset.commentDelete));
+                return;
+            }
+
+            const saveButton = event.target.closest('[data-comment-save]');
+            if (saveButton) {
+                saveEdit(Number(saveButton.dataset.commentSave));
+                return;
+            }
+
+            const cancelButton = event.target.closest('[data-comment-cancel]');
+            if (cancelButton) {
+                cancelEditing();
             }
         });
+    }
+
+    function startPolling() {
+        clearPolling();
+        state.pollTimer = setInterval(() => {
+            if (document.visibilityState === 'hidden') return;
+            fetchComments(false);
+        }, 3000);
+    }
+
+    function init() {
+        const postId = getPostId();
+        const { form, list } = getElements();
+
+        if (!postId || !form || !list) {
+            clearPolling();
+            state.postId = '';
+            state.snapshot = '';
+            state.comments = [];
+            return;
+        }
+
+        if (state.postId !== postId) {
+            state.snapshot = '';
+            state.comments = [];
+            state.editId = null;
+        }
+
+        state.postId = postId;
+        bindForm();
+        bindList();
+        fetchComments(true);
+        startPolling();
+    }
+
+    window.CommentSystem = {
+        init,
+        refresh: () => fetchComments(true)
     };
 
-});
+    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('pageLoaded', init);
+})();

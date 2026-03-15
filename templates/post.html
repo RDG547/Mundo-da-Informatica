@@ -49,6 +49,15 @@
                 <!-- Post Header Card with Image -->
                 <article class="post-header-card animate-slide-up">
                     <div class="post-header-content">
+                        {% set header_download_files = post.get_metadata('download_files') %}
+                        {% set header_download_types = namespace(items=[]) %}
+                        {% if header_download_files %}
+                            {% for file in header_download_files %}
+                                {% if file.type and file.type not in header_download_types.items %}
+                                    {% set header_download_types.items = header_download_types.items + [file.type] %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                         <!-- Thumbnail Image -->
                         <div class="post-thumbnail-container">
                             <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}" class="post-thumbnail-image">
@@ -80,6 +89,12 @@
                                     {% endif %}
                                     <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
                                 </div>
+                                {% if header_download_types.items|length > 1 %}
+                                <div class="post-format-badge">
+                                    <i class="fas fa-layer-group"></i>
+                                    <span>{{ header_download_types.items|join('/') }}</span>
+                                </div>
+                                {% endif %}
                                 {% if post.featured %}
                                 <div class="featured-badge">
                                     <i class="fas fa-star"></i> Destaque
@@ -276,35 +291,34 @@
                         </a>
                     </div>
                 </div>
-
-                <!-- Related Posts -->
-                {% if related_posts %}
-                <div class="sidebar-related-card animate-slide-up">
-                    <div class="related-header">
-                        <i class="fas fa-layer-group"></i>
-                        <h3>Posts Relacionados</h3>
-                    </div>
-                    <div class="related-posts-list">
-                        {% for related in related_posts %}
-                        <a href="{{ post_url(related) }}" class="related-post-item">
-                            <div class="related-post-image">
-                                <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="{{ related.title }}">
-                            </div>
-                            <div class="related-post-content">
-                                <h4>{{ related.title }}</h4>
-                                <div class="related-post-meta">
-                                    <span><i class="far fa-eye"></i> {{ related.views }}</span>
-                                    <span><i class="fas fa-download"></i> {{ related.downloads }}</span>
-                                </div>
-                            </div>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
             </div>
         </div>
+
+        {% if related_posts %}
+        <section class="related-posts-section animate-slide-up">
+            <div class="related-header">
+                <i class="fas fa-layer-group"></i>
+                <h3>Posts Relacionados</h3>
+            </div>
+            <div class="related-posts-grid">
+                {% for related in related_posts %}
+                <a href="{{ post_url(related) }}" class="related-post-item">
+                    <div class="related-post-image">
+                        <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="{{ related.title }}">
+                    </div>
+                    <div class="related-post-content">
+                        <span class="related-post-category">{{ related.category_rel.name if related.category_rel else related.category_str }}</span>
+                        <h4>{{ related.title }}</h4>
+                        <div class="related-post-meta">
+                            <span><i class="far fa-eye"></i> {{ related.views }}</span>
+                            <span><i class="fas fa-download"></i> {{ related.downloads }}</span>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
     </div>
 </section>
 

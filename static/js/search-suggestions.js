@@ -122,9 +122,7 @@ window.SearchSuggestions = class SearchSuggestions {
             const typeClass = suggestion.type === 'category' ? 'suggestion-category' : 'suggestion-post';
             html += `
                 <div class="suggestion-item ${typeClass}" data-index="${index}" data-url="${suggestion.url}">
-                    <div class="suggestion-icon">
-                        <i class="${suggestion.icon}"></i>
-                    </div>
+                    ${this.renderSuggestionLeading(suggestion)}
                     <div class="suggestion-content">
                         <div class="suggestion-title">${this.highlightQuery(suggestion.title, this.input.value)}</div>
                         <div class="suggestion-description">${suggestion.description}</div>
@@ -141,6 +139,22 @@ window.SearchSuggestions = class SearchSuggestions {
 
         // Bind click events to suggestions
         this.bindSuggestionEvents();
+    }
+
+    renderSuggestionLeading(suggestion) {
+        if (suggestion.type === 'post' && suggestion.image_url) {
+            return `
+                <div class="suggestion-thumb">
+                    <img src="${suggestion.image_url}" alt="${this.escapeHtml(suggestion.title)}" loading="lazy">
+                </div>
+            `;
+        }
+
+        return `
+            <div class="suggestion-icon">
+                <i class="${suggestion.icon}"></i>
+            </div>
+        `;
     }
 
     bindSuggestionEvents() {
@@ -221,6 +235,15 @@ window.SearchSuggestions = class SearchSuggestions {
 
         const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     hideSuggestions() {

@@ -475,6 +475,32 @@
                             <i class="fas fa-crown"></i> Ver Planos
                         </a>
                     </div>
+                    <div class="donation-widget" data-donation-widget>
+                        <div class="donation-widget-header">
+                            <h4><i class="fas fa-hand-holding-heart"></i> Fazer uma doacao pontual</h4>
+                            <p>Escolha qualquer valor a partir de R$ 5,00 para apoiar a manutencao da plataforma.</p>
+                        </div>
+                        <div class="donation-presets" role="group" aria-label="Valores sugeridos para doacao">
+                            <button type="button" class="donation-preset" data-donation-preset="10">R$ 10</button>
+                            <button type="button" class="donation-preset" data-donation-preset="25">R$ 25</button>
+                            <button type="button" class="donation-preset" data-donation-preset="50">R$ 50</button>
+                            <button type="button" class="donation-preset" data-donation-preset="100">R$ 100</button>
+                        </div>
+                        <label class="donation-input-label" for="donationAmountAbout">Valor da doacao</label>
+                        <div class="donation-input-wrapper">
+                            <span>R$</span>
+                            <input type="number" id="donationAmountAbout" data-donation-amount min="5" step="1" inputmode="decimal" placeholder="Digite o valor">
+                        </div>
+                        <div class="contribute-cta-buttons donation-actions">
+                            <button type="button" class="btn btn-gradient secondary" data-donation-method="pix">
+                                <i class="fas fa-qrcode"></i> Doar via PIX
+                            </button>
+                            <button type="button" class="btn btn-gradient primary" data-donation-method="card">
+                                <i class="far fa-credit-card"></i> Doar com Cartao
+                            </button>
+                        </div>
+                        <p class="donation-feedback" data-donation-feedback hidden></p>
+                    </div>
                 </div>
             </div>
         </div>

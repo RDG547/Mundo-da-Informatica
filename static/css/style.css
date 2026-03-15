@@ -613,7 +613,7 @@ section {
     display: flex;
     align-items: center;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     animation: gradientAnimation 15s ease infinite;
 }
 
@@ -640,6 +640,7 @@ section {
     height: 100px;
     background: linear-gradient(to top, var(--light-color), transparent);
     z-index: 2;
+    pointer-events: none;
 }
 
 .hero .container {
@@ -648,6 +649,7 @@ section {
     text-align: center;
     color: white;
     max-width: 800px;
+    overflow: visible;
 }
 
 .hero h1 {
@@ -840,6 +842,7 @@ section {
     transform: translateY(-30px);
     animation: fadeDown 0.8s forwards 0.4s;
     position: relative;
+    z-index: 15;
 }
 
 .search-bar input {
@@ -874,6 +877,7 @@ section {
 .search-input-wrapper {
     position: relative;
     flex: 1;
+    overflow: visible;
 }
 
 /* Search Suggestions Dropdown */
@@ -887,7 +891,7 @@ section {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
     max-height: 400px;
     overflow-y: auto;
-    z-index: 1000;
+    z-index: 12000;
     animation: slideDown 0.3s ease;
 }
 

@@ -213,12 +213,18 @@
 
     <div class="plan-info">
         <div class="plan-info-row">
-            <span class="plan-info-label">Plano:</span>
-            <span class="plan-info-value">{{ transaction.plan_type.upper() }}</span>
+            <span class="plan-info-label">{{ 'Doacao' if transaction.plan_type == 'donation' else 'Plano' }}:</span>
+            <span class="plan-info-value">
+                {% if transaction.plan_type == 'donation' %}
+                Apoio pontual
+                {% else %}
+                {{ transaction.plan_type.upper() }}
+                {% endif %}
+            </span>
         </div>
         <div class="plan-info-row">
-            <span class="plan-info-label">Período:</span>
-            <span class="plan-info-value">Mensal</span>
+            <span class="plan-info-label">{{ 'Modalidade' if transaction.plan_type == 'donation' else 'Período' }}:</span>
+            <span class="plan-info-value">{{ 'Contribuicao unica' if transaction.plan_type == 'donation' else 'Mensal' }}</span>
         </div>
         <div class="plan-info-row">
             <span class="plan-info-label">Valor:</span>
@@ -278,12 +284,12 @@
             <li>Escolha a opção PIX</li>
             <li>Escaneie o QR Code acima OU copie e cole o código PIX</li>
             <li>Confirme o pagamento</li>
-            <li>Pronto! Seu plano será ativado automaticamente</li>
+            <li>{% if transaction.plan_type == 'donation' %}Pronto! Sua doacao sera confirmada automaticamente{% else %}Pronto! Seu plano sera ativado automaticamente{% endif %}</li>
         </ol>
     </div>
 
-    <a href="{{ url_for('plans') }}" class="back-btn">
-        <i class="fas fa-arrow-left"></i> Voltar aos Planos
+    <a href="{{ return_path }}" class="back-btn">
+        <i class="fas fa-arrow-left"></i> {% if transaction.plan_type == 'donation' %}Voltar para a pagina anterior{% else %}Voltar aos Planos{% endif %}
     </a>
 </div>
 {% endblock %}
@@ -345,8 +351,8 @@
                         <strong>Erro ao processar pagamento</strong><br>
                         ${data.message || 'Tente novamente ou use outra forma de pagamento.'}
                     </p>
-                    <a href="{{ url_for('plans') }}" class="retry-btn" style="margin-top: 1rem; padding: 0.8rem 1.5rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; display: inline-block; text-decoration: none;">
-                        <i class="fas fa-arrow-left"></i> Voltar aos Planos
+                    <a href="{{ return_path }}" class="retry-btn" style="margin-top: 1rem; padding: 0.8rem 1.5rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; display: inline-block; text-decoration: none;">
+                        <i class="fas fa-arrow-left"></i> Voltar
                     </a>
                 `;
             }
@@ -447,11 +453,11 @@
                 <i class="fas fa-check-circle"></i>
             </div>
             <strong>Pagamento Confirmado!</strong>
-            <p>Seu plano foi ativado com sucesso. Redirecionando...</p>
+            <p>{% if transaction.plan_type == 'donation' %}Sua doacao foi confirmada com sucesso. Redirecionando...{% else %}Seu plano foi ativado com sucesso. Redirecionando...{% endif %}</p>
         `;
 
         setTimeout(() => {
-            window.location.href = '{{ url_for("pix_checkout_success", billing_id=billing_id) }}';
+            window.location.href = '{{ url_for("pix_checkout_success", billing_id=billing_id, next=return_path) }}';
         }, 2000);
     }
 

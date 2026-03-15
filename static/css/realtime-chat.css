@@ -445,6 +445,11 @@
     color: #1d4ed8;
 }
 
+.chat-message-action.is-danger:hover {
+    border-color: #f87171;
+    color: #dc2626;
+}
+
 .chat-message.mine .chat-message-action {
     background: rgba(255, 255, 255, 0.14);
     border-color: rgba(191, 219, 254, 0.35);
@@ -453,6 +458,11 @@
 
 .chat-message.mine .chat-message-action:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+.chat-message.mine .chat-message-action.is-danger:hover {
+    border-color: rgba(254, 202, 202, 0.85);
+    color: #fee2e2;
 }
 
 .chat-input-wrapper {

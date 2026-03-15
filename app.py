@@ -8,6 +8,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from dateutil.relativedelta import relativedelta
 import math
 import os
@@ -44,7 +45,7 @@ except ImportError:
 
 from werkzeug.security import generate_password_hash, check_password_hash
 # Importar url_parse baseado na versão disponível
-from urllib.parse import urlparse as url_parse
+from urllib.parse import quote, urlparse as url_parse
 from itsdangerous import URLSafeTimedSerializer as Serializer
 import re
 from werkzeug.utils import secure_filename
@@ -252,6 +253,112 @@ def get_image_url_for_response(image_path, folder='profiles', default='default.j
     if folder == 'posts':
         return url_for('static', filename=f'images/posts/{normalized}')
     return url_for('static', filename=f'uploads/{folder}/{normalized}')
+
+
+def get_safe_internal_path(raw_path: str | None, fallback: str = '/') -> str:
+    candidate = (raw_path or '').strip()
+    if not candidate:
+        return fallback
+
+    try:
+        parsed = url_parse(candidate)
+        if parsed.netloc:
+            return fallback
+        if not parsed.path.startswith('/'):
+            return fallback
+        return candidate
+    except (ValueError, TypeError, AttributeError):
+        return fallback
+
+
+def serialize_comment(comment: "Comment") -> dict[str, Any]:
+    if comment.user_id and comment.user:
+        author_name = comment.user.username
+        profile_image = get_image_url_for_response(
+            getattr(comment.user, 'profile_image', None),
+            folder='profiles',
+            default='default_profile.jpg'
+        )
+        user_id = comment.user_id
+    else:
+        author_name = comment.author_name or 'Usuario'
+        profile_image = None
+        user_id = None
+
+    comment_data: dict[str, Any] = {
+        'id': comment.id,
+        'author': author_name,
+        'content': comment.content,
+        'date': comment.date_posted.strftime('%d/%m/%Y %H:%M'),
+        'profile_image': profile_image,
+        'user_id': user_id,
+        'is_edited': bool(getattr(comment, 'is_edited', False))
+    }
+
+    if comment.is_edited and getattr(comment, 'date_edited', None):
+        comment_data['date_edited'] = comment.date_edited.strftime('%d/%m/%Y %H:%M')
+
+    return comment_data
+
+
+def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
+    seen_ids = {post.id}
+    related_posts: list[Post] = []
+
+    def extend_with(posts: list["Post"]) -> None:
+        for candidate in posts:
+            if candidate.id in seen_ids:
+                continue
+            seen_ids.add(candidate.id)
+            related_posts.append(candidate)
+            if len(related_posts) >= limit:
+                break
+
+    same_category = Post.query.filter(
+        Post.is_active.is_(True),
+        Post.id != post.id,
+        Post.category_str == post.category_str
+    ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit).all()
+    extend_with(same_category)
+
+    if len(related_posts) < limit and post.subcategory:
+        same_subcategory = Post.query.filter(
+            Post.is_active.is_(True),
+            Post.id != post.id,
+            Post.subcategory == post.subcategory
+        ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit).all()
+        extend_with(same_subcategory)
+
+    if len(related_posts) < limit:
+        fallback_posts = Post.query.filter(
+            Post.is_active.is_(True),
+            Post.id != post.id
+        ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit * 2).all()
+        extend_with(fallback_posts)
+
+    return related_posts[:limit]
+
+
+def parse_donation_amount_to_cents(raw_amount: Any) -> tuple[bool, int | None, str | None]:
+    normalized = str(raw_amount or '').strip().replace('R$', '').replace(' ', '')
+    normalized = normalized.replace('.', '').replace(',', '.')
+
+    if not normalized:
+        return False, None, 'Informe um valor de doacao.'
+
+    try:
+        amount = Decimal(normalized)
+    except (InvalidOperation, TypeError, ValueError):
+        return False, None, 'Valor de doacao invalido.'
+
+    if amount < Decimal('5.00'):
+        return False, None, 'A doacao minima e de R$ 5,00.'
+
+    if amount > Decimal('5000.00'):
+        return False, None, 'O valor maximo por doacao e de R$ 5.000,00.'
+
+    cents = int((amount * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    return True, cents, None
 
 
 def serialize_post_for_admin(post):
@@ -2239,8 +2346,25 @@ def post(post_id):
 
     # Se não tiver slug, continuar com a rota antiga
     increment_post_views(post_id)
-    related_posts = Post.query.filter(Post.category_str == post.category_str, Post.id != post.id).order_by(Post.views.desc()).limit(3).all()
-    return render_template('post.html', post=post, related_posts=related_posts, title=post.title)
+    related_posts = get_related_posts_for_post(post, limit=9)
+    comments = Comment.query.filter_by(
+        post_id=post.id,
+        is_approved=True
+    ).order_by(Comment.date_posted.desc()).all()
+
+    favorite_post_ids = []
+    if current_user.is_authenticated:
+        favorites = Favorite.query.filter_by(user_id=current_user.id).all()
+        favorite_post_ids = [fav.post_id for fav in favorites]
+
+    return render_template(
+        'post.html',
+        post=post,
+        related_posts=related_posts,
+        comments=comments,
+        favorite_post_ids=favorite_post_ids,
+        title=post.title
+    )
 
 @app.route('/<string:category>/<string:slug>')
 def post_by_slug(category, slug):
@@ -2251,10 +2375,7 @@ def post_by_slug(category, slug):
     increment_post_views(post.id)
 
     # Obter posts relacionados baseados na categoria
-    related_posts = Post.query.filter(
-        Post.category_str == post.category_str,
-        Post.id != post.id
-    ).order_by(Post.views.desc()).limit(3).all()
+    related_posts = get_related_posts_for_post(post, limit=9)
 
     # Obter comentários aprovados
     comments = Comment.query.filter_by(
@@ -2444,33 +2565,7 @@ def get_post_comments_by_slug(category, slug):
             is_approved=True
         ).order_by(Comment.date_posted.desc()).all()
 
-        comments_list = []
-        for comment in comments:
-            # Determinar o nome do autor e foto de perfil
-            if comment.user_id:
-                author_name = comment.user.username
-                profile_image = comment.user.profile_image if hasattr(comment.user, 'profile_image') else None
-                user_id = comment.user_id
-            else:
-                author_name = comment.author_name
-                profile_image = None
-                user_id = None
-
-            comment_data = {
-                'id': comment.id,
-                'author': author_name,
-                'content': comment.content,
-                'date': comment.date_posted.strftime('%d/%m/%Y %H:%M'),
-                'profile_image': profile_image,
-                'user_id': user_id,
-                'is_edited': comment.is_edited if hasattr(comment, 'is_edited') else False
-            }
-
-            # Adicionar data de edição se foi editado
-            if comment.is_edited and hasattr(comment, 'date_edited') and comment.date_edited:
-                comment_data['date_edited'] = comment.date_edited.strftime('%d/%m/%Y %H:%M')
-
-            comments_list.append(comment_data)
+        comments_list = [serialize_comment(comment) for comment in comments]
 
         return jsonify({
             'success': True,
@@ -2498,20 +2593,7 @@ def get_post_comments(post_id):
             is_approved=True
         ).order_by(Comment.date_posted.desc()).all()
 
-        comments_list = []
-        for comment in comments:
-            # Determinar o nome do autor
-            if comment.user_id:
-                author_name = comment.user.username
-            else:
-                author_name = comment.author_name
-
-            comments_list.append({
-                'id': comment.id,
-                'author': author_name,
-                'content': comment.content,
-                'date': comment.date_posted.strftime('%d/%m/%Y %H:%M')
-            })
+        comments_list = [serialize_comment(comment) for comment in comments]
 
         return jsonify({
             'success': True,
@@ -2589,12 +2671,8 @@ def add_post_comment_by_slug(category, slug):
             'success': True,
             'message': 'Comentário enviado com sucesso!' if new_comment.is_approved else 'Comentário enviado! Aguarde aprovação.',
             'comment': {
-                'id': new_comment.id,
-                'author': current_user.username if current_user.is_authenticated else validated_data['author_name'],
-                'content': validated_data['content'],
-                'date': new_comment.date_posted.strftime('%d/%m/%Y %H:%M'),
-                'is_approved': new_comment.is_approved,
-                'profile_image': current_user.profile_image if current_user.is_authenticated and hasattr(current_user, 'profile_image') else None
+                **serialize_comment(new_comment),
+                'is_approved': new_comment.is_approved
             }
         }
 
@@ -2771,10 +2849,7 @@ def add_post_comment(post_id):
             'success': True,
             'message': 'Comentário enviado com sucesso!' if new_comment.is_approved else 'Comentário enviado! Aguarde aprovação.',
             'comment': {
-                'id': new_comment.id,
-                'author': current_user.username if current_user.is_authenticated else validated_data['author_name'],
-                'content': validated_data['content'],
-                'date': new_comment.date_posted.strftime('%d/%m/%Y %H:%M'),
+                **serialize_comment(new_comment),
                 'is_approved': new_comment.is_approved
             }
         }
@@ -2786,6 +2861,85 @@ def add_post_comment(post_id):
         return jsonify({
             'success': False,
             'message': f'Erro ao enviar comentário: {str(e)}'
+        }), 500
+
+
+@app.route('/post/<int:post_id>/comments/<int:comment_id>', methods=['DELETE'])
+@login_required
+@editor_required
+def delete_comment(post_id, comment_id):
+    """Deleta um comentário via rota legada."""
+    try:
+        Post.query.get_or_404(post_id)
+        comment = Comment.query.filter_by(id=comment_id, post_id=post_id).first_or_404()
+
+        db.session.delete(comment)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Comentário deletado com sucesso!'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao deletar comentário: {str(e)}'
+        }), 500
+
+
+@app.route('/post/<int:post_id>/comments/<int:comment_id>', methods=['PUT'])
+@login_required
+def edit_comment(post_id, comment_id):
+    """Edita um comentário via rota legada."""
+    try:
+        Post.query.get_or_404(post_id)
+        comment = Comment.query.filter_by(id=comment_id, post_id=post_id).first_or_404()
+
+        if comment.user_id != current_user.id and current_user.role not in ('admin', 'editor'):
+            return jsonify({
+                'success': False,
+                'message': 'Você não tem permissão para editar este comentário.'
+            }), 403
+
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        new_content = (data.get('content') or '').strip()
+
+        if not new_content:
+            return jsonify({
+                'success': False,
+                'message': 'O comentário não pode estar vazio.'
+            }), 400
+
+        if len(new_content) < 3:
+            return jsonify({
+                'success': False,
+                'message': 'O comentário deve ter pelo menos 3 caracteres.'
+            }), 400
+
+        if len(new_content) > 1000:
+            return jsonify({
+                'success': False,
+                'message': 'O comentário não pode ter mais de 1000 caracteres.'
+            }), 400
+
+        comment.content = sanitize_html(new_content)
+        comment.is_edited = True
+        comment.date_edited = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Comentário editado com sucesso!',
+            'comment': serialize_comment(comment)
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao editar comentário: {str(e)}'
         }), 500
 
 
@@ -3078,6 +3232,65 @@ def create_checkout_session():
         app.logger.exception('Erro ao criar sessão de checkout Stripe')
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
+
+@app.route('/create-donation-checkout-session', methods=['POST'])
+@login_required
+def create_donation_checkout_session():
+    try:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+
+        ok, amount_cents, error_message = parse_donation_amount_to_cents(data.get('amount'))
+        if not ok or amount_cents is None:
+            return jsonify({'error': error_message or 'Valor inválido.'}), 400
+
+        next_path = get_safe_internal_path(data.get('next') or request.referrer, fallback=url_for('about'))
+        checkout_session = stripe.checkout.Session.create(
+            mode='payment',
+            payment_method_types=['card'],
+            line_items=[
+                {
+                    'price_data': {
+                        'currency': 'brl',
+                        'unit_amount': amount_cents,
+                        'product_data': {
+                            'name': 'Doacao para o Mundo da Informatica',
+                            'description': 'Contribuicao avulsa para apoiar a plataforma.'
+                        }
+                    },
+                    'quantity': 1
+                }
+            ],
+            success_url=url_for('donation_success', _external=True) + f'?session_id={{CHECKOUT_SESSION_ID}}&next={quote(next_path)}',
+            cancel_url=url_for('about', _external=True) if next_path == url_for('about') else request.host_url.rstrip('/') + next_path,
+            customer_email=current_user.email,
+            metadata={
+                'user_id': str(current_user.id),
+                'plan': 'donation',
+                'next': next_path
+            }
+        )
+
+        transaction = Transaction(
+            user_id=current_user.id,
+            payment_gateway='stripe',
+            stripe_session_id=checkout_session.id,
+            stripe_payment_intent_id=checkout_session.payment_intent,
+            plan_type='donation',
+            amount=amount_cents,
+            currency='brl',
+            status='pending'
+        )
+        db.session.add(transaction)
+        db.session.commit()
+
+        return jsonify({'success': True, 'url': checkout_session.url})
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Erro ao criar sessao de doacao Stripe')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
 @app.route('/checkout-success')
 @login_required
 def checkout_success():
@@ -3136,6 +3349,53 @@ def checkout_success():
         print(f"Error verifying payment: {e}")
 
     return redirect(url_for('plans'))
+
+
+@app.route('/donation-success')
+@login_required
+def donation_success():
+    session_id = request.args.get('session_id')
+    next_path = get_safe_internal_path(request.args.get('next'), fallback=url_for('about'))
+
+    if not session_id:
+        flash('Sessão de doação não encontrada.', 'warning')
+        return redirect(next_path)
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status != 'paid' or session.metadata.get('plan') != 'donation':
+            flash('A doação ainda não foi confirmada.', 'warning')
+            return redirect(next_path)
+
+        transaction = Transaction.query.filter_by(stripe_session_id=session_id).first()
+        if transaction:
+            transaction.status = 'completed'
+            transaction.paid_at = datetime.utcnow()
+            transaction.amount = session.amount_total or transaction.amount
+            transaction.currency = session.currency or transaction.currency
+        else:
+            transaction = Transaction(
+                user_id=current_user.id,
+                payment_gateway='stripe',
+                stripe_session_id=session_id,
+                stripe_customer_id=session.customer,
+                stripe_payment_intent_id=session.payment_intent,
+                plan_type='donation',
+                amount=session.amount_total or 0,
+                currency=session.currency or 'brl',
+                status='completed',
+                paid_at=datetime.utcnow()
+            )
+            db.session.add(transaction)
+
+        db.session.commit()
+        flash('Doação realizada com sucesso. Muito obrigado pelo apoio!', 'success')
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Erro ao confirmar doacao Stripe')
+        flash('Nao foi possivel confirmar a doação agora. Tente novamente em instantes.', 'danger')
+
+    return redirect(next_path)
 
 @app.route('/checkout-cancel')
 @login_required
@@ -3225,6 +3485,46 @@ def create_pix_checkout():
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
 
+@app.route('/create-donation-pix-checkout', methods=['POST'])
+@login_required
+def create_donation_pix_checkout():
+    try:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+
+        ok, amount_cents, error_message = parse_donation_amount_to_cents(data.get('amount'))
+        if not ok or amount_cents is None:
+            return jsonify({'error': error_message or 'Valor inválido.'}), 400
+
+        next_path = get_safe_internal_path(data.get('next') or request.referrer, fallback=url_for('about'))
+        pix_id = f'donation_{current_user.id}_{int(datetime.utcnow().timestamp())}'
+
+        transaction = Transaction(
+            user_id=current_user.id,
+            payment_gateway='abacatepay',
+            abacatepay_billing_id=pix_id,
+            plan_type='donation',
+            amount=amount_cents,
+            currency='brl',
+            status='processing',
+            abacatepay_payment_url=next_path
+        )
+        db.session.add(transaction)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'billing_id': pix_id,
+            'transaction_id': transaction.id,
+            'redirect_url': url_for('pix_checkout_page', billing_id=pix_id, next=next_path, _external=True)
+        })
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Erro ao criar checkout PIX de doacao')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
 @app.route('/process-pix-async/<billing_id>', methods=['POST'])
 @login_required
 def process_pix_async(billing_id):
@@ -3270,7 +3570,7 @@ def process_pix_async(billing_id):
         payload = {
             'amount': amount,
             'expiresIn': 3600,
-            'description': f'Plano {plan_type.upper()}',
+            'description': 'Doacao para o Mundo da Informatica' if plan_type == 'donation' else f'Plano {plan_type.upper()}',
             'customer': {
                 'name': current_user.username,
                 'cellphone': '+5511999999999',
@@ -3356,7 +3656,11 @@ def pix_checkout_page(billing_id):
 
     return render_template('pix_checkout.html',
                          transaction=transaction,
-                         billing_id=billing_id)
+                         billing_id=billing_id,
+                         return_path=get_safe_internal_path(
+                             request.args.get('next') or transaction.abacatepay_payment_url,
+                             fallback=url_for('about' if transaction.plan_type == 'donation' else 'plans')
+                         ))
 
 @app.route('/pix-checkout-error/<int:transaction_id>')
 @login_required
@@ -3378,6 +3682,7 @@ def pix_checkout_success():
     Página de sucesso após pagamento PIX
     """
     billing_id = request.args.get('billing_id')
+    transaction = None
 
     if billing_id:
         transaction = Transaction.query.filter_by(
@@ -3386,13 +3691,22 @@ def pix_checkout_success():
         ).first()
 
         if transaction and transaction.status == 'completed':
-            flash(f'Assinatura {transaction.plan_type.upper()} realizada com sucesso via PIX!', 'success')
+            if transaction.plan_type == 'donation':
+                flash('Doação realizada com sucesso via PIX. Muito obrigado pelo apoio!', 'success')
+            else:
+                flash(f'Assinatura {transaction.plan_type.upper()} realizada com sucesso via PIX!', 'success')
         else:
-            flash('Aguardando confirmação do pagamento PIX. Você receberá uma notificação quando for processado.', 'info')
+            if transaction and transaction.plan_type == 'donation':
+                flash('Aguardando confirmação da doação PIX. Você receberá a atualização assim que o pagamento for processado.', 'info')
+            else:
+                flash('Aguardando confirmação do pagamento PIX. Você receberá uma notificação quando for processado.', 'info')
     else:
         flash('Pagamento PIX em processamento.', 'info')
 
-    return redirect(url_for('plans'))
+    fallback_endpoint = 'plans'
+    if billing_id and transaction and transaction.plan_type == 'donation':
+        fallback_endpoint = 'about'
+    return redirect(get_safe_internal_path(request.args.get('next'), fallback=url_for(fallback_endpoint)))
 
 @app.route('/cancel-pix-transaction/<billing_id>', methods=['POST'])
 @login_required
@@ -3616,9 +3930,10 @@ def handle_abacatepay_payment_success(transaction, billing_data):
             debug_log(f'Transação já processada: {transaction.abacatepay_billing_id}')
             return
 
-        # ATIVAR PLANO PREMIUM/VIP
-        user.plan = transaction.plan_type
-        user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
+        if transaction.plan_type != 'donation':
+            # ATIVAR PLANO PREMIUM/VIP
+            user.plan = transaction.plan_type
+            user.subscription_end_date = datetime.utcnow() + relativedelta(months=1)
 
         # Atualizar transação
         transaction.status = 'completed'
@@ -3626,7 +3941,10 @@ def handle_abacatepay_payment_success(transaction, billing_data):
 
         db.session.commit()
 
-        debug_log(f'Plano {transaction.plan_type} ativado para usuário {user.id} via PIX')
+        if transaction.plan_type == 'donation':
+            debug_log(f'Doação PIX confirmada para usuário {user.id}')
+        else:
+            debug_log(f'Plano {transaction.plan_type} ativado para usuário {user.id} via PIX')
 
     except Exception as e:
         debug_log(f'Erro ao processar pagamento PIX: {str(e)}')
@@ -3649,7 +3967,7 @@ def handle_abacatepay_payment_refunded(transaction, billing_data):
 
     try:
         user = User.query.get(transaction.user_id)
-        if user and user.plan != 'free':
+        if user and transaction.plan_type != 'donation' and user.plan != 'free':
             # Reverter para plano gratuito
             user.plan = 'free'
             user.subscription_end_date = None
@@ -3676,6 +3994,37 @@ def handle_checkout_completed(session):
         user = User.query.get(int(user_id))
         if not user:
             debug_log(f'ERRO: Usuário {user_id} não encontrado')
+            return
+
+        if plan_type == 'donation':
+            existing_transaction = Transaction.query.filter_by(stripe_session_id=session_id).first()
+            if existing_transaction and existing_transaction.status == 'completed':
+                debug_log(f'Transação de doação já processada: {session_id}')
+                return
+
+            if existing_transaction:
+                existing_transaction.status = 'completed'
+                existing_transaction.paid_at = datetime.utcnow()
+                existing_transaction.amount = session.get('amount_total') or existing_transaction.amount
+                existing_transaction.currency = session.get('currency') or existing_transaction.currency
+                existing_transaction.stripe_customer_id = session.get('customer')
+                existing_transaction.stripe_payment_intent_id = session.get('payment_intent')
+            else:
+                db.session.add(Transaction(
+                    user_id=int(user_id),
+                    payment_gateway='stripe',
+                    stripe_session_id=session_id,
+                    stripe_customer_id=session.get('customer'),
+                    stripe_payment_intent_id=session.get('payment_intent'),
+                    plan_type='donation',
+                    amount=session.get('amount_total') or 0,
+                    currency=session.get('currency') or 'brl',
+                    status='completed',
+                    paid_at=datetime.utcnow()
+                ))
+
+            db.session.commit()
+            debug_log(f'✅ Doação confirmada para usuário {user.username} via webhook')
             return
 
         # Verificar se já foi processado
@@ -4190,7 +4539,8 @@ def search_suggestions():
             'description': f'{category_name}',
             'category': category_name,
             'url': url_for('post_by_slug', category=generate_slug(post.category_str), slug=post.slug) if post.slug else url_for('post', post_id=post.id),
-            'icon': category_icon
+            'icon': category_icon,
+            'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg')
         })
 
     return jsonify(suggestions[:8])  # Limitar a 8 sugestões

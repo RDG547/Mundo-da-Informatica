@@ -118,6 +118,15 @@
     box-shadow: var(--shadow-xl);
 }
 
+.about-section .stat-item:hover::before {
+    width: 5px;
+    opacity: 1;
+}
+
+.about-section .stat-item:hover .stat-icon {
+    color: rgba(255, 255, 255, 0.2);
+}
+
 /* Melhorias visuais */
 .about-section .section-header {
     position: relative;

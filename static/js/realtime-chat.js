@@ -344,6 +344,17 @@
         return (Date.now() - createdAtMs) <= EDIT_WINDOW_MS;
     }
 
+    function canDeleteMessageDoc(doc) {
+        if (!doc) return false;
+        if (userMeta.isAdmin) return true;
+
+        const data = doc.data() || {};
+        if (!isMessageMine(data)) return false;
+        const createdAtMs = tsToMillis(data.createdAt);
+        if (!createdAtMs) return false;
+        return (Date.now() - createdAtMs) <= EDIT_WINDOW_MS;
+    }
+
     function clearComposerAction(shouldClearInput) {
         draftReply = null;
         draftEdit = null;
@@ -468,6 +479,14 @@
                     </button>
                 `
                 : '';
+            const deleteButton = canDeleteMessageDoc(doc)
+                ? `
+                    <button type="button" class="chat-message-action is-danger" data-chat-delete="${escapeHtml(doc.id)}">
+                        <i class="fas fa-trash"></i>
+                        Excluir
+                    </button>
+                `
+                : '';
 
             return `
                 <article class="chat-message${mine ? ' mine' : ''}" data-message-id="${escapeHtml(doc.id)}">
@@ -487,6 +506,7 @@
                                 Responder
                             </button>
                             ${editButton}
+                            ${deleteButton}
                         </div>
                     </div>
                 </article>
@@ -956,11 +976,85 @@
 
         const latestMessage = activeMessageDocs.length ? activeMessageDocs[0] : null;
         if (latestMessage && latestMessage.id === draftEdit.messageId) {
-            await firestore.collection('chat_rooms').doc(currentRoomId).set(
-                buildRoomMetadataForMessage(currentRoomId, text),
-                { merge: true }
-            );
+            await syncRoomMetadataFromLatest(currentRoomId, text);
         }
+    }
+
+    async function syncRoomMetadataFromLatest(roomId, fallbackText) {
+        if (!firestore || !roomId) return;
+
+        const latestSnapshot = await firestore
+            .collection('chat_rooms')
+            .doc(roomId)
+            .collection('messages')
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+
+        if (latestSnapshot.empty) {
+            const roomDoc = firestore.collection('chat_rooms').doc(roomId);
+            const roomMeta = getRoomMeta(roomId) || {};
+            await roomDoc.set({
+                ...roomMeta,
+                id: roomId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastMessage: '',
+                lastSender: '',
+                lastSenderRole: '',
+                lastSenderSiteUserId: ''
+            }, { merge: true });
+            return;
+        }
+
+        const latestDoc = latestSnapshot.docs[0];
+        const latestData = latestDoc.data() || {};
+        const latestText = String(latestData.text || fallbackText || '').slice(0, 140);
+
+        await firestore.collection('chat_rooms').doc(roomId).set(
+            {
+                ...buildRoomMetadataForMessage(roomId, latestText),
+                lastSender: latestData.senderName || userMeta.userName,
+                lastSenderRole: latestData.senderRole || (userMeta.isAdmin ? 'admin' : 'user'),
+                lastSenderSiteUserId: latestData.senderSiteUserId || userMeta.userId
+            },
+            { merge: true }
+        );
+    }
+
+    async function deleteMessage(messageId) {
+        const targetDoc = findMessageDocById(messageId);
+        if (!targetDoc || !canDeleteMessageDoc(targetDoc)) {
+            throw new Error('Voce nao pode excluir esta mensagem.');
+        }
+
+        const data = targetDoc.data() || {};
+        const confirmed = window.confirm('Deseja excluir esta mensagem do chat?');
+        if (!confirmed) {
+            return;
+        }
+
+        await firestore
+            .collection('chat_rooms')
+            .doc(currentRoomId)
+            .collection('messages')
+            .doc(messageId)
+            .delete();
+
+        if (draftReply && draftReply.messageId === messageId) {
+            draftReply = null;
+        }
+
+        if (draftEdit && draftEdit.messageId === messageId) {
+            draftEdit = null;
+            elements.input.value = '';
+        }
+
+        const latestMessage = activeMessageDocs.length ? activeMessageDocs[0] : null;
+        if (latestMessage && latestMessage.id === messageId) {
+            await syncRoomMetadataFromLatest(currentRoomId, data.text || '');
+        }
+
+        renderComposerState();
     }
 
     async function sendMessage(text) {
@@ -1113,6 +1207,15 @@
                 const editButton = event.target.closest('[data-chat-edit]');
                 if (editButton) {
                     startEdit(editButton.dataset.chatEdit);
+                    return;
+                }
+
+                const deleteButton = event.target.closest('[data-chat-delete]');
+                if (deleteButton) {
+                    deleteMessage(deleteButton.dataset.chatDelete).catch((error) => {
+                        console.error('[CHAT] Erro ao excluir mensagem:', error);
+                        notifyUser(error.message || 'Nao foi possivel excluir a mensagem.', 'error');
+                    });
                 }
             });
         }

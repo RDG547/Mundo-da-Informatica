@@ -160,6 +160,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (form.id === 'loginForm' || form.action.includes('/login')) return false;
             // Não interceptar o formulário do chat em tempo real
             if (form.id === 'chat-message-form') return false;
+            // Não interceptar o formulário de comentários, pois ele já possui tratamento AJAX próprio
+            if (form.id === 'commentForm') return false;
             // Não interceptar formulários de perfil que já possuem tratamento AJAX próprio
             if (form.id === 'editProfileForm' || form.id === 'changePasswordForm') return false;
             return true;
@@ -1234,7 +1236,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 const searchInput = document.querySelector('.category-search-input');
                 const suggestionsDropdown = document.querySelector('.search-suggestions-dropdown');
 
-                if (searchInput && suggestionsDropdown) {
+                if (searchInput && suggestionsDropdown && !searchInput.dataset.dynamicCategorySearchInit) {
+                    searchInput.dataset.dynamicCategorySearchInit = 'true';
                     let debounceTimer;
                     let currentQuery = '';
 
@@ -1259,9 +1262,15 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
                         const html = suggestions.map(suggestion => `
                         <div class="suggestion-item" data-url="${suggestion.url}">
-                            <div class="suggestion-icon">
-                                <i class="${suggestion.icon}"></i>
-                            </div>
+                            ${suggestion.type === 'post' && suggestion.image_url ? `
+                                <div class="suggestion-thumb">
+                                    <img src="${suggestion.image_url}" alt="${escapeHtmlSuggestion(suggestion.title)}" loading="lazy">
+                                </div>
+                            ` : `
+                                <div class="suggestion-icon">
+                                    <i class="${suggestion.icon}"></i>
+                                </div>
+                            `}
                             <div class="suggestion-content">
                                 <div class="suggestion-title">${suggestion.title}</div>
                                 <div class="suggestion-description">${suggestion.description}</div>
@@ -1364,6 +1373,15 @@ if (typeof window.DynamicLoader !== 'undefined') {
                             this.blur();
                         }
                     });
+
+                    function escapeHtmlSuggestion(value) {
+                        return String(value || '')
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/"/g, '&quot;')
+                            .replace(/'/g, '&#039;');
+                    }
                 }
 
                 // Initialize post card animations

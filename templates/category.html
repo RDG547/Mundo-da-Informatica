@@ -7,7 +7,7 @@
     <div class="hero-overlay"></div>
     <div class="container">
         <div class="hero-content text-center">
-            <div class="hero-icon animate-bounce">
+            <div class="hero-icon">
                 {% if category == 'BIOS' %}
                 <i class="fas fa-microchip"></i>
                 {% elif category == 'Drivers' %}
@@ -26,8 +26,8 @@
                 <i class="fas fa-folder"></i>
                 {% endif %}
             </div>
-            <h1 class="hero-title animate-fade-up">{{ category }}</h1>
-            <p class="hero-subtitle animate-fade-up-delayed">
+            <h1 class="hero-title">{{ category }}</h1>
+            <p class="hero-subtitle">
                 {% if category == 'BIOS' %}
                 Encontre firmwares e atualizações de BIOS para notebooks, desktops, all-in-ones e monitores, organizados
                 por fabricante.

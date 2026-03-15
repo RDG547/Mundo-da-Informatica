@@ -12,6 +12,7 @@
         content="{{ site_configs.get('site_description', 'Portal completo de recursos para técnicos de informática, com BIOSs, esquemas de placas, drivers e softwares especializados.') }}">
     <meta name="keywords" content="informática, BIOS, esquemas, drivers, softwares, técnicos">
     <meta name="author" content="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
@@ -342,6 +343,7 @@
     <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
     <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>
     <script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>

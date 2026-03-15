@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_assets import Environment
 from webassets.bundle import Bundle
 from flask_compress import Compress
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
@@ -139,10 +139,9 @@ db = SQLAlchemy(app)
 compress = Compress(app)
 assets = Environment(app)
 
-# Proteção CSRF - Desabilitada temporariamente
-# TODO: Adicionar tokens CSRF em todos os formulários antes de habilitar
-# csrf = CSRFProtect(app)
-app.config['WTF_CSRF_ENABLED'] = False  # Desabilitar CSRF globalmente por enquanto
+# Proteção CSRF
+app.config['WTF_CSRF_ENABLED'] = True
+csrf = CSRFProtect(app)
 
 # Rate Limiting para evitar ataques de força bruta
 limiter = Limiter(
@@ -151,6 +150,44 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://"
 )
+
+
+def _is_json_like_request():
+    accepts_json = request.accept_mimetypes['application/json'] >= request.accept_mimetypes['text/html']
+    return request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or accepts_json
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    message = 'Token CSRF ausente, inválido ou expirado. Atualize a página e tente novamente.'
+    if _is_json_like_request():
+        return jsonify({'success': False, 'error': message, 'details': e.description}), 400
+
+    flash(message, 'danger')
+    return redirect(request.referrer or url_for('home')), 400
+
+
+@app.errorhandler(403)
+def handle_403_error(e):
+    message = 'Ação não permitida. Verifique sua sessão e tente novamente.'
+    if _is_json_like_request():
+        return jsonify({'success': False, 'error': message}), 403
+
+    flash(message, 'danger')
+    return redirect(request.referrer or url_for('home')), 403
+
+
+@app.errorhandler(400)
+def handle_400_error(e):
+    if isinstance(e, CSRFError):
+        return handle_csrf_error(e)
+
+    message = 'Não foi possível processar sua solicitação.'
+    if _is_json_like_request():
+        return jsonify({'success': False, 'error': message}), 400
+
+    flash(message, 'warning')
+    return redirect(request.referrer or url_for('home')), 400
 
 # Headers de Segurança HTTP (Talisman)
 # DESABILITADO: CSP estava bloqueando recursos externos
@@ -2979,6 +3016,7 @@ def check_pix_payment(billing_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/stripe-webhook', methods=['POST'])
+@csrf.exempt
 def stripe_webhook():
     """
     Webhook do Stripe para processar eventos de pagamento automaticamente.
@@ -3059,6 +3097,7 @@ def stripe_webhook():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/abacatepay-webhook', methods=['POST'])
+@csrf.exempt
 def abacatepay_webhook():
     """
     Webhook do Abacate Pay para processar eventos de pagamento PIX.

@@ -282,11 +282,13 @@
                     </td>
                     <td class="actions">
                         <form style="display: inline-block;" action="/admin/posts/{{ post.id }}/toggle-featured" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn-action btn-star" title="{{ 'Remover destaque' if post.featured else 'Destacar' }}">
                                 <i class="fas fa-star{{ '' if post.featured else '-o' }}"></i>
                             </button>
                         </form>
                         <form style="display: inline-block;" action="/admin/posts/{{ post.id }}/delete" method="post" onsubmit="return confirm('Tem certeza que deseja excluir este post?')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn-action btn-delete" title="Excluir">
                                 <i class="fas fa-trash"></i>
                             </button>

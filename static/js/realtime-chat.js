@@ -51,6 +51,7 @@
     let currentRoomId = 'todos';
     let selectedTicketRoomId = '';
     let panelOpen = false;
+    let triedRepairTodos = false;
 
     let firestore = null;
     let auth = null;
@@ -377,20 +378,38 @@
         }
     }
 
+    async function bootstrapRoomsFromServer() {
+        try {
+            const response = await fetch('/api/chat/bootstrap', {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            const data = await response.json().catch(() => ({}));
+            return !!(response.ok && data.success);
+        } catch (_error) {
+            return false;
+        }
+    }
+
     async function ensureBaseRooms() {
         const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
+        const bootstrapped = await bootstrapRoomsFromServer();
 
-        await ensureRoomDoc('todos', {
-            type: 'public',
-            name: 'Todos'
-        });
+        // Fallback pelo cliente caso o bootstrap no servidor não esteja disponível.
+        if (!bootstrapped) {
+            await ensureRoomDoc('todos', {
+                type: 'public',
+                name: 'Todos'
+            });
 
-        await ensureRoomDoc(supportRoomId, {
-            type: 'support',
-            name: `Suporte - ${userMeta.userName}`,
-            ownerSiteUserId: userMeta.userId,
-            ownerName: userMeta.userName
-        });
+            await ensureRoomDoc(supportRoomId, {
+                type: 'support',
+                name: `Suporte - ${userMeta.userName}`,
+                ownerSiteUserId: userMeta.userId,
+                ownerName: userMeta.userName
+            });
+        }
     }
 
     async function fetchChatFirebaseToken() {
@@ -462,12 +481,27 @@
 
         unsubscribers.activeMessages = query.onSnapshot((snapshot) => {
             renderMessages(snapshot.docs);
+            if (roomId === 'todos') {
+                triedRepairTodos = false;
+            }
             setStatus(`Sala: ${roomId}`, 'ok');
             if (panelOpen) {
                 markRoomAsRead(roomId);
             }
         }, (error) => {
             console.error('[CHAT] Erro ao receber mensagens em tempo real:', error);
+            if (roomId === 'todos' && !triedRepairTodos) {
+                triedRepairTodos = true;
+                setStatus('Reparando sala Todos...', 'error');
+                bootstrapRoomsFromServer().then((ok) => {
+                    if (ok) {
+                        subscribeActiveRoom('todos');
+                    } else {
+                        setStatus('Erro ao conectar com o chat.', 'error');
+                    }
+                });
+                return;
+            }
             setStatus('Erro ao conectar com o chat.', 'error');
         });
     }
@@ -610,13 +644,12 @@
             unsubscribers.chamadosList = firestore
                 .collection('chat_rooms')
                 .where('type', '==', 'support')
-                .orderBy('updatedAt', 'desc')
                 .limit(80)
                 .onSnapshot((snapshot) => {
                     supportTickets = snapshot.docs.map((doc) => ({
                         id: doc.id,
                         data: doc.data() || {}
-                    }));
+                    })).sort((a, b) => tsToMillis(b.data.updatedAt) - tsToMillis(a.data.updatedAt));
 
                     if (currentTab === 'chamados') {
                         if (!selectedTicketRoomId || !supportTickets.some((item) => item.id === selectedTicketRoomId)) {

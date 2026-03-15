@@ -55,11 +55,12 @@ import cloudinary.uploader
 import cloudinary.api
 try:
     import firebase_admin
-    from firebase_admin import credentials, auth as firebase_auth
+    from firebase_admin import credentials, auth as firebase_auth, firestore as firebase_firestore
 except Exception:  # pragma: no cover - fallback quando dependência não está instalada
     firebase_admin = None
     credentials = None
     firebase_auth = None
+    firebase_firestore = None
 
 try:
     from google.oauth2 import id_token as google_id_token
@@ -4857,6 +4858,72 @@ def chat_firebase_token():
     except Exception as e:
         app.logger.error(f'Erro ao criar token customizado do chat: {e}')
         return jsonify({'success': False, 'message': 'Não foi possível conectar ao chat agora.'}), 500
+
+
+def _get_firestore_client():
+    if firebase_firestore is None:
+        return None
+    if not initialize_firebase_admin():
+        return None
+    try:
+        return firebase_firestore.client()
+    except Exception as e:
+        app.logger.error(f'Erro ao obter cliente Firestore: {e}')
+        return None
+
+
+def _firestore_server_timestamp():
+    if firebase_firestore is None:
+        return None
+    # Evita warning de tipagem do Pylance para atributo dinâmico do SDK.
+    server_timestamp = getattr(firebase_firestore, 'SERVER_TIMESTAMP', None)
+    return server_timestamp
+
+
+@app.route('/api/chat/bootstrap', methods=['GET'])
+@login_required
+@limiter.limit("120 per minute")
+def chat_bootstrap():
+    """
+    Garante as salas base do chat em tempo real usando credenciais de servidor.
+    """
+    if not current_user.is_active:
+        return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+
+    db_firestore = _get_firestore_client()
+    if db_firestore is None:
+        return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
+
+    support_room_id = f"support_user_{current_user.id}"
+    owner_name = (current_user.get_full_name() or current_user.username or f'Usuario {current_user.id}')[:80]
+    server_timestamp = _firestore_server_timestamp()
+
+    try:
+        db_firestore.collection('chat_rooms').document('todos').set({
+            'id': 'todos',
+            'type': 'public',
+            'name': 'Todos',
+            'updatedAt': server_timestamp
+        }, merge=True)
+
+        db_firestore.collection('chat_rooms').document(support_room_id).set({
+            'id': support_room_id,
+            'type': 'support',
+            'name': f'Suporte - {owner_name}',
+            'ownerSiteUserId': str(current_user.id),
+            'ownerName': owner_name,
+            'updatedAt': server_timestamp
+        }, merge=True)
+
+        return jsonify({
+            'success': True,
+            'todos_room_id': 'todos',
+            'support_room_id': support_room_id,
+            'is_admin': bool(current_user.role == 'admin')
+        })
+    except Exception as e:
+        app.logger.error(f'Erro no bootstrap das salas de chat: {e}')
+        return jsonify({'success': False, 'message': 'Falha ao preparar salas do chat.'}), 500
 
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])

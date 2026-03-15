@@ -17,65 +17,65 @@
 </section>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+(function () {
+    function splitIntoChars(el, lines) {
+        var chars = [];
+        el.innerHTML = '';
+        for (var l = 0; l < lines.length; l++) {
+            var container = lines.length > 1 ? document.createElement('div') : el;
+            if (lines.length > 1) {
+                container.style.display = 'block';
+                el.appendChild(container);
+            }
+            var words = lines[l].trim().split(/\s+/);
+            for (var w = 0; w < words.length; w++) {
+                if (w > 0) {
+                    var sp = document.createElement('span');
+                    sp.style.display = 'inline-block';
+                    sp.innerHTML = '&nbsp;';
+                    container.appendChild(sp);
+                    chars.push(sp);
+                }
+                var wordWrap = document.createElement('span');
+                wordWrap.style.display = 'inline-block';
+                wordWrap.style.whiteSpace = 'nowrap';
+                for (var c = 0; c < words[w].length; c++) {
+                    var cs = document.createElement('span');
+                    cs.style.display = 'inline-block';
+                    cs.textContent = words[w][c];
+                    wordWrap.appendChild(cs);
+                    chars.push(cs);
+                }
+                container.appendChild(wordWrap);
+            }
+        }
+        return chars;
+    }
+
     function initHeroSplitText() {
         var titleEl = document.querySelector('.hero-split-text');
         var subtitleEl = document.querySelector('.hero-subtitle-split');
         var searchForm = document.querySelector('#home-search-form');
-        
-        if (!titleEl || typeof gsap === 'undefined') return;
-        
-        // Make elements visible before animation
+
+        if (!titleEl) return;
+
+        // Garantir visibilidade mesmo se a animação falhar
         titleEl.style.visibility = 'visible';
         if (subtitleEl) subtitleEl.style.visibility = 'visible';
-        
-        // Use a robust vanilla JS character splitter to mimic SplitText's 'chars' split type
-        // This avoids dependency on the premium GSAP Club Plugin which fails on free setups
-        // Split text into animated character spans, grouped by words to prevent mid-word breaks
-        function splitIntoChars(el, lines) {
-            var chars = [];
-            el.innerHTML = '';
-            for (var l = 0; l < lines.length; l++) {
-                var container = lines.length > 1 ? document.createElement('div') : el;
-                if (lines.length > 1) {
-                    container.style.display = 'block';
-                    el.appendChild(container);
-                }
-                var words = lines[l].trim().split(/\s+/);
-                for (var w = 0; w < words.length; w++) {
-                    if (w > 0) {
-                        var sp = document.createElement('span');
-                        sp.style.display = 'inline-block';
-                        sp.innerHTML = '&nbsp;';
-                        container.appendChild(sp);
-                        chars.push(sp);
-                    }
-                    var wordWrap = document.createElement('span');
-                    wordWrap.style.display = 'inline-block';
-                    wordWrap.style.whiteSpace = 'nowrap';
-                    for (var c = 0; c < words[w].length; c++) {
-                        var cs = document.createElement('span');
-                        cs.style.display = 'inline-block';
-                        cs.textContent = words[w][c];
-                        wordWrap.appendChild(cs);
-                        chars.push(cs);
-                    }
-                    container.appendChild(wordWrap);
-                }
-            }
-            return chars;
-        }
-        
+        if (searchForm) searchForm.style.opacity = '1';
+
+        if (typeof gsap === 'undefined') return;
+
         // Title: explicit 3 lines
         var titleChars = splitIntoChars(titleEl, ['Bem-vindo ao', 'Mundo da', 'Informática']);
         gsap.from(titleChars, {
             x: 150,
             opacity: 0,
-            duration: 0.7, 
+            duration: 0.7,
             ease: "power4",
             stagger: 0.04
         });
-        
+
         // Subtitle: single line, word-grouped
         if (subtitleEl) {
             var subText = subtitleEl.textContent || subtitleEl.innerText;
@@ -83,16 +83,16 @@ document.addEventListener('DOMContentLoaded', function() {
             gsap.from(subtitleChars, {
                 x: 150,
                 opacity: 0,
-                duration: 0.7, 
+                duration: 0.7,
                 ease: "power4",
                 stagger: 0.02,
                 delay: 0.4
             });
         }
-        
+
         // Animate search bar
         if (searchForm) {
-            gsap.to(searchForm, {
+            gsap.fromTo(searchForm, { opacity: 0 }, {
                 opacity: 1,
                 duration: 0.6,
                 ease: "power2.out",
@@ -100,25 +100,36 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
-    window.initHeroSplitText = initHeroSplitText;
-    
-    // Try immediately; if GSAP not ready yet, retry
-    if (typeof gsap !== 'undefined') {
-        initHeroSplitText();
-    } else {
+
+    function startHeroSplitText() {
+        if (!document.querySelector('.hero-split-text')) return;
+
+        if (typeof gsap !== 'undefined') {
+            initHeroSplitText();
+            return;
+        }
+
         var retryCount = 0;
-        var retryInterval = setInterval(function() {
+        var retryInterval = setInterval(function () {
             retryCount++;
             if (typeof gsap !== 'undefined') {
                 clearInterval(retryInterval);
                 initHeroSplitText();
             } else if (retryCount > 50) {
                 clearInterval(retryInterval);
+                initHeroSplitText(); // fallback sem animação, mas com conteúdo visível
             }
         }, 100);
     }
-});
+
+    window.initHeroSplitText = initHeroSplitText;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startHeroSplitText);
+    } else {
+        startHeroSplitText();
+    }
+})();
 </script>
 
 <!-- Categories Section -->

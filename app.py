@@ -4453,7 +4453,7 @@ def reset_password(token):
 
         is_valid, password_error = validate_password_strength(password)
         if not is_valid:
-            flash(password_error, 'danger')
+            flash(password_error or 'Senha inválida.', 'danger')
             return redirect(url_for('reset_password', token=token))
 
         # Atualizar a senha
@@ -7608,7 +7608,7 @@ def update_password():
     # Validar força da senha
     is_valid, password_error = validate_password_strength(new_password)
     if not is_valid:
-        flash(password_error, 'error')
+        flash(password_error or 'Senha inválida.', 'error')
         return redirect(url_for('profile'))
 
     # Atualize a senha

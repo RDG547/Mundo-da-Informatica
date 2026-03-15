@@ -4,6 +4,10 @@
  */
 
 // Simple and reliable FAQ toggle functionality
+function getFAQToggleIcon(faqItem) {
+    return faqItem.querySelector('.faq-toggle i, .faq-icon, .faq-question i');
+}
+
 function toggleFAQ(element) {
     console.log('toggleFAQ called with:', element);
 
@@ -14,10 +18,10 @@ function toggleFAQ(element) {
     }
 
     const faqAnswer = faqItem.querySelector('.faq-answer');
-    const faqToggle = faqItem.querySelector('.faq-toggle i');
+    const faqToggle = getFAQToggleIcon(faqItem);
 
-    if (!faqAnswer || !faqToggle) {
-        console.error('FAQ answer or toggle not found');
+    if (!faqAnswer) {
+        console.error('FAQ answer not found');
         return;
     }
 
@@ -42,9 +46,9 @@ function openFAQItem(faqItem) {
     console.log('Opening FAQ item');
 
     const faqAnswer = faqItem.querySelector('.faq-answer');
-    const faqToggle = faqItem.querySelector('.faq-toggle i');
+    const faqToggle = getFAQToggleIcon(faqItem);
 
-    if (!faqAnswer || !faqToggle) return;
+    if (!faqAnswer) return;
 
     faqItem.classList.add('active');
 
@@ -56,9 +60,16 @@ function openFAQItem(faqItem) {
     // Force reflow and let CSS handle the animation
     faqAnswer.offsetHeight;
 
-    // Update toggle icon
-    faqToggle.classList.remove('fa-plus');
-    faqToggle.classList.add('fa-minus');
+    // Update toggle icon (supports FAQ page and plans page variants)
+    if (faqToggle) {
+        if (faqToggle.classList.contains('fa-plus') || faqToggle.classList.contains('fa-minus')) {
+            faqToggle.classList.remove('fa-plus');
+            faqToggle.classList.add('fa-minus');
+        } else if (faqToggle.classList.contains('fa-chevron-down') || faqToggle.classList.contains('fa-chevron-up')) {
+            faqToggle.classList.remove('fa-chevron-down');
+            faqToggle.classList.add('fa-chevron-up');
+        }
+    }
 
     console.log('FAQ item opened');
 }
@@ -67,15 +78,22 @@ function closeFAQItem(faqItem) {
     console.log('Closing FAQ item');
 
     const faqAnswer = faqItem.querySelector('.faq-answer');
-    const faqToggle = faqItem.querySelector('.faq-toggle i');
+    const faqToggle = getFAQToggleIcon(faqItem);
 
-    if (!faqAnswer || !faqToggle) return;
+    if (!faqAnswer) return;
 
     faqItem.classList.remove('active');
 
-    // Update toggle icon
-    faqToggle.classList.remove('fa-minus');
-    faqToggle.classList.add('fa-plus');
+    // Update toggle icon (supports FAQ page and plans page variants)
+    if (faqToggle) {
+        if (faqToggle.classList.contains('fa-minus') || faqToggle.classList.contains('fa-plus')) {
+            faqToggle.classList.remove('fa-minus');
+            faqToggle.classList.add('fa-plus');
+        } else if (faqToggle.classList.contains('fa-chevron-up') || faqToggle.classList.contains('fa-chevron-down')) {
+            faqToggle.classList.remove('fa-chevron-up');
+            faqToggle.classList.add('fa-chevron-down');
+        }
+    }
 
     console.log('FAQ item closed');
 }
@@ -91,7 +109,7 @@ function initializeFAQ() {
     faqItems.forEach(item => {
         item.classList.remove('active');
         const answer = item.querySelector('.faq-answer');
-        const icon = item.querySelector('.faq-toggle i');
+        const icon = getFAQToggleIcon(item);
 
         if (answer) {
             answer.style.removeProperty('display');
@@ -100,8 +118,13 @@ function initializeFAQ() {
         }
 
         if (icon) {
-            icon.classList.remove('fa-minus');
-            icon.classList.add('fa-plus');
+            if (icon.classList.contains('fa-minus') || icon.classList.contains('fa-plus')) {
+                icon.classList.remove('fa-minus');
+                icon.classList.add('fa-plus');
+            } else if (icon.classList.contains('fa-chevron-up') || icon.classList.contains('fa-chevron-down')) {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
         }
     });
 

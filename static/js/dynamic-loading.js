@@ -477,6 +477,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             const faqCSS = document.getElementById('faq-css');
             const contactCSS = document.getElementById('contact-css');
             const aboutCSS = document.getElementById('about-css');
+            const aboutPageCSS = document.getElementById('about-page-css');
             const categoryCSS = document.getElementById('category-css');
             const profileCSS = document.getElementById('profile-css');
             const plansCSS = document.getElementById('plans-css');
@@ -487,6 +488,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (faqCSS) faqCSS.media = 'print';
             if (contactCSS) contactCSS.media = 'print';
             if (aboutCSS) aboutCSS.media = 'print';
+            if (aboutPageCSS) aboutPageCSS.media = 'print';
             if (categoryCSS) categoryCSS.media = 'print';
             if (profileCSS) profileCSS.media = 'print';
             if (plansCSS) plansCSS.media = 'print';
@@ -502,6 +504,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 console.log('[DYNAMIC-LOADING] 🎨 Contact CSS ativado');
             } else if ((path === '/about' || path === '/sobre') && aboutCSS) {
                 aboutCSS.media = 'all';
+                if (aboutPageCSS) aboutPageCSS.media = 'all';
                 console.log('[DYNAMIC-LOADING] 🎨 About CSS ativado');
             } else if ((path.startsWith('/categoria/') || path === '/categorias' || path === '/posts') && categoryCSS) {
                 categoryCSS.media = 'all';
@@ -1021,8 +1024,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
         initializeAboutPage() {
             // Force activate about CSS
             const aboutCSS = document.getElementById('about-css');
+            const aboutPageCSS = document.getElementById('about-page-css');
             if (aboutCSS) {
                 aboutCSS.media = 'all';
+            }
+            if (aboutPageCSS) {
+                aboutPageCSS.media = 'all';
             }
 
             // Initialize About page functionality

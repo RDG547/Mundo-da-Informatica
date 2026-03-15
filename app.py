@@ -4880,6 +4880,20 @@ def _firestore_server_timestamp():
     return server_timestamp
 
 
+def _firestore_timestamp_to_millis(value):
+    if value is None:
+        return 0
+
+    timestamp_method = getattr(value, 'timestamp', None)
+    if callable(timestamp_method):
+        try:
+            return int(timestamp_method() * 1000)
+        except Exception:
+            return 0
+
+    return 0
+
+
 @app.route('/api/chat/bootstrap', methods=['GET'])
 @login_required
 @limiter.limit("120 per minute")
@@ -4924,6 +4938,51 @@ def chat_bootstrap():
     except Exception as e:
         app.logger.error(f'Erro no bootstrap das salas de chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao preparar salas do chat.'}), 500
+
+
+@app.route('/api/chat/admin/tickets', methods=['GET'])
+@login_required
+@limiter.limit("120 per minute")
+def chat_admin_tickets():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+
+    db_firestore = _get_firestore_client()
+    if db_firestore is None:
+        return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
+
+    try:
+        tickets = []
+        docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream()
+
+        for doc in docs:
+            data = doc.to_dict() or {}
+            room_id = str(data.get('id') or doc.id)
+            if not room_id.startswith('support_user_'):
+                continue
+
+            updated_at_ms = _firestore_timestamp_to_millis(data.get('updatedAt'))
+            tickets.append({
+                'id': room_id,
+                'data': {
+                    'id': room_id,
+                    'type': str(data.get('type') or 'support'),
+                    'name': str(data.get('name') or ''),
+                    'ownerName': str(data.get('ownerName') or ''),
+                    'ownerSiteUserId': str(data.get('ownerSiteUserId') or ''),
+                    'lastMessage': str(data.get('lastMessage') or ''),
+                    'lastSender': str(data.get('lastSender') or ''),
+                    'lastSenderRole': str(data.get('lastSenderRole') or ''),
+                    'lastSenderSiteUserId': str(data.get('lastSenderSiteUserId') or ''),
+                    'updatedAtMs': updated_at_ms
+                }
+            })
+
+        tickets.sort(key=lambda item: int(item['data'].get('updatedAtMs') or 0), reverse=True)
+        return jsonify({'success': True, 'tickets': tickets})
+    except Exception as e:
+        app.logger.error(f'Erro ao listar chamados do chat: {e}')
+        return jsonify({'success': False, 'message': 'Falha ao carregar chamados.'}), 500
 
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])

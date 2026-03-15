@@ -374,10 +374,13 @@
         </div>
 
         <form class="chat-input-wrapper" id="chat-message-form" autocomplete="off">
-            <input type="text" id="chat-message-input" maxlength="500" placeholder="Digite sua mensagem..." required>
-            <button type="submit" id="chat-send-btn">
-                <i class="fas fa-paper-plane"></i>
-            </button>
+            <div class="chat-composer-state" id="chat-composer-state" hidden></div>
+            <div class="chat-input-row">
+                <input type="text" id="chat-message-input" maxlength="500" placeholder="Digite sua mensagem..." required>
+                <button type="submit" id="chat-send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
         </form>
     </div>
 

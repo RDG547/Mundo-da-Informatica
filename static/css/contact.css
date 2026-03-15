@@ -639,8 +639,8 @@
     flex-shrink: 0;
 }
 
-.social-platform.facebook .platform-icon {
-    background: #1877f2;
+.social-platform.whatsapp .platform-icon {
+    background: #22c55e;
 }
 
 .social-platform.instagram .platform-icon {
@@ -791,7 +791,7 @@
     text-align: center;
 }
 
-.cta-background-pattern {
+.contact-cta .cta-background-pattern {
     position: absolute;
     top: 0;
     left: 0;
@@ -806,12 +806,12 @@
     z-index: 1;
 }
 
-.cta-content {
+.contact-cta .cta-content {
     position: relative;
     z-index: 2;
 }
 
-.cta-icon {
+.contact-cta .cta-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
     width: 78px;
@@ -820,22 +820,22 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.28);
 }
 
-.cta-icon i {
-    color: #ef4444;
+.contact-cta .cta-icon i {
+    color: #ffffff;
 }
 
-.cta-content h4 {
+.contact-cta .cta-content h4 {
     font-size: 1.8rem;
     font-weight: 700;
     margin-bottom: 1rem;
     color: #ffd7a8;
 }
 
-.cta-content p {
+.contact-cta .cta-content p {
     font-size: 1.1rem;
     opacity: 1;
     margin-bottom: 2rem;

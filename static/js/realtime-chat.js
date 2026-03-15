@@ -4,10 +4,7 @@
     }
     window.__realtimeChatInitialized = true;
 
-    const CHAT_ROOMS = [
-        { id: 'todos', label: 'Todos' },
-        { id: 'suporte', label: 'Suporte' }
-    ];
+    const EDIT_WINDOW_MS = 10 * 60 * 1000;
 
     const elements = {
         button: document.getElementById('floating-chat-btn'),
@@ -19,11 +16,12 @@
         ticketList: document.getElementById('chat-ticket-list'),
         messages: document.getElementById('chat-messages'),
         form: document.getElementById('chat-message-form'),
+        composerState: document.getElementById('chat-composer-state'),
         input: document.getElementById('chat-message-input'),
         send: document.getElementById('chat-send-btn')
     };
 
-    if (!elements.button || !elements.panel) {
+    if (!elements.button || !elements.panel || !elements.messages || !elements.form || !elements.input || !elements.send) {
         return;
     }
 
@@ -47,11 +45,15 @@
     };
 
     let supportTickets = [];
+    let activeMessageDocs = [];
     let currentTab = 'todos';
     let currentRoomId = 'todos';
     let selectedTicketRoomId = '';
     let panelOpen = false;
     let triedRepairTodos = false;
+
+    let draftReply = null;
+    let draftEdit = null;
 
     let firestore = null;
     let auth = null;
@@ -65,8 +67,14 @@
 
     function tsToMillis(value) {
         if (!value) return 0;
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+            const parsed = Date.parse(value);
+            return Number.isNaN(parsed) ? 0 : parsed;
+        }
         if (typeof value.toMillis === 'function') return value.toMillis();
         if (typeof value.toDate === 'function') return value.toDate().getTime();
+        if (typeof value.updatedAtMs === 'number') return value.updatedAtMs;
         return 0;
     }
 
@@ -78,6 +86,14 @@
         if (type === 'ok') elements.status.classList.add('is-ok');
     }
 
+    function notifyUser(message, type) {
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(message, type || 'info');
+            return;
+        }
+        window.alert(message);
+    }
+
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -85,6 +101,13 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    function truncateText(value, limit) {
+        const normalized = String(value || '').trim();
+        if (!normalized) return '';
+        if (normalized.length <= limit) return normalized;
+        return `${normalized.slice(0, Math.max(0, limit - 1))}...`;
     }
 
     function formatMessageTime(createdAt) {
@@ -153,6 +176,61 @@
         return roomId.replace('support_user_', '');
     }
 
+    function getRoomMeta(roomId) {
+        if (!roomId) return null;
+        if (roomId === 'todos') return roomMetaCache.todos;
+        if (roomId === getSupportRoomIdForUser(userMeta.userId)) return roomMetaCache.suporte;
+        const ticket = supportTickets.find((item) => item.id === roomId);
+        return ticket ? (ticket.data || null) : null;
+    }
+
+    function getRoomLabel(roomId) {
+        if (roomId === 'todos') {
+            return 'Todos';
+        }
+
+        if (roomId && roomId.startsWith('support_user_')) {
+            if (currentTab === 'chamados' && userMeta.isAdmin) {
+                const roomMeta = getRoomMeta(roomId) || {};
+                const ownerName = roomMeta.ownerName || `Usuario ${extractSupportUserId(roomId)}`;
+                return `chamado de ${ownerName}`;
+            }
+            return 'Suporte';
+        }
+
+        return 'chat';
+    }
+
+    function getConnectingMessage(roomId) {
+        if (roomId === 'todos') return 'Conectando a sala Todos...';
+        if (roomId && roomId.startsWith('support_user_')) {
+            return currentTab === 'chamados' && userMeta.isAdmin
+                ? `Conectando ao ${getRoomLabel(roomId)}...`
+                : 'Conectando ao suporte...';
+        }
+        return 'Conectando ao chat...';
+    }
+
+    function getConnectedMessage(roomId) {
+        if (roomId === 'todos') return 'Conectado a sala Todos.';
+        if (roomId && roomId.startsWith('support_user_')) {
+            return currentTab === 'chamados' && userMeta.isAdmin
+                ? `Conectado ao ${getRoomLabel(roomId)}.`
+                : 'Conectado ao suporte.';
+        }
+        return 'Conectado ao chat.';
+    }
+
+    function getConnectionErrorMessage(roomId) {
+        if (roomId === 'todos') return 'Erro ao conectar-se a sala Todos.';
+        if (roomId && roomId.startsWith('support_user_')) {
+            return currentTab === 'chamados' && userMeta.isAdmin
+                ? `Erro ao conectar-se ao ${getRoomLabel(roomId)}.`
+                : 'Erro ao conectar-se ao suporte.';
+        }
+        return 'Erro ao conectar com o chat.';
+    }
+
     function getReadKey(roomId) {
         return `chat_last_read_${userMeta.userId}_${roomId}`;
     }
@@ -190,7 +268,7 @@
     function getUnreadFromRoomMeta(meta, roomId) {
         if (!meta || !roomId) return 0;
 
-        const updatedAtMs = tsToMillis(meta.updatedAt);
+        const updatedAtMs = tsToMillis(meta.updatedAt || meta.updatedAtMs);
         if (!updatedAtMs) return 0;
 
         const lastRead = getLastRead(roomId);
@@ -205,7 +283,7 @@
     function getUnreadFromTicket(ticket) {
         if (!ticket || !ticket.id || !ticket.data) return 0;
 
-        const updatedAtMs = tsToMillis(ticket.data.updatedAt);
+        const updatedAtMs = tsToMillis(ticket.data.updatedAt || ticket.data.updatedAtMs);
         if (!updatedAtMs) return 0;
 
         const lastRead = getLastRead(ticket.id);
@@ -242,8 +320,122 @@
         refreshUnreadBadges();
     }
 
+    function isMessageMine(data) {
+        const senderSiteUserId = String(data.senderSiteUserId || '');
+        const senderAuthUid = String(data.senderAuthUid || '');
+        const currentAuthUid = auth && auth.currentUser ? auth.currentUser.uid : '';
+
+        return (
+            (userMeta.userId && senderSiteUserId && userMeta.userId === senderSiteUserId) ||
+            (currentAuthUid && senderAuthUid && currentAuthUid === senderAuthUid)
+        );
+    }
+
+    function findMessageDocById(messageId) {
+        return activeMessageDocs.find((doc) => doc.id === messageId) || null;
+    }
+
+    function canEditMessageDoc(doc) {
+        if (!doc) return false;
+        const data = doc.data() || {};
+        if (!isMessageMine(data)) return false;
+        const createdAtMs = tsToMillis(data.createdAt);
+        if (!createdAtMs) return false;
+        return (Date.now() - createdAtMs) <= EDIT_WINDOW_MS;
+    }
+
+    function clearComposerAction(shouldClearInput) {
+        draftReply = null;
+        draftEdit = null;
+        if (shouldClearInput) {
+            elements.input.value = '';
+        }
+        renderComposerState();
+    }
+
+    function renderComposerState() {
+        if (!elements.composerState) {
+            updateInputState();
+            return;
+        }
+
+        if (draftEdit) {
+            elements.composerState.hidden = false;
+            elements.composerState.innerHTML = `
+                <div class="chat-composer-pill is-editing">
+                    <div class="chat-composer-copy">
+                        <strong>Editando mensagem</strong>
+                        <span>${escapeHtml(truncateText(draftEdit.originalText, 90))}</span>
+                    </div>
+                    <button type="button" class="chat-composer-cancel" data-chat-cancel-composer aria-label="Cancelar edicao">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            updateInputState();
+            return;
+        }
+
+        if (draftReply) {
+            elements.composerState.hidden = false;
+            elements.composerState.innerHTML = `
+                <div class="chat-composer-pill is-replying">
+                    <div class="chat-composer-copy">
+                        <strong>Respondendo a ${escapeHtml(draftReply.senderName || 'Usuario')}</strong>
+                        <span>${escapeHtml(truncateText(draftReply.text, 90))}</span>
+                    </div>
+                    <button type="button" class="chat-composer-cancel" data-chat-cancel-composer aria-label="Cancelar resposta">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            updateInputState();
+            return;
+        }
+
+        elements.composerState.hidden = true;
+        elements.composerState.innerHTML = '';
+        updateInputState();
+    }
+
+    function startReply(messageId) {
+        const doc = findMessageDocById(messageId);
+        if (!doc) return;
+        const data = doc.data() || {};
+        draftReply = {
+            messageId,
+            roomId: currentRoomId,
+            senderName: data.senderName || 'Usuario',
+            text: data.text || ''
+        };
+        draftEdit = null;
+        renderComposerState();
+        elements.input.focus();
+    }
+
+    function startEdit(messageId) {
+        const doc = findMessageDocById(messageId);
+        if (!doc || !canEditMessageDoc(doc)) {
+            notifyUser('Voce so pode editar mensagens proprias enviadas ha menos de 10 minutos.', 'warning');
+            return;
+        }
+
+        const data = doc.data() || {};
+        draftEdit = {
+            messageId,
+            roomId: currentRoomId,
+            originalText: data.text || ''
+        };
+        draftReply = null;
+        elements.input.value = data.text || '';
+        renderComposerState();
+        elements.input.focus();
+    }
+
     function renderMessages(docs) {
         if (!elements.messages) return;
+
+        activeMessageDocs = docs.slice();
 
         if (!docs.length) {
             elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta conversa.</div>';
@@ -251,32 +443,69 @@
         }
 
         const ordered = docs.slice().reverse();
-        const currentAuthUid = auth && auth.currentUser ? auth.currentUser.uid : '';
         const html = ordered.map((doc) => {
             const data = doc.data() || {};
             const senderName = data.senderName || 'Usuario';
             const text = data.text || '';
-            const senderSiteUserId = String(data.senderSiteUserId || '');
-            const senderAuthUid = String(data.senderAuthUid || '');
-
-            const mine = (
-                (userMeta.userId && senderSiteUserId && userMeta.userId === senderSiteUserId) ||
-                (currentAuthUid && senderAuthUid && currentAuthUid === senderAuthUid)
-            );
+            const mine = isMessageMine(data);
+            const canEdit = canEditMessageDoc(doc);
+            const replyBlock = data.replyToMessageId || data.replyToText
+                ? `
+                    <div class="chat-message-reply-preview">
+                        <span class="chat-message-reply-name">${escapeHtml(data.replyToSenderName || 'Mensagem respondida')}</span>
+                        <span class="chat-message-reply-text">${escapeHtml(truncateText(data.replyToText || '', 110))}</span>
+                    </div>
+                `
+                : '';
+            const editedBadge = data.isEdited
+                ? '<span class="chat-message-edited">editada</span>'
+                : '';
+            const editButton = canEdit
+                ? `
+                    <button type="button" class="chat-message-action" data-chat-edit="${escapeHtml(doc.id)}">
+                        <i class="fas fa-pen"></i>
+                        Editar
+                    </button>
+                `
+                : '';
 
             return `
-                <article class="chat-message${mine ? ' mine' : ''}">
+                <article class="chat-message${mine ? ' mine' : ''}" data-message-id="${escapeHtml(doc.id)}">
                     <div class="chat-message-header">
                         <span class="chat-message-sender">${escapeHtml(senderName)}</span>
                         <span class="chat-message-time">${escapeHtml(formatMessageTime(data.createdAt))}</span>
                     </div>
-                    <div class="chat-message-body">${escapeHtml(text)}</div>
+                    <div class="chat-message-body">
+                        ${replyBlock}
+                        <div class="chat-message-text">${escapeHtml(text)}</div>
+                    </div>
+                    <div class="chat-message-footer">
+                        <div class="chat-message-meta">${editedBadge}</div>
+                        <div class="chat-message-actions">
+                            <button type="button" class="chat-message-action" data-chat-reply="${escapeHtml(doc.id)}">
+                                <i class="fas fa-reply"></i>
+                                Responder
+                            </button>
+                            ${editButton}
+                        </div>
+                    </div>
                 </article>
             `;
         }).join('');
 
         elements.messages.innerHTML = html;
         elements.messages.scrollTop = elements.messages.scrollHeight;
+
+        if (draftReply && (draftReply.roomId !== currentRoomId || !findMessageDocById(draftReply.messageId))) {
+            draftReply = null;
+        }
+
+        if (draftEdit && (draftEdit.roomId !== currentRoomId || !findMessageDocById(draftEdit.messageId) || !canEditMessageDoc(findMessageDocById(draftEdit.messageId)))) {
+            draftEdit = null;
+            elements.input.value = '';
+        }
+
+        renderComposerState();
     }
 
     function setActiveTab(tabId) {
@@ -288,16 +517,23 @@
     }
 
     function updateInputState() {
-        if (!elements.input || !elements.send) return;
-
         let enabled = true;
-        if (currentTab === 'chamados' && userMeta.isAdmin) {
-            enabled = !!selectedTicketRoomId;
+        let placeholder = 'Digite sua mensagem...';
+
+        if (currentTab === 'chamados' && userMeta.isAdmin && !selectedTicketRoomId) {
+            enabled = false;
+            placeholder = supportTickets.length
+                ? 'Selecione um chamado para responder.'
+                : 'Nenhum chamado aberto no momento.';
+        } else if (draftEdit) {
+            placeholder = 'Edite sua mensagem...';
+        } else if (draftReply) {
+            placeholder = 'Digite sua resposta...';
         }
 
         elements.input.disabled = !enabled;
         elements.send.disabled = !enabled;
-        elements.input.placeholder = enabled ? 'Digite sua mensagem...' : 'Selecione um chamado para responder.';
+        elements.input.placeholder = placeholder;
     }
 
     function renderTicketList() {
@@ -320,7 +556,7 @@
             const ticketData = ticket.data || {};
             const unread = getUnreadFromTicket(ticket);
             const ownerName = ticketData.ownerName || `Usuario ${ticketData.ownerSiteUserId || ''}`;
-            const preview = (ticketData.lastMessage || 'Sem mensagens').slice(0, 70);
+            const preview = truncateText(ticketData.lastMessage || 'Sem mensagens', 70);
             const activeClass = selectedTicketRoomId === ticket.id ? ' active' : '';
             return `
                 <button type="button" class="chat-ticket-item${activeClass}" data-ticket-room="${escapeHtml(ticket.id)}">
@@ -355,6 +591,7 @@
     function selectTicket(roomId) {
         selectedTicketRoomId = roomId || '';
         renderTicketList();
+        clearComposerAction(true);
         if (currentTab === 'chamados') {
             switchToRoom(selectedTicketRoomId);
         }
@@ -396,7 +633,6 @@
         const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
         const bootstrapped = await bootstrapRoomsFromServer();
 
-        // Fallback pelo cliente caso o bootstrap no servidor não esteja disponível.
         if (!bootstrapped) {
             await ensureRoomDoc('todos', {
                 type: 'public',
@@ -427,6 +663,28 @@
         }
 
         return data.token;
+    }
+
+    async function fetchAdminTicketsFromServer() {
+        if (!userMeta.isAdmin) return false;
+
+        try {
+            const response = await fetch('/api/chat/admin/tickets', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success || !Array.isArray(data.tickets)) {
+                return false;
+            }
+            hydrateSupportTickets(data.tickets);
+            return true;
+        } catch (_error) {
+            return false;
+        }
     }
 
     async function ensureFirebaseReady() {
@@ -461,16 +719,54 @@
         }
     }
 
+    function hydrateSupportTickets(tickets) {
+        supportTickets = (tickets || [])
+            .map((ticket) => ({
+                id: String(ticket.id || ''),
+                data: ticket.data || {}
+            }))
+            .filter((ticket) => ticket.id.startsWith('support_user_'))
+            .sort((a, b) => tsToMillis(b.data.updatedAt || b.data.updatedAtMs) - tsToMillis(a.data.updatedAt || a.data.updatedAtMs));
+
+        if (currentTab === 'chamados') {
+            if (!selectedTicketRoomId || !supportTickets.some((item) => item.id === selectedTicketRoomId)) {
+                selectedTicketRoomId = supportTickets.length ? supportTickets[0].id : '';
+                switchToRoom(selectedTicketRoomId);
+            }
+        }
+
+        renderTicketList();
+        refreshUnreadBadges();
+        updateInputState();
+    }
+
+    function showCurrentEmptyState() {
+        if (currentTab === 'chamados' && userMeta.isAdmin) {
+            if (!supportTickets.length) {
+                elements.messages.innerHTML = '<div class="chat-empty-state">Nenhum chamado aberto ainda.</div>';
+            } else {
+                elements.messages.innerHTML = '<div class="chat-empty-state">Selecione um chamado para comecar.</div>';
+            }
+            return;
+        }
+
+        elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta sala.</div>';
+    }
+
     function subscribeActiveRoom(roomId) {
         clearActiveMessagesSubscription();
+        clearComposerAction(true);
+        activeMessageDocs = [];
 
         if (!roomId || !firestore) {
-            elements.messages.innerHTML = '<div class="chat-empty-state">Selecione uma conversa para comecar.</div>';
+            currentRoomId = '';
+            showCurrentEmptyState();
+            updateInputState();
             return;
         }
 
         currentRoomId = roomId;
-        setStatus(`Conectando na sala ${roomId}...`);
+        setStatus(getConnectingMessage(roomId));
 
         const query = firestore
             .collection('chat_rooms')
@@ -484,25 +780,28 @@
             if (roomId === 'todos') {
                 triedRepairTodos = false;
             }
-            setStatus(`Sala: ${roomId}`, 'ok');
+            setStatus(getConnectedMessage(roomId), 'ok');
             if (panelOpen) {
                 markRoomAsRead(roomId);
             }
-        }, (error) => {
+        }, async (error) => {
             console.error('[CHAT] Erro ao receber mensagens em tempo real:', error);
+            activeMessageDocs = [];
+
             if (roomId === 'todos' && !triedRepairTodos) {
                 triedRepairTodos = true;
                 setStatus('Reparando sala Todos...', 'error');
-                bootstrapRoomsFromServer().then((ok) => {
-                    if (ok) {
-                        subscribeActiveRoom('todos');
-                    } else {
-                        setStatus('Erro ao conectar com o chat.', 'error');
-                    }
-                });
-                return;
+                const ok = await bootstrapRoomsFromServer();
+                if (ok) {
+                    subscribeActiveRoom('todos');
+                    return;
+                }
             }
-            setStatus('Erro ao conectar com o chat.', 'error');
+
+            setStatus(getConnectionErrorMessage(roomId), 'error');
+            if (currentTab === 'chamados' && userMeta.isAdmin) {
+                await fetchAdminTicketsFromServer();
+            }
         });
     }
 
@@ -519,11 +818,7 @@
             }
 
             currentRoomId = '';
-            if (currentTab === 'chamados') {
-                elements.messages.innerHTML = '<div class="chat-empty-state">Selecione um chamado para comecar.</div>';
-            } else {
-                elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta sala.</div>';
-            }
+            showCurrentEmptyState();
             updateInputState();
             return;
         }
@@ -538,6 +833,7 @@
 
     async function switchTab(tabId) {
         setActiveTab(tabId);
+        clearComposerAction(true);
 
         if (tabId === 'todos') {
             renderTicketList();
@@ -559,10 +855,13 @@
         }
 
         if (tabId === 'chamados' && userMeta.isAdmin) {
+            renderTicketList();
+            if (!supportTickets.length) {
+                await fetchAdminTicketsFromServer();
+            }
             if (!selectedTicketRoomId && supportTickets.length) {
                 selectedTicketRoomId = supportTickets[0].id;
             }
-            renderTicketList();
             await switchToRoom(selectedTicketRoomId);
         }
     }
@@ -600,11 +899,19 @@
         return baseMeta;
     }
 
-    async function sendMessage(text) {
-        if (!firestore || !auth || !auth.currentUser || !currentRoomId) {
-            throw new Error('Chat ainda esta conectando.');
+    function buildReplyPayload() {
+        if (!draftReply) {
+            return {};
         }
 
+        return {
+            replyToMessageId: draftReply.messageId,
+            replyToSenderName: draftReply.senderName || 'Usuario',
+            replyToText: truncateText(draftReply.text || '', 180)
+        };
+    }
+
+    async function createMessage(text) {
         await firestore
             .collection('chat_rooms')
             .doc(currentRoomId)
@@ -614,15 +921,60 @@
                 senderName: userMeta.userName,
                 senderAvatar: userMeta.userAvatar,
                 senderRole: userMeta.isAdmin ? 'admin' : 'user',
-                senderSiteUserId: userMeta.userId || null,
+                senderSiteUserId: userMeta.userId,
                 senderAuthUid: auth.currentUser.uid,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                ...buildReplyPayload()
             });
 
         await firestore.collection('chat_rooms').doc(currentRoomId).set(
             buildRoomMetadataForMessage(currentRoomId, text),
             { merge: true }
         );
+    }
+
+    async function editMessage(text) {
+        if (!draftEdit) {
+            throw new Error('Nenhuma mensagem selecionada para edicao.');
+        }
+
+        const targetDoc = findMessageDocById(draftEdit.messageId);
+        if (!targetDoc || !canEditMessageDoc(targetDoc)) {
+            throw new Error('A janela de edicao desta mensagem expirou.');
+        }
+
+        await firestore
+            .collection('chat_rooms')
+            .doc(currentRoomId)
+            .collection('messages')
+            .doc(draftEdit.messageId)
+            .update({
+                text,
+                isEdited: true,
+                editedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+        const latestMessage = activeMessageDocs.length ? activeMessageDocs[0] : null;
+        if (latestMessage && latestMessage.id === draftEdit.messageId) {
+            await firestore.collection('chat_rooms').doc(currentRoomId).set(
+                buildRoomMetadataForMessage(currentRoomId, text),
+                { merge: true }
+            );
+        }
+    }
+
+    async function sendMessage(text) {
+        if (!firestore || !auth || !auth.currentUser || !currentRoomId) {
+            throw new Error('Chat ainda esta conectando.');
+        }
+
+        if (draftEdit) {
+            await editMessage(text);
+        } else {
+            await createMessage(text);
+        }
+
+        clearComposerAction(false);
     }
 
     function subscribeRoomMeta() {
@@ -641,27 +993,19 @@
         });
 
         if (userMeta.isAdmin) {
+            fetchAdminTicketsFromServer();
             unsubscribers.chamadosList = firestore
                 .collection('chat_rooms')
                 .where('type', '==', 'support')
-                .limit(80)
+                .limit(100)
                 .onSnapshot((snapshot) => {
-                    supportTickets = snapshot.docs.map((doc) => ({
+                    hydrateSupportTickets(snapshot.docs.map((doc) => ({
                         id: doc.id,
                         data: doc.data() || {}
-                    })).sort((a, b) => tsToMillis(b.data.updatedAt) - tsToMillis(a.data.updatedAt));
-
-                    if (currentTab === 'chamados') {
-                        if (!selectedTicketRoomId || !supportTickets.some((item) => item.id === selectedTicketRoomId)) {
-                            selectedTicketRoomId = supportTickets.length ? supportTickets[0].id : '';
-                            switchToRoom(selectedTicketRoomId);
-                        }
-                    }
-
-                    renderTicketList();
-                    refreshUnreadBadges();
-                }, (error) => {
+                    })));
+                }, async (error) => {
                     console.error('[CHAT] Erro ao listar chamados:', error);
+                    await fetchAdminTicketsFromServer();
                 });
         }
     }
@@ -758,30 +1102,48 @@
             });
         }
 
-        if (elements.form) {
-            elements.form.addEventListener('submit', async (event) => {
-                event.preventDefault();
+        if (elements.messages) {
+            elements.messages.addEventListener('click', (event) => {
+                const replyButton = event.target.closest('[data-chat-reply]');
+                if (replyButton) {
+                    startReply(replyButton.dataset.chatReply);
+                    return;
+                }
 
-                const text = (elements.input.value || '').trim();
-                if (!text) return;
-
-                elements.send.disabled = true;
-                try {
-                    await sendMessage(text);
-                    elements.input.value = '';
-                    markRoomAsRead(currentRoomId);
-                } catch (error) {
-                    console.error('[CHAT] Erro ao enviar mensagem:', error);
-                    if (typeof window.showNotification === 'function') {
-                        window.showNotification('Nao foi possivel enviar a mensagem. Tente novamente.', 'error');
-                    } else {
-                        alert('Nao foi possivel enviar a mensagem.');
-                    }
-                } finally {
-                    updateInputState();
+                const editButton = event.target.closest('[data-chat-edit]');
+                if (editButton) {
+                    startEdit(editButton.dataset.chatEdit);
                 }
             });
         }
+
+        if (elements.composerState) {
+            elements.composerState.addEventListener('click', (event) => {
+                const cancelButton = event.target.closest('[data-chat-cancel-composer]');
+                if (!cancelButton) return;
+                clearComposerAction(!!draftEdit);
+            });
+        }
+
+        elements.form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const text = (elements.input.value || '').trim();
+            if (!text) return;
+
+            elements.send.disabled = true;
+            try {
+                await sendMessage(text);
+                elements.input.value = '';
+                markRoomAsRead(currentRoomId);
+            } catch (error) {
+                console.error('[CHAT] Erro ao enviar mensagem:', error);
+                notifyUser(error.message || 'Nao foi possivel enviar a mensagem. Tente novamente.', 'error');
+            } finally {
+                renderComposerState();
+                updateInputState();
+            }
+        });
     }
 
     function init() {

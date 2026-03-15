@@ -4,7 +4,7 @@
 <!-- Hero Section -->
 <div class="post-hero-section"
      data-post-id="{{ post.id }}"
-     data-category="{{ post.category_str }}"
+     data-category="{{ post.category_rel.name if post.category_rel else post.category_str }}"
      data-slug="{{ post.slug }}">
     <div class="hero-particles"></div>
     <div class="hero-overlay"></div>
@@ -14,9 +14,9 @@
                 <i class="fas fa-home"></i> Início
             </a>
             <i class="fas fa-chevron-right"></i>
-            <a href="{{ url_for('category', category=post.category_str) }}">
-                {% if post.category and post.category.icon %}
-                    <i class="{{ post.category.icon }}"></i>
+            <a href="{{ url_for('category', category=(post.category_rel.name if post.category_rel else post.category_str)) }}">
+                {% if post.category_rel and post.category_rel.icon %}
+                    <i class="{{ post.category_rel.icon }}"></i>
                 {% elif post.category_str == 'BIOS' %}
                     <i class="fas fa-microchip"></i>
                 {% elif post.category_str == 'Esquemas' %}
@@ -32,7 +32,7 @@
                 {% else %}
                     <i class="fas fa-folder"></i>
                 {% endif %}
-                {{ post.category_str }}
+                {{ post.category_rel.name if post.category_rel else post.category_str }}
             </a>
             <i class="fas fa-chevron-right"></i>
             <span>{{ post.title }}</span>
@@ -61,8 +61,8 @@
                             <!-- Category Badge -->
                             <div class="post-badge-wrapper">
                                 <div class="post-category-badge">
-                                    {% if post.category and post.category.icon %}
-                                        <i class="{{ post.category.icon }}"></i>
+                                    {% if post.category_rel and post.category_rel.icon %}
+                                        <i class="{{ post.category_rel.icon }}"></i>
                                     {% elif post.category_str == 'BIOS' %}
                                         <i class="fas fa-microchip"></i>
                                     {% elif post.category_str == 'Esquemas' %}
@@ -78,7 +78,7 @@
                                     {% else %}
                                         <i class="fas fa-folder"></i>
                                     {% endif %}
-                                    <span>{{ post.category_str }}</span>
+                                    <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
                                 </div>
                                 {% if post.featured %}
                                 <div class="featured-badge">

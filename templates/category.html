@@ -276,8 +276,8 @@
                                     alt="{{ post.title }}">
                             </div>
                             <div class="post-category">
-                                {% if post.category and post.category.icon %}
-                                <i class="{{ post.category.icon }}"></i>
+                                {% if post.category_rel and post.category_rel.icon %}
+                                <i class="{{ post.category_rel.icon }}"></i>
                                 {% elif post.category_str == 'BIOS' %}
                                 <i class="fas fa-microchip"></i>
                                 {% elif post.category_str == 'Esquemas' %}
@@ -293,7 +293,7 @@
                                 {% else %}
                                 <i class="fas fa-folder"></i>
                                 {% endif %}
-                                <span>{{ post.category_str }}</span>
+                                <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
                                 {% set dl_files = post.get_metadata('download_files') %}
                                 {% if dl_files and dl_files|length > 1 %}
                                 <span class="download-types-badge" style="margin-left: 6px; background: rgba(var(--primary-rgb),0.15); color: var(--primary-color); padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600;">

@@ -2197,7 +2197,7 @@ def edit_comment_by_slug(category, slug, comment_id):
             }), 403
 
         # Obter novo conteúdo
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         new_content = data.get('content', '').strip()
 
         # Validações
@@ -2218,6 +2218,9 @@ def edit_comment_by_slug(category, slug, comment_id):
                 'success': False,
                 'message': 'O comentário não pode ter mais de 1000 caracteres.'
             }), 400
+
+        # Sanitizar conteúdo para evitar XSS ao renderizar comentário editado
+        new_content = sanitize_html(new_content)
 
         # Atualizar comentário
         comment.content = new_content

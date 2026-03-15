@@ -15,6 +15,8 @@ import json
 import sys
 import shutil
 import uuid
+import hmac
+import hashlib
 import stripe
 from stripe import error as stripe_error
 
@@ -58,8 +60,13 @@ if python_version.major == 3 and python_version.minor >= 13:
 # Carregar variáveis de ambiente
 load_dotenv()
 
+def is_production_environment():
+    """Detecta ambiente de produção com a convenção oficial do projeto."""
+    return os.environ.get('FLASK_ENV') == 'production' or bool(os.environ.get('RENDER'))
+
+
 # Verificar se está em modo debug
-DEBUG_MODE = os.environ.get('FLASK_ENV') != 'production' and not os.environ.get('RENDER')
+DEBUG_MODE = not is_production_environment()
 
 def debug_log(message):
     """Log apenas em modo de desenvolvimento"""
@@ -72,13 +79,13 @@ app = Flask(__name__)
 # Usar SECRET_KEY forte - obrigatório em produção
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
+    if is_production_environment():
         raise ValueError('SECRET_KEY deve ser definida em produção!')
     secret_key = 'dev_key_5f352a14cb7e4b119811'
 app.config['SECRET_KEY'] = secret_key
 
 # Configurações de segurança de sessão
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')  # HTTPS apenas em produção
+app.config['SESSION_COOKIE_SECURE'] = is_production_environment()  # HTTPS apenas em produção
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Não acessível via JavaScript
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Proteção CSRF
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira em 24h
@@ -2115,7 +2122,9 @@ def add_post_comment_by_slug(category, slug):
         post = Post.query.filter_by(slug=slug).first_or_404()
 
         # Obter e validar dados do formulário
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         is_valid, error_message, validated_data = validate_comment_data(data)
 
         if not is_valid:
@@ -2235,6 +2244,8 @@ def edit_comment_by_slug(category, slug, comment_id):
 
         # Obter novo conteúdo
         data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         new_content = data.get('content', '').strip()
 
         # Validações
@@ -2293,7 +2304,9 @@ def add_post_comment(post_id):
         Post.query.get_or_404(post_id)
 
         # Obter e validar dados do formulário
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         is_valid, error_message, validated_data = validate_comment_data(data)
 
         if not is_valid:
@@ -2607,8 +2620,15 @@ def get_user_permissions():
 @login_required
 def create_checkout_session():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'error': 'Dados inválidos'}), 400
         plan_type = data.get('plan')
+
+        if not plan_type:
+            return jsonify({'error': 'Plano é obrigatório'}), 400
 
         debug_log(f'Stripe Checkout - Dados recebidos: {data}')
         debug_log(f'Stripe Checkout - Plano: {plan_type}')
@@ -2643,7 +2663,8 @@ def create_checkout_session():
         )
         return jsonify({'clientSecret': checkout_session.client_secret})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Erro ao criar sessão de checkout Stripe')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 @app.route('/checkout-success')
 @login_required
@@ -2717,8 +2738,15 @@ def create_pix_checkout():
     Cria um QR Code PIX via Abacate Pay - Redirecionamento Assíncrono
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'error': 'Dados inválidos'}), 400
         plan_type = data.get('plan')
+
+        if not plan_type:
+            return jsonify({'error': 'Plano é obrigatório'}), 400
 
         print(f'[PIX] Dados recebidos: {data}')
         print(f'[PIX] Plano: {plan_type}')
@@ -3037,20 +3065,29 @@ def stripe_webhook():
     sig_header = request.headers.get('Stripe-Signature')
     webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
 
+    is_production = is_production_environment()
+
     if not webhook_secret:
         debug_log('AVISO: STRIPE_WEBHOOK_SECRET não configurado! Webhook não pode verificar assinatura.')
         # Em produção, você DEVE rejeitar webhooks sem verificação
-        if os.environ.get('FLASK_ENV') == 'production':
+        if is_production:
             return jsonify({'error': 'Webhook secret not configured'}), 500
 
     try:
         # Verificar assinatura do webhook (SEGURANÇA CRÍTICA)
-        if webhook_secret and sig_header:
+        if webhook_secret:
+            if not sig_header:
+                debug_log('ERRO CRÍTICO: Stripe-Signature ausente com STRIPE_WEBHOOK_SECRET configurado.')
+                return jsonify({'error': 'Missing signature'}), 400
             event = stripe.Webhook.construct_event(
                 payload, sig_header, webhook_secret
             )
         else:
-            # Modo dev sem verificação (NÃO USE EM PRODUÇÃO!)
+            # Fallback somente em desenvolvimento explícito
+            if os.environ.get('FLASK_ENV') != 'development':
+                debug_log('ERRO CRÍTICO: Fallback sem assinatura bloqueado fora de FLASK_ENV=development.')
+                return jsonify({'error': 'Webhook secret not configured'}), 500
+            print('⚠️⚠️⚠️ WARNING: Stripe webhook signature validation BYPASSED in development mode (FLASK_ENV=development). NEVER use this in production. ⚠️⚠️⚠️')
             event = json.loads(payload)
 
         debug_log(f'Webhook recebido: {event["type"]}')
@@ -3110,9 +3147,16 @@ def abacatepay_webhook():
     - billing.refunded: Pagamento estornado
     """
     try:
-        payload = request.get_json()
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return jsonify({'error': 'JSON inválido'}), 400
+        if not payload:
+            return jsonify({'error': 'Dados inválidos'}), 400
 
         debug_log(f'Webhook Abacate Pay recebido: {payload}')
+
+        if not payload:
+            return jsonify({'error': 'Payload inválido'}), 400
 
         # Extrair dados do evento
         event_type = payload.get('event')  # Ex: 'billing.paid'
@@ -3142,7 +3186,8 @@ def abacatepay_webhook():
 
     except Exception as e:
         debug_log(f'Erro ao processar webhook Abacate Pay: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Erro ao processar webhook Abacate Pay')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 def handle_abacatepay_payment_success(transaction, billing_data):
     """Processa pagamento PIX bem-sucedido"""
@@ -4406,8 +4451,9 @@ def reset_password(token):
             flash('As senhas não coincidem', 'danger')
             return redirect(url_for('reset_password', token=token))
 
-        if len(password) < 6:
-            flash('A senha deve ter pelo menos 6 caracteres', 'danger')
+        is_valid, password_error = validate_password_strength(password)
+        if not is_valid:
+            flash(password_error, 'danger')
             return redirect(url_for('reset_password', token=token))
 
         # Atualizar a senha
@@ -5453,7 +5499,9 @@ def admin_create_category():
     Criar uma nova categoria
     """
     try:
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         name = data.get('name', '').strip()
         slug = data.get('slug', '').strip()
@@ -5567,7 +5615,9 @@ def admin_update_category(category_id):
     """
     try:
         category = Category.query.get_or_404(category_id)
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         name = data.get('name', '').strip()
         slug = data.get('slug', '').strip()
@@ -5778,9 +5828,16 @@ def admin_categories_bulk_action():
     Executar ações em massa em categorias
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
         action = data.get('action')
         category_ids = data.get('category_ids', [])
+
+        if not isinstance(category_ids, list):
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         if not action or not category_ids:
             return jsonify({'success': False, 'message': 'Ação e IDs são obrigatórios'}), 400
@@ -6314,15 +6371,16 @@ def admin_reset_user_password(user_id):
         user = User.query.get_or_404(user_id)
 
         # Obter nova senha do JSON
-        data = request.get_json()
+        data = request.get_json() or {}
         new_password = data.get('new_password', '').strip()
 
         # Validações
         if not new_password:
             return jsonify({'success': False, 'message': 'Nova senha é obrigatória'})
 
-        if len(new_password) < 6:
-            return jsonify({'success': False, 'message': 'A senha deve ter pelo menos 6 caracteres'})
+        is_valid, password_error = validate_password_strength(new_password)
+        if not is_valid:
+            return jsonify({'success': False, 'message': password_error}), 400
 
         # Não permitir redefinir senha do próprio usuário desta forma
         if user.id == current_user.id:
@@ -6331,6 +6389,7 @@ def admin_reset_user_password(user_id):
         # Atualizar senha
         user.password = generate_password_hash(new_password)
         db.session.commit()
+        app.logger.info(f"Reset de senha executado para user_id={user.id} por admin_id={current_user.id}")
 
         # Log da atividade
         log_admin_activity(
@@ -6355,7 +6414,11 @@ def admin_update_download_limits(user_id):
     """Atualizar limites de download do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         action = data.get('action')
         period = data.get('period', 'daily')  # daily, weekly, monthly
@@ -6451,7 +6514,9 @@ def admin_verify_user(user_id):
     """Verificar ou desverificar email do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         verify = data.get('verify', True)
         user.is_verified = verify
@@ -6484,7 +6549,11 @@ def admin_update_permissions(user_id):
     """Atualizar permissões (role) do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         new_role = data.get('role', 'user')
 
@@ -6604,8 +6673,10 @@ def admin_newsletter():
 @login_required
 def downgrade_plan():
     try:
-        data = request.get_json()
-        target_plan = data.get('target_plan', 'free') if data else 'free'
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        target_plan = data.get('target_plan', 'free')
 
         # Validar plano de destino
         if target_plan not in ['free', 'premium', 'vip']:
@@ -6659,7 +6730,9 @@ def admin_create_backup():
     Criar novo backup
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         backup_type = data.get('backup_type', 'database')
         description = data.get('description', '')
 
@@ -6827,13 +6900,17 @@ def admin_save_settings():
     Salvar configurações do site
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
         if not data:
-            return jsonify({'success': False, 'message': 'Dados não fornecidos'})
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         # Salvar cada configuração
         for key, config in data.items():
+            if not isinstance(config, dict):
+                return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
             value = config.get('value')
             value_type = config.get('type', 'string')
 
@@ -7008,7 +7085,11 @@ def get_user_favorites_api():
 def reorder_favorites_api():
     """Reordena os favoritos do usuário"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
         order = data.get('order', [])
         if not order or not isinstance(order, list):
             return jsonify({'success': False, 'message': 'Ordem inválida'}), 400
@@ -7525,8 +7606,9 @@ def update_password():
         return redirect(url_for('profile'))
 
     # Validar força da senha
-    if len(new_password) < 6:
-        flash('A nova senha deve ter pelo menos 6 caracteres', 'error')
+    is_valid, password_error = validate_password_strength(new_password)
+    if not is_valid:
+        flash(password_error, 'error')
         return redirect(url_for('profile'))
 
     # Atualize a senha

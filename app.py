@@ -435,6 +435,7 @@ def initialize_firebase_admin() -> bool:
 
     service_account_path = app.config.get('FIREBASE_SERVICE_ACCOUNT_PATH', '')
     service_account_json = app.config.get('FIREBASE_SERVICE_ACCOUNT_JSON', '')
+    service_account_json_invalid = False
 
     try:
         if service_account_json:
@@ -444,7 +445,7 @@ def initialize_firebase_admin() -> bool:
                 firebase_admin.initialize_app(cred)
                 _firebase_initialized = True
                 return True
-            app.logger.warning('FIREBASE_SERVICE_ACCOUNT_JSON inválido. Tentando outros formatos de configuração.')
+            service_account_json_invalid = True
 
         if service_account_path and os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
@@ -473,6 +474,8 @@ def initialize_firebase_admin() -> bool:
             _firebase_initialized = True
             return True
 
+        if service_account_json_invalid:
+            app.logger.warning('FIREBASE_SERVICE_ACCOUNT_JSON inválido. Tentando outros formatos de configuração.')
         app.logger.warning('Firebase Admin não configurado. Defina FIREBASE_SERVICE_ACCOUNT_PATH, FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT_B64.')
         return False
     except Exception as e:

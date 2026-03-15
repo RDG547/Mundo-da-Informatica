@@ -144,12 +144,12 @@
     }
 
     function getSupportRoomIdForUser(userId) {
-        return `support_${userId}`;
+        return `support_user_${userId}`;
     }
 
     function extractSupportUserId(roomId) {
-        if (!roomId || !roomId.startsWith('support_')) return '';
-        return roomId.replace('support_', '');
+        if (!roomId || !roomId.startsWith('support_user_')) return '';
+        return roomId.replace('support_user_', '');
     }
 
     function getReadKey(roomId) {
@@ -335,6 +335,22 @@
         elements.ticketList.innerHTML = html;
     }
 
+    function getDefaultRoomForCurrentTab() {
+        if (currentTab === 'todos') {
+            return 'todos';
+        }
+
+        if (currentTab === 'suporte') {
+            return getSupportRoomIdForUser(userMeta.userId);
+        }
+
+        if (currentTab === 'chamados' && userMeta.isAdmin) {
+            return selectedTicketRoomId || '';
+        }
+
+        return '';
+    }
+
     function selectTicket(roomId) {
         selectedTicketRoomId = roomId || '';
         renderTicketList();
@@ -344,15 +360,21 @@
     }
 
     async function ensureRoomDoc(roomId, extraData) {
-        if (!firestore || !roomId) return;
+        if (!firestore || !roomId) return false;
         const baseData = {
             id: roomId,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        await firestore.collection('chat_rooms').doc(roomId).set({
-            ...baseData,
-            ...(extraData || {})
-        }, { merge: true });
+        try {
+            await firestore.collection('chat_rooms').doc(roomId).set({
+                ...baseData,
+                ...(extraData || {})
+            }, { merge: true });
+            return true;
+        } catch (error) {
+            console.warn(`[CHAT] Falha ao garantir sala ${roomId}:`, error);
+            return false;
+        }
     }
 
     async function ensureBaseRooms() {
@@ -452,8 +474,22 @@
 
     async function switchToRoom(roomId) {
         if (!roomId) {
+            const fallbackRoomId = getDefaultRoomForCurrentTab();
+            if (fallbackRoomId) {
+                subscribeActiveRoom(fallbackRoomId);
+                updateInputState();
+                if (panelOpen) {
+                    markRoomAsRead(fallbackRoomId);
+                }
+                return;
+            }
+
             currentRoomId = '';
-            elements.messages.innerHTML = '<div class="chat-empty-state">Selecione uma conversa para comecar.</div>';
+            if (currentTab === 'chamados') {
+                elements.messages.innerHTML = '<div class="chat-empty-state">Selecione um chamado para comecar.</div>';
+            } else {
+                elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta sala.</div>';
+            }
             updateInputState();
             return;
         }
@@ -477,7 +513,14 @@
 
         if (tabId === 'suporte') {
             renderTicketList();
-            await switchToRoom(getSupportRoomIdForUser(userMeta.userId));
+            const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
+            await ensureRoomDoc(supportRoomId, {
+                type: 'support',
+                name: `Suporte - ${userMeta.userName}`,
+                ownerSiteUserId: userMeta.userId,
+                ownerName: userMeta.userName
+            });
+            await switchToRoom(supportRoomId);
             return;
         }
 
@@ -507,7 +550,7 @@
             };
         }
 
-        if (roomId.startsWith('support_')) {
+        if (roomId.startsWith('support_user_')) {
             const ownerId = extractSupportUserId(roomId) || userMeta.userId;
             const ticket = supportTickets.find((item) => item.id === roomId);
             const ownerName = ticket?.data?.ownerName || (ownerId === userMeta.userId ? userMeta.userName : `Usuario ${ownerId}`);
@@ -621,9 +664,14 @@
             return;
         }
 
-        await ensureBaseRooms();
-        subscribeRoomMeta();
-        await switchTab('todos');
+        try {
+            await ensureBaseRooms();
+            subscribeRoomMeta();
+            await switchTab('todos');
+        } catch (error) {
+            console.error('[CHAT] Erro ao inicializar chat em tempo real:', error);
+            setStatus('Falha ao inicializar o chat.', 'error');
+        }
     }
 
     function setupAccessControl() {

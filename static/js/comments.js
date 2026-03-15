@@ -156,10 +156,16 @@ document.addEventListener('DOMContentLoaded', function() {
         div.className = 'comment-item animate-fade-in';
         div.dataset.commentId = comment.id;
 
+        const avatarSrc = comment.profile_image
+            ? ((comment.profile_image.startsWith('http://') || comment.profile_image.startsWith('https://'))
+                ? comment.profile_image
+                : `/static/uploads/profiles/${comment.profile_image}`)
+            : null;
+
         // Avatar: foto de perfil se existir, ícone caso contrário
         let avatarHTML;
-        if (comment.profile_image) {
-            avatarHTML = `<img src="/static/uploads/profiles/${escapeHtml(comment.profile_image)}" alt="${escapeHtml(comment.author)}" class="comment-avatar-img">`;
+        if (avatarSrc) {
+            avatarHTML = `<img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(comment.author)}" class="comment-avatar-img">`;
         } else {
             avatarHTML = `<i class="far fa-user-circle"></i>`;
         }

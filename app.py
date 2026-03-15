@@ -58,8 +58,13 @@ if python_version.major == 3 and python_version.minor >= 13:
 # Carregar variáveis de ambiente
 load_dotenv()
 
+def is_production_environment():
+    """Detecta ambiente de produção com a convenção oficial do projeto."""
+    return os.environ.get('FLASK_ENV') == 'production' or bool(os.environ.get('RENDER'))
+
+
 # Verificar se está em modo debug
-DEBUG_MODE = os.environ.get('FLASK_ENV') != 'production' and not os.environ.get('RENDER')
+DEBUG_MODE = not is_production_environment()
 
 def debug_log(message):
     """Log apenas em modo de desenvolvimento"""
@@ -72,13 +77,13 @@ app = Flask(__name__)
 # Usar SECRET_KEY forte - obrigatório em produção
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
+    if is_production_environment():
         raise ValueError('SECRET_KEY deve ser definida em produção!')
     secret_key = 'dev_key_5f352a14cb7e4b119811'
 app.config['SECRET_KEY'] = secret_key
 
 # Configurações de segurança de sessão
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')  # HTTPS apenas em produção
+app.config['SESSION_COOKIE_SECURE'] = is_production_environment()  # HTTPS apenas em produção
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Não acessível via JavaScript
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Proteção CSRF
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira em 24h
@@ -2999,20 +3004,29 @@ def stripe_webhook():
     sig_header = request.headers.get('Stripe-Signature')
     webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
 
+    is_production = is_production_environment()
+
     if not webhook_secret:
         debug_log('AVISO: STRIPE_WEBHOOK_SECRET não configurado! Webhook não pode verificar assinatura.')
         # Em produção, você DEVE rejeitar webhooks sem verificação
-        if os.environ.get('FLASK_ENV') == 'production':
+        if is_production:
             return jsonify({'error': 'Webhook secret not configured'}), 500
 
     try:
         # Verificar assinatura do webhook (SEGURANÇA CRÍTICA)
-        if webhook_secret and sig_header:
+        if webhook_secret:
+            if not sig_header:
+                debug_log('ERRO CRÍTICO: Stripe-Signature ausente com STRIPE_WEBHOOK_SECRET configurado.')
+                return jsonify({'error': 'Missing signature'}), 400
             event = stripe.Webhook.construct_event(
                 payload, sig_header, webhook_secret
             )
         else:
-            # Modo dev sem verificação (NÃO USE EM PRODUÇÃO!)
+            # Fallback somente em desenvolvimento explícito
+            if os.environ.get('FLASK_ENV') != 'development':
+                debug_log('ERRO CRÍTICO: Fallback sem assinatura bloqueado fora de FLASK_ENV=development.')
+                return jsonify({'error': 'Webhook secret not configured'}), 500
+            print('⚠️⚠️⚠️ WARNING: Stripe webhook signature validation BYPASSED in development mode (FLASK_ENV=development). NEVER use this in production. ⚠️⚠️⚠️')
             event = json.loads(payload)
 
         debug_log(f'Webhook recebido: {event["type"]}')

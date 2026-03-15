@@ -2282,7 +2282,7 @@ def edit_comment_by_slug(category, slug, comment_id):
             'message': 'Comentário editado com sucesso!',
             'comment': {
                 'id': comment.id,
-                'content': new_content,
+                'content': comment.content,
                 'is_edited': True,
                 'date_edited': comment.date_edited.strftime('%d/%m/%Y %H:%M')
             }

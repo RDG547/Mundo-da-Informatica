@@ -538,10 +538,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     showMessage('✅ Comentário editado com sucesso!', 'success');
+                    const savedContent = data.comment?.content ?? newContent;
 
                     // Atualizar o conteúdo no DOM
-                    textEl.textContent = newContent;
-                    textEl.dataset.originalContent = newContent;
+                    textEl.textContent = savedContent;
+                    textEl.dataset.originalContent = savedContent;
 
                     // Adicionar/atualizar badge de editado
                     const commentHeader = commentEl.querySelector('.comment-header');

@@ -4412,8 +4412,9 @@ def reset_password(token):
             flash('As senhas não coincidem', 'danger')
             return redirect(url_for('reset_password', token=token))
 
-        if len(password) < 6:
-            flash('A senha deve ter pelo menos 6 caracteres', 'danger')
+        is_valid, password_error = validate_password_strength(password)
+        if not is_valid:
+            flash(password_error, 'danger')
             return redirect(url_for('reset_password', token=token))
 
         # Atualizar a senha
@@ -6331,19 +6332,16 @@ def admin_reset_user_password(user_id):
         user = User.query.get_or_404(user_id)
 
         # Obter nova senha do JSON
-        data = request.get_json(silent=True) or {}
-        if not isinstance(data, dict):
-            return jsonify({'success': False, 'message': 'JSON inválido'}), 400
-        if not data:
-            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
+        data = request.get_json() or {}
         new_password = data.get('new_password', '').strip()
 
         # Validações
         if not new_password:
             return jsonify({'success': False, 'message': 'Nova senha é obrigatória'})
 
-        if len(new_password) < 6:
-            return jsonify({'success': False, 'message': 'A senha deve ter pelo menos 6 caracteres'})
+        is_valid, password_error = validate_password_strength(new_password)
+        if not is_valid:
+            return jsonify({'success': False, 'message': password_error}), 400
 
         # Não permitir redefinir senha do próprio usuário desta forma
         if user.id == current_user.id:
@@ -6352,6 +6350,7 @@ def admin_reset_user_password(user_id):
         # Atualizar senha
         user.password = generate_password_hash(new_password)
         db.session.commit()
+        app.logger.info(f"Reset de senha executado para user_id={user.id} por admin_id={current_user.id}")
 
         # Log da atividade
         log_admin_activity(
@@ -7568,8 +7567,9 @@ def update_password():
         return redirect(url_for('profile'))
 
     # Validar força da senha
-    if len(new_password) < 6:
-        flash('A nova senha deve ter pelo menos 6 caracteres', 'error')
+    is_valid, password_error = validate_password_strength(new_password)
+    if not is_valid:
+        flash(password_error, 'error')
         return redirect(url_for('profile'))
 
     # Atualize a senha

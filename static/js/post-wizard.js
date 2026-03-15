@@ -132,7 +132,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('addPostForm');
             if (form) {
                 clearDraft(); // Limpar rascunho antes de enviar
-                form.submit();
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
             }
         } else {
             // Ir para o primeiro step com erro

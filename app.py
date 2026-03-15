@@ -15,10 +15,12 @@ import json
 import sys
 import shutil
 import uuid
+import secrets
 import hmac
 import hashlib
 import stripe
 from stripe import error as stripe_error
+from typing import Optional, Tuple
 
 # Para compatibilidade, criar alias
 SignatureVerificationError = stripe_error.SignatureVerificationError  # type: ignore[attr-defined]
@@ -47,6 +49,13 @@ from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+try:
+    import firebase_admin
+    from firebase_admin import credentials, auth as firebase_auth
+except Exception:  # pragma: no cover - fallback quando dependência não está instalada
+    firebase_admin = None
+    credentials = None
+    firebase_auth = None
 
 # Verificar versão do Python e ajustar configurações
 python_version = sys.version_info
@@ -93,6 +102,17 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
+
+# Configuração Firebase (Google Sign-In)
+app.config['FIREBASE_API_KEY'] = os.environ.get('FIREBASE_API_KEY', '')
+app.config['FIREBASE_AUTH_DOMAIN'] = os.environ.get('FIREBASE_AUTH_DOMAIN', '')
+app.config['FIREBASE_PROJECT_ID'] = os.environ.get('FIREBASE_PROJECT_ID', '')
+app.config['FIREBASE_STORAGE_BUCKET'] = os.environ.get('FIREBASE_STORAGE_BUCKET', '')
+app.config['FIREBASE_MESSAGING_SENDER_ID'] = os.environ.get('FIREBASE_MESSAGING_SENDER_ID', '')
+app.config['FIREBASE_APP_ID'] = os.environ.get('FIREBASE_APP_ID', '')
+app.config['FIREBASE_MEASUREMENT_ID'] = os.environ.get('FIREBASE_MEASUREMENT_ID', '')
+app.config['FIREBASE_SERVICE_ACCOUNT_PATH'] = os.environ.get('FIREBASE_SERVICE_ACCOUNT_PATH', '')
+app.config['FIREBASE_SERVICE_ACCOUNT_JSON'] = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON', '')
 
 # Configuração do Abacate Pay
 app.config['ABACATEPAY_API_KEY'] = os.environ.get('ABACATEPAY_API_KEY')
@@ -162,6 +182,145 @@ limiter = Limiter(
 def _is_json_like_request():
     accepts_json = request.accept_mimetypes['application/json'] >= request.accept_mimetypes['text/html']
     return request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or accepts_json
+
+
+def _is_ajax_request() -> bool:
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
+
+
+def split_full_name(full_name: str) -> Tuple[str, str]:
+    full_name = (full_name or '').strip()
+    if not full_name:
+        return '', ''
+    parts = full_name.split()
+    first_name = parts[0]
+    last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
+    return first_name[:50], last_name[:50]
+
+
+def build_safe_username(raw_value: str, fallback_prefix: str = 'user') -> str:
+    base = re.sub(r'[^a-zA-Z0-9_]', '', (raw_value or '').strip())
+    if not base:
+        base = f"{fallback_prefix}{secrets.token_hex(2)}"
+    if len(base) < 4:
+        base = (base + 'user')[:4]
+    return base[:50]
+
+
+def get_unique_username(seed: str, fallback_prefix: str = 'user') -> str:
+    base = build_safe_username(seed, fallback_prefix=fallback_prefix)
+    candidate = base
+    suffix = 1
+    while User.query.filter_by(username=candidate).first():
+        suffix_token = f"_{suffix}"
+        allowed = 50 - len(suffix_token)
+        candidate = f"{base[:allowed]}{suffix_token}"
+        suffix += 1
+    return candidate
+
+
+def get_image_url_for_response(image_path, folder='profiles', default='default.jpg'):
+    if not image_path or image_path in ('default.jpg', 'default_profile.jpg'):
+        if folder == 'posts' and default in ('default.jpg', 'post-placeholder.svg'):
+            return url_for('static', filename=f'images/{default}')
+        return url_for('static', filename=f'images/{folder}/{default}')
+
+    if str(image_path).startswith('http://') or str(image_path).startswith('https://'):
+        return image_path
+
+    normalized = str(image_path).lstrip('/')
+    if normalized.startswith('uploads/'):
+        return url_for('static', filename=normalized)
+    if normalized.startswith('images/'):
+        return url_for('static', filename=normalized)
+    if normalized.startswith('posts/'):
+        return url_for('static', filename=f'images/{normalized}')
+    if normalized in ('post-placeholder.svg', 'default.jpg', 'default_profile.jpg'):
+        return url_for('static', filename=f'images/{normalized}')
+    if folder == 'posts':
+        return url_for('static', filename=f'images/posts/{normalized}')
+    return url_for('static', filename=f'uploads/{folder}/{normalized}')
+
+
+def serialize_post_for_admin(post):
+    category = post.category_rel
+    return {
+        'id': post.id,
+        'title': post.title,
+        'description': post.content or '',
+        'category_id': post.category_id,
+        'category_name': category.name if category else (post.category_str or 'Sem categoria'),
+        'category_icon': (category.icon if category else 'fas fa-folder') or 'fas fa-folder',
+        'category_color': (getattr(category, 'color', None) if category else None) or '#3a86ff',
+        'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg'),
+        'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
+        'time_posted': post.date_posted.strftime('%H:%M') if post.date_posted else '',
+        'views': post.views or 0,
+        'downloads': post.downloads or 0,
+        'featured': bool(post.featured),
+        'is_active': bool(post.is_active),
+        'post_url': url_for('post', post_id=post.id),
+    }
+
+
+_firebase_initialized = False
+
+
+def initialize_firebase_admin() -> bool:
+    global _firebase_initialized
+    if _firebase_initialized:
+        return True
+
+    if firebase_admin is None or credentials is None:
+        app.logger.warning('firebase_admin não está disponível. Instale a dependência firebase-admin.')
+        return False
+
+    try:
+        if firebase_admin._apps:  # type: ignore[attr-defined]
+            _firebase_initialized = True
+            return True
+    except Exception:
+        pass
+
+    service_account_path = app.config.get('FIREBASE_SERVICE_ACCOUNT_PATH', '')
+    service_account_json = app.config.get('FIREBASE_SERVICE_ACCOUNT_JSON', '')
+
+    try:
+        if service_account_json:
+            cred_data = json.loads(service_account_json)
+            cred = credentials.Certificate(cred_data)
+            firebase_admin.initialize_app(cred)
+            _firebase_initialized = True
+            return True
+
+        if service_account_path and os.path.exists(service_account_path):
+            cred = credentials.Certificate(service_account_path)
+            firebase_admin.initialize_app(cred)
+            _firebase_initialized = True
+            return True
+
+        app.logger.warning('Firebase Admin não configurado. Defina FIREBASE_SERVICE_ACCOUNT_PATH ou FIREBASE_SERVICE_ACCOUNT_JSON.')
+        return False
+    except Exception as e:
+        app.logger.error(f'Erro ao inicializar Firebase Admin: {e}')
+        return False
+
+
+def verify_firebase_google_token(id_token: str) -> Optional[dict]:
+    if not id_token:
+        return None
+    if firebase_auth is None:
+        return None
+    if not initialize_firebase_admin():
+        return None
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+        if decoded.get('firebase', {}).get('sign_in_provider') != 'google.com':
+            return None
+        return decoded
+    except Exception as e:
+        app.logger.warning(f'Token Google inválido: {e}')
+        return None
 
 
 @app.errorhandler(CSRFError)
@@ -509,7 +668,7 @@ def sanitize_html(html_content):
     return clean_html
 
 
-def validate_password_strength(password):
+def validate_password_strength(password: str) -> Tuple[bool, str]:
     """
     Valida a força de uma senha
 
@@ -517,7 +676,7 @@ def validate_password_strength(password):
         password: Senha a ser validada
 
     Returns:
-        tuple: (is_valid: bool, error_message: str or None)
+        tuple: (is_valid: bool, error_message: str)
     """
     if not password:
         return False, 'A senha não pode estar vazia.'
@@ -544,7 +703,7 @@ def validate_password_strength(password):
     if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         return False, 'A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?":{}|<>).'
 
-    return True, None
+    return True, ''
 
 
 def delete_old_image(image_path, protected_images=None):
@@ -931,20 +1090,8 @@ def before_request():
 @app.context_processor
 def utility_processor():
     """Funções utilitárias para templates"""
-    def get_image_url(image_path, default='default.jpg'):
-        """Retorna URL correta da imagem (Cloudinary ou local)"""
-        if not image_path:
-            return url_for('static', filename=f'images/profiles/{default}')
-
-        # Se já for URL do Cloudinary, retornar diretamente
-        if 'cloudinary.com' in image_path or image_path.startswith('http'):
-            return image_path
-
-        # Se for caminho local
-        if image_path.startswith('posts/'):
-            return url_for('static', filename=f'images/{image_path}')
-
-        return url_for('static', filename=f'uploads/profiles/{image_path}')
+    def get_image_url(image_path, folder='profiles', default='default.jpg'):
+        return get_image_url_for_response(image_path, folder=folder, default=default)
 
     return dict(get_image_url=get_image_url)
 
@@ -1572,26 +1719,7 @@ def inject_global_data():
 
     # Função helper para gerar URL de imagem (local ou Cloudinary)
     def get_image_url(image_path, folder='profiles', default='default.jpg'):
-        """
-        Retorna a URL correta da imagem (Cloudinary ou local)
-
-        Args:
-            image_path: Caminho da imagem (pode ser URL do Cloudinary ou nome do arquivo)
-            folder: Pasta local caso seja arquivo local
-            default: Imagem padrão se não houver imagem
-
-        Returns:
-            str: URL completa da imagem
-        """
-        if not image_path or image_path == 'default.jpg':
-            return url_for('static', filename=f'images/{folder}/{default}')
-
-        # Se já é uma URL do Cloudinary, retornar diretamente
-        if image_path.startswith('http://') or image_path.startswith('https://'):
-            return image_path
-
-        # Caso contrário, é um arquivo local
-        return url_for('static', filename=f'uploads/{folder}/{image_path}')
+        return get_image_url_for_response(image_path, folder=folder, default=default)
 
     # Categorias
     categories = Category.query.filter_by(is_active=True).order_by(Category.order).all()
@@ -1609,6 +1737,16 @@ def inject_global_data():
         "total_downloads": db.session.query(db.func.sum(Post.downloads)).scalar() or 0,
         "total_subscribers": Subscriber.query.filter_by(is_active=True).count(),
         "total_comments": Comment.query.count()
+    }
+
+    firebase_public_config = {
+        'apiKey': app.config.get('FIREBASE_API_KEY', ''),
+        'authDomain': app.config.get('FIREBASE_AUTH_DOMAIN', ''),
+        'projectId': app.config.get('FIREBASE_PROJECT_ID', ''),
+        'storageBucket': app.config.get('FIREBASE_STORAGE_BUCKET', ''),
+        'messagingSenderId': app.config.get('FIREBASE_MESSAGING_SENDER_ID', ''),
+        'appId': app.config.get('FIREBASE_APP_ID', ''),
+        'measurementId': app.config.get('FIREBASE_MEASUREMENT_ID', '')
     }
 
     # Dados específicos para admin (só quando necessário)
@@ -1631,6 +1769,7 @@ def inject_global_data():
         config=config,
         site_configs=config,  # Adicionar alias para compatibilidade
         stats=stats,
+        firebase_public_config=firebase_public_config,
         current_year=datetime.now().year,
         datetime=datetime,  # Adicionar datetime para uso em templates
         **admin_data
@@ -3815,6 +3954,7 @@ def admin_toggle_post_active(post_id):
 def admin_delete_post(post_id):
     """Excluir um post"""
     post = Post.query.get_or_404(post_id)
+    post_title = post.title
 
     try:
         # Deletar imagem do Cloudinary ou filesystem
@@ -3826,9 +3966,17 @@ def admin_delete_post(post_id):
 
         db.session.delete(post)
         db.session.commit()
-        flash(f'Post "{post.title}" foi excluído com sucesso!', 'success')
-    except Exception:
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': f'Post "{post_title}" foi excluído com sucesso!',
+                'post_id': post_id
+            })
+        flash(f'Post "{post_title}" foi excluído com sucesso!', 'success')
+    except Exception as e:
         db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': f'Erro ao excluir o post: {str(e)}'}), 500
         flash('Erro ao excluir o post. Tente novamente.', 'error')
 
     # Redireciona para a página de listagem de posts após exclusão
@@ -3886,11 +4034,20 @@ def admin_duplicate_post(post_id):
             }
         )
 
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': f'Post "{original_post.title}" foi duplicado com sucesso!',
+                'post': serialize_post_for_admin(new_post)
+            })
+
         flash(f'Post "{original_post.title}" foi duplicado com sucesso!', 'success')
         return redirect(url_for('admin_posts'))
 
     except Exception as e:
         db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': f'Erro ao duplicar o post: {str(e)}'}), 500
         flash(f'Erro ao duplicar o post: {str(e)}', 'error')
         return redirect(url_for('admin_posts'))
 
@@ -4299,6 +4456,105 @@ def login():
 
     return render_template('login.html', title='Login')
 
+
+@app.route('/auth/google', methods=['POST'])
+@limiter.limit("20 per minute")
+def auth_google():
+    """
+    Login/Cadastro via Google utilizando token validado pelo Firebase Admin.
+    """
+    payload = request.get_json(silent=True) or {}
+    id_token = (payload.get('idToken') or '').strip()
+    requested_next = (payload.get('next') or request.args.get('next') or '').strip()
+
+    if not id_token:
+        return jsonify({'success': False, 'message': 'Token Google ausente.'}), 400
+
+    decoded = verify_firebase_google_token(id_token)
+    if not decoded:
+        return jsonify({'success': False, 'message': 'Falha ao validar autenticação Google.'}), 401
+
+    email = (decoded.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'success': False, 'message': 'Conta Google sem email válido.'}), 400
+
+    if not decoded.get('email_verified', False):
+        return jsonify({'success': False, 'message': 'Confirme seu email no Google para continuar.'}), 400
+
+    display_name = bleach.clean((decoded.get('name') or '').strip(), tags=[], strip=True)[:100]
+    first_name, last_name = split_full_name(display_name)
+    photo_url = (decoded.get('picture') or '').strip()
+
+    user = User.query.filter_by(email=email).first()
+
+    try:
+        if user is None:
+            username_seed = display_name or email.split('@')[0] or 'google_user'
+            username = get_unique_username(username_seed, fallback_prefix='google')
+
+            user = User(
+                username=username,
+                email=email,
+                name=display_name or username,
+                first_name=first_name,
+                last_name=last_name,
+                is_active=True,
+                is_verified=True,
+                plan='free',
+                date_joined=datetime.utcnow(),
+            )
+            user.set_password(secrets.token_urlsafe(32))
+
+            if photo_url.startswith('http://') or photo_url.startswith('https://'):
+                user.profile_image = photo_url
+
+            db.session.add(user)
+            db.session.flush()
+
+        if not user.is_active:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'Esta conta está desativada. Entre em contato com o administrador.'}), 403
+
+        # Verificar limite de dispositivos
+        allowed, device_message = check_device_limit(user)
+        if not allowed:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': device_message, 'redirect_url': url_for('plans')}), 403
+
+        login_user(user, remember=True)
+        user.active_sessions = (user.active_sessions or 0) + 1
+        user.last_login = datetime.utcnow()
+
+        user_agent = parse_ua(request.user_agent.string)
+        user.ip_address = request.remote_addr or 'unknown'
+        user.browser = f"{user_agent.browser.family} {user_agent.browser.version_string}"[:50]
+        user.operating_system = f"{user_agent.os.family} {user_agent.os.version_string}"[:50]
+        user.referrer = (request.referrer or 'Google Sign-In')[:500]
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Erro no login Google: {e}')
+        return jsonify({'success': False, 'message': 'Não foi possível autenticar com Google agora.'}), 500
+
+    # Redirecionamento seguro
+    redirect_url = ''
+    try:
+        parsed = url_parse(requested_next) if requested_next else None
+        if requested_next and parsed and parsed.netloc == '':
+            redirect_url = requested_next
+    except (ValueError, TypeError, AttributeError):
+        redirect_url = ''
+
+    if not redirect_url:
+        redirect_url = url_for('admin_dashboard') if user.role in ('admin', 'editor') else url_for('home')
+
+    return jsonify({
+        'success': True,
+        'message': 'Login com Google realizado com sucesso!',
+        'redirect_url': redirect_url
+    })
+
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")  # Limitar criação de contas
@@ -4330,7 +4586,7 @@ def register():
             return redirect(url_for('register'))
 
         # Validações
-        error = None
+        error = ''
 
         if not name or not username or not email or not password or not confirm_password:
             error = 'Todos os campos são obrigatórios.'
@@ -4894,6 +5150,9 @@ def admin_create_post():
             errors['download_link'] = 'O link é obrigatório.'
 
         if errors:
+            if _is_ajax_request():
+                first_error = next(iter(errors.values()))
+                return jsonify({'success': False, 'message': first_error, 'errors': errors}), 400
             # Recarregar categorias para o modal
             categories = Category.query.order_by(Category.name).all()
             # Repassar valores preenchidos e erros para o template
@@ -4973,6 +5232,8 @@ def admin_create_post():
             file_ext = image_file.filename.rsplit('.', 1)[1].lower() if '.' in image_file.filename else ''
 
             if file_ext not in allowed_extensions:
+                if _is_ajax_request():
+                    return jsonify({'success': False, 'message': 'Formato de imagem não permitido. Use: PNG, JPG, GIF, WebP'}), 400
                 flash('Formato de imagem não permitido. Use: PNG, JPG, GIF, WebP', 'error')
                 return redirect(url_for('admin_posts'))
 
@@ -4982,6 +5243,8 @@ def admin_create_post():
             if success:
                 image_url = result  # URL do Cloudinary
             else:
+                if _is_ajax_request():
+                    return jsonify({'success': False, 'message': f'Erro ao fazer upload da imagem: {result}'}), 400
                 flash(f'Erro ao fazer upload da imagem: {result}', 'error')
                 return redirect(url_for('admin_posts'))
 
@@ -5024,11 +5287,20 @@ def admin_create_post():
 
         db.session.commit()
 
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': f'Post "{title}" criado com sucesso!',
+                'post': serialize_post_for_admin(new_post)
+            })
+
         flash(f'Post "{title}" criado com sucesso!', 'success')
         return redirect(url_for('admin_posts'))
 
     except Exception as e:
         db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': f'Erro ao criar post: {str(e)}'}), 500
         flash(f'Erro ao criar post: {str(e)}', 'error')
         return redirect(url_for('admin_posts'))
 
@@ -5044,15 +5316,27 @@ def admin_create_user():
     """
     try:
         # Extrair dados do formulário
-        name = request.form.get('name')
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        role = request.form.get('role', 'user')
+        name = sanitize_input((request.form.get('name') or '').strip())
+        username = build_safe_username((request.form.get('username') or '').strip(), fallback_prefix='user')
+        email = (request.form.get('email') or '').strip().lower()
+        password = request.form.get('password') or ''
+        role = (request.form.get('role', 'user') or 'user').strip().lower()
 
         # Validações básicas
         if not all([name, username, email, password]):
             flash('Todos os campos são obrigatórios', 'error')
+            return redirect(url_for('admin_users'))
+
+        if role not in ('admin', 'editor', 'user'):
+            role = 'user'
+
+        if len(email) > 255 or not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            flash('Email inválido', 'error')
+            return redirect(url_for('admin_users'))
+
+        is_valid, password_error = validate_password_strength(password)
+        if not is_valid:
+            flash(password_error, 'error')
             return redirect(url_for('admin_users'))
 
         # Verificar se já existe usuário com este username ou email
@@ -5061,15 +5345,19 @@ def admin_create_user():
             flash('Já existe um usuário com este username ou email', 'error')
             return redirect(url_for('admin_users'))
 
+        first_name, last_name = split_full_name(name)
+
         # Criar novo usuário
         new_user = User(
             name=name,
+            first_name=first_name,
+            last_name=last_name,
             username=username,
             email=email,
-            password=generate_password_hash(password) if password else "",
             role=role,
             is_active=True
         )
+        new_user.set_password(password)
 
         db.session.add(new_user)
         db.session.commit()
@@ -5195,11 +5483,8 @@ def admin_posts():
     page = request.args.get('page', 1, type=int)
     per_page = 10
     total = len(posts)
-
-    # Calcular itens da página atual
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_posts = posts[start:end]
+    total_pages = max(1, math.ceil(total / per_page))
+    page = max(1, min(page, total_pages))
 
     # Criar objeto de paginação
     class SimplePagination:
@@ -5241,7 +5526,9 @@ def admin_posts():
                     yield num
                     last = num
 
-    pagination = SimplePagination(page, per_page, total, page_posts)
+    # Mantemos todos os posts em memória para permitir paginação dinâmica no frontend sem recarregar.
+    # O objeto de paginação continua sendo usado para renderizar os controles iniciais.
+    pagination = SimplePagination(page, per_page, total, posts)
 
     # Obter estatísticas para a sidebar
     sidebar_stats = get_admin_sidebar_stats()
@@ -6127,6 +6414,35 @@ def admin_users():
     """
     # Buscar todos os usuários reais do banco de dados
     users = User.query.order_by(User.date_joined.desc()).all()
+    identities_fixed = False
+
+    # Corrigir dados legados inválidos que podem gerar linhas quebradas no admin
+    for user in users:
+        user_changed = False
+        username = (user.username or '').strip()
+
+        if len(username) < 4:
+            seed = (user.email or '').split('@')[0] or f'user{user.id}'
+            safe_username = get_unique_username(seed, fallback_prefix='user')
+            if safe_username != user.username:
+                user.username = safe_username
+                user_changed = True
+
+        if not (user.name or '').strip():
+            fallback_name = f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or user.username
+            if fallback_name and fallback_name != user.name:
+                user.name = fallback_name
+                user_changed = True
+
+        if user_changed:
+            identities_fixed = True
+
+    if identities_fixed:
+        try:
+            db.session.commit()
+            users = User.query.order_by(User.date_joined.desc()).all()
+        except Exception:
+            db.session.rollback()
 
     # Paginação
     page = request.args.get('page', 1, type=int)

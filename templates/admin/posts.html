@@ -113,7 +113,7 @@
                     <th>Ações</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="postsTableBody" data-per-page="{{ posts.per_page }}">
                 {% for post in posts.items %}
                 <tr data-post-id="{{ post.id }}" class="{% if not post.is_active %}inactive-row{% endif %}">
                     <td>
@@ -249,8 +249,8 @@
         </div>
 
         <!-- Enhanced Pagination -->
-        <div class="pagination-container">
-            <div class="pagination-info">
+        <div class="pagination-container" id="postsPaginationContainer" data-current-page="{{ posts.page }}" data-per-page="{{ posts.per_page }}">
+            <div class="pagination-info" id="postsPaginationInfo">
                 Mostrando {{ posts.items|length }} de {{ posts.total }} posts
             </div>
             <nav aria-label="Navegação de página">
@@ -569,9 +569,6 @@
 {% include 'admin/components/modal_post.html' %}
 
 {% block scripts %}
-<!-- Post Wizard Script - MESMO DO DASHBOARD -->
-<script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
-
 <script>
     window.addEventListener('load', function() {
         var el = document.getElementById('pageContent');
@@ -1837,7 +1834,7 @@
                     if (data.success) {
                         showNotification('Post atualizado com sucesso!', 'success');
                         closeEditPostModal();
-                        location.reload();
+                        // Atualização dinâmica: sem recarregar a página
                     } else {
                         showNotification(data.message || 'Erro ao atualizar post', 'error');
                     }
@@ -2062,4 +2059,5 @@
 
 <!-- Post Wizard Script -->
 <script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-posts-dynamic.js') }}"></script>
 {% endblock %}

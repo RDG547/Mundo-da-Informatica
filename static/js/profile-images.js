@@ -81,16 +81,17 @@ function validateProfileImage(img) {
 function handleImageError(img) {
     // Marcar imagem como com erro
     img.classList.add('error');
+    img.style.display = 'none';
 
     // Obter iniciais para o placeholder
-    let initials = 'U';
+    let initials = 'MI';
 
     // Procurar por um elemento de nome de usuário próximo para extrair iniciais
     const container = img.closest('.profile-img, .user-avatar, .admin-profile-img');
     const parentContainer = container?.parentElement;
 
     if (parentContainer) {
-        const nameElement = parentContainer.querySelector('.user-name, h4, .admin-profile-info h4');
+        const nameElement = parentContainer.querySelector('.username, .user-name, h4, .admin-profile-info h4');
 
         if (nameElement) {
             const name = nameElement.textContent.trim();
@@ -105,15 +106,16 @@ function handleImageError(img) {
     }
 
     // Buscar ou criar placeholder
+    const placeholderClass = container?.classList.contains('user-avatar') ? 'avatar-placeholder' : 'profile-placeholder';
     let placeholder = img.nextElementSibling;
-    if (!placeholder || !placeholder.classList.contains('profile-placeholder')) {
+    if (!placeholder || !placeholder.classList.contains(placeholderClass)) {
         placeholder = document.createElement('div');
-        placeholder.className = 'profile-placeholder';
+        placeholder.className = placeholderClass;
         img.parentNode.appendChild(placeholder);
     }
 
     // Atualizar o texto do placeholder
-    placeholder.textContent = initials;
+    placeholder.textContent = initials.toUpperCase();
 
     // Remover classe de carregamento
     if (container) {

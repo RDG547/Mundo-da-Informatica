@@ -1,46 +1,46 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // Função para verificar se um elemento está visível na tela
-    function isElementInViewport(el) {
-        const rect = el.getBoundingClientRect();
-        return (
-            rect.top >= 0 &&
-            rect.left >= 0 &&
-            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-            rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-        );
-    }
+function isElementInViewport(el) {
+    const rect = el.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    return rect.top <= viewportHeight * 0.9 && rect.bottom >= 0;
+}
 
-    // Função para animar a contagem dos números
-    function animateCounters() {
-        const counters = document.querySelectorAll('.count');
+function animateCounters() {
+    const counters = document.querySelectorAll('.count[data-count]');
 
-        counters.forEach(counter => {
-            // Verificar se o contador já foi animado
-            if (counter.classList.contains('animated')) return;
+    counters.forEach(counter => {
+        if (counter.classList.contains('animated')) return;
+        if (!isElementInViewport(counter)) return;
 
-            // Verificar se o contador está visível na tela
-            if (isElementInViewport(counter)) {
-                counter.classList.add('animated');
+        const target = parseInt(counter.getAttribute('data-count') || '0', 10);
+        if (!Number.isFinite(target) || target < 0) return;
 
-                const target = parseInt(counter.getAttribute('data-count'));
-                const duration = 2000; // Duração da animação em ms
-                const step = target / duration * 10; // Incremento a cada 10ms
+        counter.classList.add('animated');
 
-                let current = 0;
-                const counterAnimation = setInterval(() => {
-                    current += step;
-                    if (current >= target) {
-                        counter.textContent = target;
-                        clearInterval(counterAnimation);
-                    } else {
-                        counter.textContent = Math.floor(current);
-                    }
-                }, 10);
+        const duration = 2000;
+        const step = Math.max(1, target / duration * 10);
+        let current = 0;
+
+        const counterAnimation = setInterval(() => {
+            current += step;
+            if (current >= target) {
+                counter.textContent = target.toLocaleString('pt-BR');
+                clearInterval(counterAnimation);
+            } else {
+                counter.textContent = Math.floor(current).toLocaleString('pt-BR');
             }
-        });
-    }
+        }, 10);
+    });
+}
 
-    // Executar a animação quando a página carregar e durante o scroll
+function initializeStatsCounters() {
     animateCounters();
-    window.addEventListener('scroll', animateCounters);
+    window.removeEventListener('scroll', animateCounters);
+    window.addEventListener('scroll', animateCounters, { passive: true });
+}
+
+window.initializeStatsCounters = initializeStatsCounters;
+
+document.addEventListener('DOMContentLoaded', initializeStatsCounters);
+document.addEventListener('pageLoaded', () => {
+    setTimeout(initializeStatsCounters, 80);
 });

@@ -4,9 +4,9 @@
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
-        <h1 class="hero-title-3d hero-split-text" style="visibility: hidden;"><span class="hero-line">Bem-vindo ao</span><span class="hero-line">Mundo da</span><span class="hero-line">Informática</span></h1>
-        <p class="hero-subtitle-split" style="visibility: hidden;">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
-        <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form" style="opacity: 0;">
+        <h1 class="hero-title-3d hero-split-text"><span class="hero-line">Bem-vindo ao</span><span class="hero-line">Mundo da</span><span class="hero-line">Informática</span></h1>
+        <p class="hero-subtitle-split">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
+        <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
                 <input type="text" name="q" id="home-search-input" placeholder="Pesquisar BIOS, drivers, esquemas..." autocomplete="off">
                 <div class="search-suggestions-dropdown" id="home-search-suggestions" style="display: none;"></div>

@@ -13,6 +13,31 @@ if (typeof window.DynamicLoader !== 'undefined') {
             this.currentUrl = window.location.href;
             this.isLoading = false;
             this.cache = new Map();
+            this.fullReloadPaths = new Set([
+                '/',
+                '/home',
+                '/home/',
+                '/about',
+                '/about/',
+                '/sobre',
+                '/sobre/',
+                '/planos',
+                '/planos/',
+                '/plans',
+                '/plans/',
+                '/faq',
+                '/faq/',
+                '/contact',
+                '/contact/',
+                '/contato',
+                '/contato/',
+                '/login',
+                '/login/',
+                '/register',
+                '/register/',
+                '/reset-password',
+                '/reset-password/'
+            ]);
             this.init();
         }
 
@@ -115,7 +140,15 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 return false;
             }
 
+            if (this.shouldForceFullReload(url.pathname)) {
+                return false;
+            }
+
             return true;
+        }
+
+        shouldForceFullReload(pathname) {
+            return this.fullReloadPaths.has(pathname);
         }
 
         shouldInterceptForm(form) {
@@ -133,6 +166,17 @@ if (typeof window.DynamicLoader !== 'undefined') {
         async loadPage(url) {
             // Prevent loading same page or loading while already loading
             if (this.isLoading || url === this.currentUrl) {
+                return;
+            }
+
+            const targetUrl = new URL(url, window.location.origin);
+            const currentPath = window.location.pathname;
+            const targetPath = targetUrl.pathname;
+
+            // Segurança extra: alguns links chamam loadPage() diretamente (fora do interceptador).
+            // Nessas rotas críticas, forçamos recarregamento completo para evitar estado visual quebrado.
+            if (this.shouldForceFullReload(targetPath) && targetPath !== currentPath) {
+                window.location.href = targetUrl.href;
                 return;
             }
 
@@ -1034,15 +1078,19 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
             // Initialize About page functionality
             setTimeout(() => {
-                // Initialize statistics counter animation
-                const statsCounters = document.querySelectorAll('.stat-number');
+                // Initialize statistics counter animation (somente cards de serviços da página Sobre)
+                const statsCounters = document.querySelectorAll('.service-stats .stat-number');
                 if (statsCounters.length > 0) {
                     // Animate counters when they come into view
                     const observer = new IntersectionObserver((entries) => {
                         entries.forEach(entry => {
                             if (entry.isIntersecting) {
                                 const counter = entry.target;
-                                const target = parseInt(counter.innerText);
+                                const target = parseInt((counter.textContent || '').replace(/[^\d]/g, ''), 10);
+                                if (!Number.isFinite(target) || target <= 0) {
+                                    observer.unobserve(counter);
+                                    return;
+                                }
                                 const increment = target / 50;
                                 let current = 0;
 

@@ -3,10 +3,6 @@
 // ==========================================
 
 (function() {
-    // Evitar inicialização duplicada
-    if (window._aboutModalInitialized) return;
-    window._aboutModalInitialized = true;
-
     function initContributeModal() {
         const modal = document.getElementById('contributeModal');
         const openBtn = document.getElementById('openContributeModal');
@@ -80,4 +76,7 @@
     } else {
         initContributeModal();
     }
+
+    // Suporte explícito para carregamento dinâmico de conteúdo
+    document.addEventListener('pageLoaded', initContributeModal);
 })();

@@ -132,10 +132,11 @@ function handleProfileImages() {
         // Tratamento de erro para imagens
         img.addEventListener('error', function () {
             this.classList.add('error');
+            this.style.display = 'none';
 
             // Obtém as iniciais do usuário para o placeholder
             let initials = 'MI';
-            const nameElement = img.closest('.admin-profile, .user-card')?.querySelector('.admin-profile-info h4, .user-name');
+            const nameElement = img.closest('.admin-profile, .user-card, .user-cell')?.querySelector('.admin-profile-info h4, .user-name, .username');
 
             if (nameElement) {
                 const name = nameElement.textContent.trim();
@@ -148,10 +149,11 @@ function handleProfileImages() {
             }
 
             // Cria ou atualiza o placeholder com as iniciais
+            const placeholderClass = container?.classList.contains('user-avatar') ? 'avatar-placeholder' : 'profile-placeholder';
             let placeholder = img.nextElementSibling;
-            if (!placeholder || !placeholder.classList.contains('profile-placeholder')) {
+            if (!placeholder || !placeholder.classList.contains(placeholderClass)) {
                 placeholder = document.createElement('div');
-                placeholder.className = 'profile-placeholder';
+                placeholder.className = placeholderClass;
                 img.parentNode.appendChild(placeholder);
             }
             placeholder.textContent = initials.toUpperCase();

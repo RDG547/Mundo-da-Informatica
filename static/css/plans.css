@@ -386,6 +386,14 @@
     overflow: hidden;
 }
 
+.plans-faq-section .container {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .plans-faq-section .section-title {
     text-align: center;
     margin: 0 auto 2.5rem;

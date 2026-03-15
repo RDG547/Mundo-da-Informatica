@@ -163,7 +163,7 @@
                             <th>Ações</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="categoriesTableBody">
                         {% for category in categories %}
                         <tr data-category-id="{{ category.id }}" {% if not category.is_active %}class="inactive-row"{% endif %}>
                             <td>
@@ -284,9 +284,12 @@
                 </div>
 
                 <!-- Paginação -->
-                <div class="pagination-container">
+                <div class="pagination-container" id="categoriesPaginationContainer" data-per-page="10">
+                    <div class="pagination-info" id="categoriesPaginationInfo">
+                        Mostrando {{ categories|length }} categorias
+                    </div>
                     <nav aria-label="Navegação de página">
-                        <ul class="pagination">
+                        <ul class="pagination" id="categoriesPagination">
                             <li class="page-item disabled">
                                 <span class="page-link">&laquo;</span>
                             </li>
@@ -1979,7 +1982,7 @@
                     // Recarregar a página para mostrar os dados atualizados
                     showNotification(data.message, 'success');
                     setTimeout(() => {
-                        window.location.reload();
+                        // Atualização dinâmica: sem recarregar a página
                     }, 1500);
                 } else {
                     showNotification(data.message, 'error');
@@ -2323,7 +2326,7 @@
 
                     // Recarregar a página para mostrar as alterações
                     setTimeout(() => {
-                        window.location.reload();
+                        // Atualização dinâmica: sem recarregar a página
                     }, 1500);
                 } else {
                     showNotification(data.message, 'error');
@@ -2454,7 +2457,7 @@
                         });
                     } else if (action === 'toggle-status') {
                         // Recarregar para atualizar os status visualmente
-                        setTimeout(() => location.reload(), 1000);
+                        // Atualização dinâmica: sem recarregar a página
                     } else if (action === 'feature' || action === 'unfeature') {
                         // Atualizar checkboxes de destaque
                         selectedCategories.forEach(id => {
@@ -2514,7 +2517,7 @@
         window.refreshStats = function() {
             showNotification('Atualizando estatísticas...', 'info');
             setTimeout(() => {
-                window.location.reload();
+                // Atualização dinâmica: sem recarregar a página
             }, 1000);
         };
 
@@ -2619,5 +2622,5 @@
         });
     });
 </script>
+<script src="{{ url_for('static', filename='js/admin-categories-dynamic.js') }}"></script>
 {% endblock %}
-

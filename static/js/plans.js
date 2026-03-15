@@ -235,11 +235,14 @@ window.initializePlansPage = function () {
 
     // FAQ Toggle
     window.toggleFAQ = function (element) {
-        const faqItem = element.parentElement;
+        const question = element?.closest ? element.closest('.faq-question') : element;
+        const faqItem = question ? question.closest('.faq-item') : null;
+        if (!faqItem) return;
         const isActive = faqItem.classList.contains('active');
+        const scope = faqItem.closest('.plans-faq-section') || document;
 
         // Close all FAQ items
-        document.querySelectorAll('.faq-item').forEach(item => {
+        scope.querySelectorAll('.faq-item').forEach(item => {
             item.classList.remove('active');
         });
 

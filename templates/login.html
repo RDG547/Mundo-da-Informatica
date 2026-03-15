@@ -643,6 +643,14 @@
                     </button>
                 </form>
 
+                <div class="social-auth">
+                    <div class="social-separator"><span>ou continue com</span></div>
+                    <button type="button" class="btn-google-auth" data-google-auth-button>
+                        <i class="fab fa-google"></i>
+                        Entrar com Google
+                    </button>
+                </div>
+
                 <div class="login-footer">
                     <p>Não tem uma conta? <a href="{{ url_for('register') }}" class="highlight-link">Cadastre-se</a></p>
                     <p><a href="#" class="forgot-password-link">Esqueceu a senha?</a></p>
@@ -934,6 +942,70 @@
         border-color: var(--accent-color) !important;
         background-color: rgba(255, 0, 110, 0.02);
     }
+
+    .social-auth {
+        margin-top: 1.25rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .social-separator {
+        position: relative;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+
+    .social-separator::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 100%;
+        border-top: 1px solid rgba(0, 0, 0, 0.12);
+        transform: translateY(-50%);
+        z-index: 1;
+    }
+
+    .social-separator span {
+        position: relative;
+        z-index: 2;
+        background: #fff;
+        padding: 0 0.8rem;
+        font-size: 0.85rem;
+        color: var(--gray-color);
+    }
+
+    .btn-google-auth {
+        width: 100%;
+        border: 1px solid rgba(0, 0, 0, 0.14);
+        background: #fff;
+        color: #2d3748;
+        border-radius: var(--radius-md);
+        padding: 0.85rem 1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        cursor: pointer;
+        transition: var(--transition-normal);
+    }
+
+    .btn-google-auth:hover {
+        border-color: #4285f4;
+        box-shadow: 0 6px 18px rgba(66, 133, 244, 0.18);
+        transform: translateY(-1px);
+    }
+
+    .btn-google-auth i {
+        color: #db4437;
+    }
+
+    .btn-google-auth.is-disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
 </style>
 
 {% endblock %}
@@ -1019,4 +1091,8 @@
 
 <!-- Partículas interativas -->
 <script src="{{ url_for('static', filename='js/auth-particles.js') }}"></script>
+<script id="firebase-config" type="application/json">{{ firebase_public_config | tojson | safe }}</script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="{{ url_for('static', filename='js/firebase-google-auth.js') }}"></script>
 {% endblock %}

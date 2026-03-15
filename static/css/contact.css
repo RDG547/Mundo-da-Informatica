@@ -782,9 +782,10 @@
 .contact-cta {
     margin: 4rem 0 2rem;
     padding: 3rem;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(135deg, #102445 0%, #1d355d 50%, #204a7f 100%);
+    border: 1px solid rgba(148, 163, 184, 0.35);
     border-radius: 20px;
-    color: white;
+    color: #e2e8f0;
     position: relative;
     overflow: hidden;
     text-align: center;
@@ -796,9 +797,13 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="10" cy="10" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="90" cy="30" r="1.5" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="80" r="1" fill="rgba(255,255,255,0.1)"/></svg>');
-    opacity: 0.3;
+    background-image:
+        linear-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+    background-size: 36px 36px;
+    opacity: 0.45;
     animation: float 8s ease-in-out infinite reverse;
+    z-index: 1;
 }
 
 .cta-content {
@@ -809,19 +814,33 @@
 .cta-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.cta-icon i {
+    color: #ef4444;
 }
 
 .cta-content h4 {
     font-size: 1.8rem;
     font-weight: 700;
     margin-bottom: 1rem;
+    color: #ffd7a8;
 }
 
 .cta-content p {
     font-size: 1.1rem;
-    opacity: 0.9;
+    opacity: 1;
     margin-bottom: 2rem;
     line-height: 1.6;
+    color: #dbe7ff;
 }
 
 .cta-stats {
@@ -840,12 +859,13 @@
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
-    color: white;
+    color: #f8fafc;
 }
 
 .stat-label {
     font-size: 0.9rem;
-    opacity: 0.8;
+    opacity: 1;
+    color: #cbd5e1;
 }
 
 /* Responsive Design */

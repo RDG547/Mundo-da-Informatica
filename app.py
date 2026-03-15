@@ -12,12 +12,16 @@ from dateutil.relativedelta import relativedelta
 import math
 import os
 import json
+import ast
+import base64
 import sys
 import shutil
 import uuid
 import secrets
 import hmac
 import hashlib
+import urllib.request
+import urllib.error
 import stripe
 from stripe import error as stripe_error
 from typing import Optional, Tuple
@@ -56,6 +60,13 @@ except Exception:  # pragma: no cover - fallback quando dependência não está 
     firebase_admin = None
     credentials = None
     firebase_auth = None
+
+try:
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_auth_requests
+except Exception:  # pragma: no cover - fallback quando dependência não está instalada
+    google_id_token = None
+    google_auth_requests = None
 
 # Verificar versão do Python e ajustar configurações
 python_version = sys.version_info
@@ -266,6 +277,100 @@ def serialize_post_for_admin(post):
 _firebase_initialized = False
 
 
+def _sanitize_service_account_dict(data: dict) -> dict:
+    normalized = dict(data)
+
+    private_key = normalized.get('private_key')
+    if isinstance(private_key, str):
+        normalized['private_key'] = private_key.replace('\\n', '\n').replace('\r\n', '\n')
+
+    return normalized
+
+
+def _normalize_service_account_json(raw_value: str) -> Optional[dict]:
+    raw = (raw_value or '').strip()
+    if not raw:
+        return None
+
+    candidates = [raw]
+    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        candidates.append(raw[1:-1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return _sanitize_service_account_dict(parsed)
+        except Exception:
+            continue
+
+    try:
+        parsed_literal = ast.literal_eval(raw)
+        if isinstance(parsed_literal, dict):
+            return _sanitize_service_account_dict(parsed_literal)
+    except Exception:
+        pass
+
+    # Fallback para JSON com quebras reais de linha dentro da private_key
+    if '"private_key"' in raw and 'BEGIN PRIVATE KEY' in raw and 'END PRIVATE KEY' in raw:
+        def _repair_private_key(match):
+            key_content = match.group(1)
+            key_content = key_content.replace('\r', '').replace('\n', '\\n')
+            return f'"private_key":"{key_content}"'
+
+        repaired = re.sub(
+            r'"private_key"\s*:\s*"(.*?)"',
+            _repair_private_key,
+            raw,
+            flags=re.S
+        )
+        try:
+            parsed = json.loads(repaired)
+            if isinstance(parsed, dict):
+                return _sanitize_service_account_dict(parsed)
+        except Exception:
+            pass
+
+    return None
+
+
+def _build_service_account_from_split_env() -> Optional[dict]:
+    client_email = os.environ.get('FIREBASE_CLIENT_EMAIL', '').strip()
+    private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '').strip()
+    private_key_id = os.environ.get('FIREBASE_PRIVATE_KEY_ID', '').strip()
+    project_id = app.config.get('FIREBASE_PROJECT_ID', '')
+
+    if not client_email or not private_key or not project_id:
+        return None
+
+    normalized_private_key = private_key.replace('\\n', '\n')
+
+    return {
+        'type': 'service_account',
+        'project_id': project_id,
+        'private_key_id': private_key_id or None,
+        'private_key': normalized_private_key,
+        'client_email': client_email,
+        'token_uri': 'https://oauth2.googleapis.com/token'
+    }
+
+
+def _build_service_account_from_base64_env() -> Optional[dict]:
+    raw_b64 = os.environ.get('FIREBASE_SERVICE_ACCOUNT_B64', '').strip()
+    if not raw_b64:
+        return None
+
+    try:
+        decoded = base64.b64decode(raw_b64).decode('utf-8')
+        parsed = json.loads(decoded)
+        if isinstance(parsed, dict):
+            return _sanitize_service_account_dict(parsed)
+    except Exception as e:
+        app.logger.warning(f'FIREBASE_SERVICE_ACCOUNT_B64 inválido: {e}')
+
+    return None
+
+
 def initialize_firebase_admin() -> bool:
     global _firebase_initialized
     if _firebase_initialized:
@@ -287,11 +392,13 @@ def initialize_firebase_admin() -> bool:
 
     try:
         if service_account_json:
-            cred_data = json.loads(service_account_json)
-            cred = credentials.Certificate(cred_data)
-            firebase_admin.initialize_app(cred)
-            _firebase_initialized = True
-            return True
+            cred_data = _normalize_service_account_json(service_account_json)
+            if cred_data:
+                cred = credentials.Certificate(cred_data)
+                firebase_admin.initialize_app(cred)
+                _firebase_initialized = True
+                return True
+            app.logger.warning('FIREBASE_SERVICE_ACCOUNT_JSON inválido. Tentando outros formatos de configuração.')
 
         if service_account_path and os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
@@ -299,28 +406,126 @@ def initialize_firebase_admin() -> bool:
             _firebase_initialized = True
             return True
 
-        app.logger.warning('Firebase Admin não configurado. Defina FIREBASE_SERVICE_ACCOUNT_PATH ou FIREBASE_SERVICE_ACCOUNT_JSON.')
+        b64_cred_data = _build_service_account_from_base64_env()
+        if b64_cred_data:
+            cred = credentials.Certificate(b64_cred_data)
+            firebase_admin.initialize_app(cred)
+            _firebase_initialized = True
+            return True
+
+        split_cred_data = _build_service_account_from_split_env()
+        if split_cred_data:
+            cred = credentials.Certificate(split_cred_data)
+            firebase_admin.initialize_app(cred)
+            _firebase_initialized = True
+            return True
+
+        app.logger.warning('Firebase Admin não configurado. Defina FIREBASE_SERVICE_ACCOUNT_PATH, FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT_B64.')
         return False
     except Exception as e:
         app.logger.error(f'Erro ao inicializar Firebase Admin: {e}')
         return False
 
 
+def _verify_firebase_token_via_identity_toolkit(id_token: str) -> Optional[dict]:
+    api_key = (app.config.get('FIREBASE_API_KEY', '') or '').strip()
+    if not api_key:
+        return None
+
+    endpoint = f'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={api_key}'
+    payload = json.dumps({'idToken': id_token}).encode('utf-8')
+    req = urllib.request.Request(
+        endpoint,
+        data=payload,
+        headers={'Content-Type': 'application/json'},
+        method='POST'
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            body = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode('utf-8')
+        except Exception:
+            error_body = ''
+        app.logger.warning(f'Falha HTTP no fallback Identity Toolkit: {e.code} {error_body}')
+        return None
+    except Exception as e:
+        app.logger.warning(f'Falha no fallback Identity Toolkit: {e}')
+        return None
+
+    users = body.get('users') or []
+    if not users:
+        return None
+
+    user_info = users[0]
+    provider_user_info = user_info.get('providerUserInfo') or []
+    provider_ids = {
+        (item.get('providerId') or '').strip()
+        for item in provider_user_info
+        if isinstance(item, dict)
+    }
+
+    # Se há provider explicitado e não inclui Google, rejeita.
+    if provider_ids and 'google.com' not in provider_ids:
+        return None
+
+    email = (user_info.get('email') or '').strip().lower()
+    if not email:
+        return None
+
+    return {
+        'uid': user_info.get('localId'),
+        'email': email,
+        'email_verified': bool(user_info.get('emailVerified')),
+        'name': user_info.get('displayName') or '',
+        'picture': user_info.get('photoUrl') or '',
+        'firebase': {
+            'sign_in_provider': 'google.com' if 'google.com' in provider_ids else ''
+        }
+    }
+
+
 def verify_firebase_google_token(id_token: str) -> Optional[dict]:
     if not id_token:
         return None
-    if firebase_auth is None:
-        return None
-    if not initialize_firebase_admin():
-        return None
-    try:
-        decoded = firebase_auth.verify_id_token(id_token)
-        if decoded.get('firebase', {}).get('sign_in_provider') != 'google.com':
-            return None
-        return decoded
-    except Exception as e:
-        app.logger.warning(f'Token Google inválido: {e}')
-        return None
+
+    # Caminho principal: Firebase Admin SDK
+    if firebase_auth is not None and initialize_firebase_admin():
+        try:
+            decoded = firebase_auth.verify_id_token(id_token)
+            provider = decoded.get('firebase', {}).get('sign_in_provider')
+            if provider and provider != 'google.com':
+                return None
+            return decoded
+        except Exception as e:
+            app.logger.warning(f'Falha na validação via Firebase Admin: {e}')
+
+    # Fallback: validação pública do token Firebase sem credencial de service account
+    if google_id_token is not None and google_auth_requests is not None:
+        project_id = app.config.get('FIREBASE_PROJECT_ID', '') or None
+        try:
+            decoded = google_id_token.verify_firebase_token(
+                id_token,
+                google_auth_requests.Request(),
+                project_id
+            )
+            if not decoded:
+                return None
+            provider = decoded.get('firebase', {}).get('sign_in_provider')
+            if provider and provider != 'google.com':
+                return None
+            return decoded
+        except Exception as e:
+            app.logger.warning(f'Falha na validação fallback do token Firebase: {e}')
+
+    # Fallback final: validação via API oficial Identity Toolkit
+    decoded_by_api = _verify_firebase_token_via_identity_toolkit(id_token)
+    if decoded_by_api:
+        return decoded_by_api
+
+    return None
 
 
 @app.errorhandler(CSRFError)

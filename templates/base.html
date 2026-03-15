@@ -60,6 +60,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/click-effects.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}">
 
     <!-- Page-specific CSS - Always loaded but conditionally activated -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}" id="faq-css" {% if request.endpoint
@@ -110,7 +111,9 @@
 <body
     data-is-admin="{% if current_user.is_authenticated and current_user.role == 'admin' %}true{% else %}false{% endif %}"
     data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
-    data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}">
+    data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
+    data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
+    data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
     <!-- Preloader -->
     <div class="preloader">
         <div class="loader"></div>
@@ -334,12 +337,47 @@
     <!-- Floating Beta Tag -->
     <div class="floating-beta-tag">Beta</div>
 
+    <!-- Floating Chat Panel -->
+    <section class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
+        <header class="chat-panel-header">
+            <div>
+                <h4>Chat ao Vivo</h4>
+                <p id="chat-connection-status">Conectando...</p>
+            </div>
+            <button type="button" class="chat-close-btn" id="chat-close-btn" title="Fechar chat">
+                <i class="fas fa-times"></i>
+            </button>
+        </header>
+
+        <div class="chat-room-tabs" id="chat-room-tabs">
+            <button type="button" class="chat-room-tab active" data-chat-room="todos">Todos</button>
+            <button type="button" class="chat-room-tab" data-chat-room="suporte">Suporte</button>
+            <button type="button" class="chat-room-tab" data-chat-room="bios">BIOS</button>
+            <button type="button" class="chat-room-tab" data-chat-room="drivers">Drivers</button>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-empty-state">Carregando mensagens da sala...</div>
+        </div>
+
+        <form class="chat-input-wrapper" id="chat-message-form" autocomplete="off">
+            <input type="text" id="chat-message-input" maxlength="500" placeholder="Digite sua mensagem..." required>
+            <button type="submit" id="chat-send-btn">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </form>
+    </section>
+
     <!-- JavaScript Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/SplitText.min.js"></script>
+    <script id="firebase-config" type="application/json">{{ firebase_public_config | tojson | safe }}</script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
     <!-- Custom JavaScript -->
     <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
@@ -352,6 +390,7 @@
     <script src="{{ url_for('static', filename='js/faq.js') }}"></script>
     <script src="{{ url_for('static', filename='js/feature-modals.js') }}"></script>
     <script src="{{ url_for('static', filename='js/search-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/realtime-chat.js') }}"></script>
     {% block extra_js %}{% endblock %}
 
     <style>

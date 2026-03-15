@@ -60,8 +60,13 @@ if python_version.major == 3 and python_version.minor >= 13:
 # Carregar variáveis de ambiente
 load_dotenv()
 
+def is_production_environment():
+    """Detecta ambiente de produção com a convenção oficial do projeto."""
+    return os.environ.get('FLASK_ENV') == 'production' or bool(os.environ.get('RENDER'))
+
+
 # Verificar se está em modo debug
-DEBUG_MODE = os.environ.get('FLASK_ENV') != 'production' and not os.environ.get('RENDER')
+DEBUG_MODE = not is_production_environment()
 
 def debug_log(message):
     """Log apenas em modo de desenvolvimento"""
@@ -74,13 +79,13 @@ app = Flask(__name__)
 # Usar SECRET_KEY forte - obrigatório em produção
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
+    if is_production_environment():
         raise ValueError('SECRET_KEY deve ser definida em produção!')
     secret_key = 'dev_key_5f352a14cb7e4b119811'
 app.config['SECRET_KEY'] = secret_key
 
 # Configurações de segurança de sessão
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')  # HTTPS apenas em produção
+app.config['SESSION_COOKIE_SECURE'] = is_production_environment()  # HTTPS apenas em produção
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Não acessível via JavaScript
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Proteção CSRF
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira em 24h
@@ -2570,8 +2575,11 @@ def get_user_permissions():
 @login_required
 def create_checkout_session():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         plan_type = data.get('plan')
+
+        if not plan_type:
+            return jsonify({'error': 'Plano é obrigatório'}), 400
 
         debug_log(f'Stripe Checkout - Dados recebidos: {data}')
         debug_log(f'Stripe Checkout - Plano: {plan_type}')
@@ -2606,7 +2614,8 @@ def create_checkout_session():
         )
         return jsonify({'clientSecret': checkout_session.client_secret})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Erro ao criar sessão de checkout Stripe')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 @app.route('/checkout-success')
 @login_required
@@ -2680,8 +2689,11 @@ def create_pix_checkout():
     Cria um QR Code PIX via Abacate Pay - Redirecionamento Assíncrono
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         plan_type = data.get('plan')
+
+        if not plan_type:
+            return jsonify({'error': 'Plano é obrigatório'}), 400
 
         print(f'[PIX] Dados recebidos: {data}')
         print(f'[PIX] Plano: {plan_type}')
@@ -3000,20 +3012,29 @@ def stripe_webhook():
     sig_header = request.headers.get('Stripe-Signature')
     webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
 
+    is_production = is_production_environment()
+
     if not webhook_secret:
         debug_log('AVISO: STRIPE_WEBHOOK_SECRET não configurado! Webhook não pode verificar assinatura.')
         # Em produção, você DEVE rejeitar webhooks sem verificação
-        if os.environ.get('FLASK_ENV') == 'production':
+        if is_production:
             return jsonify({'error': 'Webhook secret not configured'}), 500
 
     try:
         # Verificar assinatura do webhook (SEGURANÇA CRÍTICA)
-        if webhook_secret and sig_header:
+        if webhook_secret:
+            if not sig_header:
+                debug_log('ERRO CRÍTICO: Stripe-Signature ausente com STRIPE_WEBHOOK_SECRET configurado.')
+                return jsonify({'error': 'Missing signature'}), 400
             event = stripe.Webhook.construct_event(
                 payload, sig_header, webhook_secret
             )
         else:
-            # Modo dev sem verificação (NÃO USE EM PRODUÇÃO!)
+            # Fallback somente em desenvolvimento explícito
+            if os.environ.get('FLASK_ENV') != 'development':
+                debug_log('ERRO CRÍTICO: Fallback sem assinatura bloqueado fora de FLASK_ENV=development.')
+                return jsonify({'error': 'Webhook secret not configured'}), 500
+            print('⚠️⚠️⚠️ WARNING: Stripe webhook signature validation BYPASSED in development mode (FLASK_ENV=development). NEVER use this in production. ⚠️⚠️⚠️')
             event = json.loads(payload)
 
         debug_log(f'Webhook recebido: {event["type"]}')
@@ -3103,6 +3124,9 @@ def abacatepay_webhook():
 
         debug_log(f'Webhook Abacate Pay recebido: {payload}')
 
+        if not payload:
+            return jsonify({'error': 'Payload inválido'}), 400
+
         # Extrair dados do evento
         event_type = payload.get('event')  # Ex: 'billing.paid'
         billing_data = payload.get('data', {})
@@ -3131,7 +3155,8 @@ def abacatepay_webhook():
 
     except Exception as e:
         debug_log(f'Erro ao processar webhook Abacate Pay: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Erro ao processar webhook Abacate Pay')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 def handle_abacatepay_payment_success(transaction, billing_data):
     """Processa pagamento PIX bem-sucedido"""
@@ -5767,7 +5792,7 @@ def admin_categories_bulk_action():
     Executar ações em massa em categorias
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         action = data.get('action')
         category_ids = data.get('category_ids', [])
 
@@ -6303,7 +6328,7 @@ def admin_reset_user_password(user_id):
         user = User.query.get_or_404(user_id)
 
         # Obter nova senha do JSON
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         new_password = data.get('new_password', '').strip()
 
         # Validações
@@ -6344,7 +6369,7 @@ def admin_update_download_limits(user_id):
     """Atualizar limites de download do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         action = data.get('action')
         period = data.get('period', 'daily')  # daily, weekly, monthly
@@ -6440,7 +6465,7 @@ def admin_verify_user(user_id):
     """Verificar ou desverificar email do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         verify = data.get('verify', True)
         user.is_verified = verify
@@ -6473,7 +6498,7 @@ def admin_update_permissions(user_id):
     """Atualizar permissões (role) do usuário"""
     try:
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         new_role = data.get('role', 'user')
 
@@ -6593,8 +6618,8 @@ def admin_newsletter():
 @login_required
 def downgrade_plan():
     try:
-        data = request.get_json()
-        target_plan = data.get('target_plan', 'free') if data else 'free'
+        data = request.get_json(silent=True) or {}
+        target_plan = data.get('target_plan', 'free')
 
         # Validar plano de destino
         if target_plan not in ['free', 'premium', 'vip']:
@@ -6648,7 +6673,7 @@ def admin_create_backup():
     Criar novo backup
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         backup_type = data.get('backup_type', 'database')
         description = data.get('description', '')
 
@@ -6816,7 +6841,7 @@ def admin_save_settings():
     Salvar configurações do site
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         if not data:
             return jsonify({'success': False, 'message': 'Dados não fornecidos'})
@@ -6997,7 +7022,7 @@ def get_user_favorites_api():
 def reorder_favorites_api():
     """Reordena os favoritos do usuário"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         order = data.get('order', [])
         if not order or not isinstance(order, list):
             return jsonify({'success': False, 'message': 'Ordem inválida'}), 400

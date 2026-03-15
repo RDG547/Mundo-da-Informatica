@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ site_configs.get('site_name', 'Mundo da Informática') }} - {% if title %}{{ title }}{% else %}{{
         site_configs.get('site_description', 'Seu portal de recursos para informática') }}{% endif %}</title>
 
@@ -343,6 +344,44 @@
     <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        (function () {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            function appendCsrfToForm(form) {
+                if (!csrfToken || !form) return;
+                const method = (form.getAttribute('method') || 'GET').toUpperCase();
+                if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
+                if (form.querySelector('input[name="csrf_token"]')) return;
+
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = csrfToken;
+                form.prepend(input);
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                document.querySelectorAll('form').forEach(appendCsrfToForm);
+            });
+
+            const originalFetch = window.fetch;
+            window.fetch = function (resource, options = {}) {
+                const requestOptions = { ...options };
+                const method = (requestOptions.method || 'GET').toUpperCase();
+
+                if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+                    const headers = new Headers(requestOptions.headers || {});
+                    if (!headers.has('X-CSRFToken')) {
+                        headers.set('X-CSRFToken', csrfToken);
+                    }
+                    requestOptions.headers = headers;
+                }
+
+                return originalFetch(resource, requestOptions);
+            };
+        })();
+    </script>
     <script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>
     <script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>
     <script src="{{ url_for('static', filename='js/faq.js') }}"></script>

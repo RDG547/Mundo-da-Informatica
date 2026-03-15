@@ -15,6 +15,8 @@ import json
 import sys
 import shutil
 import uuid
+import hmac
+import hashlib
 import stripe
 from stripe import error as stripe_error
 
@@ -144,10 +146,8 @@ db = SQLAlchemy(app)
 compress = Compress(app)
 assets = Environment(app)
 
-# Proteção CSRF - Desabilitada temporariamente
-# TODO: Adicionar tokens CSRF em todos os formulários antes de habilitar
-# csrf = CSRFProtect(app)
-app.config['WTF_CSRF_ENABLED'] = False  # Desabilitar CSRF globalmente por enquanto
+# Proteção CSRF
+csrf = CSRFProtect(app)
 
 # Rate Limiting para evitar ataques de força bruta
 limiter = Limiter(
@@ -2991,6 +2991,7 @@ def check_pix_payment(billing_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/stripe-webhook', methods=['POST'])
+@csrf.exempt
 def stripe_webhook():
     """
     Webhook do Stripe para processar eventos de pagamento automaticamente.
@@ -3080,6 +3081,7 @@ def stripe_webhook():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/abacatepay-webhook', methods=['POST'])
+@csrf.exempt
 def abacatepay_webhook():
     """
     Webhook do Abacate Pay para processar eventos de pagamento PIX.
@@ -3092,7 +3094,33 @@ def abacatepay_webhook():
     - billing.refunded: Pagamento estornado
     """
     try:
+        raw_payload = request.get_data()
         payload = request.get_json(silent=True) or {}
+
+        webhook_secret = os.environ.get('ABACATEPAY_WEBHOOK_SECRET')
+        signature = (
+            request.headers.get('X-Abacatepay-Signature')
+            or request.headers.get('X-AbacatePay-Signature')
+            or request.headers.get('Abacatepay-Signature')
+        )
+
+        if webhook_secret:
+            if not signature:
+                debug_log('ERRO: Assinatura do webhook Abacate Pay ausente')
+                return jsonify({'error': 'Missing signature'}), 400
+
+            expected_signature = hmac.new(
+                webhook_secret.encode('utf-8'),
+                raw_payload,
+                hashlib.sha256
+            ).hexdigest()
+
+            provided_signature = signature.split('=', 1)[-1].strip()
+            if not hmac.compare_digest(expected_signature, provided_signature):
+                debug_log('ERRO: Assinatura inválida no webhook Abacate Pay')
+                return jsonify({'error': 'Invalid signature'}), 400
+        else:
+            debug_log('AVISO: ABACATEPAY_WEBHOOK_SECRET não configurado; assinatura não validada.')
 
         debug_log(f'Webhook Abacate Pay recebido: {payload}')
 

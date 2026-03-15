@@ -332,13 +332,14 @@
     <!-- Floating Chat Button -->
     <button class="floating-chat-btn" id="floating-chat-btn" title="Chat ao Vivo">
         <i class="fas fa-comments"></i>
+        <span class="floating-chat-unread" id="floating-chat-unread" hidden>0</span>
     </button>
 
     <!-- Floating Beta Tag -->
     <div class="floating-beta-tag">Beta</div>
 
     <!-- Floating Chat Panel -->
-    <section class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
+    <div class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
         <header class="chat-panel-header">
             <div>
                 <h4>Chat ao Vivo</h4>
@@ -350,11 +351,23 @@
         </header>
 
         <div class="chat-room-tabs" id="chat-room-tabs">
-            <button type="button" class="chat-room-tab active" data-chat-room="todos">Todos</button>
-            <button type="button" class="chat-room-tab" data-chat-room="suporte">Suporte</button>
-            <button type="button" class="chat-room-tab" data-chat-room="bios">BIOS</button>
-            <button type="button" class="chat-room-tab" data-chat-room="drivers">Drivers</button>
+            <button type="button" class="chat-room-tab active" data-chat-room="todos">
+                Todos
+                <span class="chat-tab-unread" data-chat-badge="todos" hidden>0</span>
+            </button>
+            <button type="button" class="chat-room-tab" data-chat-room="suporte">
+                Suporte
+                <span class="chat-tab-unread" data-chat-badge="suporte" hidden>0</span>
+            </button>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+            <button type="button" class="chat-room-tab" data-chat-room="chamados">
+                Chamados
+                <span class="chat-tab-unread" data-chat-badge="chamados" hidden>0</span>
+            </button>
+            {% endif %}
         </div>
+
+        <div class="chat-ticket-list" id="chat-ticket-list" hidden></div>
 
         <div class="chat-messages" id="chat-messages">
             <div class="chat-empty-state">Carregando mensagens da sala...</div>
@@ -366,7 +379,7 @@
                 <i class="fas fa-paper-plane"></i>
             </button>
         </form>
-    </section>
+    </div>
 
     <!-- JavaScript Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>

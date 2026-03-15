@@ -24,7 +24,7 @@ import urllib.request
 import urllib.error
 import stripe
 from stripe import error as stripe_error
-from typing import Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 # Para compatibilidade, criar alias
 SignatureVerificationError = stripe_error.SignatureVerificationError  # type: ignore[attr-defined]
@@ -371,6 +371,52 @@ def _build_service_account_from_base64_env() -> Optional[dict]:
     return None
 
 
+def _build_service_account_from_dotenv_block() -> Optional[dict]:
+    """
+    Fallback para desenvolvimento local:
+    lê FIREBASE_SERVICE_ACCOUNT_JSON em formato multiline diretamente do arquivo .env.
+    """
+    dotenv_candidates = [
+        os.path.join(os.getcwd(), '.env'),
+        os.path.join(os.path.dirname(__file__), '.env')
+    ]
+
+    for dotenv_path in dotenv_candidates:
+        if not os.path.exists(dotenv_path):
+            continue
+
+        try:
+            with open(dotenv_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except Exception:
+            continue
+
+        for idx, raw_line in enumerate(lines):
+            stripped = raw_line.strip()
+            if not stripped.startswith('FIREBASE_SERVICE_ACCOUNT_JSON='):
+                continue
+
+            first_chunk = stripped.split('=', 1)[1].strip()
+            if not first_chunk:
+                continue
+
+            block = first_chunk
+            balance = block.count('{') - block.count('}')
+            line_cursor = idx + 1
+
+            while balance > 0 and line_cursor < len(lines):
+                next_line = lines[line_cursor].rstrip('\n')
+                block += '\n' + next_line
+                balance += next_line.count('{') - next_line.count('}')
+                line_cursor += 1
+
+            parsed = _normalize_service_account_json(block)
+            if parsed:
+                return parsed
+
+    return None
+
+
 def initialize_firebase_admin() -> bool:
     global _firebase_initialized
     if _firebase_initialized:
@@ -416,6 +462,13 @@ def initialize_firebase_admin() -> bool:
         split_cred_data = _build_service_account_from_split_env()
         if split_cred_data:
             cred = credentials.Certificate(split_cred_data)
+            firebase_admin.initialize_app(cred)
+            _firebase_initialized = True
+            return True
+
+        dotenv_cred_data = _build_service_account_from_dotenv_block()
+        if dotenv_cred_data:
+            cred = credentials.Certificate(dotenv_cred_data)
             firebase_admin.initialize_app(cred)
             _firebase_initialized = True
             return True
@@ -513,10 +566,21 @@ def verify_firebase_google_token(id_token: str) -> Optional[dict]:
             )
             if not decoded:
                 return None
-            provider = decoded.get('firebase', {}).get('sign_in_provider')
+
+            if not isinstance(decoded, Mapping):
+                return None
+
+            decoded_dict: dict[str, Any] = dict(decoded)
+            firebase_claim = decoded_dict.get('firebase')
+            provider = ''
+            if isinstance(firebase_claim, Mapping):
+                provider_value = firebase_claim.get('sign_in_provider')
+                if isinstance(provider_value, str):
+                    provider = provider_value
+
             if provider and provider != 'google.com':
                 return None
-            return decoded
+            return decoded_dict
         except Exception as e:
             app.logger.warning(f'Falha na validação fallback do token Firebase: {e}')
 
@@ -4759,6 +4823,37 @@ def auth_google():
         'message': 'Login com Google realizado com sucesso!',
         'redirect_url': redirect_url
     })
+
+
+@app.route('/api/chat/firebase-token', methods=['GET'])
+@login_required
+@limiter.limit("60 per minute")
+def chat_firebase_token():
+    """
+    Gera token customizado do Firebase para o chat em tempo real.
+    Somente usuários autenticados no site podem obter este token.
+    """
+    if not current_user.is_active:
+        return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+
+    if firebase_auth is None:
+        return jsonify({'success': False, 'message': 'Firebase Admin indisponível no servidor.'}), 503
+
+    if not initialize_firebase_admin():
+        return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.'}), 503
+
+    try:
+        firebase_uid = f"site_user_{current_user.id}"
+        additional_claims = {
+            'site_user_id': str(current_user.id),
+            'site_role': str(current_user.role or 'user')
+        }
+        token = firebase_auth.create_custom_token(firebase_uid, additional_claims)
+        token_str = token.decode('utf-8') if isinstance(token, bytes) else str(token)
+        return jsonify({'success': True, 'token': token_str, 'uid': firebase_uid})
+    except Exception as e:
+        app.logger.error(f'Erro ao criar token customizado do chat: {e}')
+        return jsonify({'success': False, 'message': 'Não foi possível conectar ao chat agora.'}), 500
 
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])

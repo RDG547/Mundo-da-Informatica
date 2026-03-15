@@ -158,6 +158,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (form.target === '_blank') return false;
             // Não interceptar o formulário de login
             if (form.id === 'loginForm' || form.action.includes('/login')) return false;
+            // Não interceptar o formulário do chat em tempo real
+            if (form.id === 'chat-message-form') return false;
             // Não interceptar formulários de perfil que já possuem tratamento AJAX próprio
             if (form.id === 'editProfileForm' || form.id === 'changePasswordForm') return false;
             return true;

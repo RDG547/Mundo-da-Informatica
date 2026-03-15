@@ -152,14 +152,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Scroll to top button
     const scrollTop = document.querySelector('.scroll-top');
     const floatingChat = document.getElementById('floating-chat-btn');
+    const floatingChatPanel = document.getElementById('floating-chat-panel');
     if (scrollTop) {
         window.addEventListener('scroll', () => {
             if (window.scrollY > 300) {
                 scrollTop.classList.add('active');
                 if (floatingChat) floatingChat.classList.add('shifted-up');
+                if (floatingChatPanel) floatingChatPanel.classList.add('shifted-up');
             } else {
                 scrollTop.classList.remove('active');
                 if (floatingChat) floatingChat.classList.remove('shifted-up');
+                if (floatingChatPanel) floatingChatPanel.classList.remove('shifted-up');
             }
         });
 

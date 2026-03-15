@@ -6,17 +6,17 @@
 
     const CHAT_ROOMS = [
         { id: 'todos', label: 'Todos' },
-        { id: 'suporte', label: 'Suporte' },
-        { id: 'bios', label: 'BIOS' },
-        { id: 'drivers', label: 'Drivers' }
+        { id: 'suporte', label: 'Suporte' }
     ];
 
     const elements = {
         button: document.getElementById('floating-chat-btn'),
+        floatingUnread: document.getElementById('floating-chat-unread'),
         panel: document.getElementById('floating-chat-panel'),
         close: document.getElementById('chat-close-btn'),
         status: document.getElementById('chat-connection-status'),
         roomTabs: document.getElementById('chat-room-tabs'),
+        ticketList: document.getElementById('chat-ticket-list'),
         messages: document.getElementById('chat-messages'),
         form: document.getElementById('chat-message-form'),
         input: document.getElementById('chat-message-input'),
@@ -29,26 +29,52 @@
 
     const userMeta = {
         isAuthenticated: document.body.dataset.authenticated === 'true',
+        isAdmin: document.body.dataset.isAdmin === 'true',
         userId: (document.body.dataset.userId || '').trim(),
-        userName: (document.body.dataset.userName || '').trim() || 'Visitante',
+        userName: (document.body.dataset.userName || '').trim() || 'Usuario',
         userAvatar: (document.body.dataset.userAvatar || '').trim()
     };
 
-    let currentRoom = 'todos';
-    let unsubscribeMessages = null;
+    const tabBadges = {
+        todos: document.querySelector('[data-chat-badge="todos"]'),
+        suporte: document.querySelector('[data-chat-badge="suporte"]'),
+        chamados: document.querySelector('[data-chat-badge="chamados"]')
+    };
+
+    const roomMetaCache = {
+        todos: null,
+        suporte: null
+    };
+
+    let supportTickets = [];
+    let currentTab = 'todos';
+    let currentRoomId = 'todos';
+    let selectedTicketRoomId = '';
+    let panelOpen = false;
+
     let firestore = null;
     let auth = null;
+
+    const unsubscribers = {
+        activeMessages: null,
+        todosMeta: null,
+        suporteMeta: null,
+        chamadosList: null
+    };
+
+    function tsToMillis(value) {
+        if (!value) return 0;
+        if (typeof value.toMillis === 'function') return value.toMillis();
+        if (typeof value.toDate === 'function') return value.toDate().getTime();
+        return 0;
+    }
 
     function setStatus(message, type) {
         if (!elements.status) return;
         elements.status.textContent = message;
         elements.status.classList.remove('is-error', 'is-ok');
-        if (type === 'error') {
-            elements.status.classList.add('is-error');
-        }
-        if (type === 'ok') {
-            elements.status.classList.add('is-ok');
-        }
+        if (type === 'error') elements.status.classList.add('is-error');
+        if (type === 'ok') elements.status.classList.add('is-ok');
     }
 
     function escapeHtml(value) {
@@ -70,9 +96,18 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
-        } catch (error) {
+        } catch (_error) {
             return 'agora';
         }
+    }
+
+    function getLoginRedirectUrl() {
+        const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        return `/login?next=${encodeURIComponent(next || '/')}`;
+    }
+
+    function redirectToLogin() {
+        window.location.href = getLoginRedirectUrl();
     }
 
     function readFirebaseConfig() {
@@ -86,7 +121,7 @@
             }
             return parsed;
         } catch (error) {
-            console.error('[CHAT] Config Firebase inválida:', error);
+            console.error('[CHAT] Config Firebase invalida:', error);
             return null;
         }
     }
@@ -108,49 +143,109 @@
         return firebase.initializeApp(config);
     }
 
-    async function ensureFirebaseReady() {
-        const app = getFirebaseApp();
-        if (!app || !firebase.auth || !firebase.firestore) {
-            return false;
-        }
-
-        auth = firebase.auth();
-        firestore = firebase.firestore();
-
-        if (!auth.currentUser) {
-            try {
-                await auth.signInAnonymously();
-            } catch (error) {
-                console.error('[CHAT] Falha ao autenticar anonimamente no Firebase:', error);
-                return false;
-            }
-        }
-
-        return true;
+    function getSupportRoomIdForUser(userId) {
+        return `support_${userId}`;
     }
 
-    async function ensureRoomDoc(roomId) {
-        if (!firestore) return;
-        const roomMeta = CHAT_ROOMS.find((room) => room.id === roomId);
-        await firestore.collection('chat_rooms').doc(roomId).set({
-            id: roomId,
-            name: roomMeta ? roomMeta.label : roomId,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+    function extractSupportUserId(roomId) {
+        if (!roomId || !roomId.startsWith('support_')) return '';
+        return roomId.replace('support_', '');
     }
 
-    function setActiveRoomTab(roomId) {
-        if (!elements.roomTabs) return;
-        elements.roomTabs.querySelectorAll('[data-chat-room]').forEach((button) => {
-            button.classList.toggle('active', button.dataset.chatRoom === roomId);
-        });
+    function getReadKey(roomId) {
+        return `chat_last_read_${userMeta.userId}_${roomId}`;
+    }
+
+    function getLastRead(roomId) {
+        try {
+            const raw = localStorage.getItem(getReadKey(roomId));
+            return raw ? Number(raw) || 0 : 0;
+        } catch (_error) {
+            return 0;
+        }
+    }
+
+    function setLastRead(roomId, millis) {
+        if (!roomId) return;
+        try {
+            localStorage.setItem(getReadKey(roomId), String(millis || Date.now()));
+        } catch (_error) {
+            // ignore
+        }
+    }
+
+    function setBadge(element, count) {
+        if (!element) return;
+        const safeCount = Math.max(0, Number(count) || 0);
+        if (safeCount <= 0) {
+            element.hidden = true;
+            element.textContent = '0';
+            return;
+        }
+        element.hidden = false;
+        element.textContent = safeCount > 99 ? '99+' : String(safeCount);
+    }
+
+    function getUnreadFromRoomMeta(meta, roomId) {
+        if (!meta || !roomId) return 0;
+
+        const updatedAtMs = tsToMillis(meta.updatedAt);
+        if (!updatedAtMs) return 0;
+
+        const lastRead = getLastRead(roomId);
+        if (updatedAtMs <= lastRead) return 0;
+
+        const lastSenderId = String(meta.lastSenderSiteUserId || '');
+        if (lastSenderId && lastSenderId === userMeta.userId) return 0;
+
+        return 1;
+    }
+
+    function getUnreadFromTicket(ticket) {
+        if (!ticket || !ticket.id || !ticket.data) return 0;
+
+        const updatedAtMs = tsToMillis(ticket.data.updatedAt);
+        if (!updatedAtMs) return 0;
+
+        const lastRead = getLastRead(ticket.id);
+        if (updatedAtMs <= lastRead) return 0;
+
+        const lastSenderRole = String(ticket.data.lastSenderRole || '').toLowerCase();
+        const lastSenderId = String(ticket.data.lastSenderSiteUserId || '');
+
+        if (lastSenderId && lastSenderId === userMeta.userId) return 0;
+        if (userMeta.isAdmin && lastSenderRole === 'admin') return 0;
+
+        return 1;
+    }
+
+    function refreshUnreadBadges() {
+        const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
+        const unreadTodos = getUnreadFromRoomMeta(roomMetaCache.todos, 'todos');
+        const unreadSuporte = getUnreadFromRoomMeta(roomMetaCache.suporte, supportRoomId);
+
+        let unreadChamados = 0;
+        if (userMeta.isAdmin) {
+            unreadChamados = supportTickets.reduce((acc, ticket) => acc + getUnreadFromTicket(ticket), 0);
+        }
+
+        setBadge(tabBadges.todos, unreadTodos);
+        setBadge(tabBadges.suporte, unreadSuporte);
+        setBadge(tabBadges.chamados, unreadChamados);
+        setBadge(elements.floatingUnread, unreadTodos + unreadSuporte + unreadChamados);
+    }
+
+    function markRoomAsRead(roomId) {
+        if (!roomId) return;
+        setLastRead(roomId, Date.now());
+        refreshUnreadBadges();
     }
 
     function renderMessages(docs) {
         if (!elements.messages) return;
 
         if (!docs.length) {
-            elements.messages.innerHTML = '<div class="chat-empty-state">Ainda não há mensagens nesta sala. Seja o primeiro a falar.</div>';
+            elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta conversa.</div>';
             return;
         }
 
@@ -158,10 +253,10 @@
         const currentAuthUid = auth && auth.currentUser ? auth.currentUser.uid : '';
         const html = ordered.map((doc) => {
             const data = doc.data() || {};
-            const senderName = data.senderName || 'Usuário';
+            const senderName = data.senderName || 'Usuario';
             const text = data.text || '';
-            const senderSiteUserId = (data.senderSiteUserId || '').toString();
-            const senderAuthUid = (data.senderAuthUid || '').toString();
+            const senderSiteUserId = String(data.senderSiteUserId || '');
+            const senderAuthUid = String(data.senderAuthUid || '');
 
             const mine = (
                 (userMeta.userId && senderSiteUserId && userMeta.userId === senderSiteUserId) ||
@@ -183,83 +278,328 @@
         elements.messages.scrollTop = elements.messages.scrollHeight;
     }
 
-    async function subscribeRoom(roomId) {
-        if (!firestore) {
+    function setActiveTab(tabId) {
+        currentTab = tabId;
+        if (!elements.roomTabs) return;
+        elements.roomTabs.querySelectorAll('[data-chat-room]').forEach((button) => {
+            button.classList.toggle('active', button.dataset.chatRoom === tabId);
+        });
+    }
+
+    function updateInputState() {
+        if (!elements.input || !elements.send) return;
+
+        let enabled = true;
+        if (currentTab === 'chamados' && userMeta.isAdmin) {
+            enabled = !!selectedTicketRoomId;
+        }
+
+        elements.input.disabled = !enabled;
+        elements.send.disabled = !enabled;
+        elements.input.placeholder = enabled ? 'Digite sua mensagem...' : 'Selecione um chamado para responder.';
+    }
+
+    function renderTicketList() {
+        if (!elements.ticketList) return;
+
+        if (!userMeta.isAdmin || currentTab !== 'chamados') {
+            elements.ticketList.hidden = true;
+            elements.ticketList.innerHTML = '';
             return;
         }
 
-        if (unsubscribeMessages) {
-            unsubscribeMessages();
-            unsubscribeMessages = null;
+        elements.ticketList.hidden = false;
+
+        if (!supportTickets.length) {
+            elements.ticketList.innerHTML = '<div class="chat-ticket-empty">Nenhum chamado aberto ainda.</div>';
+            return;
         }
 
-        setActiveRoomTab(roomId);
+        const html = supportTickets.map((ticket) => {
+            const ticketData = ticket.data || {};
+            const unread = getUnreadFromTicket(ticket);
+            const ownerName = ticketData.ownerName || `Usuario ${ticketData.ownerSiteUserId || ''}`;
+            const preview = (ticketData.lastMessage || 'Sem mensagens').slice(0, 70);
+            const activeClass = selectedTicketRoomId === ticket.id ? ' active' : '';
+            return `
+                <button type="button" class="chat-ticket-item${activeClass}" data-ticket-room="${escapeHtml(ticket.id)}">
+                    <div class="chat-ticket-main">
+                        <strong>${escapeHtml(ownerName)}</strong>
+                        <span>${escapeHtml(preview)}</span>
+                    </div>
+                    ${unread > 0 ? `<span class="chat-ticket-unread">${unread > 99 ? '99+' : unread}</span>` : ''}
+                </button>
+            `;
+        }).join('');
+
+        elements.ticketList.innerHTML = html;
+    }
+
+    function selectTicket(roomId) {
+        selectedTicketRoomId = roomId || '';
+        renderTicketList();
+        if (currentTab === 'chamados') {
+            switchToRoom(selectedTicketRoomId);
+        }
+    }
+
+    async function ensureRoomDoc(roomId, extraData) {
+        if (!firestore || !roomId) return;
+        const baseData = {
+            id: roomId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await firestore.collection('chat_rooms').doc(roomId).set({
+            ...baseData,
+            ...(extraData || {})
+        }, { merge: true });
+    }
+
+    async function ensureBaseRooms() {
+        const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
+
+        await ensureRoomDoc('todos', {
+            type: 'public',
+            name: 'Todos'
+        });
+
+        await ensureRoomDoc(supportRoomId, {
+            type: 'support',
+            name: `Suporte - ${userMeta.userName}`,
+            ownerSiteUserId: userMeta.userId,
+            ownerName: userMeta.userName
+        });
+    }
+
+    async function fetchChatFirebaseToken() {
+        const response = await fetch('/api/chat/firebase-token', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success || !data.token) {
+            throw new Error(data.message || 'Falha ao gerar token do chat.');
+        }
+
+        return data.token;
+    }
+
+    async function ensureFirebaseReady() {
+        const app = getFirebaseApp();
+        if (!app || !firebase.auth || !firebase.firestore) {
+            return false;
+        }
+
+        auth = firebase.auth();
+        firestore = firebase.firestore();
+
+        const expectedUid = `site_user_${userMeta.userId}`;
+        const mustRefreshUser = !auth.currentUser || auth.currentUser.uid !== expectedUid;
+
+        if (mustRefreshUser) {
+            try {
+                const token = await fetchChatFirebaseToken();
+                await auth.signInWithCustomToken(token);
+            } catch (error) {
+                console.error('[CHAT] Falha ao autenticar no Firebase com token customizado:', error);
+                return false;
+            }
+        }
+
+        return !!(auth.currentUser && auth.currentUser.uid === expectedUid);
+    }
+
+    function clearActiveMessagesSubscription() {
+        if (typeof unsubscribers.activeMessages === 'function') {
+            unsubscribers.activeMessages();
+            unsubscribers.activeMessages = null;
+        }
+    }
+
+    function subscribeActiveRoom(roomId) {
+        clearActiveMessagesSubscription();
+
+        if (!roomId || !firestore) {
+            elements.messages.innerHTML = '<div class="chat-empty-state">Selecione uma conversa para comecar.</div>';
+            return;
+        }
+
+        currentRoomId = roomId;
         setStatus(`Conectando na sala ${roomId}...`);
-
-        try {
-            await ensureRoomDoc(roomId);
-        } catch (error) {
-            console.warn('[CHAT] Não foi possível garantir metadados da sala:', error);
-        }
 
         const query = firestore
             .collection('chat_rooms')
             .doc(roomId)
             .collection('messages')
             .orderBy('createdAt', 'desc')
-            .limit(60);
+            .limit(80);
 
-        unsubscribeMessages = query.onSnapshot((snapshot) => {
+        unsubscribers.activeMessages = query.onSnapshot((snapshot) => {
             renderMessages(snapshot.docs);
             setStatus(`Sala: ${roomId}`, 'ok');
+            if (panelOpen) {
+                markRoomAsRead(roomId);
+            }
         }, (error) => {
             console.error('[CHAT] Erro ao receber mensagens em tempo real:', error);
             setStatus('Erro ao conectar com o chat.', 'error');
         });
     }
 
-    async function switchRoom(roomId) {
-        currentRoom = roomId;
-        if (!firestore) {
-            const ready = await ensureFirebaseReady();
-            if (!ready) {
-                setStatus('Chat indisponível no momento.', 'error');
-                return;
-            }
+    async function switchToRoom(roomId) {
+        if (!roomId) {
+            currentRoomId = '';
+            elements.messages.innerHTML = '<div class="chat-empty-state">Selecione uma conversa para comecar.</div>';
+            updateInputState();
+            return;
         }
 
-        await subscribeRoom(roomId);
+        subscribeActiveRoom(roomId);
+        updateInputState();
+
+        if (panelOpen) {
+            markRoomAsRead(roomId);
+        }
+    }
+
+    async function switchTab(tabId) {
+        setActiveTab(tabId);
+
+        if (tabId === 'todos') {
+            renderTicketList();
+            await switchToRoom('todos');
+            return;
+        }
+
+        if (tabId === 'suporte') {
+            renderTicketList();
+            await switchToRoom(getSupportRoomIdForUser(userMeta.userId));
+            return;
+        }
+
+        if (tabId === 'chamados' && userMeta.isAdmin) {
+            if (!selectedTicketRoomId && supportTickets.length) {
+                selectedTicketRoomId = supportTickets[0].id;
+            }
+            renderTicketList();
+            await switchToRoom(selectedTicketRoomId);
+        }
+    }
+
+    function buildRoomMetadataForMessage(roomId, messageText) {
+        const baseMeta = {
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: String(messageText || '').slice(0, 140),
+            lastSender: userMeta.userName,
+            lastSenderRole: userMeta.isAdmin ? 'admin' : 'user',
+            lastSenderSiteUserId: userMeta.userId
+        };
+
+        if (roomId === 'todos') {
+            return {
+                ...baseMeta,
+                type: 'public',
+                name: 'Todos'
+            };
+        }
+
+        if (roomId.startsWith('support_')) {
+            const ownerId = extractSupportUserId(roomId) || userMeta.userId;
+            const ticket = supportTickets.find((item) => item.id === roomId);
+            const ownerName = ticket?.data?.ownerName || (ownerId === userMeta.userId ? userMeta.userName : `Usuario ${ownerId}`);
+            return {
+                ...baseMeta,
+                type: 'support',
+                name: `Suporte - ${ownerName}`,
+                ownerSiteUserId: ownerId,
+                ownerName: ownerName
+            };
+        }
+
+        return baseMeta;
     }
 
     async function sendMessage(text) {
-        if (!firestore || !auth || !auth.currentUser) {
-            throw new Error('Chat ainda está conectando.');
+        if (!firestore || !auth || !auth.currentUser || !currentRoomId) {
+            throw new Error('Chat ainda esta conectando.');
         }
 
         await firestore
             .collection('chat_rooms')
-            .doc(currentRoom)
+            .doc(currentRoomId)
             .collection('messages')
             .add({
                 text,
                 senderName: userMeta.userName,
                 senderAvatar: userMeta.userAvatar,
+                senderRole: userMeta.isAdmin ? 'admin' : 'user',
                 senderSiteUserId: userMeta.userId || null,
                 senderAuthUid: auth.currentUser.uid,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-        await firestore.collection('chat_rooms').doc(currentRoom).set({
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastMessage: text.slice(0, 140),
-            lastSender: userMeta.userName
-        }, { merge: true });
+        await firestore.collection('chat_rooms').doc(currentRoomId).set(
+            buildRoomMetadataForMessage(currentRoomId, text),
+            { merge: true }
+        );
+    }
+
+    function subscribeRoomMeta() {
+        if (!firestore) return;
+
+        const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
+
+        unsubscribers.todosMeta = firestore.collection('chat_rooms').doc('todos').onSnapshot((docSnap) => {
+            roomMetaCache.todos = docSnap.exists ? (docSnap.data() || null) : null;
+            refreshUnreadBadges();
+        });
+
+        unsubscribers.suporteMeta = firestore.collection('chat_rooms').doc(supportRoomId).onSnapshot((docSnap) => {
+            roomMetaCache.suporte = docSnap.exists ? (docSnap.data() || null) : null;
+            refreshUnreadBadges();
+        });
+
+        if (userMeta.isAdmin) {
+            unsubscribers.chamadosList = firestore
+                .collection('chat_rooms')
+                .where('type', '==', 'support')
+                .orderBy('updatedAt', 'desc')
+                .limit(80)
+                .onSnapshot((snapshot) => {
+                    supportTickets = snapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        data: doc.data() || {}
+                    }));
+
+                    if (currentTab === 'chamados') {
+                        if (!selectedTicketRoomId || !supportTickets.some((item) => item.id === selectedTicketRoomId)) {
+                            selectedTicketRoomId = supportTickets.length ? supportTickets[0].id : '';
+                            switchToRoom(selectedTicketRoomId);
+                        }
+                    }
+
+                    renderTicketList();
+                    refreshUnreadBadges();
+                }, (error) => {
+                    console.error('[CHAT] Erro ao listar chamados:', error);
+                });
+        }
     }
 
     function openPanel() {
+        panelOpen = true;
         elements.panel.classList.add('open');
         elements.panel.setAttribute('aria-hidden', 'false');
         elements.button.classList.add('active');
+
+        if (currentRoomId) {
+            markRoomAsRead(currentRoomId);
+        }
+
         setTimeout(() => {
             if (elements.input && !elements.input.disabled) {
                 elements.input.focus();
@@ -268,6 +608,7 @@
     }
 
     function closePanel() {
+        panelOpen = false;
         elements.panel.classList.remove('open');
         elements.panel.setAttribute('aria-hidden', 'true');
         elements.button.classList.remove('active');
@@ -280,24 +621,21 @@
             return;
         }
 
-        await switchRoom(currentRoom);
+        await ensureBaseRooms();
+        subscribeRoomMeta();
+        await switchTab('todos');
     }
 
     function setupAccessControl() {
-        if (!elements.input || !elements.send) {
-            return;
+        if (!userMeta.isAuthenticated || !userMeta.userId) {
+            elements.button.style.display = 'none';
+            elements.panel.style.display = 'none';
+            window.openLiveChat = redirectToLogin;
+            return false;
         }
 
-        if (userMeta.isAuthenticated) {
-            elements.input.disabled = false;
-            elements.send.disabled = false;
-            elements.input.placeholder = 'Digite sua mensagem...';
-            return;
-        }
-
-        elements.input.disabled = true;
-        elements.send.disabled = true;
-        elements.input.placeholder = 'Faça login para enviar mensagens.';
+        updateInputState();
+        return true;
     }
 
     function bindEvents() {
@@ -321,13 +659,21 @@
 
         if (elements.roomTabs) {
             elements.roomTabs.addEventListener('click', (event) => {
-                const tab = event.target.closest('[data-chat-room]');
-                if (!tab) return;
+                const tabButton = event.target.closest('[data-chat-room]');
+                if (!tabButton) return;
+                const tabId = tabButton.dataset.chatRoom;
+                if (!tabId || tabId === currentTab) return;
+                switchTab(tabId);
+            });
+        }
 
-                const roomId = tab.dataset.chatRoom;
-                if (!roomId || roomId === currentRoom) return;
-
-                switchRoom(roomId);
+        if (elements.ticketList) {
+            elements.ticketList.addEventListener('click', (event) => {
+                const ticketButton = event.target.closest('[data-ticket-room]');
+                if (!ticketButton) return;
+                const roomId = ticketButton.dataset.ticketRoom;
+                if (!roomId || roomId === selectedTicketRoomId) return;
+                selectTicket(roomId);
             });
         }
 
@@ -335,44 +681,35 @@
             elements.form.addEventListener('submit', async (event) => {
                 event.preventDefault();
 
-                if (!userMeta.isAuthenticated) {
-                    if (typeof window.showNotification === 'function') {
-                        window.showNotification('Faça login para enviar mensagens no chat.', 'warning');
-                    } else {
-                        alert('Faça login para enviar mensagens no chat.');
-                    }
-                    return;
-                }
-
                 const text = (elements.input.value || '').trim();
-                if (!text) {
-                    return;
-                }
+                if (!text) return;
 
                 elements.send.disabled = true;
                 try {
                     await sendMessage(text);
                     elements.input.value = '';
+                    markRoomAsRead(currentRoomId);
                 } catch (error) {
                     console.error('[CHAT] Erro ao enviar mensagem:', error);
                     if (typeof window.showNotification === 'function') {
-                        window.showNotification('Não foi possível enviar a mensagem. Tente novamente.', 'error');
+                        window.showNotification('Nao foi possivel enviar a mensagem. Tente novamente.', 'error');
                     } else {
-                        alert('Não foi possível enviar a mensagem.');
+                        alert('Nao foi possivel enviar a mensagem.');
                     }
                 } finally {
-                    elements.send.disabled = !userMeta.isAuthenticated;
+                    updateInputState();
                 }
             });
         }
     }
 
     function init() {
-        setupAccessControl();
+        if (!setupAccessControl()) {
+            return;
+        }
+
         bindEvents();
         initializeChatConnection();
-
-        // Compatibilidade com botão de chat em FAQ/outros pontos
         window.openLiveChat = openPanel;
     }
 

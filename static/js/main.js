@@ -1,282 +1,277 @@
-// Preloader
-window.addEventListener('load', function() {
-    const preloader = document.querySelector('.preloader');
-    if (preloader) {
+(function () {
+    'use strict';
+
+    function hidePreloader() {
+        const preloader = document.querySelector('.preloader');
+        if (!preloader || preloader.dataset.hidden === 'true') {
+            return;
+        }
+
         setTimeout(() => {
             preloader.classList.add('fade-out');
             setTimeout(() => {
                 preloader.style.display = 'none';
+                preloader.dataset.hidden = 'true';
             }, 500);
         }, 500);
     }
 
-    // Inicializar AOS (Animate On Scroll)
-    if (typeof AOS !== 'undefined') {
-        AOS.init({
-            duration: 800,
-            easing: 'ease-in-out',
-            once: true,
-            mirror: false
-        });
+    function initializeAOS() {
+        if (typeof AOS === 'undefined') {
+            return;
+        }
+
+        if (!window.__mainAosInitialized) {
+            AOS.init({
+                duration: 800,
+                easing: 'ease-in-out',
+                once: true,
+                mirror: false
+            });
+            window.__mainAosInitialized = true;
+            return;
+        }
+
+        if (typeof AOS.refreshHard === 'function') {
+            AOS.refreshHard();
+        } else if (typeof AOS.refresh === 'function') {
+            AOS.refresh();
+        }
     }
 
-    // Tratamento para erros de carregamento de imagens de perfil
-    handleProfileImages();
-});
+    function handleImageState(img) {
+        if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+            img.classList.add('error');
+        } else {
+            img.classList.remove('error');
+            const container = img.closest('.admin-profile-img, .user-avatar, .profile-img');
+            if (container) {
+                container.classList.remove('loading');
+            }
+        }
+    }
 
-// Função para lidar com as imagens de perfil na interface
-function handleProfileImages() {
-    // Seleciona todas as imagens de perfil
-    const profileImages = document.querySelectorAll('.profile-img, .user-avatar img, .admin-profile-img img');
+    function bindProfileImage(img) {
+        if (!img || img.tagName !== 'IMG') {
+            return;
+        }
 
-    // Adiciona manipulador de eventos para cada imagem
-    profileImages.forEach(img => {
-        // Verifica se a imagem já foi carregada
+        if (img.dataset.mainProfileBound === 'true') {
+            if (img.complete) {
+                handleImageState(img);
+            }
+            return;
+        }
+
+        img.dataset.mainProfileBound = 'true';
+
         if (img.complete) {
             handleImageState(img);
         } else {
-            img.addEventListener('load', function() {
+            img.addEventListener('load', function () {
                 handleImageState(this);
             });
         }
 
-        // Manipula erros de carregamento
-        img.addEventListener('error', function() {
+        img.addEventListener('error', function () {
             this.classList.add('error');
 
-            // Tenta carregar novamente a partir do cache (apenas uma vez)
             if (!this.dataset.retried) {
                 this.dataset.retried = 'true';
                 const originalSrc = this.src;
                 this.removeAttribute('src');
                 setTimeout(() => {
-                    if (this) this.src = originalSrc;
+                    if (this) {
+                        this.src = originalSrc;
+                    }
                 }, 500);
             }
         });
-    });
-}
-
-// Função auxiliar para gerenciar o estado da imagem
-function handleImageState(img) {
-    // Verifica se a imagem tem conteúdo válido
-    if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-        img.classList.add('error');
-    } else {
-        img.classList.remove('error');
-
-        // Remove classe de carregamento do contêiner
-        const container = img.closest('.admin-profile-img, .user-avatar, .profile-img');
-        if (container) {
-            container.classList.remove('loading');
-        }
     }
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Menu Toggle para dispositivos móveis
-    const menuToggle = document.querySelector('.menu-toggle');
-    const navMenu = document.querySelector('.nav-menu');
+    function handleProfileImages() {
+        const profileImages = document.querySelectorAll('.profile-img, .profile-img img, .user-avatar img, .admin-profile-img img');
+        profileImages.forEach(bindProfileImage);
+    }
 
-    if (menuToggle) {
-        menuToggle.addEventListener('click', function() {
+    function bindMenuToggle() {
+        const menuToggle = document.querySelector('.menu-toggle');
+        const navMenu = document.querySelector('.nav-menu');
+
+        if (!menuToggle || !navMenu || menuToggle.dataset.mainMenuBound === 'true') {
+            return;
+        }
+
+        menuToggle.dataset.mainMenuBound = 'true';
+        menuToggle.addEventListener('click', function () {
             navMenu.classList.toggle('active');
             menuToggle.classList.toggle('active');
         });
     }
 
-    // Navbar Scroll Effect
-    const navbar = document.querySelector('.navbar');
-    window.addEventListener('scroll', function() {
-        if (window.scrollY > 50) {
-            navbar.classList.add('scrolled');
-        } else {
-            navbar.classList.remove('scrolled');
-        }
-    });
+    function bindNavLinks() {
+        const navMenu = document.querySelector('.nav-menu');
+        const menuToggle = document.querySelector('.menu-toggle');
 
-    // Fechar o menu ao clicar em um link
-    const navLinks = document.querySelectorAll('.nav-menu a');
-    navLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            navMenu.classList.remove('active');
-            menuToggle.classList.remove('active');
-        });
-    });
+        document.querySelectorAll('.nav-menu a').forEach((link) => {
+            if (link.dataset.mainNavLinkBound === 'true') {
+                return;
+            }
 
-    // Accordion para FAQ
-    const accordionHeaders = document.querySelectorAll('.accordion-header');
-    accordionHeaders.forEach(header => {
-        header.addEventListener('click', () => {
-            header.classList.toggle('active');
-            const content = header.nextElementSibling;
-
-            // Fechar outros acordeões
-            accordionHeaders.forEach(otherHeader => {
-                if (otherHeader !== header) {
-                    otherHeader.classList.remove('active');
-                    otherHeader.nextElementSibling.style.maxHeight = 0;
-                    otherHeader.nextElementSibling.classList.remove('active');
+            link.dataset.mainNavLinkBound = 'true';
+            link.addEventListener('click', () => {
+                if (navMenu) {
+                    navMenu.classList.remove('active');
                 }
-            });
-
-            if (header.classList.contains('active')) {
-                content.style.maxHeight = content.scrollHeight + 'px';
-                content.classList.add('active');
-            } else {
-                content.style.maxHeight = 0;
-                content.classList.remove('active');
-            }
-        });
-    });
-
-    // Animação de rolagem suave para links internos
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function(e) {
-            if (this.getAttribute('href') !== '#') {
-                e.preventDefault();
-
-                const targetId = this.getAttribute('href');
-                const targetElement = document.querySelector(targetId);
-
-                if (targetElement) {
-                    window.scrollTo({
-                        top: targetElement.offsetTop - 80,
-                        behavior: 'smooth'
-                    });
+                if (menuToggle) {
+                    menuToggle.classList.remove('active');
                 }
-            }
-        });
-    });
-
-    // Scroll to top button
-    const scrollTop = document.querySelector('.scroll-top');
-    const floatingChat = document.getElementById('floating-chat-btn');
-    const floatingChatPanel = document.getElementById('floating-chat-panel');
-    if (scrollTop) {
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 300) {
-                scrollTop.classList.add('active');
-                if (floatingChat) floatingChat.classList.add('shifted-up');
-                if (floatingChatPanel) floatingChatPanel.classList.add('shifted-up');
-            } else {
-                scrollTop.classList.remove('active');
-                if (floatingChat) floatingChat.classList.remove('shifted-up');
-                if (floatingChatPanel) floatingChatPanel.classList.remove('shifted-up');
-            }
-        });
-
-        scrollTop.addEventListener('click', () => {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
             });
         });
     }
 
-    // Dark mode toggle
-    const darkModeToggle = document.querySelector('.dark-mode');
-    if (darkModeToggle) {
-        darkModeToggle.addEventListener('click', () => {
-            document.body.setAttribute('data-theme',
-                document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-        });
-    }
+    function bindAccordionHeaders() {
+        document.querySelectorAll('.accordion-header').forEach((header) => {
+            if (header.dataset.mainAccordionBound === 'true') {
+                return;
+            }
 
-    // Formulário de contato com validação e animação
-    const contactForm = document.querySelector('.contact-form form');
-    if (contactForm) {
-        contactForm.addEventListener('submit', function(e) {
-            e.preventDefault();
+            header.dataset.mainAccordionBound = 'true';
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                const accordionHeaders = document.querySelectorAll('.accordion-header');
 
-            // Validação básica
-            let isValid = true;
-            const inputs = this.querySelectorAll('input, textarea');
+                header.classList.toggle('active');
 
-            inputs.forEach(input => {
-                if (input.value.trim() === '') {
-                    isValid = false;
-                    input.classList.add('error');
-
-                    const errorMessage = document.createElement('div');
-                    errorMessage.className = 'error-message';
-                    errorMessage.textContent = 'Este campo é obrigatório';
-
-                    // Remover mensagem de erro existente
-                    const existingError = input.parentElement.querySelector('.error-message');
-                    if (existingError) {
-                        existingError.remove();
-                    }
-
-                    input.parentElement.appendChild(errorMessage);
-
-                    // Adicionar evento para remover o erro quando o usuário digitar
-                    input.addEventListener('input', function() {
-                        if (this.value.trim() !== '') {
-                            this.classList.remove('error');
-                            const errorMsg = this.parentElement.querySelector('.error-message');
-                            if (errorMsg) {
-                                errorMsg.remove();
-                            }
+                accordionHeaders.forEach((otherHeader) => {
+                    if (otherHeader !== header) {
+                        otherHeader.classList.remove('active');
+                        if (otherHeader.nextElementSibling) {
+                            otherHeader.nextElementSibling.style.maxHeight = 0;
+                            otherHeader.nextElementSibling.classList.remove('active');
                         }
-                    });
+                    }
+                });
+
+                if (!content) {
+                    return;
+                }
+
+                if (header.classList.contains('active')) {
+                    content.style.maxHeight = `${content.scrollHeight}px`;
+                    content.classList.add('active');
+                } else {
+                    content.style.maxHeight = 0;
+                    content.classList.remove('active');
                 }
             });
-
-            if (isValid) {
-                // Simulando envio
-                const submitButton = this.querySelector('button[type="submit"]');
-                const originalText = submitButton.textContent;
-
-                submitButton.disabled = true;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-
-                // Simulando uma requisição
-                setTimeout(() => {
-                    // Animação de sucesso
-                    contactForm.innerHTML = `
-                        <div class="success-message" style="text-align: center;">
-                            <div class="success-icon">
-                                <i class="fas fa-check-circle"></i>
-                            </div>
-                            <h3>Mensagem Enviada!</h3>
-                            <p>Obrigado pelo seu contato. Responderemos em breve.</p>
-                        </div>
-                    `;
-
-                    // Animar entrada da mensagem de sucesso
-                    const successMessage = contactForm.querySelector('.success-message');
-                    successMessage.style.opacity = 0;
-                    successMessage.style.transform = 'translateY(20px)';
-
-                    setTimeout(() => {
-                        successMessage.style.transition = 'all 0.5s ease';
-                        successMessage.style.opacity = 1;
-                        successMessage.style.transform = 'translateY(0)';
-                    }, 100);
-
-                }, 1500);
-            }
         });
     }
 
-    // Botões de compartilhamento com compartilhamento real
-    const shareButtons = document.querySelectorAll('.social-share a');
-    if (shareButtons.length > 0) {
-        shareButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
+    function bindSmoothScrollAnchors() {
+        document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+            if (anchor.dataset.mainSmoothScrollBound === 'true') {
+                return;
+            }
+
+            anchor.dataset.mainSmoothScrollBound = 'true';
+            anchor.addEventListener('click', function (e) {
+                const href = this.getAttribute('href');
+                if (!href || href === '#') {
+                    return;
+                }
+
+                const targetElement = document.querySelector(href);
+                if (!targetElement) {
+                    return;
+                }
+
+                e.preventDefault();
+                window.scrollTo({
+                    top: targetElement.offsetTop - 80,
+                    behavior: 'smooth'
+                });
+            });
+        });
+    }
+
+    function updateNavbarScrollState() {
+        const navbar = document.querySelector('.navbar');
+        if (navbar) {
+            navbar.classList.toggle('scrolled', window.scrollY > 50);
+        }
+    }
+
+    function updateScrollTopState() {
+        const scrollTop = document.querySelector('.scroll-top');
+        const floatingChat = document.getElementById('floating-chat-btn');
+        const floatingChatPanel = document.getElementById('floating-chat-panel');
+        const shouldShift = window.scrollY > 300;
+
+        if (scrollTop) {
+            scrollTop.classList.toggle('active', shouldShift);
+        }
+        if (floatingChat) {
+            floatingChat.classList.toggle('shifted-up', shouldShift);
+        }
+        if (floatingChatPanel) {
+            floatingChatPanel.classList.toggle('shifted-up', shouldShift);
+        }
+    }
+
+    function bindScrollTopButton() {
+        const scrollTop = document.querySelector('.scroll-top');
+        if (!scrollTop) {
+            return;
+        }
+
+        if (scrollTop.dataset.mainScrollTopBound !== 'true') {
+            scrollTop.dataset.mainScrollTopBound = 'true';
+            scrollTop.addEventListener('click', () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        }
+
+        updateScrollTopState();
+    }
+
+    function bindDarkModeToggle() {
+        const darkModeToggle = document.querySelector('.dark-mode');
+        if (!darkModeToggle || darkModeToggle.dataset.mainDarkModeBound === 'true') {
+            return;
+        }
+
+        darkModeToggle.dataset.mainDarkModeBound = 'true';
+        darkModeToggle.addEventListener('click', () => {
+            document.body.setAttribute(
+                'data-theme',
+                document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+            );
+        });
+    }
+
+    function bindShareButtons() {
+        document.querySelectorAll('.social-share a').forEach((button) => {
+            if (button.dataset.mainShareBound === 'true') {
+                return;
+            }
+
+            button.dataset.mainShareBound = 'true';
+            button.addEventListener('click', function (e) {
                 e.preventDefault();
 
                 const pageUrl = window.location.href;
                 const pageTitle = document.title;
 
-                // Identificar a rede social pelo ícone
                 if (this.querySelector('.fa-facebook') || this.classList.contains('facebook')) {
                     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`, 'facebook-share', 'width=580,height=296');
                 } else if (this.querySelector('.fa-twitter') || this.classList.contains('twitter')) {
                     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(pageTitle)}&url=${encodeURIComponent(pageUrl)}`, 'twitter-share', 'width=550,height=235');
                 } else if (this.querySelector('.fa-whatsapp') || this.classList.contains('whatsapp')) {
-                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(pageTitle + ' ' + pageUrl)}`, 'whatsapp-share', 'width=550,height=450');
+                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(`${pageTitle} ${pageUrl}`)}`, 'whatsapp-share', 'width=550,height=450');
                 } else if (this.querySelector('.fa-telegram') || this.classList.contains('telegram')) {
                     window.open(`https://telegram.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(pageTitle)}`, 'telegram-share', 'width=550,height=450');
                 }
@@ -284,97 +279,161 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Lazy loading para imagens
-    const lazyImages = document.querySelectorAll('img[data-src]');
-    if (lazyImages.length > 0) {
-        const imageObserver = new IntersectionObserver((entries, observer) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
+    function getLazyImageObserver() {
+        if (!window.__mainLazyImageObserver) {
+            window.__mainLazyImageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) {
+                        return;
+                    }
+
                     const img = entry.target;
                     img.src = img.dataset.src;
                     img.removeAttribute('data-src');
-                    imageObserver.unobserve(img);
-                }
+                    observer.unobserve(img);
+                });
             });
-        });
+        }
 
-        lazyImages.forEach(img => {
-            imageObserver.observe(img);
+        return window.__mainLazyImageObserver;
+    }
+
+    function initializeLazyImages() {
+        const observer = getLazyImageObserver();
+        document.querySelectorAll('img[data-src]:not([data-main-lazy-observed])').forEach((img) => {
+            img.dataset.mainLazyObserved = 'true';
+            observer.observe(img);
         });
     }
 
-    // Adicionar animações aos cards
-    const animateElements = (entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('animate');
-                observer.unobserve(entry.target);
+    function getRevealObserver() {
+        if (!window.__mainRevealObserver) {
+            window.__mainRevealObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) {
+                        return;
+                    }
+
+                    entry.target.classList.add('animate');
+                    observer.unobserve(entry.target);
+                });
+            }, {
+                root: null,
+                threshold: 0.1
+            });
+        }
+
+        return window.__mainRevealObserver;
+    }
+
+    function initializeRevealCards() {
+        const observer = getRevealObserver();
+        document.querySelectorAll('.category-card, .post-card, .team-member').forEach((item) => {
+            item.classList.add('reveal');
+            if (item.dataset.mainRevealObserved === 'true') {
+                return;
             }
+
+            item.dataset.mainRevealObserved = 'true';
+            observer.observe(item);
         });
-    };
+    }
 
-    const observer = new IntersectionObserver(animateElements, {
-        root: null,
-        threshold: 0.1
-    });
-
-    document.querySelectorAll('.category-card, .post-card, .team-member').forEach(item => {
-        item.classList.add('reveal');
-        observer.observe(item);
-    });
-
-    // Efeito Parallax para seções com fundo
-    window.addEventListener('scroll', function() {
-        const parallaxElements = document.querySelectorAll('.hero, .cta, .about-header, .contact-header');
-        parallaxElements.forEach(element => {
+    function updateParallaxEffects() {
+        document.querySelectorAll('.hero, .cta, .about-header, .contact-header').forEach((element) => {
             const scrollPosition = window.scrollY;
             const elementPosition = element.offsetTop;
             const elementHeight = element.offsetHeight;
 
             if (scrollPosition > elementPosition - window.innerHeight && scrollPosition < elementPosition + elementHeight) {
-                const speed = element.dataset.speed || 0.5;
+                const speed = Number(element.dataset.speed || 0.5);
                 const yPos = (scrollPosition - elementPosition) * speed;
                 element.style.backgroundPosition = `center ${yPos}px`;
             }
         });
-    });
+    }
 
-    // Contador para estatísticas (se existirem)
-    const statsElements = document.querySelectorAll('.counter');
-    if (statsElements.length > 0) {
-        const statsObserver = new IntersectionObserver((entries, observer) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const countTarget = parseInt(entry.target.getAttribute('data-count'));
-                    const countElement = entry.target;
+    function getSimpleCounterObserver() {
+        if (!window.__mainSimpleCounterObserver) {
+            window.__mainSimpleCounterObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting || entry.target.dataset.mainCounterAnimated === 'true') {
+                        return;
+                    }
+
+                    const countTarget = parseInt(entry.target.getAttribute('data-count') || '0', 10);
+                    if (!Number.isFinite(countTarget) || countTarget <= 0) {
+                        observer.unobserve(entry.target);
+                        return;
+                    }
+
+                    entry.target.dataset.mainCounterAnimated = 'true';
                     let count = 0;
-                    const duration = 2000; // ms
-                    const interval = duration / countTarget;
+                    const duration = 2000;
+                    const step = Math.max(1, Math.ceil(countTarget / (duration / 16)));
 
                     const counter = setInterval(() => {
-                        count++;
-                        countElement.textContent = count;
-
+                        count += step;
                         if (count >= countTarget) {
+                            entry.target.textContent = countTarget;
                             clearInterval(counter);
+                            return;
                         }
-                    }, interval);
+
+                        entry.target.textContent = count;
+                    }, 16);
 
                     observer.unobserve(entry.target);
-                }
+                });
             });
-        });
+        }
 
-        statsElements.forEach(stat => {
-            statsObserver.observe(stat);
+        return window.__mainSimpleCounterObserver;
+    }
+
+    function initializeSimpleCounters() {
+        const observer = getSimpleCounterObserver();
+        document.querySelectorAll('.counter[data-count]').forEach((counter) => {
+            if (counter.dataset.mainCounterObserved === 'true') {
+                return;
+            }
+
+            counter.dataset.mainCounterObserved = 'true';
+            observer.observe(counter);
         });
     }
 
-    // Typed.js para elementos de texto dinâmico (se existir)
-    const typedElement = document.querySelector('.typed-text');
-    if (typedElement && typeof Typed !== 'undefined') {
-        new Typed(typedElement, {
-            strings: typedElement.getAttribute('data-typed-items').split(','),
+    function initializeTypedText() {
+        if (typeof Typed === 'undefined') {
+            return;
+        }
+
+        const typedElement = document.querySelector('.typed-text');
+        if (!typedElement) {
+            if (window.__mainTypedInstance && typeof window.__mainTypedInstance.destroy === 'function') {
+                window.__mainTypedInstance.destroy();
+            }
+            window.__mainTypedInstance = null;
+            window.__mainTypedElement = null;
+            return;
+        }
+
+        if (window.__mainTypedElement === typedElement && window.__mainTypedInstance) {
+            return;
+        }
+
+        if (window.__mainTypedInstance && typeof window.__mainTypedInstance.destroy === 'function') {
+            window.__mainTypedInstance.destroy();
+        }
+
+        const typedItems = typedElement.getAttribute('data-typed-items');
+        if (!typedItems) {
+            return;
+        }
+
+        window.__mainTypedElement = typedElement;
+        window.__mainTypedInstance = new Typed(typedElement, {
+            strings: typedItems.split(','),
             typeSpeed: 100,
             backSpeed: 50,
             backDelay: 2000,
@@ -382,44 +441,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // FAQ functionality is now handled by the dedicated FAQManager class in faq.js
-    // This prevents conflicts and ensures proper functionality after page refreshes
-});
+    function getAnimationObserver() {
+        if (!window.__mainAnimationObserver) {
+            window.__mainAnimationObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) {
+                        return;
+                    }
 
-// Adicionar classe de animação CSS para elementos estáticos
-document.addEventListener('DOMContentLoaded', function() {
-    const animElements = document.querySelectorAll('.animate-fade-in, .animate-slide-left, .animate-slide-right, .animate-slide-up, .animate-pulse');
-    animElements.forEach(elem => {
-        elem.style.opacity = 0;
-
-        const observer = new IntersectionObserver(entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
                     entry.target.style.opacity = 1;
                     observer.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.1 });
+                });
+            }, { threshold: 0.1 });
+        }
 
-        observer.observe(elem);
-    });
-});
+        return window.__mainAnimationObserver;
+    }
 
-// Filtros para galerias ou listas (se existirem)
-document.addEventListener('DOMContentLoaded', function() {
-    const filterButtons = document.querySelectorAll('[data-filter]');
-    if (filterButtons.length > 0) {
-        filterButtons.forEach(button => {
-            button.addEventListener('click', function() {
+    function initializeStaticAnimations() {
+        const observer = getAnimationObserver();
+        document.querySelectorAll('.animate-fade-in, .animate-slide-left, .animate-slide-right, .animate-slide-up, .animate-pulse').forEach((elem) => {
+            if (elem.dataset.mainAnimationObserved === 'true') {
+                return;
+            }
+
+            elem.dataset.mainAnimationObserved = 'true';
+            elem.style.opacity = 0;
+            observer.observe(elem);
+        });
+    }
+
+    function bindFilterButtons() {
+        document.querySelectorAll('[data-filter]').forEach((button) => {
+            if (button.dataset.mainFilterBound === 'true') {
+                return;
+            }
+
+            button.dataset.mainFilterBound = 'true';
+            button.addEventListener('click', function () {
                 const filterValue = this.dataset.filter;
+                const filterButtons = document.querySelectorAll('[data-filter]');
                 const items = document.querySelectorAll('[data-category]');
 
-                // Remover classe ativa de todos os botões
-                filterButtons.forEach(btn => btn.classList.remove('active'));
-                // Adicionar classe ativa ao botão clicado
+                filterButtons.forEach((btn) => btn.classList.remove('active'));
                 this.classList.add('active');
 
-                items.forEach(item => {
+                items.forEach((item) => {
                     if (filterValue === 'all' || item.dataset.category === filterValue) {
                         item.style.display = 'block';
                         setTimeout(() => {
@@ -437,23 +504,31 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-});
 
-// Swiper Carousel (se existir)
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof Swiper !== 'undefined') {
-        // Inicializar todos os carousels com a classe swiper
-        document.querySelectorAll('.swiper').forEach(swiperElement => {
+    function initializeSwipers() {
+        if (typeof Swiper === 'undefined') {
+            return;
+        }
+
+        document.querySelectorAll('.swiper').forEach((swiperElement) => {
+            if (swiperElement.dataset.mainSwiperInitialized === 'true') {
+                if (swiperElement.swiper && typeof swiperElement.swiper.update === 'function') {
+                    swiperElement.swiper.update();
+                }
+                return;
+            }
+
+            swiperElement.dataset.mainSwiperInitialized = 'true';
             new Swiper(swiperElement, {
                 slidesPerView: 'auto',
                 spaceBetween: 30,
                 pagination: {
-                    el: '.swiper-pagination',
+                    el: swiperElement.querySelector('.swiper-pagination') || '.swiper-pagination',
                     clickable: true,
                 },
                 navigation: {
-                    nextEl: '.swiper-button-next',
-                    prevEl: '.swiper-button-prev',
+                    nextEl: swiperElement.querySelector('.swiper-button-next') || '.swiper-button-next',
+                    prevEl: swiperElement.querySelector('.swiper-button-prev') || '.swiper-button-prev',
                 },
                 breakpoints: {
                     640: {
@@ -472,4 +547,66 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-});
+
+    function bindGlobalWindowHandlers() {
+        if (window.__mainGlobalHandlersBound) {
+            updateNavbarScrollState();
+            updateScrollTopState();
+            updateParallaxEffects();
+            return;
+        }
+
+        window.__mainGlobalHandlersBound = true;
+        window.addEventListener('scroll', () => {
+            updateNavbarScrollState();
+            updateScrollTopState();
+            updateParallaxEffects();
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            initializeAOS();
+        }, { passive: true });
+
+        updateNavbarScrollState();
+        updateScrollTopState();
+        updateParallaxEffects();
+    }
+
+    function initializeMainUi() {
+        bindGlobalWindowHandlers();
+        bindMenuToggle();
+        bindNavLinks();
+        bindAccordionHeaders();
+        bindSmoothScrollAnchors();
+        bindScrollTopButton();
+        bindDarkModeToggle();
+        bindShareButtons();
+        handleProfileImages();
+        initializeLazyImages();
+        initializeRevealCards();
+        initializeSimpleCounters();
+        initializeTypedText();
+        initializeStaticAnimations();
+        bindFilterButtons();
+        initializeSwipers();
+        initializeAOS();
+    }
+
+    window.handleProfileImages = handleProfileImages;
+    window.initializeMainUi = initializeMainUi;
+
+    window.addEventListener('load', () => {
+        hidePreloader();
+        initializeMainUi();
+    });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeMainUi);
+    } else {
+        initializeMainUi();
+    }
+
+    document.addEventListener('pageLoaded', () => {
+        setTimeout(initializeMainUi, 0);
+    });
+})();

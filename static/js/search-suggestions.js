@@ -255,8 +255,11 @@ window.SearchSuggestions = class SearchSuggestions {
 } // Fim da verificação de carregamento
 
 // Initialize search suggestions when DOM is loaded
-if (typeof window.SearchSuggestions !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function() {
+function initializeSearchSuggestions() {
+    if (typeof window.SearchSuggestions === 'undefined') {
+        return;
+    }
+
         // Initialize for hero search bar
         const heroInput = document.querySelector('.hero .search-bar input[name="q"]');
         const homeSearchInput = document.getElementById('home-search-input');
@@ -277,5 +280,13 @@ if (typeof window.SearchSuggestions !== 'undefined') {
                 input.setAttribute('data-suggestions-initialized', 'true');
             }
         });
-    });
 }
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeSearchSuggestions);
+} else {
+    initializeSearchSuggestions();
+}
+
+document.addEventListener('pageLoaded', initializeSearchSuggestions);
+window.initializeSearchSuggestions = initializeSearchSuggestions;

@@ -334,8 +334,13 @@ function initializeHomeSearch() {
     }
 }
 
-// Initialize on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', initializeHomeSearch);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeHomeSearch);
+} else {
+    initializeHomeSearch();
+}
+
+document.addEventListener('pageLoaded', initializeHomeSearch);
 
 // Export for dynamic loading
 window.initializeHomeSearch = initializeHomeSearch;

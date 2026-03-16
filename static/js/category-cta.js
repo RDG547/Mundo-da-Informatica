@@ -93,9 +93,14 @@ function closeContentRequestModal() {
 }
 
 // Inicializar sugestões de pesquisa e eventos
-document.addEventListener('DOMContentLoaded', function () {
+function initializeCategoryCta() {
     const input = document.getElementById('inlineSearchInputCat');
     if (input) {
+        if (input.dataset.categoryCtaBound === 'true') {
+            return;
+        }
+
+        input.dataset.categoryCtaBound = 'true';
         input.addEventListener('focus', function () {
             this.style.borderColor = '#667eea';
             this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
@@ -113,7 +118,15 @@ document.addEventListener('DOMContentLoaded', function () {
             );
         }
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeCategoryCta);
+} else {
+    initializeCategoryCta();
+}
+
+document.addEventListener('pageLoaded', initializeCategoryCta);
 
 // CSS do modal (adicionar dinamicamente)
 if (!document.getElementById('category-cta-styles')) {

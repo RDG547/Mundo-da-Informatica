@@ -76,17 +76,19 @@ function showInlineToast(message, type = 'success') {
     }, 3000);
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Selecionar todos os formulários de pesquisa que não têm validação específica
+function initSearchValidation() {
     const searchForms = document.querySelectorAll('form[action*="search"], form[action*="pesquisa"]');
 
     searchForms.forEach(form => {
-        // Ignorar se já tem validação (home-search, category-search)
         if (form.id === 'home-search-form' || form.classList.contains('category-search-form')) {
             return;
         }
 
-        // Adicionar validação
+        if (form.dataset.searchValidationBound === 'true') {
+            return;
+        }
+
+        form.dataset.searchValidationBound = 'true';
         form.addEventListener('submit', function(e) {
             const searchInput = form.querySelector('input[name="q"]');
             if (!searchInput) return;
@@ -108,4 +110,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSearchValidation);
+} else {
+    initSearchValidation();
+}
+
+document.addEventListener('pageLoaded', initSearchValidation);

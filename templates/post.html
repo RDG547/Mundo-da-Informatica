@@ -229,7 +229,8 @@
                     <!-- Comment Form -->
                     <div class="comment-form-card">
                         <h4>Deixe seu comentário</h4>
-                        <form class="comment-form" id="commentForm">
+                        <form class="comment-form" id="commentForm" method="post" action="{{ url_for('add_post_comment', post_id=post.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             {% if current_user.is_authenticated %}
                             <input type="hidden" id="commentName" value="{{ current_user.username }}">
                             <input type="hidden" id="commentEmail" value="{{ current_user.email }}">
@@ -238,20 +239,20 @@
                                 <label for="commentName">
                                     <i class="far fa-user"></i> Nome *
                                 </label>
-                                <input type="text" class="form-control" id="commentName" placeholder="Seu nome" required>
+                                <input type="text" class="form-control" id="commentName" name="name" placeholder="Seu nome" required>
                             </div>
                             <div class="form-group">
                                 <label for="commentEmail">
                                     <i class="far fa-envelope"></i> Email *
                                 </label>
-                                <input type="email" class="form-control" id="commentEmail" placeholder="seu@email.com" required>
+                                <input type="email" class="form-control" id="commentEmail" name="email" placeholder="seu@email.com" required>
                             </div>
                             {% endif %}
                             <div class="form-group">
                                 <label for="commentText">
                                     <i class="far fa-comment-dots"></i> Comentário *
                                 </label>
-                                <textarea class="form-control" id="commentText" rows="3" placeholder="Escreva seu comentário..." required></textarea>
+                                <textarea class="form-control" id="commentText" name="content" rows="3" placeholder="Escreva seu comentário..." required></textarea>
                             </div>
                             <button type="submit" class="btn-submit-comment">
                                 <i class="fas fa-paper-plane"></i>

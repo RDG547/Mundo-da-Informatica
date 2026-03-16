@@ -32,62 +32,57 @@
         rel="stylesheet">
 
     <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" data-static-base-style="true">
 
     <!-- AOS Animation Library -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" data-static-base-style="true">
 
     <!-- Swiper Carousel -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css" data-static-base-style="true">
 
     <!-- Page-specific preloads -->
-    {% if request.endpoint == 'faq' %}
     <link rel="preload" href="{{ url_for('static', filename='css/faq.css') }}" as="style">
-    <link rel="preload" href="{{ url_for('static', filename='js/faq.js') }}" as="script">
-    {% endif %}
-    {% if request.endpoint == 'contact' %}
     <link rel="preload" href="{{ url_for('static', filename='css/contact.css') }}" as="style">
-    {% endif %}
-    {% if request.endpoint == 'category' or request.endpoint == 'all_categories' %}
+    <link rel="preload" href="{{ url_for('static', filename='css/about.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/about-page.css') }}" as="style">
     <link rel="preload" href="{{ url_for('static', filename='css/category.css') }}" as="style">
-    {% endif %}
-    {% if request.endpoint == 'profile' %}
     <link rel="preload" href="{{ url_for('static', filename='css/profile-page.css') }}" as="style">
     <link rel="preload" href="{{ url_for('static', filename='css/admin.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/post-detail.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/plans.css') }}" as="style">
+    {% if request.endpoint == 'faq' %}
+    <link rel="preload" href="{{ url_for('static', filename='js/faq.js') }}" as="script">
     {% endif %}
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/click-effects.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" data-static-base-style="true">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}" data-static-base-style="true">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/click-effects.css') }}" data-static-base-style="true">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}" data-static-base-style="true">
 
     <!-- Page-specific CSS - Always loaded but conditionally activated -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}" id="faq-css" {% if request.endpoint
-        !='faq' %}media="print" onload="this.media='all'" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/contact.css') }}" id="contact-css" {% if
-        request.endpoint !='contact' %}media="print" onload="this.media='all'" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}" id="about-css" {% if
-        request.endpoint !='about' %}media="print" onload="this.media='all'" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/about-page.css') }}" id="about-page-css" {% if
-        request.endpoint !='about' %}media="print" onload="this.media='all'" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/category.css') }}" id="category-css" {% if
-        request.endpoint !='category' and request.endpoint !='all_categories' %}media="print" onload="this.media='all'"
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}" id="faq-css" data-static-base-style="true" {% if request.endpoint
+        !='faq' %}media="print" {% endif %}>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/contact.css') }}" id="contact-css" data-static-base-style="true" {% if
+        request.endpoint !='contact' %}media="print" {% endif %}>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}" id="about-css" data-static-base-style="true">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/about-page.css') }}" id="about-page-css" data-static-base-style="true">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/category.css') }}" id="category-css" data-static-base-style="true" {% if
+        request.endpoint !='category' and request.endpoint !='all_categories' %}media="print"
         {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}" id="profile-css" {% if
-        request.endpoint !='profile' %}media="print" onload="this.media='all'" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" id="admin-css" {% if
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}" id="profile-css" data-static-base-style="true" {% if
         request.endpoint !='profile' %}media="print" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}" id="post-detail-css" {% if
-        request.endpoint not in ['post', 'post_by_slug' ] %}media="print" onload="this.media='all'" {% endif %}>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}" id="plans-css" {% if
-        request.endpoint !='plans' %}media="print" onload="this.media='all'" {% endif %}>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" id="admin-css" data-static-base-style="true" {% if
+        request.endpoint !='profile' %}media="print" {% endif %}>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}" id="post-detail-css" data-static-base-style="true" {% if
+        request.endpoint not in ['post', 'post_by_slug' ] %}media="print" {% endif %}>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}" id="plans-css" data-static-base-style="true">
 
     {% block extra_css %}{% endblock %}
 
     <!-- CSS Customizado das Configurações -->
     {% if site_configs.get('custom_css') %}
-    <style>
+    <style data-static-base-style="true">
         {
                 {
                 site_configs.custom_css | safe
@@ -98,8 +93,8 @@
 
     <!-- Google Analytics -->
     {% if site_configs.get('google_analytics') %}
-    <script async src="https://www.googletagmanager.com/gtag/js?id={{ site_configs.google_analytics }}"></script>
-    <script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ site_configs.google_analytics }}" data-static-base-script="true"></script>
+    <script data-static-base-script="true">
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
         gtag('js', new Date());
@@ -138,7 +133,9 @@
                             class="dropdown-toggle {% if request.path == url_for('home') %}active{% endif %}"><i
                                 class="fas fa-home"></i> Início</a></li>
                     <li class="dropdown">
-                        <a href="{{ url_for('all_categories') }}" class="dropdown-toggle">
+                        <a href="{{ url_for('all_categories') }}"
+                            class="dropdown-toggle {% if request.endpoint in ['all_categories', 'category', 'subcategory'] or request.path.startswith('/categoria/') %}active{% endif %}"
+                            data-nav-group="categories">
                             <i class="fas fa-folder"></i> Categorias <i class="fas fa-chevron-down dropdown-arrow"></i>
                         </a>
                         <div class="dropdown-menu">
@@ -240,7 +237,9 @@
                         </div>
                     </li>
                     <li class="dropdown">
-                        <a href="#" class="dropdown-toggle">
+                        <a href="#"
+                            class="dropdown-toggle {% if request.endpoint in ['about', 'faq', 'contact', 'terms_of_service', 'privacy_policy'] or request.path in ['/about', '/sobre', '/faq', '/contact', '/contato', '/termos-de-uso', '/politica-de-privacidade'] %}active{% endif %}"
+                            data-nav-group="support">
                             <i class="fas fa-question-circle"></i> Ajuda & Suporte <i
                                 class="fas fa-chevron-down dropdown-arrow"></i>
                         </a>
@@ -385,31 +384,31 @@
     </div>
 
     <!-- JavaScript Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/SplitText.min.js"></script>
-    <script id="firebase-config" type="application/json">{{ firebase_public_config | tojson | safe }}</script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js" data-static-base-script="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js" data-static-base-script="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12" data-static-base-script="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js" data-static-base-script="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/SplitText.min.js" data-static-base-script="true"></script>
+    <script id="firebase-config" type="application/json" data-static-base-script="true">{{ firebase_public_config | tojson | safe }}</script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" data-static-base-script="true"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" data-static-base-script="true"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" data-static-base-script="true"></script>
 
     <!-- Custom JavaScript -->
-    <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/faq.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/feature-modals.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/search-validation.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/realtime-chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/navbar.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/csrf.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/stats-counter.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/profile-images.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/faq.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/feature-modals.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>
     {% block extra_js %}{% endblock %}
 
-    <style>
+    <style data-static-base-style="true">
         /* Header styles */
         header {
             background: var(--white-color);
@@ -648,16 +647,16 @@
     </style>
 
     <!-- Search Suggestions -->
-    <script src="{{ url_for('static', filename='js/search-suggestions.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/search-suggestions.js') }}" data-static-base-script="true"></script>
 
     <!-- Dynamic Loading -->
-    <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}" data-static-base-script="true"></script>
 
     <!-- Particles Animation -->
-    <script src="{{ url_for('static', filename='js/particles.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/particles.js') }}" data-static-base-script="true"></script>
 
     <!-- Fixed Header Script -->
-    <script>
+    <script data-static-base-script="true">
         document.addEventListener('DOMContentLoaded', function () {
             const header = document.querySelector('header');
 
@@ -713,7 +712,7 @@
         });
     </script>
 
-    <style>
+    <style data-static-base-style="true">
         /* Search Input Wrapper */
         .search-input-wrapper {
             position: relative;
@@ -1073,7 +1072,7 @@
         {% endwith %}
     </div>
 
-    <script>
+    <script data-static-base-script="true">
         // Auto-dismiss flash messages
         document.addEventListener('DOMContentLoaded', function () {
             const toasts = document.querySelectorAll('.favorite-toast');
@@ -1089,7 +1088,7 @@
     </script>
 
     <!-- Download Control System -->
-    <script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/download-control.js') }}" data-static-base-script="true"></script>
 
     <!-- Aviso sobre Miniaturas Ilustrativas -->
     <div id="thumbnailDisclaimerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99998; justify-content:center; align-items:center;">
@@ -1112,7 +1111,7 @@
             </button>
         </div>
     </div>
-    <script>
+    <script data-static-base-script="true">
     (function() {
         var disclaimerModal = document.getElementById('thumbnailDisclaimerModal');
         var dontShowCheckbox = document.getElementById('disclaimerDontShow');
@@ -1149,7 +1148,7 @@
         <span id="globalLightboxClose" style="position:absolute; top:20px; right:28px; color:#fff; font-size:2.2rem; cursor:pointer; z-index:2; line-height:1;">&times;</span>
         <img id="globalLightboxImage" src="" alt="" style="max-width:90vw; max-height:90vh; border-radius:8px; object-fit:contain; box-shadow:0 8px 40px rgba(0,0,0,0.5);">
     </div>
-    <script>
+    <script data-static-base-script="true">
     (function() {
         var lightbox = document.getElementById('globalImageLightbox');
         var lightboxImg = document.getElementById('globalLightboxImage');
@@ -1196,12 +1195,12 @@
             <div id="multiDownloadOptions" style="display:flex; flex-direction:column; gap:10px;"></div>
         </div>
     </div>
-    <style>
+    <style data-static-base-style="true">
         @keyframes modalFadeIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
         .post-card .post-image img { cursor: zoom-in; }
         .download-title-thumb:not(.download-title-thumb-placeholder) { cursor: zoom-in; }
     </style>
-    <script>
+    <script data-static-base-script="true">
     (function() {
         var modal = document.getElementById('multiDownloadModal');
         var optionsDiv = document.getElementById('multiDownloadOptions');

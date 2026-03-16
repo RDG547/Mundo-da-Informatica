@@ -76,7 +76,7 @@ function showInlineToast(message, type = 'success') {
     }, 3000);
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function initializeCategoriesSearch() {
     const searchForm = document.querySelector('.category-search-form');
     const searchInput = document.querySelector('.category-search-input');
     const suggestionsDropdown = document.querySelector('.search-suggestions-dropdown');
@@ -85,6 +85,12 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('Search elements not found on categories page');
         return;
     }
+
+    if (searchInput.dataset.categoriesSearchInitialized === 'true') {
+        return;
+    }
+
+    searchInput.dataset.categoriesSearchInitialized = 'true';
 
     let debounceTimer = null;
     let selectedIndex = -1;
@@ -321,4 +327,12 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeCategoriesSearch);
+} else {
+    initializeCategoriesSearch();
+}
+
+document.addEventListener('pageLoaded', initializeCategoriesSearch);

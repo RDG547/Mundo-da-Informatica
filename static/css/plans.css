@@ -34,7 +34,7 @@
     pointer-events: none;
 }
 
-.hero-particles {
+.plans-hero .hero-particles {
     position: absolute;
     top: 0;
     left: 0;
@@ -44,7 +44,7 @@
     animation: float 6s ease-in-out infinite;
 }
 
-.hero-overlay {
+.plans-hero .hero-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -59,7 +59,7 @@
     z-index: 2;
 }
 
-.hero-content {
+.plans-hero .hero-content {
     text-align: center !important;
     width: 100%;
     display: flex;
@@ -68,13 +68,13 @@
     justify-content: center;
 }
 
-.hero-icon {
+.plans-hero .hero-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
     opacity: 0.9;
 }
 
-.hero-title {
+.plans-hero .hero-title {
     font-size: 2.8rem;
     font-weight: 700;
     margin-bottom: 1rem;
@@ -84,7 +84,7 @@
     background-clip: text;
 }
 
-.hero-subtitle {
+.plans-hero .hero-subtitle {
     font-size: 1.1rem;
     opacity: 0.9;
     margin-bottom: 2rem;
@@ -227,19 +227,19 @@
     gap: 0.5rem;
 }
 
-.currency {
+.plan-price .currency {
     font-size: 1.5rem;
     font-weight: 600;
     color: #718096;
 }
 
-.amount {
+.plan-price .amount {
     font-size: 3rem;
     font-weight: 800;
     color: #2d3748;
 }
 
-.period {
+.plan-price .period {
     font-size: 1rem;
     color: #718096;
 }
@@ -403,6 +403,11 @@
     gap: 0.6rem;
 }
 
+.plans-faq-section .section-title i {
+    color: #3182ce;
+    font-size: 2rem;
+}
+
 .plans-faq-section::before {
     content: '';
     position: absolute;
@@ -429,6 +434,7 @@
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid rgba(0, 0, 0, 0.02);
+    position: relative;
 }
 
 .plans-faq-section .faq-item:hover {
@@ -445,6 +451,21 @@
     align-items: center;
     background: white;
     transition: all 0.3s ease;
+}
+
+.plans-faq-section .faq-item.active {
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+    border-color: rgba(102, 126, 234, 0.18);
+}
+
+.plans-faq-section .faq-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
 }
 
 .plans-faq-section .faq-question h4 {
@@ -494,6 +515,7 @@
     line-height: 1.7;
     font-size: 1rem;
     border-top: 1px solid transparent;
+    margin-left: 4px;
 }
 
 .plans-faq-section .faq-item.active .faq-answer-content {
@@ -521,15 +543,15 @@
 }
 
 @media (max-width: 768px) {
-    .hero-title {
+    .plans-hero .hero-title {
         font-size: 2.2rem;
     }
 
-    .hero-subtitle {
+    .plans-hero .hero-subtitle {
         font-size: 1.1rem;
     }
 
-    .section-title {
+    .plans-faq-section .section-title {
         font-size: 2rem;
     }
 

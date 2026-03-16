@@ -13,41 +13,61 @@ if (typeof window.DynamicLoader !== 'undefined') {
             this.currentUrl = window.location.href;
             this.isLoading = false;
             this.cache = new Map();
-            this.fullReloadPaths = new Set([
-                '/',
-                '/home',
-                '/home/',
-                '/about',
-                '/about/',
-                '/sobre',
-                '/sobre/',
-                '/planos',
-                '/planos/',
-                '/plans',
-                '/plans/',
-                '/faq',
-                '/faq/',
-                '/contact',
-                '/contact/',
-                '/contato',
-                '/contato/',
-                '/login',
-                '/login/',
-                '/register',
-                '/register/',
-                '/reset-password',
-                '/reset-password/'
-            ]);
+            this.fullReloadPaths = new Set();
             this.init();
         }
 
         init() {
+            this.installReadyEventFallbacks();
             this.bindEvents();
             this.createLoadingIndicator();
             this.handleBrowserNavigation();
 
             // Initialize page styles for current page
             this.initializeCurrentPageStyles();
+        }
+
+        installReadyEventFallbacks() {
+            if (window.__dynamicReadyFallbacksInstalled) {
+                return;
+            }
+
+            const invokeListener = (listener, target, eventName) => {
+                const event = new Event(eventName);
+                setTimeout(() => {
+                    try {
+                        if (typeof listener === 'function') {
+                            listener.call(target, event);
+                        } else if (listener && typeof listener.handleEvent === 'function') {
+                            listener.handleEvent(event);
+                        }
+                    } catch (error) {
+                        console.error(`[DYNAMIC-LOADING] Erro ao disparar ${eventName}:`, error);
+                    }
+                }, 0);
+            };
+
+            const originalDocumentAddEventListener = document.addEventListener.bind(document);
+            document.addEventListener = (type, listener, options) => {
+                if (type === 'DOMContentLoaded' && document.readyState !== 'loading') {
+                    invokeListener(listener, document, 'DOMContentLoaded');
+                    return;
+                }
+
+                originalDocumentAddEventListener(type, listener, options);
+            };
+
+            const originalWindowAddEventListener = window.addEventListener.bind(window);
+            window.addEventListener = (type, listener, options) => {
+                if (type === 'load' && document.readyState === 'complete') {
+                    invokeListener(listener, window, 'load');
+                    return;
+                }
+
+                originalWindowAddEventListener(type, listener, options);
+            };
+
+            window.__dynamicReadyFallbacksInstalled = true;
         }
 
         initializeCurrentPageStyles() {
@@ -135,11 +155,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 return false;
             }
 
-            // DON'T INTERCEPT PROFILE LINKS - profile page has sidebar and needs full reload
-            if (url.pathname.startsWith('/profile')) {
-                return false;
-            }
-
             if (this.shouldForceFullReload(url.pathname)) {
                 return false;
             }
@@ -167,7 +182,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
             return true;
         }
 
-        async loadPage(url) {
+        async loadPage(url, options = {}) {
+            const { updateHistory = true } = options;
             // Prevent loading same page or loading while already loading
             if (this.isLoading || url === this.currentUrl) {
                 return;
@@ -177,13 +193,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
             const currentPath = window.location.pathname;
             const targetPath = targetUrl.pathname;
 
-            // Segurança extra: alguns links chamam loadPage() diretamente (fora do interceptador).
-            // Nessas rotas críticas, forçamos recarregamento completo para evitar estado visual quebrado.
-            if (this.shouldForceFullReload(targetPath) && targetPath !== currentPath) {
-                window.location.href = targetUrl.href;
-                return;
-            }
-
             this.isLoading = true;
             this.showLoading();
 
@@ -191,8 +200,13 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 // Always fetch fresh content to avoid stale CSS/JS issues
                 const content = await this.fetchPageContent(url);
 
-                this.updatePage(content, url);
-                this.updateUrl(url);
+                if (updateHistory) {
+                    this.updateUrl(url);
+                } else {
+                    this.currentUrl = url;
+                }
+
+                await this.updatePage(content, url);
 
             } catch (error) {
                 console.error('Error loading page:', error);
@@ -237,23 +251,34 @@ if (typeof window.DynamicLoader !== 'undefined') {
             return {
                 title: doc.title,
                 content: content,
-                scripts: Array.from(doc.querySelectorAll('script[src]')),
-                inlineScripts: Array.from(doc.querySelectorAll('script:not([src])')),
-                styles: Array.from(doc.querySelectorAll('link[rel="stylesheet"]')),
-                inlineStyles: Array.from(doc.querySelectorAll('style'))
+                scripts: Array.from(doc.querySelectorAll('script[src]')).filter(script =>
+                    !script.hasAttribute('data-static-base-script') && !content.contains(script)
+                ),
+                inlineScripts: Array.from(doc.querySelectorAll('script:not([src])')).filter(script =>
+                    !script.hasAttribute('data-static-base-script')
+                    && script.type !== 'application/json'
+                    && !content.contains(script)
+                ),
+                styles: Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).filter(style =>
+                    !style.hasAttribute('data-static-base-style')
+                ),
+                inlineStyles: Array.from(doc.querySelectorAll('style')).filter(style =>
+                    !style.hasAttribute('data-static-base-style')
+                )
             };
         }
 
-        updatePage(pageData, url) {
+        async updatePage(pageData, url) {
             // Update page title
             document.title = pageData.title;
 
             // Load page-specific styles (skipped for admin)
-            this.loadPageStyles(url, pageData.styles);
+            await this.loadPageStyles(url, pageData.styles);
 
             // Find main content container
             // For admin pages, target the admin-content-wrapper specifically
-            const isAdminPage = window.location.pathname.startsWith('/admin');
+            const targetPath = new URL(url, window.location.origin).pathname;
+            const isAdminPage = targetPath.startsWith('/admin');
             let mainContainer;
 
             if (isAdminPage) {
@@ -268,10 +293,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
             }
 
             if (mainContainer && pageData.content) {
+                mainContainer.setAttribute('data-dynamic-loading-root', 'true');
                 if (isAdminPage) {
                     // Instant update for admin
                     mainContainer.innerHTML = pageData.content.innerHTML;
-                    this.loadPageScripts(pageData.scripts);
+                    await this.loadPageScripts(url, pageData.scripts);
                     this.executeInlineScripts(pageData.inlineScripts);
                     this.applyInlineStyles(pageData.inlineStyles);
                     this.executeContentScripts(mainContainer);
@@ -282,28 +308,28 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     mainContainer.style.opacity = '0';
                     mainContainer.style.transition = 'opacity 0.15s ease-in-out';
 
-                    setTimeout(() => {
-                        console.log('[DYNAMIC-LOADING] 📄 Atualizando conteúdo da página');
-                        mainContainer.innerHTML = pageData.content.innerHTML;
+                    await new Promise(resolve => setTimeout(resolve, 100));
 
-                        console.log('[DYNAMIC-LOADING] 📜 Carregando scripts');
-                        this.loadPageScripts(pageData.scripts);
-                        this.executeInlineScripts(pageData.inlineScripts);
-                        this.applyInlineStyles(pageData.inlineStyles);
-                        this.executeContentScripts(mainContainer);
+                    console.log('[DYNAMIC-LOADING] 📄 Atualizando conteúdo da página');
+                    mainContainer.innerHTML = pageData.content.innerHTML;
 
-                        // Reinicializa componentes imediatamente
-                        this.reinitializeComponents();
+                    console.log('[DYNAMIC-LOADING] 📜 Carregando scripts');
+                    await this.loadPageScripts(url, pageData.scripts);
+                    this.executeInlineScripts(pageData.inlineScripts);
+                    this.applyInlineStyles(pageData.inlineStyles);
+                    this.executeContentScripts(mainContainer);
 
-                        // Double rAF ensures the browser has painted with styles applied
+                    // Reinicializa componentes imediatamente
+                    this.reinitializeComponents();
+
+                    // Double rAF ensures the browser has painted with styles applied
+                    requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                mainContainer.style.opacity = '1';
-                            });
+                            mainContainer.style.opacity = '1';
                         });
+                    });
 
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }, 100);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             }
 
@@ -480,6 +506,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 window.initTheme();
             }
 
+            // Re-initialize shared UI behaviors
+            if (typeof window.initializeMainUi === 'function') {
+                console.log('[DYNAMIC-LOADING] 🧩 Reinicializando main UI');
+                window.initializeMainUi();
+            }
+
             // Re-initialize navbar interactions
             if (typeof window.initNavbar === 'function') {
                 console.log('[DYNAMIC-LOADING] 📱 Reinicializando navbar');
@@ -487,7 +519,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
             }
 
             // Re-initialize any other components
-            console.log('[DYNAMIC-LOADING] ✨ Disparando evento pageLoaded');
+            console.log('[DYNAMIC-LOADING] ✨ Disparando eventos de ciclo de vida');
+            this.dispatchEvent('contentLoaded');
             this.dispatchEvent('pageLoaded');
 
             console.log('[DYNAMIC-LOADING] ✅ Reinicialização completa!');
@@ -514,7 +547,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             document.dispatchEvent(adminScriptEvent);
         }
 
-        loadPageStyles(url, styles) {
+        async loadPageStyles(url, styles) {
             // Don't reload styles in admin area - they're already loaded
             const path = new URL(url, window.location.origin).pathname;
             if (path.startsWith('/admin')) {
@@ -532,42 +565,64 @@ if (typeof window.DynamicLoader !== 'undefined') {
             const postDetailCSS = document.getElementById('post-detail-css');
             const adminCSS = document.getElementById('admin-css');
 
+            const activatedStyles = [];
+
             // Desativar todos os CSS específicos de página
             if (faqCSS) faqCSS.media = 'print';
             if (contactCSS) contactCSS.media = 'print';
-            if (aboutCSS) aboutCSS.media = 'print';
-            if (aboutPageCSS) aboutPageCSS.media = 'print';
             if (categoryCSS) categoryCSS.media = 'print';
             if (profileCSS) profileCSS.media = 'print';
-            if (plansCSS) plansCSS.media = 'print';
             if (postDetailCSS) postDetailCSS.media = 'print';
             if (adminCSS) adminCSS.media = 'print';
 
             // Determine which page-specific CSS to activate based on URL
             if (path === '/faq' && faqCSS) {
                 faqCSS.media = 'all';
+                activatedStyles.push(faqCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 FAQ CSS ativado');
             } else if ((path === '/contact' || path === '/contato') && contactCSS) {
                 contactCSS.media = 'all';
+                activatedStyles.push(contactCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Contact CSS ativado');
             } else if ((path === '/about' || path === '/sobre') && aboutCSS) {
                 aboutCSS.media = 'all';
+                activatedStyles.push(aboutCSS);
                 if (aboutPageCSS) aboutPageCSS.media = 'all';
+                if (aboutPageCSS) activatedStyles.push(aboutPageCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 About CSS ativado');
             } else if ((path.startsWith('/categoria/') || path === '/categorias' || path === '/posts') && categoryCSS) {
                 categoryCSS.media = 'all';
+                activatedStyles.push(categoryCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Category CSS ativado');
             } else if (path.startsWith('/profile')) {
                 if (profileCSS) profileCSS.media = 'all';
+                if (profileCSS) activatedStyles.push(profileCSS);
                 if (adminCSS) adminCSS.media = 'all'; // Profile também usa admin.css
+                if (adminCSS) activatedStyles.push(adminCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Profile CSS ativado');
             } else if ((path === '/plans' || path === '/planos') && plansCSS) {
                 plansCSS.media = 'all';
+                activatedStyles.push(plansCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Plans CSS ativado');
             } else if (path.startsWith('/post/') || this.isPostPage(path)) {
                 if (postDetailCSS) postDetailCSS.media = 'all';
+                if (postDetailCSS) activatedStyles.push(postDetailCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Post Detail CSS ativado');
             }
+
+            if (aboutCSS && !activatedStyles.includes(aboutCSS)) {
+                activatedStyles.push(aboutCSS);
+            }
+            if (aboutPageCSS && !activatedStyles.includes(aboutPageCSS)) {
+                activatedStyles.push(aboutPageCSS);
+            }
+            if (plansCSS && !activatedStyles.includes(plansCSS)) {
+                activatedStyles.push(plansCSS);
+            }
+
+            await Promise.all(activatedStyles.map((styleLink) => this.ensureStylesheetReady(styleLink)));
+            await this.syncDynamicStyles(styles);
+            await this.waitForNextPaint();
         }
 
         // Helper para detectar páginas de post (categoria/slug)
@@ -576,33 +631,55 @@ if (typeof window.DynamicLoader !== 'undefined') {
             return parts.length === 2 && !['admin', 'profile', 'categoria', 'api'].includes(parts[0]);
         }
 
-        loadPageScripts(scripts) {
-            // Don't reload scripts in admin area - they're already loaded
-            const currentPath = window.location.pathname;
-            if (currentPath.startsWith('/admin')) {
+        async loadPageScripts(url, scripts) {
+            const path = new URL(url, window.location.origin).pathname;
+            if (path.startsWith('/admin')) {
                 return;
             }
 
-            // Load page-specific scripts
-            scripts.forEach(scriptElement => {
-                if (scriptElement.src && !document.querySelector(`script[src="${scriptElement.src}"]`)) {
+            document.querySelectorAll('script[data-dynamic-js="true"]').forEach((script) => script.remove());
+            const baseScriptUrls = new Set(
+                Array.from(document.querySelectorAll('script[data-static-base-script="true"][src]'))
+                    .map((script) => script.src)
+            );
+            const loadedDynamicUrls = new Set();
+
+            for (const scriptElement of scripts) {
+                if (!scriptElement.src) {
+                    continue;
+                }
+
+                const normalizedSrc = new URL(scriptElement.src, window.location.origin).href;
+                if (baseScriptUrls.has(normalizedSrc) || loadedDynamicUrls.has(normalizedSrc)) {
+                    continue;
+                }
+                loadedDynamicUrls.add(normalizedSrc);
+
+                await new Promise((resolve) => {
                     const script = document.createElement('script');
-                    script.src = scriptElement.src;
-                    script.async = true; // Load asynchronously
+                    script.src = normalizedSrc;
+                    script.async = false;
                     script.setAttribute('data-dynamic-js', 'true');
 
-                    // Add load listener for debugging
+                    Array.from(scriptElement.attributes).forEach(attr => {
+                        if (attr.name !== 'src') {
+                            script.setAttribute(attr.name, attr.value);
+                        }
+                    });
+
                     script.onload = () => {
                         console.log('Script loaded:', scriptElement.src);
+                        resolve();
                     };
 
                     script.onerror = () => {
                         console.error('Failed to load script:', scriptElement.src);
+                        resolve();
                     };
 
-                    document.head.appendChild(script);
-                }
-            });
+                    document.body.appendChild(script);
+                });
+            }
         }
 
         executeInlineScripts(inlineScripts) {
@@ -642,6 +719,94 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 });
 
                 document.head.appendChild(style);
+            });
+        }
+
+        async syncDynamicStyles(styles) {
+            const desiredHrefs = new Set(
+                styles
+                    .map(style => style.href)
+                    .filter(Boolean)
+                    .map(href => new URL(href, window.location.origin).href)
+            );
+
+            document.querySelectorAll('link[data-dynamic-page-style="true"]').forEach(link => {
+                if (!desiredHrefs.has(link.href)) {
+                    link.remove();
+                }
+            });
+
+            const existingHrefs = new Set(
+                Array.from(document.querySelectorAll('link[rel="stylesheet"][href]'))
+                    .map(link => link.href)
+            );
+
+            for (const href of desiredHrefs) {
+                if (existingHrefs.has(href)) {
+                    continue;
+                }
+
+                await new Promise((resolve) => {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = href;
+                    link.setAttribute('data-dynamic-page-style', 'true');
+                    link.onload = () => resolve();
+                    link.onerror = () => resolve();
+                    document.head.appendChild(link);
+                });
+            }
+        }
+
+        ensureStylesheetReady(link) {
+            if (!link) {
+                return Promise.resolve();
+            }
+
+            return new Promise((resolve) => {
+                let settled = false;
+                const finish = () => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    link.dataset.dynamicStylesheetReady = 'true';
+                    link.removeEventListener('load', finish);
+                    link.removeEventListener('error', finish);
+                    resolve();
+                };
+
+                if (this.isStylesheetReady(link)) {
+                    finish();
+                    return;
+                }
+
+                link.addEventListener('load', finish, { once: true });
+                link.addEventListener('error', finish, { once: true });
+
+                setTimeout(() => {
+                    if (this.isStylesheetReady(link)) {
+                        finish();
+                    }
+                }, 0);
+
+                setTimeout(finish, 1500);
+            });
+        }
+
+        isStylesheetReady(link) {
+            try {
+                return Boolean(link.sheet);
+            } catch (error) {
+                return true;
+            }
+        }
+
+        waitForNextPaint() {
+            return new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(resolve);
+                });
             });
         }
 
@@ -922,16 +1087,51 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         updateActiveNavigation(url) {
+            const targetPath = new URL(url, window.location.origin).pathname;
+            const supportPaths = new Set([
+                '/about',
+                '/sobre',
+                '/faq',
+                '/contact',
+                '/contato',
+                '/termos-de-uso',
+                '/politica-de-privacidade'
+            ]);
+            const isCategoryPath = targetPath === '/categorias' || targetPath.startsWith('/categoria/');
+
             // Remove active class from all nav links
             document.querySelectorAll('.nav-menu a').forEach(link => {
                 link.classList.remove('active');
             });
 
+            document.querySelectorAll('.nav-menu a[data-nav-group="support"]').forEach(link => {
+                if (supportPaths.has(targetPath)) {
+                    link.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.nav-menu a[data-nav-group="categories"]').forEach(link => {
+                if (isCategoryPath) {
+                    link.classList.add('active');
+                }
+            });
+
             // Add active class to current page link
-            const currentLink = document.querySelector(`a[href="${url}"]`);
-            if (currentLink) {
-                currentLink.classList.add('active');
-            }
+            document.querySelectorAll('.nav-menu a[href]').forEach(link => {
+                try {
+                    const rawHref = link.getAttribute('href');
+                    if (!rawHref || rawHref === '#' || link.dataset.navGroup) {
+                        return;
+                    }
+
+                    const linkPath = new URL(link.href, window.location.origin).pathname;
+                    if (linkPath === targetPath) {
+                        link.classList.add('active');
+                    }
+                } catch (error) {
+                    console.warn('[DYNAMIC-LOADING] Erro ao atualizar navegação ativa:', error);
+                }
+            });
         }
 
         updateUrl(url) {
@@ -941,9 +1141,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
         handleBrowserNavigation() {
             window.addEventListener('popstate', (e) => {
-                if (e.state && e.state.url) {
-                    this.loadPage(e.state.url);
-                }
+                const targetUrl = e.state?.url || window.location.href;
+                this.loadPage(targetUrl, { updateHistory: false });
             });
         }
 
@@ -974,15 +1173,23 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 const content = {
                     title: doc.title,
                     content: doc.querySelector('main') || doc.querySelector('.container') || doc.body,
-                    scripts: Array.from(doc.querySelectorAll('script[src]')),
-                    inlineScripts: Array.from(doc.querySelectorAll('script:not([src])')),
-                    styles: Array.from(doc.querySelectorAll('link[rel="stylesheet"]')),
-                    inlineStyles: Array.from(doc.querySelectorAll('style'))
+                    scripts: Array.from(doc.querySelectorAll('script[src]')).filter(script =>
+                        !script.hasAttribute('data-static-base-script')
+                    ),
+                    inlineScripts: Array.from(doc.querySelectorAll('script:not([src])')).filter(script =>
+                        !script.hasAttribute('data-static-base-script') && script.type !== 'application/json'
+                    ),
+                    styles: Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).filter(style =>
+                        !style.hasAttribute('data-static-base-style')
+                    ),
+                    inlineStyles: Array.from(doc.querySelectorAll('style')).filter(style =>
+                        !style.hasAttribute('data-static-base-style')
+                    )
                 };
 
-                // Update page with new content (whether it's the same page with errors or a new page)
-                this.updatePage(content, finalUrl);
                 this.updateUrl(finalUrl);
+                // Update page with new content (whether it's the same page with errors or a new page)
+                await this.updatePage(content, finalUrl);
 
             } catch (error) {
                 console.error('Error submitting form:', error);
@@ -995,6 +1202,10 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         createLoadingIndicator() {
+            if (document.getElementById('dynamic-loader')) {
+                return;
+            }
+
             const loader = document.createElement('div');
             loader.id = 'dynamic-loader';
             loader.innerHTML = `
@@ -1008,16 +1219,13 @@ if (typeof window.DynamicLoader !== 'undefined') {
             style.textContent = `
             #dynamic-loader {
                 position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
                 background: rgba(255, 255, 255, 0.9);
                 display: none;
                 justify-content: center;
                 align-items: center;
                 z-index: 9999;
                 backdrop-filter: blur(5px);
+                pointer-events: auto;
             }
 
             .loader-spinner {
@@ -1053,6 +1261,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
         showLoading() {
             const loader = document.getElementById('dynamic-loader');
             if (loader) {
+                this.attachLoaderToMain(loader);
                 loader.style.display = 'flex';
             }
         }
@@ -1062,6 +1271,40 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (loader) {
                 loader.style.display = 'none';
             }
+        }
+
+        attachLoaderToMain(loader) {
+            const mainContainer = document.querySelector('.main-content-container') ||
+                document.querySelector('main') ||
+                document.querySelector('[data-dynamic-loading-root="true"]');
+
+            if (!mainContainer) {
+                if (loader.parentNode !== document.body) {
+                    document.body.appendChild(loader);
+                }
+                loader.style.top = '0';
+                loader.style.left = '0';
+                loader.style.width = '100vw';
+                loader.style.height = '100vh';
+                return;
+            }
+
+            const rect = mainContainer.getBoundingClientRect();
+            const header = document.querySelector('header');
+            const headerRect = header?.getBoundingClientRect();
+            const top = Math.max(rect.top, headerRect ? headerRect.bottom : 0, 0);
+            const left = Math.max(rect.left, 0);
+            const width = Math.max(rect.width, window.innerWidth);
+            const height = Math.max(Math.min(rect.bottom, window.innerHeight) - top, 240);
+
+            if (loader.parentNode !== document.body) {
+                document.body.appendChild(loader);
+            }
+
+            loader.style.top = `${top}px`;
+            loader.style.left = `${left}px`;
+            loader.style.width = `${width}px`;
+            loader.style.height = `${height}px`;
         }
 
         dispatchEvent(eventName, data = {}) {

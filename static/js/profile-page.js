@@ -1126,3 +1126,4 @@ if (document.readyState === 'loading') {
 
 // Re-inicializar quando carregado dinamicamente
 document.addEventListener('contentLoaded', initializeProfilePage);
+document.addEventListener('pageLoaded', initializeProfilePage);

@@ -301,6 +301,24 @@ def serialize_comment(comment: "Comment") -> dict[str, Any]:
     return comment_data
 
 
+def request_prefers_json_response() -> bool:
+    return bool(
+        request.is_json
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in (request.headers.get('Accept') or '')
+    )
+
+
+def redirect_back_to_post(post: "Post | None", fallback_endpoint: str = 'home'):
+    if post is not None:
+        if getattr(post, 'slug', None) and getattr(post, 'category_str', None):
+            return redirect(url_for('post_by_slug', category=generate_slug(post.category_str), slug=post.slug))
+        if getattr(post, 'id', None):
+            return redirect(url_for('post', post_id=post.id))
+
+    return redirect(url_for(fallback_endpoint))
+
+
 def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
     seen_ids = {post.id}
     related_posts: list[Post] = []
@@ -1759,6 +1777,11 @@ class Comment(db.Model):
         """Retorna o status do comentário baseado em is_approved"""
         return 'approved' if self.is_approved else 'pending'
 
+    @status.setter
+    def status(self, value):
+        normalized = str(value or '').strip().lower()
+        self.is_approved = normalized == 'approved'
+
     @property
     def created_at(self):
         """Alias para date_posted para compatibilidade com template"""
@@ -2622,10 +2645,13 @@ def add_post_comment_by_slug(category, slug):
         is_valid, error_message, validated_data = validate_comment_data(data)
 
         if not is_valid:
-            return jsonify({
-                'success': False,
-                'message': error_message
-            }), 400
+            if request_prefers_json_response():
+                return jsonify({
+                    'success': False,
+                    'message': error_message
+                }), 400
+            flash(error_message or 'Não foi possível validar o comentário.', 'error')
+            return redirect_back_to_post(post)
 
         # Type guard: garantir que validated_data não é None após validação bem-sucedida
         assert validated_data is not None, "validated_data should not be None when is_valid is True"
@@ -2635,24 +2661,32 @@ def add_post_comment_by_slug(category, slug):
             # Verificar limite de comentários baseado no plano
             allowed, message = check_comment_limit(current_user)
             if not allowed:
-                return jsonify({
-                    'success': False,
-                    'message': message
-                }), 403
+                if request_prefers_json_response():
+                    return jsonify({
+                        'success': False,
+                        'message': message
+                    }), 403
+                flash(message, 'warning')
+                return redirect_back_to_post(post)
 
             new_comment = Comment(
                 content=validated_data['content'],
                 post_id=post.id,
                 user_id=current_user.id,
+                author_name=current_user.name or current_user.username,
+                author_email=current_user.email,
                 is_approved=True  # Comentários de usuários logados são aprovados automaticamente
             )
         else:
             # Validar nome e email para usuários não logados
             if not validated_data['author_name'] or not validated_data['author_email']:
-                return jsonify({
-                    'success': False,
-                    'message': 'Nome e email são obrigatórios.'
-                }), 400
+                if request_prefers_json_response():
+                    return jsonify({
+                        'success': False,
+                        'message': 'Nome e email são obrigatórios.'
+                    }), 400
+                flash('Nome e email são obrigatórios.', 'error')
+                return redirect_back_to_post(post)
 
             new_comment = Comment(
                 content=validated_data['content'],
@@ -2676,14 +2710,21 @@ def add_post_comment_by_slug(category, slug):
             }
         }
 
-        return jsonify(response_data), 201
+        if request_prefers_json_response():
+            return jsonify(response_data), 201
+
+        flash(response_data['message'], 'success' if new_comment.is_approved else 'info')
+        return redirect_back_to_post(post)
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'Erro ao adicionar comentário: {str(e)}'
-        }), 500
+        if request_prefers_json_response():
+            return jsonify({
+                'success': False,
+                'message': f'Erro ao adicionar comentário: {str(e)}'
+            }), 500
+        flash('Erro ao adicionar comentário. Tente novamente.', 'error')
+        return redirect_back_to_post(post if 'post' in locals() else None)
 
 
 @app.route('/<string:category>/<string:slug>/comments/<int:comment_id>', methods=['DELETE'])
@@ -2790,20 +2831,22 @@ def edit_comment_by_slug(category, slug, comment_id):
 def add_post_comment(post_id):
     """Adiciona um novo comentário a um post específico (rota legada)"""
     try:
-        # Verifica se o post existe (lança 404 se não existir)
-        Post.query.get_or_404(post_id)
+        post = Post.query.get_or_404(post_id)
 
-        # Obter e validar dados do formulário
+        # Verifica se o post existe (lança 404 se não existir)
         data = request.get_json(silent=True) if request.is_json else request.form
         if request.is_json and not isinstance(data, dict):
             return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         is_valid, error_message, validated_data = validate_comment_data(data)
 
         if not is_valid:
-            return jsonify({
-                'success': False,
-                'message': error_message
-            }), 400
+            if request_prefers_json_response():
+                return jsonify({
+                    'success': False,
+                    'message': error_message
+                }), 400
+            flash(error_message or 'Não foi possível validar o comentário.', 'error')
+            return redirect_back_to_post(post)
 
         # Type guard: garantir que validated_data não é None após validação bem-sucedida
         assert validated_data is not None, "validated_data should not be None when is_valid is True"
@@ -2813,24 +2856,32 @@ def add_post_comment(post_id):
             # Verificar limite de comentários baseado no plano
             allowed, message = check_comment_limit(current_user)
             if not allowed:
-                return jsonify({
-                    'success': False,
-                    'message': message
-                }), 403
+                if request_prefers_json_response():
+                    return jsonify({
+                        'success': False,
+                        'message': message
+                    }), 403
+                flash(message, 'warning')
+                return redirect_back_to_post(post)
 
             new_comment = Comment(
                 content=validated_data['content'],
                 post_id=post_id,
                 user_id=current_user.id,
+                author_name=current_user.name or current_user.username,
+                author_email=current_user.email,
                 is_approved=True  # Comentários de usuários logados são aprovados automaticamente
             )
         else:
             # Validar nome e email para usuários não logados
             if not validated_data['author_name'] or not validated_data['author_email']:
-                return jsonify({
-                    'success': False,
-                    'message': 'Nome e email são obrigatórios.'
-                }), 400
+                if request_prefers_json_response():
+                    return jsonify({
+                        'success': False,
+                        'message': 'Nome e email são obrigatórios.'
+                    }), 400
+                flash('Nome e email são obrigatórios.', 'error')
+                return redirect_back_to_post(post)
 
             new_comment = Comment(
                 content=validated_data['content'],
@@ -2854,14 +2905,21 @@ def add_post_comment(post_id):
             }
         }
 
-        return jsonify(response_data), 201
+        if request_prefers_json_response():
+            return jsonify(response_data), 201
+
+        flash(response_data['message'], 'success' if new_comment.is_approved else 'info')
+        return redirect_back_to_post(post)
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'Erro ao enviar comentário: {str(e)}'
-        }), 500
+        if request_prefers_json_response():
+            return jsonify({
+                'success': False,
+                'message': f'Erro ao enviar comentário: {str(e)}'
+            }), 500
+        flash('Erro ao enviar comentário. Tente novamente.', 'error')
+        return redirect_back_to_post(post if 'post' in locals() else None)
 
 
 @app.route('/post/<int:post_id>/comments/<int:comment_id>', methods=['DELETE'])
@@ -3122,17 +3180,17 @@ def get_user_permissions():
     comments_info = {}
     if user.plan == 'free':
         comments_info = {
-            'allowed': False,
-            'limit': 0,
-            'used': 0,
-            'remaining': 0
+            'allowed': True,
+            'limit': 3,
+            'used': comments_today,
+            'remaining': max(0, 3 - comments_today)
         }
     elif user.plan == 'premium':
         comments_info = {
             'allowed': True,
-            'limit': 2,
+            'limit': 10,
             'used': comments_today,
-            'remaining': max(0, 2 - comments_today)
+            'remaining': max(0, 10 - comments_today)
         }
     else:  # VIP
         comments_info = {
@@ -5237,7 +5295,9 @@ def _firestore_timestamp_to_millis(value):
     timestamp_method = getattr(value, 'timestamp', None)
     if callable(timestamp_method):
         try:
-            return int(timestamp_method() * 1000)
+            timestamp_seconds = timestamp_method()
+            if isinstance(timestamp_seconds, (int, float)):
+                return int(timestamp_seconds * 1000)
         except Exception:
             return 0
 
@@ -8747,13 +8807,15 @@ def check_comment_limit(user):
     ).count()
 
     if user.plan == 'premium':
-        # Premium: 2 comentários diários
-        if count >= 2:
-            return False, "Você atingiu o limite de 2 comentários diários. Faça upgrade para VIP para comentários ilimitados."
-        return True, f"Comentário autorizado. Você tem {2 - count} comentários restantes hoje."
+        # Premium: 10 comentários diários
+        if count >= 10:
+            return False, "Você atingiu o limite de 10 comentários diários. Faça upgrade para VIP para comentários ilimitados."
+        return True, f"Comentário autorizado. Você tem {10 - count} comentários restantes hoje."
 
-    # Plano Grátis: Sem permissão para comentar
-    return False, "Comentários não estão disponíveis no plano Grátis. Faça upgrade para Premium (2/dia) ou VIP (ilimitado) para comentar."
+    # Plano Grátis: 3 comentários diários
+    if count >= 3:
+        return False, "Você atingiu o limite de 3 comentários diários. Faça upgrade para Premium ou VIP para ampliar esse limite."
+    return True, f"Comentário autorizado. Você tem {3 - count} comentários restantes hoje."
 
 
 def check_download_history_access(user):

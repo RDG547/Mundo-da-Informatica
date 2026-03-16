@@ -390,3 +390,10 @@ if (document.readyState === 'loading') {
 } else {
     window.initializePlansPage();
 }
+
+document.addEventListener('pageLoaded', function () {
+    if (document.querySelector('.plans-section')) {
+        window.plansPageInitialized = false;
+        window.initializePlansPage();
+    }
+});

@@ -318,6 +318,8 @@ window.addEventListener('load', function() {
     initAuthParticles();
 });
 
+document.addEventListener('pageLoaded', initAuthParticles);
+
 // Observar mudanças no body para detectar navegações SPA
 if (typeof MutationObserver !== 'undefined') {
     const observer = new MutationObserver(function(mutations) {

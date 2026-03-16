@@ -503,4 +503,6 @@ if (typeof window.FavoriteManager !== 'undefined') {
     } else {
         favoriteManager.init();
     }
+
+    document.addEventListener('pageLoaded', () => favoriteManager.init());
 }

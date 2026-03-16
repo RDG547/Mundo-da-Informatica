@@ -5,36 +5,33 @@
  * Quando o mouse sai do dropdown, espera 300ms antes de fechar
  */
 
-document.addEventListener('DOMContentLoaded', function() {
-    const dropdowns = document.querySelectorAll('.dropdown');
+function initializeDropdownDelay() {
+    document.querySelectorAll('.dropdown').forEach((dropdown) => {
+        if (dropdown.dataset.dropdownDelayInitialized === 'true') {
+            return;
+        }
 
-    dropdowns.forEach(dropdown => {
+        dropdown.dataset.dropdownDelayInitialized = 'true';
         let closeTimer = null;
 
-        // Quando o mouse entra no dropdown
-        dropdown.addEventListener('mouseenter', function() {
-            // Cancela qualquer timer de fechamento pendente
+        dropdown.addEventListener('mouseenter', function () {
             if (closeTimer) {
                 clearTimeout(closeTimer);
                 closeTimer = null;
             }
-            // Adiciona classe para mostrar o menu
             this.classList.add('show');
         });
 
-        // Quando o mouse sai do dropdown
-        dropdown.addEventListener('mouseleave', function() {
+        dropdown.addEventListener('mouseleave', function () {
             const self = this;
-            // Define um delay de 300ms antes de fechar
-            closeTimer = setTimeout(function() {
+            closeTimer = setTimeout(function () {
                 self.classList.remove('show');
-            }, 300); // 300ms de delay
+            }, 300);
         });
 
-        // Previne o fechamento se o mouse mover para dentro do menu
         const dropdownMenu = dropdown.querySelector('.dropdown-menu');
         if (dropdownMenu) {
-            dropdownMenu.addEventListener('mouseenter', function() {
+            dropdownMenu.addEventListener('mouseenter', function () {
                 if (closeTimer) {
                     clearTimeout(closeTimer);
                     closeTimer = null;
@@ -42,4 +39,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeDropdownDelay);
+} else {
+    initializeDropdownDelay();
+}
+
+document.addEventListener('pageLoaded', initializeDropdownDelay);
+window.initializeDropdownDelay = initializeDropdownDelay;

@@ -63,6 +63,12 @@
         return originalFetch(resource, options);
     };
 
-    document.addEventListener('DOMContentLoaded', ensureFormTokens);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureFormTokens);
+    } else {
+        ensureFormTokens();
+    }
+
+    document.addEventListener('pageLoaded', ensureFormTokens);
     window.csrfUtils = { getCsrfToken, ensureFormTokens };
 })();

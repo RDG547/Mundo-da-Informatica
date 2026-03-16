@@ -34,7 +34,7 @@
     pointer-events: none;
 }
 
-.hero-particles {
+.about-hero .hero-particles {
     position: absolute;
     top: 0;
     left: 0;
@@ -43,7 +43,7 @@
     pointer-events: none;
 }
 
-.hero-particles .particle {
+.about-hero .hero-particles .particle {
     position: absolute;
     width: 4px;
     height: 4px;
@@ -114,11 +114,11 @@
     min-height: 100vh;
 }
 
-.section-header {
+.about-section .section-header {
     margin-bottom: 3rem;
 }
 
-.section-header h2 {
+.about-section .section-header h2 {
     font-size: 2.2rem;
     font-weight: 700;
     color: #2d3748;
@@ -131,7 +131,7 @@
     padding-bottom: 1rem;
 }
 
-.section-header h2::after {
+.about-section .section-header h2::after {
     content: '';
     position: absolute;
     bottom: 0;
@@ -143,12 +143,12 @@
     border-radius: 2px;
 }
 
-.section-header h2 i {
+.about-section .section-header h2 i {
     color: #3182ce;
     font-size: 2rem;
 }
 
-.section-header p {
+.about-section .section-header p {
     font-size: 1.1rem;
     color: #718096;
     max-width: 600px;
@@ -978,7 +978,7 @@
     gap: 1.5rem;
 }
 
-.feature-item {
+.community-features .feature-item {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -1045,12 +1045,12 @@
 }
 
 .community-cta {
-    background: linear-gradient(135deg, #ed8936, #dd6b20);
+    background: linear-gradient(135deg, #3a86ff 0%, #8338ec 100%);
     border-radius: 16px;
     padding: 2.5rem;
     text-align: center;
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e2e8f0;
+    box-shadow: 0 18px 40px rgba(102, 126, 234, 0.18);
+    border: 1px solid rgba(102, 126, 234, 0.2);
 }
 
 .community-cta h3 {
@@ -1248,7 +1248,7 @@
         gap: 1rem;
     }
 
-    .section-header h2,
+    .about-section .section-header h2,
     .services-header h2,
     .workflow-header h2,
     .team-header h2,
@@ -1316,10 +1316,14 @@
     height: 100%;
     z-index: 9999;
     animation: fadeIn 0.3s ease;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow-y: auto;
 }
 
 .contribute-modal.active {
-    display: block;
+    display: flex;
 }
 
 .contribute-modal-overlay {
@@ -1335,10 +1339,9 @@
 .contribute-modal-content {
     position: relative;
     background: white;
-    max-width: 900px;
-    width: 90%;
-    max-height: 90vh;
-    margin: 2rem auto;
+    width: min(860px, 100%);
+    max-height: min(92vh, calc(100dvh - 2rem));
+    margin: 0 auto;
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -1673,9 +1676,9 @@
 /* Responsividade do Modal */
 @media (max-width: 768px) {
     .contribute-modal-content {
-        width: 95%;
-        margin: 1rem auto;
-        max-height: 95vh;
+        width: min(100%, calc(100vw - 1rem));
+        max-height: min(94vh, calc(100dvh - 1rem));
+        border-radius: 18px;
     }
 
     .contribute-modal-header {
@@ -1722,6 +1725,40 @@
     .contribute-cta-buttons .btn {
         width: 100%;
         justify-content: center;
+    }
+}
+
+@media (max-width: 576px) {
+    .contribute-modal {
+        padding: 0.5rem;
+    }
+
+    .contribute-modal-content {
+        width: calc(100vw - 1rem);
+        max-height: calc(100dvh - 1rem);
+        border-radius: 16px;
+    }
+
+    .contribute-modal-header {
+        padding: 1.75rem 1rem 1.25rem;
+    }
+
+    .contribute-modal-header h2 {
+        font-size: 1.35rem;
+        line-height: 1.15;
+    }
+
+    .contribute-modal-header p {
+        font-size: 0.98rem;
+    }
+
+    .contribute-modal-body {
+        padding: 1rem;
+    }
+
+    .contribute-option {
+        gap: 1rem;
+        padding: 1.25rem;
     }
 }
 

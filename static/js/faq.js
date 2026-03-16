@@ -105,9 +105,18 @@ function initializeFAQ() {
     const faqItems = document.querySelectorAll('.faq-item');
     console.log('Found FAQ items:', faqItems.length);
 
-    // Ensure all FAQ items start in closed state
+    let defaultOpenItem = null;
+
+    // Ensure FAQ items start in a predictable state
     faqItems.forEach(item => {
-        item.classList.remove('active');
+        const shouldStartOpen = item.dataset.initialOpen === 'true';
+
+        if (shouldStartOpen && !defaultOpenItem) {
+            defaultOpenItem = item;
+        } else {
+            item.classList.remove('active');
+        }
+
         const answer = item.querySelector('.faq-answer');
         const icon = getFAQToggleIcon(item);
 
@@ -118,7 +127,15 @@ function initializeFAQ() {
         }
 
         if (icon) {
-            if (icon.classList.contains('fa-minus') || icon.classList.contains('fa-plus')) {
+            if (shouldStartOpen) {
+                if (icon.classList.contains('fa-plus') || icon.classList.contains('fa-minus')) {
+                    icon.classList.remove('fa-plus');
+                    icon.classList.add('fa-minus');
+                } else if (icon.classList.contains('fa-chevron-down') || icon.classList.contains('fa-chevron-up')) {
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                }
+            } else if (icon.classList.contains('fa-minus') || icon.classList.contains('fa-plus')) {
                 icon.classList.remove('fa-minus');
                 icon.classList.add('fa-plus');
             } else if (icon.classList.contains('fa-chevron-up') || icon.classList.contains('fa-chevron-down')) {
@@ -127,6 +144,10 @@ function initializeFAQ() {
             }
         }
     });
+
+    if (defaultOpenItem) {
+        defaultOpenItem.classList.add('active');
+    }
 
     console.log('FAQ initialization complete');
 }
@@ -290,9 +311,8 @@ function openLiveChat() {
 // Initialize FAQ functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, checking for FAQ elements');
-    if (!window.faqInitialized && (document.querySelector('.faq-section') || document.querySelector('.faq-item'))) {
+    if (document.querySelector('.faq-section')) {
         console.log('FAQ elements found, initializing');
-        window.faqInitialized = true;
         initializeFAQ();
         initializeFAQSearch();
     }
@@ -301,10 +321,9 @@ document.addEventListener('DOMContentLoaded', function() {
 // Handle dynamic content loading
 document.addEventListener('pageLoaded', function() {
     console.log('Page loaded event, checking for FAQ elements');
-    if (!window.faqInitialized && (document.querySelector('.faq-section') || document.querySelector('.faq-item'))) {
+    if (document.querySelector('.faq-section')) {
         setTimeout(() => {
             console.log('Delayed FAQ initialization');
-            window.faqInitialized = true;
             initializeFAQ();
             initializeFAQSearch();
         }, 100);

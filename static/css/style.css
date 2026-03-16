@@ -446,8 +446,8 @@ section {
     background-color: var(--dark-color);
     color: white;
     padding: 1rem 0;
-    position: sticky;
-    top: 0;
+    position: relative;
+    top: auto;
     z-index: 1000;
     box-shadow: var(--shadow-md);
     transition: var(--transition-normal);
@@ -3174,6 +3174,8 @@ footer {
 .main-content-container {
     display: flex;
     flex-direction: column;
+    position: relative;
+    isolation: isolate;
 }
 
 /* Categorias (mantém sua posição original no início) */

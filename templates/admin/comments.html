@@ -189,7 +189,7 @@
                                     <i class="fas fa-ban"></i>
                                 </a>
                                 {% endif %}
-                                <a href="#" class="btn-action btn-reply" title="Responder" data-comment-id="{{ comment.id }}">
+                                <a href="{{ url_for('post', post_id=comment.post_id) }}?reply_to={{ comment.id }}#commentForm" class="btn-action btn-reply" title="Responder" data-comment-id="{{ comment.id }}" target="_blank" rel="noopener">
                                     <i class="fas fa-reply"></i>
                                 </a>
                                 <a href="#" class="btn-action btn-delete" title="Excluir" data-comment-id="{{ comment.id }}" data-comment-author="{{ comment.author_name }}">

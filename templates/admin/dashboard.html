@@ -345,11 +345,17 @@
 <script src="{{ url_for('static', filename='js/post-wizard.js') }}"></script>
 
 <script>
-    // Aguardar carregamento completo da página
-    window.addEventListener('load', function() {
-        console.log('Dashboard: Página completamente carregada');
+    function bootDashboard() {
+        console.log('Dashboard: página pronta');
         initializeDashboard();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootDashboard);
+    } else {
+        bootDashboard();
+    }
+    document.addEventListener('adminPageLoaded', bootDashboard);
 
     function initializeDashboard() {
         console.log('Inicializando dashboard...');

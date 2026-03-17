@@ -199,6 +199,49 @@
             transform: translateY(0);
         }
     }
+
+    #addPostModal .download-entry-row {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin-bottom: 4px;
+    }
+
+    #addPostModal .download-type-select {
+        flex: 0 0 120px !important;
+        width: 120px !important;
+        max-width: 120px !important;
+    }
+
+    #addPostModal .download-url-group {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+
+    #addPostModal .download-size-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+        margin-left: 128px;
+    }
+
+    #addPostModal .download-size-input {
+        width: 110px !important;
+        max-width: 110px !important;
+        flex: 0 0 110px !important;
+    }
+
+    #addPostModal .download-size-unit {
+        width: 96px !important;
+        max-width: 96px !important;
+        flex: 0 0 96px !important;
+        padding-right: 2.25rem !important;
+    }
+
+    #addPostModal .subcategory-input {
+        width: 100% !important;
+    }
 </style>
 <div class="modal" id="addPostModal">
     <div class="modal-content modal-xl">
@@ -330,6 +373,18 @@
                                     <div class="invalid-feedback">{{ form_errors.category }}</div>
                                 {% endif %}
                             </div>
+
+                            <div class="form-group">
+                                <label for="postSubcategory" class="form-label">
+                                    <i class="fas fa-sitemap"></i> Subcategoria
+                                </label>
+                                <input type="text" id="postSubcategory" name="subcategory"
+                                       class="form-control modern-input subcategory-input"
+                                       list="postSubcategoryOptions"
+                                       value="{{ form_data.subcategory if form_data else '' }}"
+                                       placeholder="Selecione ou digite uma subcategoria">
+                                <datalist id="postSubcategoryOptions"></datalist>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -345,14 +400,14 @@
                                 </label>
                                 <div id="downloadLinksContainer">
                                     <div class="download-entry" data-index="0">
-                                        <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px;">
-                                            <select name="download_type_0" class="form-select" style="width: 120px; flex-shrink: 0;">
+                                        <div class="download-entry-row">
+                                            <select name="download_type_0" class="form-select download-type-select">
                                                 <option value="BIOS">BIOS</option>
                                                 <option value="EC">EC</option>
                                                 <option value="ME">ME</option>
                                                 <option value="Outro">Outro</option>
                                             </select>
-                                            <div class="input-group" style="flex: 1;">
+                                            <div class="input-group download-url-group">
                                                 <input type="url" name="download_url_0"
                                                        class="form-control modern-input"
                                                        placeholder="https://exemplo.com/arquivo.zip"
@@ -362,9 +417,9 @@
                                                 </button>
                                             </div>
                                         </div>
-                                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; margin-left: 128px;">
-                                            <input type="number" name="download_size_0" class="form-control modern-input" placeholder="Tamanho" step="0.1" min="0" style="width: 100px;">
-                                            <select name="download_size_unit_0" class="form-select" style="width: 70px;">
+                                        <div class="download-size-row">
+                                            <input type="number" name="download_size_0" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0">
+                                            <select name="download_size_unit_0" class="form-select download-size-unit">
                                                 <option value="MB">MB</option>
                                                 <option value="GB">GB</option>
                                                 <option value="KB">KB</option>
@@ -557,3 +612,6 @@
         </div>
     </div>
 </div>
+<script>
+    window.adminCategorySubcategories = {{ category_subcategories_map|default({}, true)|tojson }};
+</script>

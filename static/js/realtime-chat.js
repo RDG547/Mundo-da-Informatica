@@ -579,13 +579,18 @@
             const preview = truncateText(ticketData.lastMessage || 'Sem mensagens', 70);
             const activeClass = selectedTicketRoomId === ticket.id ? ' active' : '';
             return `
-                <button type="button" class="chat-ticket-item${activeClass}" data-ticket-room="${escapeHtml(ticket.id)}">
-                    <div class="chat-ticket-main">
-                        <strong>${escapeHtml(ownerName)}</strong>
-                        <span>${escapeHtml(preview)}</span>
-                    </div>
-                    ${unread > 0 ? `<span class="chat-ticket-unread">${unread > 99 ? '99+' : unread}</span>` : ''}
-                </button>
+                <div class="chat-ticket-row${activeClass}">
+                    <button type="button" class="chat-ticket-item${activeClass}" data-ticket-room="${escapeHtml(ticket.id)}">
+                        <div class="chat-ticket-main">
+                            <strong>${escapeHtml(ownerName)}</strong>
+                            <span>${escapeHtml(preview)}</span>
+                        </div>
+                        ${unread > 0 ? `<span class="chat-ticket-unread">${unread > 99 ? '99+' : unread}</span>` : ''}
+                    </button>
+                    <button type="button" class="chat-ticket-delete" data-ticket-delete="${escapeHtml(ticket.id)}" title="Excluir chamado">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
             `;
         }).join('');
 
@@ -1057,6 +1062,43 @@
         renderComposerState();
     }
 
+    async function deleteTicket(roomId) {
+        if (!userMeta.isAdmin || !roomId) {
+            throw new Error('Voce nao pode excluir este chamado.');
+        }
+
+        const confirmed = window.confirm('Deseja excluir este chamado inteiro? Todas as mensagens serao removidas.');
+        if (!confirmed) {
+            return;
+        }
+
+        const response = await fetch(`/api/chat/admin/tickets/${encodeURIComponent(roomId)}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Nao foi possivel excluir o chamado.');
+        }
+
+        supportTickets = supportTickets.filter((ticket) => ticket.id !== roomId);
+        renderTicketList();
+        refreshUnreadBadges();
+
+        if (selectedTicketRoomId === roomId) {
+            selectedTicketRoomId = supportTickets.length ? supportTickets[0].id : '';
+            await switchToRoom(selectedTicketRoomId);
+        } else {
+            updateInputState();
+        }
+
+        notifyUser(data.message || 'Chamado excluido com sucesso.', 'success');
+    }
+
     async function sendMessage(text) {
         if (!firestore || !auth || !auth.currentUser || !currentRoomId) {
             throw new Error('Chat ainda esta conectando.');
@@ -1188,6 +1230,17 @@
 
         if (elements.ticketList) {
             elements.ticketList.addEventListener('click', (event) => {
+                const deleteButton = event.target.closest('[data-ticket-delete]');
+                if (deleteButton) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    deleteTicket(deleteButton.dataset.ticketDelete).catch((error) => {
+                        console.error('[CHAT] Erro ao excluir chamado:', error);
+                        notifyUser(error.message || 'Nao foi possivel excluir o chamado.', 'error');
+                    });
+                    return;
+                }
+
                 const ticketButton = event.target.closest('[data-ticket-room]');
                 if (!ticketButton) return;
                 const roomId = ticketButton.dataset.ticketRoom;

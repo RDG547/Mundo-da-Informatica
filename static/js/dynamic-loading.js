@@ -149,11 +149,15 @@ if (typeof window.DynamicLoader !== 'undefined') {
             // Don't intercept logout links
             if (link.href.includes('/logout')) return false;
 
-            // DON'T INTERCEPT ANY ADMIN LINKS - admin is a separate application
             const url = new URL(link.href);
-            if (url.pathname.startsWith('/admin')) {
+            const currentIsAdmin = window.location.pathname.startsWith('/admin');
+            const targetIsAdmin = url.pathname.startsWith('/admin');
+
+            if (currentIsAdmin !== targetIsAdmin) {
                 return false;
             }
+
+            if (link.dataset.noDynamic === 'true') return false;
 
             if (this.shouldForceFullReload(url.pathname)) {
                 return false;
@@ -167,6 +171,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         shouldInterceptForm(form) {
+            const action = form.action || window.location.href;
+            const actionPath = new URL(action, window.location.origin).pathname;
+
+            // No admin mantemos submit tradicional para evitar conflito com formulários complexos
+            if (window.location.pathname.startsWith('/admin') || actionPath.startsWith('/admin')) return false;
             // Não interceptar formulários de upload
             if (form.enctype === 'multipart/form-data') return false;
             // Não interceptar forms com target="_blank"
@@ -1132,6 +1141,22 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     console.warn('[DYNAMIC-LOADING] Erro ao atualizar navegação ativa:', error);
                 }
             });
+
+            document.querySelectorAll('.admin-nav-item[href]').forEach((link) => {
+                try {
+                    const rawHref = link.getAttribute('href');
+                    if (!rawHref || rawHref === '#') {
+                        link.classList.remove('active');
+                        return;
+                    }
+
+                    const linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/+$/, '');
+                    const normalizedTargetPath = targetPath.replace(/\/+$/, '');
+                    link.classList.toggle('active', linkPath === normalizedTargetPath);
+                } catch (error) {
+                    console.warn('[DYNAMIC-LOADING] Erro ao atualizar navegação ativa do admin:', error);
+                }
+            });
         }
 
         updateUrl(url) {
@@ -1876,11 +1901,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
 // Initialize when DOM is loaded
 if (typeof window.DynamicLoader !== 'undefined') {
     document.addEventListener('DOMContentLoaded', function () {
-        // Only initialize if not in admin area
-        if (!window.location.pathname.startsWith('/admin')) {
-            if (!window.dynamicLoader) {
-                window.dynamicLoader = new window.DynamicLoader();
-            }
+        if (!window.dynamicLoader) {
+            window.dynamicLoader = new window.DynamicLoader();
         }
     });
 }

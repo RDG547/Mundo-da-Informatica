@@ -49,7 +49,7 @@ from urllib.parse import quote, urlparse as url_parse
 from itsdangerous import URLSafeTimedSerializer as Serializer
 import re
 from werkzeug.utils import secure_filename
-from PIL import Image
+from PIL import Image, ImageOps
 from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
@@ -292,13 +292,34 @@ def serialize_comment(comment: "Comment") -> dict[str, Any]:
         'date': comment.date_posted.strftime('%d/%m/%Y %H:%M'),
         'profile_image': profile_image,
         'user_id': user_id,
-        'is_edited': bool(getattr(comment, 'is_edited', False))
+        'is_edited': bool(getattr(comment, 'is_edited', False)),
+        'parent_id': getattr(comment, 'parent_id', None)
     }
 
     if comment.is_edited and getattr(comment, 'date_edited', None):
         comment_data['date_edited'] = comment.date_edited.strftime('%d/%m/%Y %H:%M')
 
     return comment_data
+
+
+def serialize_comment_thread(comments: list["Comment"]) -> list[dict[str, Any]]:
+    serialized_by_id: dict[int, dict[str, Any]] = {}
+    roots: list[dict[str, Any]] = []
+
+    for comment in comments:
+        payload = serialize_comment(comment)
+        payload['replies'] = []
+        serialized_by_id[comment.id] = payload
+
+    for comment in comments:
+        payload = serialized_by_id[comment.id]
+        parent_id = getattr(comment, 'parent_id', None)
+        if parent_id and parent_id in serialized_by_id:
+            serialized_by_id[parent_id]['replies'].append(payload)
+        else:
+            roots.append(payload)
+
+    return roots
 
 
 def request_prefers_json_response() -> bool:
@@ -317,6 +338,30 @@ def redirect_back_to_post(post: "Post | None", fallback_endpoint: str = 'home'):
             return redirect(url_for('post', post_id=post.id))
 
     return redirect(url_for(fallback_endpoint))
+
+
+def get_admin_posts_overview() -> dict[str, int]:
+    return {
+        'total_posts': Post.query.count(),
+        'featured_posts': Post.query.filter_by(featured=True).count()
+    }
+
+
+def get_category_subcategories_map() -> dict[str, list[str]]:
+    rows = db.session.query(Post.category_id, Post.subcategory).filter(
+        Post.category_id.isnot(None),
+        Post.subcategory.isnot(None),
+        Post.subcategory != ''
+    ).distinct().order_by(Post.subcategory.asc()).all()
+
+    subcategories_map: dict[str, list[str]] = {}
+    for category_id, subcategory in rows:
+        key = str(category_id)
+        subcategories_map.setdefault(key, [])
+        if subcategory not in subcategories_map[key]:
+            subcategories_map[key].append(subcategory)
+
+    return subcategories_map
 
 
 def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
@@ -1766,11 +1811,21 @@ class Comment(db.Model):
     # Adicionar chave estrangeira para Post
     post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=False)
 
+    # Comentário pai para respostas encadeadas
+    parent_id = db.Column(db.Integer, db.ForeignKey('comments.id'), nullable=True)
+
     # Relacionamento com User
     user = db.relationship('User', backref='comments')
 
     # Relacionamento com Post
     post = db.relationship('Post', backref='comments')
+
+    # Relacionamento para respostas
+    parent = db.relationship(
+        'Comment',
+        remote_side=[id],
+        backref=db.backref('replies', lazy=True, cascade="all, delete-orphan")
+    )
 
     @property
     def status(self):
@@ -2586,14 +2641,14 @@ def get_post_comments_by_slug(category, slug):
         comments = Comment.query.filter_by(
             post_id=post.id,
             is_approved=True
-        ).order_by(Comment.date_posted.desc()).all()
+        ).order_by(Comment.date_posted.desc(), Comment.id.desc()).all()
 
-        comments_list = [serialize_comment(comment) for comment in comments]
+        comments_list = serialize_comment_thread(comments)
 
         return jsonify({
             'success': True,
             'comments': comments_list,
-            'count': len(comments_list)
+            'count': len(comments)
         })
 
     except Exception as e:
@@ -2614,14 +2669,14 @@ def get_post_comments(post_id):
         comments = Comment.query.filter_by(
             post_id=post_id,
             is_approved=True
-        ).order_by(Comment.date_posted.desc()).all()
+        ).order_by(Comment.date_posted.desc(), Comment.id.desc()).all()
 
-        comments_list = [serialize_comment(comment) for comment in comments]
+        comments_list = serialize_comment_thread(comments)
 
         return jsonify({
             'success': True,
             'comments': comments_list,
-            'count': len(comments_list)
+            'count': len(comments)
         })
 
     except Exception as e:
@@ -2656,6 +2711,16 @@ def add_post_comment_by_slug(category, slug):
         # Type guard: garantir que validated_data não é None após validação bem-sucedida
         assert validated_data is not None, "validated_data should not be None when is_valid is True"
 
+        parent_id = None
+        raw_parent_id = str((data or {}).get('parent_id', '')).strip() if data else ''
+        if raw_parent_id:
+            if not raw_parent_id.isdigit():
+                return jsonify({'success': False, 'message': 'Comentário pai inválido.'}), 400
+            parent_comment = Comment.query.filter_by(id=int(raw_parent_id), post_id=post.id).first()
+            if parent_comment is None:
+                return jsonify({'success': False, 'message': 'Comentário pai não encontrado.'}), 404
+            parent_id = parent_comment.id
+
         # Se usuário estiver logado, usar seus dados
         if current_user.is_authenticated:
             # Verificar limite de comentários baseado no plano
@@ -2675,7 +2740,8 @@ def add_post_comment_by_slug(category, slug):
                 user_id=current_user.id,
                 author_name=current_user.name or current_user.username,
                 author_email=current_user.email,
-                is_approved=True  # Comentários de usuários logados são aprovados automaticamente
+                is_approved=True,  # Comentários de usuários logados são aprovados automaticamente
+                parent_id=parent_id
             )
         else:
             # Validar nome e email para usuários não logados
@@ -2693,7 +2759,8 @@ def add_post_comment_by_slug(category, slug):
                 post_id=post.id,
                 author_name=validated_data['author_name'],
                 author_email=validated_data['author_email'],
-                is_approved=False  # Comentários de não logados precisam aprovação
+                is_approved=False,  # Comentários de não logados precisam aprovação
+                parent_id=parent_id
             )
 
         # Salvar no banco
@@ -2851,6 +2918,16 @@ def add_post_comment(post_id):
         # Type guard: garantir que validated_data não é None após validação bem-sucedida
         assert validated_data is not None, "validated_data should not be None when is_valid is True"
 
+        parent_id = None
+        raw_parent_id = str((data or {}).get('parent_id', '')).strip() if data else ''
+        if raw_parent_id:
+            if not raw_parent_id.isdigit():
+                return jsonify({'success': False, 'message': 'Comentário pai inválido.'}), 400
+            parent_comment = Comment.query.filter_by(id=int(raw_parent_id), post_id=post_id).first()
+            if parent_comment is None:
+                return jsonify({'success': False, 'message': 'Comentário pai não encontrado.'}), 404
+            parent_id = parent_comment.id
+
         # Se usuário estiver logado, usar seus dados
         if current_user.is_authenticated:
             # Verificar limite de comentários baseado no plano
@@ -2870,7 +2947,8 @@ def add_post_comment(post_id):
                 user_id=current_user.id,
                 author_name=current_user.name or current_user.username,
                 author_email=current_user.email,
-                is_approved=True  # Comentários de usuários logados são aprovados automaticamente
+                is_approved=True,  # Comentários de usuários logados são aprovados automaticamente
+                parent_id=parent_id
             )
         else:
             # Validar nome e email para usuários não logados
@@ -2888,7 +2966,8 @@ def add_post_comment(post_id):
                 post_id=post_id,
                 author_name=validated_data['author_name'],
                 author_email=validated_data['author_email'],
-                is_approved=False  # Comentários de não logados precisam aprovação
+                is_approved=False,  # Comentários de não logados precisam aprovação
+                parent_id=parent_id
             )
 
         # Salvar no banco
@@ -4651,7 +4730,8 @@ def admin_delete_post(post_id):
             return jsonify({
                 'success': True,
                 'message': f'Post "{post_title}" foi excluído com sucesso!',
-                'post_id': post_id
+                'post_id': post_id,
+                'stats': get_admin_posts_overview()
             })
         flash(f'Post "{post_title}" foi excluído com sucesso!', 'success')
     except Exception as e:
@@ -4689,6 +4769,7 @@ def admin_duplicate_post(post_id):
             content=original_post.content,
             category_id=original_post.category_id,
             category_str=original_post.category_str,
+            subcategory=original_post.subcategory,
             download_link=original_post.download_link,
             image_url=duplicated_image_url,
             featured=False,  # Cópias não são destacadas por padrão
@@ -4696,10 +4777,18 @@ def admin_duplicate_post(post_id):
             author_id=current_user.id,
             views=0,
             downloads=0,
+            tags=original_post.tags,
+            seo_title=original_post.seo_title,
+            seo_description=original_post.seo_description,
             slug=slug
         )
 
         db.session.add(new_post)
+
+        original_download_files = original_post.get_metadata('download_files')
+        if isinstance(original_download_files, list) and original_download_files:
+            new_post.set_metadata('download_files', original_download_files)
+
         db.session.commit()
 
         # Log da atividade
@@ -4719,7 +4808,8 @@ def admin_duplicate_post(post_id):
             return jsonify({
                 'success': True,
                 'message': f'Post "{original_post.title}" foi duplicado com sucesso!',
-                'post': serialize_post_for_admin(new_post)
+                'post': serialize_post_for_admin(new_post),
+                'stats': get_admin_posts_overview()
             })
 
         flash(f'Post "{original_post.title}" foi duplicado com sucesso!', 'success')
@@ -4745,14 +4835,19 @@ def admin_post_data(post_id):
         'content': post.content,
         'category_id': post.category_id,
         'category_str': post.category_str,
+        'subcategory': post.subcategory,
         'download_link': post.download_link,
         'image_url': post.image_url,
+        'image_preview_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg'),
         'featured': post.featured,
         'is_active': post.is_active,
         'author_id': post.author_id,
         'views': post.views,
         'downloads': post.downloads,
         'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+        'tags': post.tags,
+        'seo_title': post.seo_title,
+        'seo_description': post.seo_description,
         'custom_metadata': post.get_metadata() or {}
     })
 
@@ -4768,9 +4863,13 @@ def admin_update_post(post_id):
         title = request.form.get('title', '').strip()
         content = request.form.get('content', '').strip()
         category_id = request.form.get('category_id')
+        subcategory = request.form.get('subcategory', '').strip()
         download_link = request.form.get('download_link', '').strip()
         download_files_json = request.form.get('download_files', '')
         image_url = request.form.get('image_url', '').strip()
+        tags = request.form.get('tags', '').strip()
+        seo_title = request.form.get('seo_title', '').strip()
+        seo_description = request.form.get('seo_description', '').strip()
         featured = request.form.get('featured') == 'true'
         is_active = request.form.get('is_active') == 'true'
 
@@ -4830,13 +4929,21 @@ def admin_update_post(post_id):
                 counter += 1
             post.slug = slug
 
+        category = Category.query.get(int(category_id)) if category_id else None
+
         post.title = title
         post.content = content
         post.category_id = int(category_id) if category_id else None
+        post.category_str = category.name if category else 'Sem categoria'
+        post.subcategory = subcategory or None
         post.download_link = download_link if download_link else None
-        post.image_url = image_url if image_url else 'default.jpg'
+        post.image_url = image_url if image_url else 'post-placeholder.svg'
         post.featured = featured
         post.is_active = is_active
+        post.tags = tags or None
+        post.seo_title = seo_title or None
+        post.seo_description = seo_description or None
+        post.date_updated = datetime.utcnow()
 
         # Armazenar download_files no custom_metadata
         if download_files_json:
@@ -4873,7 +4980,8 @@ def admin_update_post(post_id):
                 'is_active': post.is_active,
                 'featured': post.featured,
                 'date': post.date_posted.strftime('%d/%m/%Y')
-            }
+            },
+            'stats': get_admin_posts_overview()
         })
 
     except Exception as e:
@@ -5280,6 +5388,26 @@ def _get_firestore_client():
         return None
 
 
+def _delete_chat_room_recursive(db_firestore, room_id: str) -> None:
+    room_ref = db_firestore.collection('chat_rooms').document(room_id)
+    messages = list(room_ref.collection('messages').stream())
+
+    if messages:
+        batch = db_firestore.batch()
+        operations = 0
+        for message_doc in messages:
+            batch.delete(message_doc.reference)
+            operations += 1
+            if operations >= 400:
+                batch.commit()
+                batch = db_firestore.batch()
+                operations = 0
+        if operations:
+            batch.commit()
+
+    room_ref.delete()
+
+
 def _firestore_server_timestamp():
     if firebase_firestore is None:
         return None
@@ -5393,6 +5521,28 @@ def chat_admin_tickets():
     except Exception as e:
         app.logger.error(f'Erro ao listar chamados do chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao carregar chamados.'}), 500
+
+
+@app.route('/api/chat/admin/tickets/<string:room_id>', methods=['DELETE'])
+@login_required
+@limiter.limit("60 per minute")
+def chat_admin_delete_ticket(room_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+
+    if not str(room_id).startswith('support_user_'):
+        return jsonify({'success': False, 'message': 'Chamado inválido.'}), 400
+
+    db_firestore = _get_firestore_client()
+    if db_firestore is None:
+        return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
+
+    try:
+        _delete_chat_room_recursive(db_firestore, room_id)
+        return jsonify({'success': True, 'message': 'Chamado excluído com sucesso.', 'room_id': room_id})
+    except Exception as e:
+        app.logger.error(f'Erro ao excluir chamado do chat {room_id}: {e}')
+        return jsonify({'success': False, 'message': 'Falha ao excluir o chamado.'}), 500
 
 # Rota de cadastro
 @app.route('/register', methods=['GET', 'POST'])
@@ -5816,6 +5966,7 @@ def admin_dashboard():
         "recent_posts": recent_posts,
         "recent_activities": recent_activities,
         "categories": categories,
+        "category_subcategories_map": get_category_subcategories_map(),
         "post_count": stats["posts"],
         "category_count": stats["categories"],
         "unread_comments": comments_count,  # Total de comentários
@@ -5966,9 +6117,13 @@ def admin_create_post():
         # Extrair dados do formulário
         title = request.form.get('title')
         category_id = request.form.get('category')
+        subcategory = request.form.get('subcategory', '').strip()
         content = request.form.get('content')
         download_link = request.form.get('download_link', '')
         download_files_json = request.form.get('download_files', '')
+        tags = request.form.get('tags', '').strip()
+        seo_title = request.form.get('seo_title', '').strip()
+        seo_description = request.form.get('seo_description', '').strip()
         # Proteção contra NaN injection
         featured_value = request.form.get('featured', '')
         if isinstance(featured_value, str) and featured_value.lower() in ('nan', 'infinity', '-infinity'):
@@ -6004,22 +6159,17 @@ def admin_create_post():
                     'content': content,
                     'category': category_id,
                     'download_link': download_link,
-                    'tags': request.form.get('tags', ''),
-                    'seo_title': request.form.get('seo_title', ''),
-                    'seo_description': request.form.get('seo_description', ''),
+                    'subcategory': subcategory,
+                    'tags': tags,
+                    'seo_title': seo_title,
+                    'seo_description': seo_description,
                     'featured': featured,
                 },
                 # Repassar posts e stats para manter a página
                 **get_admin_sidebar_stats()
             }
-            # Paginação e posts
-            posts = Post.query.order_by(Post.date_posted.desc()).all()
             page = request.args.get('page', 1, type=int)
             per_page = 10
-            total = len(posts)
-            start = (page - 1) * per_page
-            end = start + per_page
-            page_posts = posts[start:end]
             class SimplePagination:
                 def __init__(self, page, per_page, total, items):
                     self.page = page
@@ -6051,9 +6201,12 @@ def admin_create_post():
                                 yield None
                             yield num
                             last = num
-            pagination = SimplePagination(page, per_page, total, page_posts)
+            posts_pagination = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=per_page, error_out=False)
+            pagination = SimplePagination(page, per_page, posts_pagination.total, posts_pagination.items)
             context["posts"] = pagination
             context["pagination"] = pagination
+            context["posts_overview"] = get_admin_posts_overview()
+            context["category_subcategories_map"] = get_category_subcategories_map()
             context["system_status"] = "online"
             context["app_version"] = "1.6.2"
             return render_template('admin/posts.html', **context)
@@ -6105,11 +6258,15 @@ def admin_create_post():
             content=content,
             category_id=category_id if category else None,
             category_str=category.name if category else 'Sem categoria',
+            subcategory=subcategory or None,
             download_link=download_link,
             image_url=image_url,
             featured=featured,
             author_id=current_user.id,
             is_active=True,
+            tags=tags or None,
+            seo_title=seo_title or None,
+            seo_description=seo_description or None,
             slug=slug
         )
 
@@ -6130,7 +6287,8 @@ def admin_create_post():
             return jsonify({
                 'success': True,
                 'message': f'Post "{title}" criado com sucesso!',
-                'post': serialize_post_for_admin(new_post)
+                'post': serialize_post_for_admin(new_post),
+                'stats': get_admin_posts_overview()
             })
 
         flash(f'Post "{title}" criado com sucesso!', 'success')
@@ -6276,98 +6434,9 @@ def admin_posts():
     """
     Página para gerenciar posts
     """
-    # Implementar paginação com dados reais
-    class _Pagination:
-        def __init__(self, items, page, per_page=10, total=0):
-            self.items = items
-            self.page = page
-            self.per_page = per_page
-            self.total = total or len(items)
-
-        @property
-        def pages(self):
-            return max(1, math.ceil(self.total / self.per_page))
-
-        @property
-        def has_prev(self):
-            return self.page > 1
-
-        @property
-        def has_next(self):
-            return self.page < self.pages
-
-        @property
-        def prev_num(self):
-            return self.page - 1 if self.has_prev else None
-
-        @property
-        def next_num(self):
-            return self.page + 1 if self.has_next else None
-
-        def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
-            last = 0
-            for num in range(1, self.pages + 1):
-                if num <= left_edge or \
-                   (num > self.page - left_current - 1 and num < self.page + right_current) or \
-                   num > self.pages - right_edge:
-                    if last + 1 != num:
-                        yield None
-                    yield num
-                    last = num
-
-    # Buscar posts reais do banco de dados
-    posts = Post.query.order_by(Post.date_posted.desc()).all()
-
-    # Paginação
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    total = len(posts)
-    total_pages = max(1, math.ceil(total / per_page))
-    page = max(1, min(page, total_pages))
-
-    # Criar objeto de paginação
-    class SimplePagination:
-        def __init__(self, page, per_page, total, items):
-            self.page = page
-            self.per_page = per_page
-            self.total = total
-            self.items = items
-
-        @property
-        def pages(self):
-            return max(1, math.ceil(self.total / self.per_page))
-
-        @property
-        def has_prev(self):
-            return self.page > 1
-
-        @property
-        def has_next(self):
-            return self.page < self.pages
-
-        @property
-        def prev_num(self):
-            return self.page - 1 if self.has_prev else None
-
-        @property
-        def next_num(self):
-            return self.page + 1 if self.has_next else None
-
-        def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
-            """Método para iterar pelas páginas disponíveis"""
-            last = 0
-            for num in range(1, self.pages + 1):
-                if num <= left_edge or \
-                   (num > self.page - left_current - 1 and num < self.page + right_current) or \
-                   num > self.pages - right_edge:
-                    if last + 1 != num:
-                        yield None
-                    yield num
-                    last = num
-
-    # Mantemos todos os posts em memória para permitir paginação dinâmica no frontend sem recarregar.
-    # O objeto de paginação continua sendo usado para renderizar os controles iniciais.
-    pagination = SimplePagination(page, per_page, total, posts)
+    pagination = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     # Obter estatísticas para a sidebar
     sidebar_stats = get_admin_sidebar_stats()
@@ -6379,7 +6448,9 @@ def admin_posts():
         "title": "Gerenciar Posts",
         "posts": pagination,
         "pagination": pagination,
+        "posts_overview": get_admin_posts_overview(),
         "categories": categories,
+        "category_subcategories_map": get_category_subcategories_map(),
         "system_status": "online",
         "app_version": "1.6.2",
         **sidebar_stats
@@ -8472,23 +8543,20 @@ def upload_to_cloudinary(file, folder='profiles'):
         tuple: (success: bool, url_or_error: str)
     """
     try:
-        # Processar a imagem antes do upload
+        # Processar a imagem sem duplicar todos os pixels em memória.
         img = Image.open(file.stream)
+        img = ImageOps.exif_transpose(img)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
 
-        # Remover dados EXIF (segurança)
-        img_data = list(img.getdata())
-        img_without_exif = Image.new(img.mode, img.size)
-        img_without_exif.putdata(img_data)
-        img_without_exif = img_without_exif.convert('RGB')
-
-        # Redimensionar para otimizar (máximo 800x800 para perfis)
-        if folder == 'profiles':
-            img_without_exif.thumbnail((800, 800))
+        max_size = (800, 800) if folder == 'profiles' else (1600, 1600)
+        resampling = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+        img.thumbnail(max_size, resampling)
 
         # Salvar em buffer temporário
         from io import BytesIO
         buffer = BytesIO()
-        img_without_exif.save(buffer, format='JPEG', optimize=True, quality=85)
+        img.save(buffer, format='JPEG', optimize=True, quality=82, progressive=True)
         buffer.seek(0)
 
         # Upload para Cloudinary
@@ -8498,7 +8566,7 @@ def upload_to_cloudinary(file, folder='profiles'):
             resource_type='image',
             format='jpg',
             transformation=[
-                {'width': 800, 'height': 800, 'crop': 'limit'},
+                {'width': max_size[0], 'height': max_size[1], 'crop': 'limit'},
                 {'quality': 'auto:good'},
                 {'fetch_format': 'auto'}
             ]
@@ -9195,6 +9263,11 @@ with app.app_context():
                     conn.execute(text("ALTER TABLE favorites ADD COLUMN position INTEGER DEFAULT 0"))
                     conn.commit()
                     print("  ➕ Coluna 'position' adicionada à tabela favorites")
+                comment_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(comments)"))]
+                if 'parent_id' not in comment_cols:
+                    conn.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
+                    conn.commit()
+                    print("  ➕ Coluna 'parent_id' adicionada à tabela comments")
         except Exception:
             pass
     except Exception as e:

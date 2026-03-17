@@ -65,6 +65,14 @@ def migrate():
             migrations_applied = True
             print("✓ position column added to favorites")
 
+        cursor.execute("PRAGMA table_info(comments)")
+        comment_columns = [info[1] for info in cursor.fetchall()]
+        if 'parent_id' not in comment_columns:
+            print("Adding parent_id column to comments...")
+            cursor.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER")
+            migrations_applied = True
+            print("✓ parent_id column added to comments")
+
         # Verificar se tabela transactions existe
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")
         transactions_table_exists = cursor.fetchone() is not None

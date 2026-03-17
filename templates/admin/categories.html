@@ -833,10 +833,17 @@
 
 {% block scripts %}
 <script>
-    window.addEventListener('load', function() {
+    function activateCategoriesPageContent() {
         var el = document.getElementById('pageContent');
         if (el) { el.classList.remove('page-loading'); el.classList.add('page-loaded'); }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', activateCategoriesPageContent);
+    } else {
+        activateCategoriesPageContent();
+    }
+    document.addEventListener('adminPageLoaded', activateCategoriesPageContent);
 </script>
 <style>
     /* Estilos específicos para a página de categorias */

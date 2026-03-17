@@ -231,6 +231,7 @@
                         <h4>Deixe seu comentário</h4>
                         <form class="comment-form" id="commentForm" method="post" action="{{ url_for('add_post_comment', post_id=post.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" id="commentParentId" name="parent_id" value="{{ request.args.get('reply_to', '') }}">
                             {% if current_user.is_authenticated %}
                             <input type="hidden" id="commentName" value="{{ current_user.username }}">
                             <input type="hidden" id="commentEmail" value="{{ current_user.email }}">
@@ -252,6 +253,19 @@
                                 <label for="commentText">
                                     <i class="far fa-comment-dots"></i> Comentário *
                                 </label>
+                                <div class="comment-reply-state" id="commentReplyState" hidden>
+                                    <div class="comment-reply-summary">
+                                        <i class="fas fa-reply"></i>
+                                        <div class="comment-reply-copy">
+                                            <strong>Respondendo a <span id="commentReplyAuthor"></span></strong>
+                                            <p id="commentReplyPreview"></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn-cancel-reply" data-comment-cancel-reply>
+                                        <i class="fas fa-times"></i>
+                                        Cancelar
+                                    </button>
+                                </div>
                                 <textarea class="form-control" id="commentText" name="content" rows="3" placeholder="Escreva seu comentário..." required></textarea>
                             </div>
                             <button type="submit" class="btn-submit-comment">
@@ -303,12 +317,27 @@
             </div>
             <div class="related-posts-grid">
                 {% for related in related_posts %}
+                {% set related_download_files = related.get_metadata('download_files') %}
+                {% set related_download_types = namespace(items=[]) %}
+                {% if related_download_files %}
+                    {% for file in related_download_files %}
+                        {% if file.type and file.type not in related_download_types.items %}
+                            {% set related_download_types.items = related_download_types.items + [file.type] %}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
                 <a href="{{ post_url(related) }}" class="related-post-item">
                     <div class="related-post-image">
                         <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="{{ related.title }}">
                     </div>
                     <div class="related-post-content">
-                        <span class="related-post-category">{{ related.category_rel.name if related.category_rel else related.category_str }}</span>
+                        <span class="related-post-category">
+                            {% if related_download_types.items %}
+                                {{ related_download_types.items|join('/') }}
+                            {% else %}
+                                {{ related.category_rel.name if related.category_rel else related.category_str }}
+                            {% endif %}
+                        </span>
                         <h4>{{ related.title }}</h4>
                         <div class="related-post-meta">
                             <span><i class="far fa-eye"></i> {{ related.views }}</span>
@@ -474,7 +503,8 @@
 }
 
 .btn-delete-comment,
-.btn-edit-comment {
+.btn-edit-comment,
+.btn-reply-comment {
     background: none;
     border: none;
     cursor: pointer;
@@ -489,12 +519,14 @@
     color: #ff4757;
 }
 
-.btn-edit-comment {
+.btn-edit-comment,
+.btn-reply-comment {
     color: #667eea;
 }
 
 .btn-delete-comment:hover,
-.btn-edit-comment:hover {
+.btn-edit-comment:hover,
+.btn-reply-comment:hover {
     opacity: 1;
     transform: scale(1.1);
 }
@@ -504,6 +536,10 @@
 }
 
 .btn-edit-comment:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.btn-reply-comment:hover {
     background: rgba(102, 126, 234, 0.1);
 }
 
@@ -591,10 +627,32 @@
     border-radius: 8px;
 }
 
+.comment-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.comment-replies {
+    margin-left: 3.5rem;
+    padding-left: 1.1rem;
+    border-left: 1px solid rgba(102, 126, 234, 0.18);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.comment-item.is-reply {
+    background: rgba(102, 126, 234, 0.04);
+    border-radius: 10px;
+    padding: 12px;
+}
+
 .comment-header {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .comment-author {
@@ -603,6 +661,66 @@
 
 .comment-date {
     flex-shrink: 0;
+}
+
+.comment-reply-state {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 10px;
+    background: rgba(102, 126, 234, 0.06);
+}
+
+.comment-reply-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: #667eea;
+}
+
+.comment-reply-copy strong {
+    display: block;
+    font-size: 14px;
+}
+
+.comment-reply-copy p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-secondary, #6b7280);
+    line-height: 1.4;
+}
+
+.btn-cancel-reply {
+    border: none;
+    background: rgba(255, 71, 87, 0.12);
+    color: #ff4757;
+    border-radius: 999px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-cancel-reply:hover {
+    background: rgba(255, 71, 87, 0.18);
+}
+
+@media (max-width: 768px) {
+    .comment-replies {
+        margin-left: 1rem;
+        padding-left: 0.85rem;
+    }
+
+    .comment-reply-state {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 @keyframes fadeIn {

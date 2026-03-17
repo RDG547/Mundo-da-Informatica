@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const richEditor = document.getElementById('postContentEditor');
     const hiddenTextarea = document.getElementById('postContent');
     const saveBtnDefaultHtml = saveBtn ? saveBtn.innerHTML : '';
+    const categorySelect = document.getElementById('postCategory');
+    const subcategoryInput = document.getElementById('postSubcategory');
+    const subcategoryOptions = document.getElementById('postSubcategoryOptions');
 
     if (!nextBtn || !prevBtn || !saveBtn) {
         console.error('Botões do wizard não encontrados!');
@@ -35,6 +38,18 @@ document.addEventListener('DOMContentLoaded', function() {
         saveBtn.innerHTML = isSubmitting
             ? '<i class="fas fa-spinner fa-spin"></i> Publicando...'
             : saveBtnDefaultHtml;
+    }
+
+    function updateSubcategoryOptions() {
+        if (!subcategoryOptions) return;
+
+        const subcategoriesMap = window.adminCategorySubcategories || {};
+        const selectedCategory = categorySelect?.value ? String(categorySelect.value) : '';
+        const options = Array.isArray(subcategoriesMap[selectedCategory]) ? subcategoriesMap[selectedCategory] : [];
+
+        subcategoryOptions.innerHTML = options
+            .map((option) => `<option value="${String(option).replace(/"/g, '&quot;')}"></option>`)
+            .join('');
     }
 
     function showStep(step) {
@@ -229,7 +244,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = {
             title: document.getElementById('postTitle')?.value || '',
             content: document.getElementById('postContent')?.value || '',
-            category: document.getElementById('postCategory')?.value || ''
+            category: document.getElementById('postCategory')?.value || '',
+            subcategory: document.getElementById('postSubcategory')?.value || ''
         };
         localStorage.setItem('postDraft', JSON.stringify(formData));
     }
@@ -250,6 +266,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (document.getElementById('postCategory')) {
                     document.getElementById('postCategory').value = formData.category || '';
+                }
+                if (document.getElementById('postSubcategory')) {
+                    document.getElementById('postSubcategory').value = formData.subcategory || '';
                 }
                 return true;
             } catch (e) {
@@ -292,6 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addPostModal.addEventListener('show', function() {
             resetForm();
             showStep(1);
+            updateSubcategoryOptions();
 
             const hasDraft = loadDraft();
             if (hasDraft && typeof showNotification !== 'undefined') {
@@ -312,8 +332,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    categorySelect?.addEventListener('change', function() {
+        updateSubcategoryOptions();
+        if (subcategoryInput && subcategoryOptions && !subcategoryOptions.querySelector(`option[value="${subcategoryInput.value}"]`)) {
+            subcategoryInput.value = '';
+        }
+        saveDraft();
+    });
+
     // Inicializar no step 1
     showStep(1);
+    updateSubcategoryOptions();
 
     // ==========================================
     // MULTI-DOWNLOAD ENTRIES
@@ -329,14 +358,14 @@ document.addEventListener('DOMContentLoaded', function() {
             entry.className = 'download-entry';
             entry.setAttribute('data-index', idx);
             entry.innerHTML = `
-                <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px;">
-                    <select name="download_type_${idx}" class="form-select" style="width: 120px; flex-shrink: 0;">
+                <div class="download-entry-row">
+                    <select name="download_type_${idx}" class="form-select download-type-select">
                         <option value="BIOS">BIOS</option>
                         <option value="EC">EC</option>
                         <option value="ME">ME</option>
                         <option value="Outro">Outro</option>
                     </select>
-                    <div class="input-group" style="flex: 1;">
+                    <div class="input-group download-url-group">
                         <input type="url" name="download_url_${idx}"
                                class="form-control modern-input"
                                placeholder="https://exemplo.com/arquivo.zip"
@@ -350,9 +379,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; margin-left: 128px;">
-                    <input type="number" name="download_size_${idx}" class="form-control modern-input" placeholder="Tamanho" step="0.1" min="0" style="width: 100px;">
-                    <select name="download_size_unit_${idx}" class="form-select" style="width: 70px;">
+                <div class="download-size-row">
+                    <input type="number" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0">
+                    <select name="download_size_unit_${idx}" class="form-select download-size-unit">
                         <option value="MB">MB</option>
                         <option value="GB">GB</option>
                         <option value="KB">KB</option>

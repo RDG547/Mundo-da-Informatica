@@ -17,11 +17,11 @@
         <div class="header-actions">
             <div class="quick-stats">
                 <div class="stat-item">
-                    <span class="stat-number">{{ posts.total }}</span>
+                    <span class="stat-number" data-posts-total-stat>{{ posts_overview.total_posts }}</span>
                     <span class="stat-label">Total</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number">{{ posts.items | selectattr('featured') | list | length }}</span>
+                    <span class="stat-number" data-posts-featured-stat>{{ posts_overview.featured_posts }}</span>
                     <span class="stat-label">Destaque</span>
                 </div>
             </div>
@@ -43,7 +43,7 @@
         <div class="header-left">
             <h2 class="admin-card-title">
                 <i class="fas fa-list"></i> Posts Publicados
-                <span class="count-badge">{{ posts.total }}</span>
+                <span class="count-badge" data-posts-total-badge>{{ posts_overview.total_posts }}</span>
             </h2>
         </div>
         <div class="header-right">
@@ -115,7 +115,7 @@
             </thead>
             <tbody id="postsTableBody" data-per-page="{{ posts.per_page }}">
                 {% for post in posts.items %}
-                <tr data-post-id="{{ post.id }}" class="{% if not post.is_active %}inactive-row{% endif %}">
+                <tr data-post-id="{{ post.id }}" data-category-id="{{ post.category_id or '' }}" class="{% if not post.is_active %}inactive-row{% endif %}">
                     <td>
                         <input type="checkbox" class="form-check-input post-checkbox" value="{{ post.id }}">
                     </td>
@@ -249,7 +249,7 @@
         </div>
 
         <!-- Enhanced Pagination -->
-        <div class="pagination-container" id="postsPaginationContainer" data-current-page="{{ posts.page }}" data-per-page="{{ posts.per_page }}">
+        <div class="pagination-container" id="postsPaginationContainer" data-current-page="{{ posts.page }}" data-per-page="{{ posts.per_page }}" data-total="{{ posts.total }}">
             <div class="pagination-info" id="postsPaginationInfo">
                 Mostrando {{ posts.items|length }} de {{ posts.total }} posts
             </div>
@@ -355,7 +355,7 @@
                 </div>
             </div>
 
-            <form id="editPostForm" enctype="multipart/form-data" onsubmit="savePost(event)">
+            <form id="editPostForm" enctype="multipart/form-data">
                 <input type="hidden" id="editPostId" name="post_id">
 
                 <!-- Step 1: Informações Básicas -->
@@ -494,6 +494,19 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
+                            <div class="form-group">
+                                <label for="editPostSubcategory" class="form-label">
+                                    <i class="fas fa-sitemap"></i> Subcategoria
+                                </label>
+                                <input type="text"
+                                       id="editPostSubcategory"
+                                       name="subcategory"
+                                       class="form-control modern-input"
+                                       list="editPostSubcategoryOptions"
+                                       placeholder="Selecione ou digite uma subcategoria">
+                                <datalist id="editPostSubcategoryOptions"></datalist>
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -553,7 +566,7 @@
                         <button type="button" class="btn-admin btn-admin-outline" onclick="prevEditStep()">
                             <i class="fas fa-arrow-left"></i> Anterior
                         </button>
-                        <button type="button" class="btn-admin btn-admin-success" onclick="savePost(event)">
+                        <button type="button" class="btn-admin btn-admin-success" id="editSavePostBtn" onclick="savePost(event)">
                             <i class="fas fa-save"></i> Salvar Alterações
                         </button>
                     </div>
@@ -570,10 +583,17 @@
 
 {% block scripts %}
 <script>
-    window.addEventListener('load', function() {
+    function activatePostsPageContent() {
         var el = document.getElementById('pageContent');
         if (el) { el.classList.remove('page-loading'); el.classList.add('page-loaded'); }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', activatePostsPageContent);
+    } else {
+        activatePostsPageContent();
+    }
+    document.addEventListener('adminPageLoaded', activatePostsPageContent);
 </script>
 
 <script>
@@ -584,34 +604,69 @@
 
     // Variável global para controlar o step atual
     let currentEditStep = 1;
+    const EDIT_TOTAL_STEPS = 3;
+
+    async function parseJsonResponse(response) {
+        const rawText = await response.text();
+        try {
+            return JSON.parse(rawText);
+        } catch (_error) {
+            throw new Error(rawText && rawText.trim().startsWith('<')
+                ? 'O servidor retornou HTML em vez de JSON. Verifique o backend.'
+                : 'Resposta inválida do servidor.');
+        }
+    }
+
+    function getAdminSubcategoriesMap() {
+        return window.adminCategorySubcategories || {};
+    }
+
+    function updateEditSubcategoryOptions(selectedCategoryId, preferredValue) {
+        const input = document.getElementById('editPostSubcategory');
+        const datalist = document.getElementById('editPostSubcategoryOptions');
+        if (!input || !datalist) return;
+
+        const map = getAdminSubcategoriesMap();
+        const options = Array.isArray(map[String(selectedCategoryId || '')]) ? map[String(selectedCategoryId || '')] : [];
+        datalist.innerHTML = options
+            .map((option) => `<option value="${String(option).replace(/"/g, '&quot;')}"></option>`)
+            .join('');
+
+        if (typeof preferredValue === 'string') {
+            input.value = preferredValue;
+        } else if (input.value && !options.includes(input.value)) {
+            input.value = '';
+        }
+    }
+
+    window.goToEditStep = function (targetStep) {
+        const normalizedStep = Number(targetStep);
+        if (!Number.isInteger(normalizedStep) || normalizedStep < 1 || normalizedStep > EDIT_TOTAL_STEPS) {
+            return;
+        }
+
+        const modal = document.getElementById('editPostModal');
+        if (!modal) return;
+
+        modal.querySelectorAll('.step').forEach((stepEl) => {
+            const stepNumber = Number(stepEl.getAttribute('data-step'));
+            stepEl.classList.toggle('active', stepNumber === normalizedStep);
+            stepEl.classList.toggle('completed', stepNumber < normalizedStep);
+        });
+
+        modal.querySelectorAll('.step-content').forEach((contentEl) => {
+            contentEl.classList.toggle('active', Number(contentEl.getAttribute('data-step')) === normalizedStep);
+        });
+
+        currentEditStep = normalizedStep;
+    };
 
     // Função para avançar para o próximo step
     window.nextEditStep = function () {
         console.log('nextEditStep chamado, currentEditStep:', currentEditStep);
 
-        if (currentEditStep < 3) {
-            // Desativar step atual
-            const currentStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
-            const currentContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
-
-            if (currentStepElement) currentStepElement.classList.remove('active');
-            if (currentContentElement) currentContentElement.classList.remove('active');
-
-            // Ativar próximo step
-            currentEditStep++;
-
-            const nextStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
-            const nextContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
-
-            if (nextStepElement) nextStepElement.classList.add('active');
-            if (nextContentElement) nextContentElement.classList.add('active');
-
-            // Marcar steps anteriores como completos
-            for (let i = 1; i < currentEditStep; i++) {
-                const stepToComplete = document.querySelector(`#editPostModal .step[data-step="${i}"]`);
-                if (stepToComplete) stepToComplete.classList.add('completed');
-            }
-
+        if (currentEditStep < EDIT_TOTAL_STEPS) {
+            window.goToEditStep(currentEditStep + 1);
             console.log('Avançou para step:', currentEditStep);
         }
     };
@@ -619,25 +674,7 @@
     // Função para voltar ao step anterior
     window.prevEditStep = function () {
         if (currentEditStep > 1) {
-            // Desativar step atual
-            const currentStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
-            const currentContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
-
-            if (currentStepElement) currentStepElement.classList.remove('active');
-            if (currentContentElement) currentContentElement.classList.remove('active');
-
-            // Ativar step anterior
-            currentEditStep--;
-
-            const prevStepElement = document.querySelector(`#editPostModal .step[data-step="${currentEditStep}"]`);
-            const prevContentElement = document.querySelector(`#editPostModal .step-content[data-step="${currentEditStep}"]`);
-
-            if (prevStepElement) prevStepElement.classList.add('active');
-            if (prevContentElement) prevContentElement.classList.add('active');
-
-            // Remover completed do step atual
-            if (prevStepElement) prevStepElement.classList.remove('completed');
-
+            window.goToEditStep(currentEditStep - 1);
             console.log('Voltou para step:', currentEditStep);
         }
     };
@@ -737,20 +774,20 @@
         const categoryFilter = document.getElementById('filterCategory');
         const statusFilter = document.getElementById('filterStatus');
         const sortBy = document.getElementById('sortBy');
-        const tableRows = document.querySelectorAll('.admin-table tbody tr:not(.empty-state)');
+        const getTableRows = () => Array.from(document.querySelectorAll('.admin-table tbody tr[data-post-id]'));
 
         function filterAndSearchPosts() {
             const searchTerm = searchInput.value.toLowerCase();
             const selectedCategory = categoryFilter.value;
             const selectedStatus = statusFilter.value;
+            const tableRows = getTableRows();
 
             tableRows.forEach(row => {
                 const titleCell = row.querySelector('.post-title')?.textContent.toLowerCase() || '';
                 const excerptCell = row.querySelector('.post-excerpt')?.textContent.toLowerCase() || '';
-                const categoryCell = row.querySelector('.category-badge')?.textContent.toLowerCase() || '';
 
                 const matchesSearch = titleCell.includes(searchTerm) || excerptCell.includes(searchTerm);
-                const matchesCategory = !selectedCategory || row.querySelector('.category-badge')?.textContent.includes(selectedCategory);
+                const matchesCategory = !selectedCategory || (row.dataset.categoryId || '') === selectedCategory;
 
                 let matchesStatus = true;
                 if (selectedStatus === 'active') {
@@ -773,11 +810,18 @@
         }
 
         function updateResultsCount() {
+            const tableRows = getTableRows();
             const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
-            const countElement = document.querySelector('.count-badge');
+            const countElement = document.querySelector('[data-posts-total-badge]');
             if (countElement) {
-                countElement.textContent = visibleRows.length;
+                if (searchInput.value || categoryFilter.value || statusFilter.value) {
+                    countElement.textContent = visibleRows.length;
+                } else {
+                    countElement.textContent = document.getElementById('postsPaginationContainer')?.dataset?.total || visibleRows.length;
+                }
             }
+
+            window.AdminPostsDynamic?.refreshPaginationInfo();
         }
 
         // Event listeners for filters
@@ -792,6 +836,8 @@
             statusFilter.value = '';
             filterAndSearchPosts();
         };
+
+        window.refreshPostsListFilters = filterAndSearchPosts;
 
         // Export function
         window.exportPosts = function () {
@@ -1022,20 +1068,7 @@
                 return;
             }
 
-            // Resetar para o primeiro step
-            currentEditStep = 1;
-            const steps = modal.querySelectorAll('.step');
-            const stepContents = modal.querySelectorAll('.step-content');
-
-            steps.forEach((step, index) => {
-                step.classList.remove('active', 'completed');
-                if (index === 0) step.classList.add('active');
-            });
-
-            stepContents.forEach((content, index) => {
-                content.classList.remove('active');
-                if (index === 0) content.classList.add('active');
-            });
+            window.goToEditStep(1);
 
             // Preencher dados no modal
             document.getElementById('editPostId').value = post.id;
@@ -1063,6 +1096,7 @@
             }
 
             document.getElementById('editPostCategory').value = post.category_id || '';
+            updateEditSubcategoryOptions(post.category_id || '', post.subcategory || '');
 
             // Populate multi-download entries (also handles download_link)
             populateEditDownloadEntries(post);
@@ -1077,13 +1111,7 @@
                 if (preview && previewContainer && placeholder) {
                     // Se a URL já é completa (Cloudinary), usar direto
                     // Senão, é uma URL relativa antiga e não vai funcionar
-                    let imageUrl = post.image_url;
-                    if (!imageUrl.startsWith('http')) {
-                        // URL relativa antiga - não exibir
-                        console.warn('Imagem com URL relativa antiga:', imageUrl);
-                        removeEditImage();
-                        return;
-                    }
+                    let imageUrl = post.image_preview_url || post.image_url;
 
                     preview.src = imageUrl;
                     previewContainer.style.display = 'block';
@@ -1150,19 +1178,19 @@
                 sizeVal = parts[0] || '';
                 sizeUnit = parts[1] || 'MB';
             }
-            entry.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:4px;">' +
-                '<select name="edit_download_type_' + idx + '" class="form-select" style="width:120px;flex-shrink:0;">' +
+            entry.innerHTML = '<div class="download-entry-row">' +
+                '<select name="edit_download_type_' + idx + '" class="form-select download-type-select">' +
                 '<option value="BIOS"' + (type === 'BIOS' ? ' selected' : '') + '>BIOS</option>' +
                 '<option value="EC"' + (type === 'EC' ? ' selected' : '') + '>EC</option>' +
                 '<option value="ME"' + (type === 'ME' ? ' selected' : '') + '>ME</option>' +
                 '<option value="Outro"' + (type === 'Outro' ? ' selected' : '') + '>Outro</option>' +
                 '</select>' +
-                '<div class="input-group" style="flex:1;">' +
+                '<div class="input-group download-url-group">' +
                 '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip" value="' + (url || '') + '">' +
                 '</div>' + removeHtml + '</div>' +
-                '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;margin-left:128px;">' +
-                '<input type="number" name="edit_download_size_' + idx + '" class="form-control modern-input" placeholder="Tamanho" step="0.1" min="0" style="width:100px;" value="' + sizeVal + '">' +
-                '<select name="edit_download_size_unit_' + idx + '" class="form-select" style="width:70px;">' +
+                '<div class="download-size-row">' +
+                '<input type="number" name="edit_download_size_' + idx + '" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0" value="' + sizeVal + '">' +
+                '<select name="edit_download_size_unit_' + idx + '" class="form-select download-size-unit">' +
                 '<option value="MB"' + (sizeUnit === 'MB' ? ' selected' : '') + '>MB</option>' +
                 '<option value="GB"' + (sizeUnit === 'GB' ? ' selected' : '') + '>GB</option>' +
                 '<option value="KB"' + (sizeUnit === 'KB' ? ' selected' : '') + '>KB</option>' +
@@ -1219,6 +1247,9 @@
             collectEditDownloadData();
 
             const form = document.getElementById('editPostForm');
+            if (!form || form.dataset.submitting === 'true') {
+                return;
+            }
             const formData = new FormData(form);
             const postId = formData.get('post_id');
             console.log('Post ID:', postId);
@@ -1227,17 +1258,26 @@
             formData.set('featured', document.getElementById('editPostFeatured').checked);
             formData.set('is_active', document.getElementById('editPostActive').checked);
 
+            form.dataset.submitting = 'true';
+            const saveBtn = document.getElementById('editSavePostBtn');
+            const originalSaveLabel = saveBtn ? saveBtn.innerHTML : '';
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            }
+
             fetch(`/admin/posts/${postId}/update`, {
                 method: 'POST',
                 body: formData
             })
-                .then(response => {
+                .then(async (response) => {
                     console.log('Response status:', response.status);
-                    return response.json();
+                    const data = await parseJsonResponse(response);
+                    return { ok: response.ok, data };
                 })
-                .then(data => {
+                .then(({ ok, data }) => {
                     console.log('Response data:', data);
-                    if (data.success) {
+                    if (ok && data.success) {
                         showNotification('Post atualizado com sucesso!', 'success');
                         closeEditPostModal();
 
@@ -1245,16 +1285,23 @@
                         if (data.post) {
                             const row = document.querySelector(`tr[data-post-id="${data.post.id}"]`);
                             if (row) {
+                                row.classList.toggle('inactive-row', !data.post.is_active);
+                                row.dataset.categoryId = data.post.category_id || '';
+
                                 // Atualizar Título
                                 const titleEl = row.querySelector('.post-title');
                                 if (titleEl) titleEl.textContent = data.post.title;
 
+                                const thumbImage = row.querySelector('.post-thumb-img');
+                                if (thumbImage && data.post.image_url) {
+                                    thumbImage.src = data.post.image_url;
+                                }
+
                                 // Atualizar Categoria
                                 const categoryBadge = row.querySelector('.category-badge');
                                 if (categoryBadge) {
-                                    // Manter o ícone se possível ou usar padrão
-                                    const icon = categoryBadge.querySelector('i') ? categoryBadge.querySelector('i').className : 'fas fa-folder';
-                                    categoryBadge.innerHTML = `<i class="${icon}"></i> ${data.post.category_name}`;
+                                    categoryBadge.style.background = data.post.category_color || '#3a86ff';
+                                    categoryBadge.innerHTML = `<i class="${data.post.category_icon || 'fas fa-folder'}"></i> ${data.post.category_name}`;
                                 }
 
                                 // Atualizar Status
@@ -1271,6 +1318,11 @@
                                     statusCell.innerHTML = statusHtml;
                                 }
 
+                                const deleteBtn = row.querySelector('.btn-delete');
+                                if (deleteBtn) {
+                                    deleteBtn.setAttribute('data-post-title', data.post.title);
+                                }
+
                                 // Adicionar efeito visual de atualização
                                 row.style.transition = 'background-color 0.5s';
                                 row.style.backgroundColor = '#e8f5e9';
@@ -1278,6 +1330,14 @@
                                     row.style.backgroundColor = '';
                                 }, 1000);
                             }
+                        }
+
+                        if (data.stats) {
+                            window.AdminPostsDynamic?.updatePostsOverview(data.stats);
+                        }
+
+                        if (typeof window.refreshPostsListFilters === 'function') {
+                            window.refreshPostsListFilters();
                         }
                     } else {
                         console.error('Update failed:', data.message);
@@ -1287,12 +1347,18 @@
                 .catch(error => {
                     console.error('Erro ao salvar post:', error);
                     showNotification('Erro ao salvar post: ' + error, 'error');
-                    alert('Erro de conexão ou servidor: ' + error);
+                })
+                .finally(() => {
+                    delete form.dataset.submitting;
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = originalSaveLabel;
+                    }
                 });
         };
 
         // Animation delays for table rows
-        tableRows.forEach((row, index) => {
+        getTableRows().forEach((row, index) => {
             row.style.animationDelay = `${index * 0.05}s`;
             row.classList.add('slide-in-up');
         });
@@ -1421,6 +1487,49 @@
     #editPostModal .step-content .rich-editor {
         width: 100% !important;
         max-width: 100%;
+    }
+
+    #editPostModal .form-steps .step {
+        cursor: pointer;
+    }
+
+    #editPostModal .download-entry-row {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin-bottom: 4px;
+    }
+
+    #editPostModal .download-type-select {
+        flex: 0 0 120px !important;
+        width: 120px !important;
+        max-width: 120px !important;
+    }
+
+    #editPostModal .download-url-group {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+
+    #editPostModal .download-size-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+        margin-left: 128px;
+    }
+
+    #editPostModal .download-size-input {
+        width: 110px !important;
+        max-width: 110px !important;
+        flex: 0 0 110px !important;
+    }
+
+    #editPostModal .download-size-unit {
+        width: 96px !important;
+        max-width: 96px !important;
+        flex: 0 0 96px !important;
+        padding-right: 2.25rem !important;
     }
 
     /* Melhorar editor rico no modal */
@@ -1818,31 +1927,7 @@
     if (editPostForm) {
         editPostForm.addEventListener('submit', function (e) {
             e.preventDefault();
-
-            // Sincronizar conteúdo do editor antes de enviar
-            syncEditEditorContent();
-
-            const formData = new FormData(this);
-            const postId = document.getElementById('editPostId').value;
-
-            fetch(`/admin/posts/${postId}/update`, {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('Post atualizado com sucesso!', 'success');
-                        closeEditPostModal();
-                        // Atualização dinâmica: sem recarregar a página
-                    } else {
-                        showNotification(data.message || 'Erro ao atualizar post', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    showNotification('Erro ao atualizar post', 'error');
-                });
+            window.savePost(e);
         });
     }
 
@@ -1952,6 +2037,7 @@
 
         // Contador de caracteres do título
         const editTitleInput = document.getElementById('editPostTitle');
+        const editCategoryInput = document.getElementById('editPostCategory');
         if (editTitleInput) {
             editTitleInput.addEventListener('input', function () {
                 const counter = document.getElementById('editTitleCount');
@@ -1961,6 +2047,19 @@
             });
             console.log('Contador de título inicializado');
         }
+
+        editCategoryInput?.addEventListener('change', function () {
+            updateEditSubcategoryOptions(this.value);
+        });
+
+        document.querySelectorAll('#editPostModal .step').forEach((stepEl) => {
+            stepEl.style.cursor = 'pointer';
+            stepEl.addEventListener('click', function () {
+                const targetStep = Number(this.getAttribute('data-step'));
+                if (!Number.isInteger(targetStep)) return;
+                window.goToEditStep(targetStep);
+            });
+        });
 
         // Setup da área de upload de imagem - USANDO MESMA LÓGICA DO MODAL DE NOVO POST
         const editUploadArea = document.getElementById('editImageUploadArea');

@@ -10,7 +10,9 @@
         isLoading: false,
         snapshot: '',
         comments: [],
-        editId: null
+        editId: null,
+        replyId: null,
+        pendingReplyId: null
     };
 
     function getElements() {
@@ -21,7 +23,11 @@
             count: document.querySelector('.comments-count'),
             name: document.getElementById('commentName'),
             email: document.getElementById('commentEmail'),
-            text: document.getElementById('commentText')
+            text: document.getElementById('commentText'),
+            parentId: document.getElementById('commentParentId'),
+            replyState: document.getElementById('commentReplyState'),
+            replyAuthor: document.getElementById('commentReplyAuthor'),
+            replyPreview: document.getElementById('commentReplyPreview')
         };
     }
 
@@ -56,6 +62,10 @@
             .replace(/'/g, '&#039;');
     }
 
+    function parseMultilineText(value) {
+        return escapeHtml(value).replace(/\n/g, '<br>');
+    }
+
     function isAdmin() {
         return document.body.dataset.isAdmin === 'true';
     }
@@ -77,6 +87,10 @@
         return isAdmin();
     }
 
+    function canReplyComment(_comment) {
+        return true;
+    }
+
     function renderAvatar(comment) {
         if (comment.profile_image) {
             return `<img src="${escapeHtml(comment.profile_image)}" alt="${escapeHtml(comment.author)}" class="comment-avatar-img">`;
@@ -86,6 +100,14 @@
 
     function renderCommentActions(comment) {
         const actions = [];
+
+        if (canReplyComment(comment)) {
+            actions.push(`
+                <button type="button" class="btn-reply-comment" data-comment-reply="${comment.id}" title="Responder comentário">
+                    <i class="fas fa-reply"></i>
+                </button>
+            `);
+        }
 
         if (canEditComment(comment)) {
             actions.push(`
@@ -103,33 +125,91 @@
             `);
         }
 
-        if (!actions.length) {
-            return '';
-        }
-
-        return `<div class="comment-actions">${actions.join('')}</div>`;
+        return actions.length ? `<div class="comment-actions">${actions.join('')}</div>` : '';
     }
 
-    function renderCommentItem(comment) {
+    function renderCommentItem(comment, depth = 0) {
         const editedBadge = comment.is_edited
             ? `<span class="comment-edited-badge" title="${escapeHtml(comment.date_edited || 'Editado')}">editado</span>`
             : '';
 
+        const replies = Array.isArray(comment.replies) ? comment.replies : [];
+        const replyClass = depth > 0 ? ' is-reply' : '';
+
         return `
-            <div class="comment-item animate-fade-in" data-comment-id="${comment.id}">
-                <div class="comment-avatar">
-                    ${renderAvatar(comment)}
-                </div>
-                <div class="comment-content">
-                    <div class="comment-header">
-                        <h4 class="comment-author">${escapeHtml(comment.author)}</h4>
-                        <span class="comment-date">${escapeHtml(comment.date)} ${editedBadge}</span>
-                        ${renderCommentActions(comment)}
+            <div class="comment-thread" data-comment-thread="${comment.id}">
+                <div class="comment-item animate-fade-in${replyClass}" data-comment-id="${comment.id}">
+                    <div class="comment-avatar">
+                        ${renderAvatar(comment)}
                     </div>
-                    <p class="comment-text">${escapeHtml(comment.content)}</p>
+                    <div class="comment-content">
+                        <div class="comment-header">
+                            <h4 class="comment-author">${escapeHtml(comment.author)}</h4>
+                            <span class="comment-date">${escapeHtml(comment.date)} ${editedBadge}</span>
+                            ${renderCommentActions(comment)}
+                        </div>
+                        <p class="comment-text">${parseMultilineText(comment.content)}</p>
+                    </div>
                 </div>
+                ${replies.length ? `<div class="comment-replies">${replies.map((reply) => renderCommentItem(reply, depth + 1)).join('')}</div>` : ''}
             </div>
         `;
+    }
+
+    function countComments(comments) {
+        return (comments || []).reduce((total, comment) => total + 1 + countComments(comment.replies || []), 0);
+    }
+
+    function findCommentById(comments, commentId) {
+        for (const comment of comments || []) {
+            if (Number(comment.id) === Number(commentId)) {
+                return comment;
+            }
+
+            const nested = findCommentById(comment.replies || [], commentId);
+            if (nested) {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    function updateCommentTree(comments, commentId, updater) {
+        return (comments || []).map((comment) => {
+            if (Number(comment.id) === Number(commentId)) {
+                return updater(comment);
+            }
+
+            const replies = updateCommentTree(comment.replies || [], commentId, updater);
+            return replies !== comment.replies ? { ...comment, replies } : comment;
+        });
+    }
+
+    function removeCommentFromTree(comments, commentId) {
+        let changed = false;
+
+        const nextComments = (comments || []).reduce((acc, comment) => {
+            if (Number(comment.id) === Number(commentId)) {
+                changed = true;
+                return acc;
+            }
+
+            const nestedResult = removeCommentFromTree(comment.replies || [], commentId);
+            if (nestedResult.changed) {
+                changed = true;
+                acc.push({ ...comment, replies: nestedResult.comments });
+                return acc;
+            }
+
+            acc.push(comment);
+            return acc;
+        }, []);
+
+        return {
+            changed,
+            comments: nextComments
+        };
     }
 
     function renderComments(comments) {
@@ -148,12 +228,18 @@
                 </div>
             `;
         } else {
-            list.innerHTML = state.comments.map(renderCommentItem).join('');
+            list.innerHTML = state.comments.map((comment) => renderCommentItem(comment)).join('');
         }
 
         if (count) {
-            count.textContent = `(${state.comments.length})`;
+            count.textContent = `(${countComments(state.comments)})`;
         }
+
+        if (state.replyId && !findCommentById(state.comments, state.replyId)) {
+            clearReplyState();
+        }
+
+        applyPendingReplyIntent();
     }
 
     function showMessage(message, type) {
@@ -188,6 +274,75 @@
         }
     }
 
+    async function parseJsonResponse(response) {
+        const rawText = await response.text();
+
+        try {
+            return rawText ? JSON.parse(rawText) : {};
+        } catch (_error) {
+            throw new Error('O servidor retornou uma resposta invalida ao processar os comentarios.');
+        }
+    }
+
+    function updateReplyState(comment) {
+        const { parentId, replyState, replyAuthor, replyPreview, text } = getElements();
+        if (!comment || !replyState || !parentId) return;
+
+        state.replyId = Number(comment.id);
+        parentId.value = String(comment.id);
+        replyState.hidden = false;
+
+        if (replyAuthor) {
+            replyAuthor.textContent = comment.author || 'Usuario';
+        }
+
+        if (replyPreview) {
+            replyPreview.textContent = (comment.content || '').trim().slice(0, 140);
+        }
+
+        if (text) {
+            text.focus();
+            text.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function clearReplyState() {
+        const { parentId, replyState, replyAuthor, replyPreview } = getElements();
+
+        state.replyId = null;
+        if (parentId) parentId.value = '';
+        if (replyState) replyState.hidden = true;
+        if (replyAuthor) replyAuthor.textContent = '';
+        if (replyPreview) replyPreview.textContent = '';
+    }
+
+    function applyPendingReplyIntent() {
+        const params = new URLSearchParams(window.location.search);
+        const requestedReplyId = state.pendingReplyId || params.get('reply_to');
+        if (!requestedReplyId) return;
+
+        const targetComment = findCommentById(state.comments, requestedReplyId);
+        if (!targetComment) return;
+
+        state.pendingReplyId = null;
+        updateReplyState(targetComment);
+
+        if (params.get('reply_to')) {
+            params.delete('reply_to');
+            const nextSearch = params.toString();
+            const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash || ''}`;
+            window.history.replaceState({}, '', nextUrl);
+        }
+    }
+
+    function startReply(commentId) {
+        const comment = findCommentById(state.comments, commentId);
+        if (!comment) return;
+
+        cancelEditing();
+        updateReplyState(comment);
+    }
+
     async function fetchComments(forceRender = false) {
         if (!state.postId || state.isLoading) return;
         state.isLoading = true;
@@ -197,19 +352,19 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             });
-            const data = await response.json();
+            const data = await parseJsonResponse(response);
             if (!response.ok || !data.success) {
-                throw new Error(data.message || 'Erro ao carregar comentários.');
+                throw new Error(data.message || 'Erro ao carregar comentarios.');
             }
 
             const nextSnapshot = JSON.stringify(data.comments || []);
             if (forceRender || nextSnapshot !== state.snapshot) {
                 renderComments(data.comments || []);
             } else if (getElements().count) {
-                getElements().count.textContent = `(${data.count || 0})`;
+                getElements().count.textContent = `(${data.count || countComments(state.comments)})`;
             }
         } catch (error) {
-            console.error('Erro ao carregar comentários:', error);
+            console.error('Erro ao carregar comentarios:', error);
         } finally {
             state.isLoading = false;
         }
@@ -223,7 +378,7 @@
         const submitBtn = form.querySelector('button[type="submit"]');
 
         if (!content) {
-            showMessage('Por favor, preencha o campo de comentário.', 'error');
+            showMessage('Por favor, preencha o campo de comentario.', 'error');
             return;
         }
 
@@ -234,9 +389,11 @@
             }
         }
 
+        const wasReply = Boolean(state.replyId);
         const payload = { content };
         if (name && name.type !== 'hidden') payload.name = (name.value || '').trim();
         if (email && email.type !== 'hidden') payload.email = (email.value || '').trim();
+        if (state.replyId) payload.parent_id = state.replyId;
 
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -253,27 +410,24 @@
                 credentials: 'same-origin',
                 body: JSON.stringify(payload)
             });
-            const data = await response.json();
+            const data = await parseJsonResponse(response);
 
             if (!response.ok || !data.success) {
-                throw new Error(data.message || 'Erro ao enviar comentário.');
-            }
-
-            if (data.comment && data.comment.is_approved) {
-                renderComments([
-                    data.comment,
-                    ...state.comments.filter((comment) => Number(comment.id) !== Number(data.comment.id))
-                ]);
-                showMessage('Comentário publicado com sucesso!', 'success');
-                fetchComments(true);
-            } else {
-                showMessage(data.message || 'Comentário enviado! Aguarde aprovação.', 'info');
+                throw new Error(data.message || 'Erro ao enviar comentario.');
             }
 
             form.reset();
+            clearReplyState();
+            await fetchComments(true);
+
+            if (data.comment && data.comment.is_approved) {
+                showMessage(wasReply ? 'Resposta publicada com sucesso!' : 'Comentario publicado com sucesso!', 'success');
+            } else {
+                showMessage(data.message || (wasReply ? 'Resposta enviada! Aguarde aprovacao.' : 'Comentario enviado! Aguarde aprovacao.'), 'info');
+            }
         } catch (error) {
-            console.error('Erro ao enviar comentário:', error);
-            showMessage(error.message || 'Erro ao enviar comentário.', 'error');
+            console.error('Erro ao enviar comentario:', error);
+            showMessage(error.message || 'Erro ao enviar comentario.', 'error');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -299,10 +453,11 @@
     }
 
     function startEditing(commentId) {
-        const comment = state.comments.find((item) => Number(item.id) === Number(commentId));
+        const comment = findCommentById(state.comments, commentId);
         const target = document.querySelector(`[data-comment-id="${commentId}"]`);
         if (!comment || !target || state.editId === Number(commentId)) return;
 
+        clearReplyState();
         cancelEditing();
         state.editId = Number(commentId);
 
@@ -311,6 +466,7 @@
         textEl.style.display = 'none';
         textEl.insertAdjacentHTML('afterend', buildEditForm(comment));
         target.classList.add('editing');
+
         const textarea = target.querySelector('.edit-comment-textarea');
         if (textarea) textarea.focus();
     }
@@ -337,7 +493,7 @@
 
         const content = (textarea.value || '').trim();
         if (!content) {
-            showMessage('O comentário não pode estar vazio.', 'error');
+            showMessage('O comentario nao pode estar vazio.', 'error');
             return;
         }
 
@@ -351,28 +507,27 @@
                 credentials: 'same-origin',
                 body: JSON.stringify({ content })
             });
-            const data = await response.json();
+            const data = await parseJsonResponse(response);
             if (!response.ok || !data.success) {
-                throw new Error(data.message || 'Erro ao editar comentário.');
+                throw new Error(data.message || 'Erro ao editar comentario.');
             }
 
             const updatedComment = data.comment || {};
-            state.comments = state.comments.map((comment) => (
-                Number(comment.id) === Number(commentId)
-                    ? { ...comment, ...updatedComment }
-                    : comment
-            ));
+            state.comments = updateCommentTree(state.comments, commentId, (comment) => ({
+                ...comment,
+                ...updatedComment
+            }));
             renderComments(state.comments);
             cancelEditing();
-            showMessage('Comentário editado com sucesso!', 'success');
+            showMessage('Comentario editado com sucesso!', 'success');
         } catch (error) {
-            console.error('Erro ao editar comentário:', error);
-            showMessage(error.message || 'Erro ao editar comentário.', 'error');
+            console.error('Erro ao editar comentario:', error);
+            showMessage(error.message || 'Erro ao editar comentario.', 'error');
         }
     }
 
     async function deleteComment(commentId) {
-        if (!window.confirm('Tem certeza que deseja deletar este comentário?')) {
+        if (!window.confirm('Tem certeza que deseja deletar este comentario?')) {
             return;
         }
 
@@ -384,22 +539,23 @@
                 }),
                 credentials: 'same-origin'
             });
-            const data = await response.json();
+            const data = await parseJsonResponse(response);
             if (!response.ok || !data.success) {
-                throw new Error(data.message || 'Erro ao deletar comentário.');
+                throw new Error(data.message || 'Erro ao deletar comentario.');
             }
 
-            state.comments = state.comments.filter((comment) => Number(comment.id) !== Number(commentId));
+            const removal = removeCommentFromTree(state.comments, commentId);
+            state.comments = removal.comments;
             renderComments(state.comments);
-            showMessage('Comentário deletado com sucesso!', 'success');
+            showMessage('Comentario deletado com sucesso!', 'success');
         } catch (error) {
-            console.error('Erro ao deletar comentário:', error);
-            showMessage(error.message || 'Erro ao deletar comentário.', 'error');
+            console.error('Erro ao deletar comentario:', error);
+            showMessage(error.message || 'Erro ao deletar comentario.', 'error');
         }
     }
 
     function bindForm() {
-        const { form } = getElements();
+        const { form, replyState } = getElements();
         if (!form || form.dataset.commentsBound === 'true') return;
 
         form.dataset.commentsBound = 'true';
@@ -407,6 +563,12 @@
             event.preventDefault();
             event.stopPropagation();
             submitComment();
+        });
+
+        replyState?.addEventListener('click', (event) => {
+            const cancelButton = event.target.closest('[data-comment-cancel-reply]');
+            if (!cancelButton) return;
+            clearReplyState();
         });
     }
 
@@ -416,6 +578,12 @@
 
         list.dataset.commentsBound = 'true';
         list.addEventListener('click', (event) => {
+            const replyButton = event.target.closest('[data-comment-reply]');
+            if (replyButton) {
+                startReply(Number(replyButton.dataset.commentReply));
+                return;
+            }
+
             const editButton = event.target.closest('[data-comment-edit]');
             if (editButton) {
                 startEditing(Number(editButton.dataset.commentEdit));
@@ -458,6 +626,8 @@
             state.postId = '';
             state.snapshot = '';
             state.comments = [];
+            state.editId = null;
+            clearReplyState();
             return;
         }
 
@@ -465,6 +635,8 @@
             state.snapshot = '';
             state.comments = [];
             state.editId = null;
+            clearReplyState();
+            state.pendingReplyId = new URLSearchParams(window.location.search).get('reply_to');
         }
 
         state.postId = postId;
@@ -476,7 +648,11 @@
 
     window.CommentSystem = {
         init,
-        refresh: () => fetchComments(true)
+        refresh: () => fetchComments(true),
+        replyTo(commentId) {
+            state.pendingReplyId = String(commentId || '');
+            applyPendingReplyIntent();
+        }
     };
 
     document.addEventListener('DOMContentLoaded', init);

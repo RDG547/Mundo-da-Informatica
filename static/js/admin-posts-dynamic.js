@@ -1,4 +1,9 @@
 (function () {
+    if (window.AdminPostsDynamic && typeof window.AdminPostsDynamic.init === 'function') {
+        window.AdminPostsDynamic.init();
+        return;
+    }
+
     function getCsrfToken() {
         return (window.csrfUtils && window.csrfUtils.getCsrfToken && window.csrfUtils.getCsrfToken())
             || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
@@ -19,25 +24,48 @@
         if (typeof window.showNotification === 'function') {
             window.showNotification(message, type || 'info');
         } else {
-            alert(message);
+            window.alert(message);
         }
+    }
+
+    function getTableBody() {
+        return document.getElementById('postsTableBody');
     }
 
     function getRows() {
         return Array.from(document.querySelectorAll('#postsTableBody tr[data-post-id]'));
     }
 
+    function getPaginationContainer() {
+        return document.getElementById('postsPaginationContainer');
+    }
+
     function getCurrentPage() {
-        const container = document.getElementById('postsPaginationContainer');
+        const container = getPaginationContainer();
         const fromData = parseInt(container?.dataset?.currentPage || '1', 10);
         const fromUrl = parseInt(new URLSearchParams(window.location.search).get('page') || '', 10);
-        return Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : (Number.isFinite(fromData) && fromData > 0 ? fromData : 1);
+        return Number.isFinite(fromUrl) && fromUrl > 0
+            ? fromUrl
+            : (Number.isFinite(fromData) && fromData > 0 ? fromData : 1);
     }
 
     function getPerPage() {
-        const container = document.getElementById('postsPaginationContainer');
+        const container = getPaginationContainer();
         const fromData = parseInt(container?.dataset?.perPage || '10', 10);
         return Number.isFinite(fromData) && fromData > 0 ? fromData : 10;
+    }
+
+    function getTotalPosts() {
+        const container = getPaginationContainer();
+        const total = parseInt(container?.dataset?.total || '0', 10);
+        return Number.isFinite(total) && total >= 0 ? total : 0;
+    }
+
+    function setTotalPosts(total) {
+        const container = getPaginationContainer();
+        if (container) {
+            container.dataset.total = String(Math.max(0, Number(total) || 0));
+        }
     }
 
     function hasActiveFilters() {
@@ -47,105 +75,139 @@
         return Boolean(search || category || status);
     }
 
-    function getPageWindow(totalPages, currentPage) {
-        const pages = [];
-        const add = (value) => {
-            if (!pages.includes(value)) pages.push(value);
-        };
+    async function parseJsonResponse(response) {
+        const rawText = await response.text();
+        let data = {};
 
-        add(1);
-        add(totalPages);
-        for (let p = currentPage - 2; p <= currentPage + 2; p += 1) {
-            if (p > 1 && p < totalPages) add(p);
+        try {
+            data = rawText ? JSON.parse(rawText) : {};
+        } catch (_error) {
+            const normalized = rawText.trim().slice(0, 120);
+            if (normalized.startsWith('<')) {
+                throw new Error('O servidor retornou uma pagina invalida em vez de JSON. Verifique o log da aplicacao.');
+            }
+            throw new Error('A resposta do servidor nao esta em um formato valido.');
         }
 
-        pages.sort((a, b) => a - b);
-        const output = [];
-        for (let i = 0; i < pages.length; i += 1) {
-            const page = pages[i];
-            const prev = pages[i - 1];
-            if (i > 0 && prev + 1 < page) output.push(null);
-            output.push(page);
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Erro na operacao.');
         }
-        return output;
+
+        return data;
     }
 
-    function renderPagination(totalRows, page, perPage) {
-        const container = document.getElementById('postsPaginationContainer');
-        if (!container) return;
+    function updateSidebarPostsBadge(total) {
+        const badge = document.querySelector('.admin-nav-item[href="/admin/posts"] .nav-badge')
+            || document.querySelector('.admin-nav-item[href="/admin/posts/"] .nav-badge');
 
-        const paginationList = container.querySelector('.pagination');
+        if (badge) {
+            badge.textContent = total > 0 ? String(total) : '';
+        }
+    }
+
+    function refreshPaginationInfo() {
         const info = document.getElementById('postsPaginationInfo');
-        const totalPages = Math.max(1, Math.ceil(totalRows / perPage));
-        const safePage = Math.min(Math.max(1, page), totalPages);
+        if (!info) return;
 
-        if (info) {
-            const visibleRows = getRows().filter((row) => row.style.display !== 'none').length;
-            info.textContent = `Mostrando ${visibleRows} de ${totalRows} posts`;
-        }
-
-        if (!paginationList) return;
-
-        const pageItems = getPageWindow(totalPages, safePage)
-            .map((value) => {
-                if (value === null) {
-                    return '<li class="page-item disabled"><span class="page-link">…</span></li>';
-                }
-                if (value === safePage) {
-                    return `<li class="page-item active"><span class="page-link">${value}</span></li>`;
-                }
-                return `<li class="page-item"><a class="page-link" href="/admin/posts?page=${value}" data-page="${value}">${value}</a></li>`;
-            })
-            .join('');
-
-        const prevDisabled = safePage <= 1;
-        const nextDisabled = safePage >= totalPages;
-        const prevHref = `/admin/posts?page=${Math.max(1, safePage - 1)}`;
-        const nextHref = `/admin/posts?page=${Math.min(totalPages, safePage + 1)}`;
-
-        paginationList.innerHTML = `
-            <li class="page-item ${prevDisabled ? 'disabled' : ''}">
-                ${prevDisabled ? '<span class="page-link"><i class="fas fa-chevron-left"></i></span>' : `<a class="page-link" href="${prevHref}" data-page="${safePage - 1}"><i class="fas fa-chevron-left"></i></a>`}
-            </li>
-            ${pageItems}
-            <li class="page-item ${nextDisabled ? 'disabled' : ''}">
-                ${nextDisabled ? '<span class="page-link"><i class="fas fa-chevron-right"></i></span>' : `<a class="page-link" href="${nextHref}" data-page="${safePage + 1}"><i class="fas fa-chevron-right"></i></a>`}
-            </li>
-        `;
-
-        container.dataset.currentPage = String(safePage);
-    }
-
-    function applyClientPagination(targetPage) {
         const rows = getRows();
-        const perPage = getPerPage();
+        const visibleRows = rows.filter((row) => row.style.display !== 'none');
+        const totalPosts = getTotalPosts();
 
         if (!rows.length) {
-            renderPagination(0, 1, perPage);
+            info.textContent = totalPosts > 0
+                ? `Mostrando 0 de ${totalPosts} posts`
+                : 'Nenhum post encontrado';
             return;
         }
 
         if (hasActiveFilters()) {
-            const total = rows.length;
-            renderPagination(total, 1, total || perPage);
+            info.textContent = `Mostrando ${visibleRows.length} de ${rows.length} posts nesta pagina`;
             return;
         }
 
-        const totalRows = rows.length;
-        const totalPages = Math.max(1, Math.ceil(totalRows / perPage));
-        const page = Math.min(Math.max(1, targetPage || 1), totalPages);
-        const start = (page - 1) * perPage;
-        const end = start + perPage;
+        info.textContent = `Mostrando ${rows.length} de ${totalPosts} posts`;
+    }
 
-        rows.forEach((row, index) => {
-            row.style.display = index >= start && index < end ? '' : 'none';
+    function updatePostsOverview(stats) {
+        if (!stats || typeof stats !== 'object') {
+            refreshPaginationInfo();
+            return;
+        }
+
+        const totalPosts = Math.max(0, Number(stats.total_posts) || 0);
+        const featuredPosts = Math.max(0, Number(stats.featured_posts) || 0);
+
+        setTotalPosts(totalPosts);
+
+        document.querySelectorAll('[data-posts-total-stat], [data-posts-total-badge]').forEach((element) => {
+            element.textContent = String(totalPosts);
         });
 
-        renderPagination(totalRows, page, perPage);
+        document.querySelectorAll('[data-posts-featured-stat]').forEach((element) => {
+            element.textContent = String(featuredPosts);
+        });
 
-        const url = new URL(window.location.href);
-        url.searchParams.set('page', String(page));
-        window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+        updateSidebarPostsBadge(totalPosts);
+        refreshPaginationInfo();
+    }
+
+    function removeEmptyStateRow() {
+        document.querySelector('#postsTableBody .empty-state')?.remove();
+    }
+
+    function ensureEmptyState() {
+        const tbody = getTableBody();
+        if (!tbody || getRows().length) return;
+
+        tbody.innerHTML = `
+            <tr class="empty-state">
+                <td colspan="8" style="text-align: center; padding: 3rem;">
+                    <div class="empty-state-content">
+                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                        <h4 class="text-muted">Nenhum post encontrado</h4>
+                        <p class="text-muted">Crie um novo post para ele aparecer aqui.</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        refreshPaginationInfo();
+    }
+
+    function trimRowsForCurrentPage() {
+        if (getCurrentPage() !== 1) return;
+
+        const perPage = getPerPage();
+        const rows = getRows();
+        rows.slice(perPage).forEach((row) => row.remove());
+    }
+
+    function reapplyCurrentFilters() {
+        if (typeof window.refreshPostsListFilters === 'function') {
+            window.refreshPostsListFilters();
+            return;
+        }
+
+        const searchInput = document.getElementById('searchPosts');
+        const categoryFilter = document.getElementById('filterCategory');
+        const statusFilter = document.getElementById('filterStatus');
+
+        if (searchInput) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            return;
+        }
+
+        if (categoryFilter) {
+            categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+
+        if (statusFilter) {
+            statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+
+        refreshPaginationInfo();
     }
 
     function buildPostRow(post) {
@@ -160,7 +222,7 @@
                 : '<span class="badge badge-secondary"><i class="fas fa-pause-circle"></i> Inativo</span>');
 
         return `
-            <tr data-post-id="${post.id}" class="${post.is_active ? '' : 'inactive-row'}">
+            <tr data-post-id="${post.id}" data-category-id="${escapeHtml(post.category_id || '')}" class="${post.is_active ? '' : 'inactive-row'}">
                 <td><input type="checkbox" class="form-check-input post-checkbox" value="${post.id}"></td>
                 <td>
                     <div class="post-title-cell">
@@ -233,59 +295,51 @@
         }
 
         const response = await fetch(url, options);
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Erro na operação.');
-        }
-        return data;
+        return parseJsonResponse(response);
     }
 
-    function initPostsDynamic() {
-        if (!document.getElementById('postsTableBody')) return;
-
-        applyClientPagination(getCurrentPage());
-
-        // Reaplicar paginação quando filtros mudarem
-        ['searchPosts', 'filterCategory', 'filterStatus'].forEach((id) => {
-            const input = document.getElementById(id);
-            input?.addEventListener('input', () => {
-                setTimeout(() => applyClientPagination(1), 0);
-            });
-            input?.addEventListener('change', () => {
-                setTimeout(() => applyClientPagination(1), 0);
-            });
-        });
-
-        // Interceptar links de paginação
-        document.addEventListener('click', function (event) {
-            const link = event.target.closest('#postsPaginationContainer a.page-link');
-            if (!link) return;
-
-            const page = parseInt(link.dataset.page || '', 10);
-            if (!Number.isFinite(page)) return;
-
-            event.preventDefault();
-            event.stopPropagation();
-            applyClientPagination(page);
-        }, true);
-
-        // Impedir submit padrão do formulário de edição (evita location.reload em listeners antigos)
-        const editForm = document.getElementById('editPostForm');
-        if (editForm && !editForm.dataset.dynamicBound) {
-            editForm.dataset.dynamicBound = 'true';
-            editForm.addEventListener('submit', function (event) {
-                event.preventDefault();
-                event.stopImmediatePropagation();
-                if (typeof window.savePost === 'function') {
-                    window.savePost(event);
-                }
-            }, true);
+    function prependPostRow(post) {
+        if (!post || getCurrentPage() !== 1) {
+            return false;
         }
 
-        // Abertura de modal de exclusão com delegação (captura)
+        const tbody = getTableBody();
+        if (!tbody) {
+            return false;
+        }
+
+        removeEmptyStateRow();
+        tbody.insertAdjacentHTML('afterbegin', buildPostRow(post));
+        trimRowsForCurrentPage();
+        reapplyCurrentFilters();
+        return true;
+    }
+
+    function goToPreviousPageIfNeeded() {
+        if (getRows().length || getCurrentPage() <= 1 || getTotalPosts() <= 0) {
+            ensureEmptyState();
+            refreshPaginationInfo();
+            return;
+        }
+
+        const previousPageUrl = `/admin/posts?page=${Math.max(1, getCurrentPage() - 1)}`;
+        if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
+            window.dynamicLoader.loadPage(previousPageUrl);
+        } else {
+            window.location.href = previousPageUrl;
+        }
+    }
+
+    function bindGlobalHandlers() {
+        if (window.__adminPostsDynamicGlobalBound) {
+            return;
+        }
+
+        window.__adminPostsDynamicGlobalBound = true;
+
         document.addEventListener('click', function (event) {
             const deleteBtn = event.target.closest('.btn-delete');
-            if (!deleteBtn) return;
+            if (!deleteBtn || !document.getElementById('postsTableBody')) return;
 
             event.preventDefault();
             event.stopImmediatePropagation();
@@ -298,7 +352,7 @@
 
             const modalBodyP = modal.querySelector('.modal-body p');
             if (modalBodyP) {
-                modalBodyP.innerHTML = `Tem certeza que deseja excluir o post <strong>"${escapeHtml(postTitle)}"</strong>? Esta ação não pode ser desfeita.`;
+                modalBodyP.innerHTML = `Tem certeza que deseja excluir o post <strong>"${escapeHtml(postTitle)}"</strong>? Esta acao nao pode ser desfeita.`;
             }
 
             form.action = `/admin/posts/${postId}/delete`;
@@ -307,111 +361,148 @@
             }
         }, true);
 
-        // Excluir post sem reload
-        const deleteForm = document.getElementById('deletePostForm');
-        if (deleteForm && !deleteForm.dataset.dynamicBound) {
-            deleteForm.dataset.dynamicBound = 'true';
-            deleteForm.addEventListener('submit', async function (event) {
-                event.preventDefault();
-                event.stopImmediatePropagation();
-
-                try {
-                    const result = await ajaxPost(deleteForm.action);
-                    const row = document.querySelector(`tr[data-post-id="${result.post_id}"]`);
-                    if (row) row.remove();
-                    showToast(result.message || 'Post excluído com sucesso!', 'success');
-                    if (typeof window.closeModal === 'function') {
-                        window.closeModal('deleteModal');
-                    }
-                    applyClientPagination(getCurrentPage());
-                } catch (error) {
-                    showToast(error.message, 'error');
-                }
-            }, true);
-        }
-
-        // Duplicar post sem reload
         document.addEventListener('click', async function (event) {
             const duplicateBtn = event.target.closest('.btn-duplicate');
-            if (!duplicateBtn) return;
+            if (!duplicateBtn || !document.getElementById('postsTableBody')) return;
 
             event.preventDefault();
             event.stopImmediatePropagation();
 
             const postId = duplicateBtn.getAttribute('data-post-id');
-            if (!postId) return;
-
-            if (!window.confirm('Deseja duplicar este post?')) return;
+            if (!postId || !window.confirm('Deseja duplicar este post?')) return;
 
             try {
                 const result = await ajaxPost(`/admin/posts/${postId}/duplicate`);
-                if (result.post) {
-                    const tableBody = document.getElementById('postsTableBody');
-                    tableBody?.insertAdjacentHTML('afterbegin', buildPostRow(result.post));
-                    applyClientPagination(1);
-                }
-                showToast(result.message || 'Post duplicado com sucesso!', 'success');
+                updatePostsOverview(result.stats);
+
+                const inserted = prependPostRow(result.post);
+                const message = inserted || getCurrentPage() === 1
+                    ? (result.message || 'Post duplicado com sucesso!')
+                    : `${result.message || 'Post duplicado com sucesso!'} A copia aparece na pagina 1.`;
+
+                showToast(message, 'success');
             } catch (error) {
                 showToast(error.message, 'error');
             }
         }, true);
-
-        // Criar novo post sem reload
-        const addPostForm = document.getElementById('addPostForm');
-        if (addPostForm && !addPostForm.dataset.dynamicBound) {
-            addPostForm.dataset.dynamicBound = 'true';
-            addPostForm.addEventListener('submit', async function (event) {
-                event.preventDefault();
-
-                if (addPostForm.dataset.submitting === 'true') {
-                    return;
-                }
-
-                addPostForm.dataset.submitting = 'true';
-
-                const saveBtn = document.getElementById('savePostBtn');
-                if (saveBtn && !saveBtn.dataset.defaultHtml) {
-                    saveBtn.dataset.defaultHtml = saveBtn.innerHTML;
-                }
-
-                if (saveBtn) {
-                    saveBtn.disabled = true;
-                    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
-                }
-
-                const formData = new FormData(addPostForm);
-
-                try {
-                    const result = await ajaxPost(addPostForm.action, formData);
-                    if (result.post) {
-                        const tableBody = document.getElementById('postsTableBody');
-                        tableBody?.insertAdjacentHTML('afterbegin', buildPostRow(result.post));
-                        applyClientPagination(1);
-                    }
-
-                    addPostForm.reset();
-                    const editor = document.getElementById('postContentEditor');
-                    if (editor) editor.innerHTML = '';
-
-                    if (typeof window.closeModal === 'function') {
-                        window.closeModal('addPostModal');
-                    }
-
-                    showToast(result.message || 'Post criado com sucesso!', 'success');
-                } catch (error) {
-                    showToast(error.message, 'error');
-                } finally {
-                    delete addPostForm.dataset.submitting;
-                    addPostForm.dispatchEvent(new CustomEvent('post:create:complete'));
-
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.innerHTML = saveBtn.dataset.defaultHtml || saveBtn.innerHTML;
-                    }
-                }
-            }, true);
-        }
     }
 
-    document.addEventListener('DOMContentLoaded', initPostsDynamic);
+    function bindDeleteForm() {
+        const deleteForm = document.getElementById('deletePostForm');
+        if (!deleteForm || deleteForm.dataset.dynamicBound === 'true') return;
+
+        deleteForm.dataset.dynamicBound = 'true';
+        deleteForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            try {
+                const result = await ajaxPost(deleteForm.action);
+                document.querySelector(`tr[data-post-id="${result.post_id}"]`)?.remove();
+                updatePostsOverview(result.stats);
+
+                if (typeof window.closeModal === 'function') {
+                    window.closeModal('deleteModal');
+                }
+
+                showToast(result.message || 'Post excluido com sucesso!', 'success');
+                goToPreviousPageIfNeeded();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }, true);
+    }
+
+    function bindEditForm() {
+        const editForm = document.getElementById('editPostForm');
+        if (!editForm || editForm.dataset.dynamicBound === 'true') return;
+
+        editForm.dataset.dynamicBound = 'true';
+        editForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (typeof window.savePost === 'function') {
+                window.savePost(event);
+            }
+        }, true);
+    }
+
+    function bindCreateForm() {
+        const addPostForm = document.getElementById('addPostForm');
+        if (!addPostForm || addPostForm.dataset.dynamicBound === 'true') return;
+
+        addPostForm.dataset.dynamicBound = 'true';
+        addPostForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            if (addPostForm.dataset.submitting === 'true') {
+                return;
+            }
+
+            addPostForm.dataset.submitting = 'true';
+
+            const saveBtn = document.getElementById('savePostBtn');
+            if (saveBtn && !saveBtn.dataset.defaultHtml) {
+                saveBtn.dataset.defaultHtml = saveBtn.innerHTML;
+            }
+
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+            }
+
+            const formData = new FormData(addPostForm);
+
+            try {
+                const result = await ajaxPost(addPostForm.action, formData);
+                updatePostsOverview(result.stats);
+
+                const inserted = prependPostRow(result.post);
+
+                addPostForm.reset();
+                const editor = document.getElementById('postContentEditor');
+                if (editor) editor.innerHTML = '';
+
+                if (typeof window.closeModal === 'function') {
+                    window.closeModal('addPostModal');
+                }
+
+                const message = inserted || getCurrentPage() === 1
+                    ? (result.message || 'Post criado com sucesso!')
+                    : `${result.message || 'Post criado com sucesso!'} Ele ja esta disponivel na pagina 1.`;
+
+                showToast(message, 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                delete addPostForm.dataset.submitting;
+                addPostForm.dispatchEvent(new CustomEvent('post:create:complete'));
+
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = saveBtn.dataset.defaultHtml || saveBtn.innerHTML;
+                }
+            }
+        }, true);
+    }
+
+    function init() {
+        if (!document.getElementById('postsTableBody')) return;
+
+        bindGlobalHandlers();
+        bindDeleteForm();
+        bindEditForm();
+        bindCreateForm();
+        refreshPaginationInfo();
+        updateSidebarPostsBadge(getTotalPosts());
+    }
+
+    window.AdminPostsDynamic = {
+        init,
+        updatePostsOverview,
+        refreshPaginationInfo
+    };
+
+    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('adminPageLoaded', init);
 })();

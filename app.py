@@ -50,6 +50,7 @@ from itsdangerous import URLSafeTimedSerializer as Serializer
 import re
 from werkzeug.utils import secure_filename
 from PIL import Image, ImageOps
+from PIL.Image import Resampling
 from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
@@ -8550,8 +8551,7 @@ def upload_to_cloudinary(file, folder='profiles'):
             img = img.convert('RGB')
 
         max_size = (800, 800) if folder == 'profiles' else (1600, 1600)
-        resampling = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
-        img.thumbnail(max_size, resampling)
+        img.thumbnail(max_size, Resampling.LANCZOS)
 
         # Salvar em buffer temporário
         from io import BytesIO

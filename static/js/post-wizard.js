@@ -23,10 +23,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveBtn = document.getElementById('savePostBtn');
     const richEditor = document.getElementById('postContentEditor');
     const hiddenTextarea = document.getElementById('postContent');
+    const saveBtnDefaultHtml = saveBtn ? saveBtn.innerHTML : '';
 
     if (!nextBtn || !prevBtn || !saveBtn) {
         console.error('Botões do wizard não encontrados!');
         return;
+    }
+
+    function setSubmitState(isSubmitting) {
+        saveBtn.disabled = isSubmitting;
+        saveBtn.innerHTML = isSubmitting
+            ? '<i class="fas fa-spinner fa-spin"></i> Publicando...'
+            : saveBtnDefaultHtml;
     }
 
     function showStep(step) {
@@ -118,6 +126,10 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         e.stopPropagation();
 
+        if (saveBtn.disabled) {
+            return;
+        }
+
         // Validar TODOS os steps antes de salvar
         if (validateAllSteps()) {
             // Sincronizar editor com textarea antes de enviar
@@ -131,11 +143,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Submeter o formulário
             const form = document.getElementById('addPostForm');
             if (form) {
+                setSubmitState(true);
                 clearDraft(); // Limpar rascunho antes de enviar
-                if (typeof form.requestSubmit === 'function') {
-                    form.requestSubmit();
-                } else {
-                    form.submit();
+                try {
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                } catch (error) {
+                    setSubmitState(false);
+                    throw error;
                 }
             }
         } else {
@@ -253,6 +271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 richEditor.innerHTML = '';
             }
         }
+        setSubmitState(false);
     }
 
     // Sincronizar editor rich text com textarea oculto
@@ -284,8 +303,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Limpar rascunho ao submeter formulário
     const addPostForm = document.getElementById('addPostForm');
     if (addPostForm) {
-        addPostForm.addEventListener('submit', function(e) {
+        addPostForm.addEventListener('submit', function() {
             clearDraft();
+        });
+
+        addPostForm.addEventListener('post:create:complete', function() {
+            setSubmitState(false);
         });
     }
 

@@ -18,12 +18,19 @@ class ModernPostForm {
     }
 
     bindEvents() {
+        const addPostForm = document.getElementById('addPostForm');
+        const wizardManaged = addPostForm?.dataset.wizardManaged === 'true';
+
         // Step Navigation
-        document.getElementById('nextStep')?.addEventListener('click', () => this.nextStep());
-        document.getElementById('prevStep')?.addEventListener('click', () => this.prevStep());
+        if (!wizardManaged) {
+            document.getElementById('nextStep')?.addEventListener('click', () => this.nextStep());
+            document.getElementById('prevStep')?.addEventListener('click', () => this.prevStep());
+        }
 
         // Form Submission
-        document.getElementById('savePostBtn')?.addEventListener('click', () => this.submitForm());
+        if (!wizardManaged) {
+            document.getElementById('savePostBtn')?.addEventListener('click', () => this.submitForm());
+        }
 
         // Character Counting
         this.bindCharacterCounters();

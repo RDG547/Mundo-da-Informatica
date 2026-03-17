@@ -363,6 +363,22 @@
             addPostForm.addEventListener('submit', async function (event) {
                 event.preventDefault();
 
+                if (addPostForm.dataset.submitting === 'true') {
+                    return;
+                }
+
+                addPostForm.dataset.submitting = 'true';
+
+                const saveBtn = document.getElementById('savePostBtn');
+                if (saveBtn && !saveBtn.dataset.defaultHtml) {
+                    saveBtn.dataset.defaultHtml = saveBtn.innerHTML;
+                }
+
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+                }
+
                 const formData = new FormData(addPostForm);
 
                 try {
@@ -384,6 +400,14 @@
                     showToast(result.message || 'Post criado com sucesso!', 'success');
                 } catch (error) {
                     showToast(error.message, 'error');
+                } finally {
+                    delete addPostForm.dataset.submitting;
+                    addPostForm.dispatchEvent(new CustomEvent('post:create:complete'));
+
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = saveBtn.dataset.defaultHtml || saveBtn.innerHTML;
+                    }
                 }
             }, true);
         }

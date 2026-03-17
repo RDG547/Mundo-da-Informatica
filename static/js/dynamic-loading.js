@@ -557,11 +557,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         async loadPageStyles(url, styles) {
-            // Don't reload styles in admin area - they're already loaded
             const path = new URL(url, window.location.origin).pathname;
-            if (path.startsWith('/admin')) {
-                return;
-            }
 
             // Reset all page-specific styles to print media (disabled)
             const faqCSS = document.getElementById('faq-css');
@@ -641,11 +637,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         async loadPageScripts(url, scripts) {
-            const path = new URL(url, window.location.origin).pathname;
-            if (path.startsWith('/admin')) {
-                return;
-            }
-
             document.querySelectorAll('script[data-dynamic-js="true"]').forEach((script) => script.remove());
             const baseScriptUrls = new Set(
                 Array.from(document.querySelectorAll('script[data-static-base-script="true"][src]'))

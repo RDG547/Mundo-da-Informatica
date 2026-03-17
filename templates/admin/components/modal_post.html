@@ -239,9 +239,6 @@
         padding-right: 2.25rem !important;
     }
 
-    #addPostModal .subcategory-input {
-        width: 100% !important;
-    }
 </style>
 <div class="modal" id="addPostModal">
     <div class="modal-content modal-xl">
@@ -374,17 +371,6 @@
                                 {% endif %}
                             </div>
 
-                            <div class="form-group">
-                                <label for="postSubcategory" class="form-label">
-                                    <i class="fas fa-sitemap"></i> Subcategoria
-                                </label>
-                                <input type="text" id="postSubcategory" name="subcategory"
-                                       class="form-control modern-input subcategory-input"
-                                       list="postSubcategoryOptions"
-                                       value="{{ form_data.subcategory if form_data else '' }}"
-                                       placeholder="Selecione ou digite uma subcategoria">
-                                <datalist id="postSubcategoryOptions"></datalist>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -612,6 +598,3 @@
         </div>
     </div>
 </div>
-<script>
-    window.adminCategorySubcategories = {{ category_subcategories_map|default({}, true)|tojson }};
-</script>

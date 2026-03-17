@@ -365,6 +365,19 @@ def get_category_subcategories_map() -> dict[str, list[str]]:
     return subcategories_map
 
 
+def get_plain_text_excerpt(content: str | None, limit: int = 220) -> str:
+    normalized = re.sub(
+        r'\s+',
+        ' ',
+        bleach.clean(content or '', tags=[], strip=True)
+    ).strip()
+
+    if limit > 0 and len(normalized) > limit:
+        return f"{normalized[:limit].rstrip()}..."
+
+    return normalized
+
+
 def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
     seen_ids = {post.id}
     related_posts: list[Post] = []
@@ -430,7 +443,8 @@ def serialize_post_for_admin(post):
     return {
         'id': post.id,
         'title': post.title,
-        'description': post.content or '',
+        'description': get_plain_text_excerpt(post.content, limit=220),
+        'excerpt': get_plain_text_excerpt(post.content, limit=120),
         'category_id': post.category_id,
         'category_name': category.name if category else (post.category_str or 'Sem categoria'),
         'category_icon': (category.icon if category else 'fas fa-folder') or 'fas fa-folder',
@@ -4864,7 +4878,6 @@ def admin_update_post(post_id):
         title = request.form.get('title', '').strip()
         content = request.form.get('content', '').strip()
         category_id = request.form.get('category_id')
-        subcategory = request.form.get('subcategory', '').strip()
         download_link = request.form.get('download_link', '').strip()
         download_files_json = request.form.get('download_files', '')
         image_url = request.form.get('image_url', '').strip()
@@ -4936,7 +4949,6 @@ def admin_update_post(post_id):
         post.content = content
         post.category_id = int(category_id) if category_id else None
         post.category_str = category.name if category else 'Sem categoria'
-        post.subcategory = subcategory or None
         post.download_link = download_link if download_link else None
         post.image_url = image_url if image_url else 'post-placeholder.svg'
         post.featured = featured
@@ -6118,7 +6130,6 @@ def admin_create_post():
         # Extrair dados do formulário
         title = request.form.get('title')
         category_id = request.form.get('category')
-        subcategory = request.form.get('subcategory', '').strip()
         content = request.form.get('content')
         download_link = request.form.get('download_link', '')
         download_files_json = request.form.get('download_files', '')
@@ -6160,7 +6171,6 @@ def admin_create_post():
                     'content': content,
                     'category': category_id,
                     'download_link': download_link,
-                    'subcategory': subcategory,
                     'tags': tags,
                     'seo_title': seo_title,
                     'seo_description': seo_description,
@@ -6259,7 +6269,6 @@ def admin_create_post():
             content=content,
             category_id=category_id if category else None,
             category_str=category.name if category else 'Sem categoria',
-            subcategory=subcategory or None,
             download_link=download_link,
             image_url=image_url,
             featured=featured,

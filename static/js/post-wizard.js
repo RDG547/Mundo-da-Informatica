@@ -3,12 +3,17 @@
  * Gerencia o formulário de múltiplas etapas para criar posts
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+function initPostWizard() {
     // Verificar se o modal existe na página
     const addPostModal = document.getElementById('addPostModal');
     if (!addPostModal) {
         return; // Sair se não houver modal de post na página
     }
+
+    if (addPostModal.dataset.postWizardInitialized === 'true') {
+        return;
+    }
+    addPostModal.dataset.postWizardInitialized = 'true';
 
     console.log('Post Wizard inicializado');
 
@@ -24,9 +29,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const richEditor = document.getElementById('postContentEditor');
     const hiddenTextarea = document.getElementById('postContent');
     const saveBtnDefaultHtml = saveBtn ? saveBtn.innerHTML : '';
-    const categorySelect = document.getElementById('postCategory');
-    const subcategoryInput = document.getElementById('postSubcategory');
-    const subcategoryOptions = document.getElementById('postSubcategoryOptions');
 
     if (!nextBtn || !prevBtn || !saveBtn) {
         console.error('Botões do wizard não encontrados!');
@@ -38,18 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
         saveBtn.innerHTML = isSubmitting
             ? '<i class="fas fa-spinner fa-spin"></i> Publicando...'
             : saveBtnDefaultHtml;
-    }
-
-    function updateSubcategoryOptions() {
-        if (!subcategoryOptions) return;
-
-        const subcategoriesMap = window.adminCategorySubcategories || {};
-        const selectedCategory = categorySelect?.value ? String(categorySelect.value) : '';
-        const options = Array.isArray(subcategoriesMap[selectedCategory]) ? subcategoriesMap[selectedCategory] : [];
-
-        subcategoryOptions.innerHTML = options
-            .map((option) => `<option value="${String(option).replace(/"/g, '&quot;')}"></option>`)
-            .join('');
     }
 
     function showStep(step) {
@@ -244,8 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = {
             title: document.getElementById('postTitle')?.value || '',
             content: document.getElementById('postContent')?.value || '',
-            category: document.getElementById('postCategory')?.value || '',
-            subcategory: document.getElementById('postSubcategory')?.value || ''
+            category: document.getElementById('postCategory')?.value || ''
         };
         localStorage.setItem('postDraft', JSON.stringify(formData));
     }
@@ -266,9 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (document.getElementById('postCategory')) {
                     document.getElementById('postCategory').value = formData.category || '';
-                }
-                if (document.getElementById('postSubcategory')) {
-                    document.getElementById('postSubcategory').value = formData.subcategory || '';
                 }
                 return true;
             } catch (e) {
@@ -311,7 +297,6 @@ document.addEventListener('DOMContentLoaded', function() {
         addPostModal.addEventListener('show', function() {
             resetForm();
             showStep(1);
-            updateSubcategoryOptions();
 
             const hasDraft = loadDraft();
             if (hasDraft && typeof showNotification !== 'undefined') {
@@ -332,17 +317,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    categorySelect?.addEventListener('change', function() {
-        updateSubcategoryOptions();
-        if (subcategoryInput && subcategoryOptions && !subcategoryOptions.querySelector(`option[value="${subcategoryInput.value}"]`)) {
-            subcategoryInput.value = '';
-        }
-        saveDraft();
-    });
-
     // Inicializar no step 1
     showStep(1);
-    updateSubcategoryOptions();
 
     // ==========================================
     // MULTI-DOWNLOAD ENTRIES
@@ -463,4 +439,12 @@ document.addEventListener('DOMContentLoaded', function() {
             downloadLinkField.value = files[0].url;
         }
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPostWizard);
+} else {
+    initPostWizard();
+}
+
+document.addEventListener('adminPageLoaded', initPostWizard);

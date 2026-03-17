@@ -211,6 +211,7 @@
     }
 
     function buildPostRow(post) {
+        const postExcerpt = String(post.excerpt || post.description || '').trim();
         const featuredHtml = post.featured
             ? '<span class="featured-indicator" title="Post em destaque"><i class="fas fa-star"></i></span>'
             : '';
@@ -231,7 +232,7 @@
                         </div>
                         <div class="post-title-info">
                             <div class="post-title">${escapeHtml(post.title)}</div>
-                            ${post.description ? `<small class="post-excerpt text-muted">${escapeHtml(post.description.substring(0, 100))}${post.description.length > 100 ? '...' : ''}</small>` : ''}
+                            ${postExcerpt ? `<small class="post-excerpt text-muted">${escapeHtml(postExcerpt)}</small>` : ''}
                             ${featuredHtml}
                         </div>
                     </div>

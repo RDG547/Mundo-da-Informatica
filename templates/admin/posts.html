@@ -126,9 +126,10 @@
                             </div>
                             <div class="post-title-info">
                                 <div class="post-title">{{ post.title }}</div>
-                                {% if post.description %}
+                                {% set post_excerpt = post.content|striptags|trim %}
+                                {% if post_excerpt %}
                                 <small class="post-excerpt text-muted">
-                                    {{ post.description[:100] }}{% if post.description|length > 100 %}...{% endif %}
+                                    {{ post_excerpt[:100] }}{% if post_excerpt|length > 100 %}...{% endif %}
                                 </small>
                                 {% endif %}
                                 {% if post.featured %}
@@ -495,18 +496,6 @@
                                 </select>
                             </div>
 
-                            <div class="form-group">
-                                <label for="editPostSubcategory" class="form-label">
-                                    <i class="fas fa-sitemap"></i> Subcategoria
-                                </label>
-                                <input type="text"
-                                       id="editPostSubcategory"
-                                       name="subcategory"
-                                       class="form-control modern-input"
-                                       list="editPostSubcategoryOptions"
-                                       placeholder="Selecione ou digite uma subcategoria">
-                                <datalist id="editPostSubcategoryOptions"></datalist>
-                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -614,28 +603,6 @@
             throw new Error(rawText && rawText.trim().startsWith('<')
                 ? 'O servidor retornou HTML em vez de JSON. Verifique o backend.'
                 : 'Resposta inválida do servidor.');
-        }
-    }
-
-    function getAdminSubcategoriesMap() {
-        return window.adminCategorySubcategories || {};
-    }
-
-    function updateEditSubcategoryOptions(selectedCategoryId, preferredValue) {
-        const input = document.getElementById('editPostSubcategory');
-        const datalist = document.getElementById('editPostSubcategoryOptions');
-        if (!input || !datalist) return;
-
-        const map = getAdminSubcategoriesMap();
-        const options = Array.isArray(map[String(selectedCategoryId || '')]) ? map[String(selectedCategoryId || '')] : [];
-        datalist.innerHTML = options
-            .map((option) => `<option value="${String(option).replace(/"/g, '&quot;')}"></option>`)
-            .join('');
-
-        if (typeof preferredValue === 'string') {
-            input.value = preferredValue;
-        } else if (input.value && !options.includes(input.value)) {
-            input.value = '';
         }
     }
 
@@ -1096,7 +1063,6 @@
             }
 
             document.getElementById('editPostCategory').value = post.category_id || '';
-            updateEditSubcategoryOptions(post.category_id || '', post.subcategory || '');
 
             // Populate multi-download entries (also handles download_link)
             populateEditDownloadEntries(post);
@@ -1291,6 +1257,24 @@
                                 // Atualizar Título
                                 const titleEl = row.querySelector('.post-title');
                                 if (titleEl) titleEl.textContent = data.post.title;
+
+                                const excerptEl = row.querySelector('.post-excerpt');
+                                const excerptText = (data.post.excerpt || data.post.description || '').trim();
+                                if (excerptEl) {
+                                    if (excerptText) {
+                                        excerptEl.textContent = excerptText;
+                                    } else {
+                                        excerptEl.remove();
+                                    }
+                                } else if (excerptText) {
+                                    const titleInfo = row.querySelector('.post-title-info');
+                                    if (titleInfo) {
+                                        const small = document.createElement('small');
+                                        small.className = 'post-excerpt text-muted';
+                                        small.textContent = excerptText;
+                                        titleInfo.appendChild(small);
+                                    }
+                                }
 
                                 const thumbImage = row.querySelector('.post-thumb-img');
                                 if (thumbImage && data.post.image_url) {
@@ -2047,10 +2031,6 @@
             });
             console.log('Contador de título inicializado');
         }
-
-        editCategoryInput?.addEventListener('change', function () {
-            updateEditSubcategoryOptions(this.value);
-        });
 
         document.querySelectorAll('#editPostModal .step').forEach((stepEl) => {
             stepEl.style.cursor = 'pointer';

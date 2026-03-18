@@ -170,6 +170,71 @@ window.confirmRemoveImage = async function(event) {
     }
 };
 
+function getProfileScrollOffset() {
+    const header = document.querySelector('header');
+    const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 70;
+    return headerHeight + 16;
+}
+
+function setActiveProfileSectionLink(sectionId) {
+    document.querySelectorAll('.admin-nav-item[data-profile-section-link]').forEach((link) => {
+        link.classList.toggle('active', link.dataset.profileSectionLink === sectionId);
+    });
+}
+
+window.scrollToProfileSection = function (sectionId) {
+    const target = document.getElementById(sectionId);
+    if (!target) {
+        return false;
+    }
+
+    const top = target.getBoundingClientRect().top + window.scrollY - getProfileScrollOffset();
+    window.scrollTo({
+        top: Math.max(top, 0),
+        behavior: 'smooth'
+    });
+
+    setActiveProfileSectionLink(sectionId);
+    if (window.history && typeof window.history.replaceState === 'function') {
+        window.history.replaceState(null, '', '#' + sectionId);
+    } else {
+        window.location.hash = sectionId;
+    }
+
+    return false;
+};
+
+function initializeProfileSectionNav() {
+    const navLinks = document.querySelectorAll('.admin-nav-item[data-profile-section-link]');
+    if (!navLinks.length) {
+        return;
+    }
+
+    navLinks.forEach((link) => {
+        if (link.dataset.profileNavInit === 'true') {
+            return;
+        }
+
+        link.dataset.profileNavInit = 'true';
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            window.scrollToProfileSection(this.dataset.profileSectionLink);
+        });
+    });
+
+    if (window.location.hash) {
+        const sectionId = window.location.hash.replace('#', '');
+        if (document.getElementById(sectionId)) {
+            setTimeout(() => {
+                window.scrollToProfileSection(sectionId);
+            }, 120);
+            return;
+        }
+    }
+
+    setActiveProfileSectionLink('');
+}
+
 // Favorite functions - GLOBAL
 window.removeFavorite = async function (postId) {
     // Usa o modal de confirmação do FavoriteManager
@@ -594,6 +659,7 @@ window.showToast = function(message, type = 'success') {
 // Initialize profile page functionality
 function initializeProfilePage() {
     console.log('Inicializando página de perfil...');
+    initializeProfileSectionNav();
 
     // Image upload functionality
     const imageInput = document.getElementById('profile-image-input');
@@ -1127,3 +1193,11 @@ if (document.readyState === 'loading') {
 // Re-inicializar quando carregado dinamicamente
 document.addEventListener('contentLoaded', initializeProfilePage);
 document.addEventListener('pageLoaded', initializeProfilePage);
+window.addEventListener('hashchange', function () {
+    const sectionId = window.location.hash.replace('#', '');
+    if (sectionId && document.getElementById(sectionId)) {
+        window.scrollToProfileSection(sectionId);
+    } else {
+        setActiveProfileSectionLink('');
+    }
+});

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="vip-area-page">
+    <div class="container">
+        <div class="vip-area-card">
+            <div class="vip-area-badge">
+                <i class="fas fa-gem"></i>
+                Exclusivo para assinantes VIP
+            </div>
+
+            <div class="vip-area-icon">
+                <i class="fas fa-crown"></i>
+            </div>
+
+            <h1>Área VIP em Construção</h1>
+            <p>
+                Estamos preparando uma área exclusiva com recursos premium, conteúdos avançados e experiências especiais para assinantes VIP.
+            </p>
+
+            <div class="vip-area-highlights">
+                <div class="vip-highlight">
+                    <i class="fas fa-toolbox"></i>
+                    <span>Ferramentas exclusivas</span>
+                </div>
+                <div class="vip-highlight">
+                    <i class="fas fa-bolt"></i>
+                    <span>Acesso antecipado</span>
+                </div>
+                <div class="vip-highlight">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Conteúdo avançado</span>
+                </div>
+            </div>
+
+            <div class="vip-area-actions">
+                <a href="{{ url_for('home') }}" class="btn btn-gradient primary">
+                    <i class="fas fa-home"></i> Voltar ao Início
+                </a>
+                <a href="{{ url_for('contact') }}" class="btn btn-outline-light">
+                    <i class="fas fa-envelope"></i> Falar com o Suporte
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.vip-area-page {
+    min-height: calc(100vh - 160px);
+    display: flex;
+    align-items: center;
+    padding: 4rem 0;
+    background:
+        radial-gradient(circle at top left, rgba(212, 160, 23, 0.18), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(58, 134, 255, 0.18), transparent 30%),
+        linear-gradient(135deg, #f7fafc 0%, #edf4ff 100%);
+}
+
+.vip-area-card {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem;
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+    text-align: center;
+}
+
+.vip-area-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 1rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #fff4c2, #ffe082);
+    color: #8a5a00;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.vip-area-icon {
+    width: 92px;
+    height: 92px;
+    margin: 0 auto 1.5rem;
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.6rem;
+    color: white;
+    background: linear-gradient(135deg, #d4a017, #f4c95d);
+    box-shadow: 0 18px 38px rgba(212, 160, 23, 0.28);
+}
+
+.vip-area-card h1 {
+    font-size: clamp(2rem, 3vw, 3rem);
+    margin-bottom: 1rem;
+    color: #152033;
+}
+
+.vip-area-card p {
+    max-width: 680px;
+    margin: 0 auto;
+    color: #5b6678;
+    font-size: 1.05rem;
+    line-height: 1.8;
+}
+
+.vip-area-highlights {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.vip-highlight {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    min-height: 140px;
+    padding: 1.4rem 1rem;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #f8fbff, #eef4fb);
+    border: 1px solid rgba(58, 134, 255, 0.12);
+    color: #1f2d43;
+    font-weight: 600;
+}
+
+.vip-highlight i {
+    font-size: 1.5rem;
+    color: #3a86ff;
+}
+
+.vip-area-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn-outline-light {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1.4rem;
+    border-radius: 12px;
+    border: 1px solid rgba(21, 32, 51, 0.14);
+    color: #1f2d43;
+    text-decoration: none;
+    background: white;
+    transition: all 0.25s ease;
+}
+
+.btn-outline-light:hover {
+    color: #1f2d43;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
+}
+
+@media (max-width: 768px) {
+    .vip-area-page {
+        padding: 2rem 0;
+    }
+
+    .vip-area-card {
+        padding: 2rem 1.25rem;
+    }
+
+    .vip-area-highlights {
+        grid-template-columns: 1fr;
+    }
+
+    .vip-area-actions {
+        flex-direction: column;
+    }
+
+    .vip-area-actions a {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}

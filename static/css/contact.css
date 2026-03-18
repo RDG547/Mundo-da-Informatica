@@ -458,6 +458,25 @@
     line-height: 1.6;
 }
 
+.form-helper {
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.attachments-summary {
+    margin-top: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    background: #eef4ff;
+    border: 1px dashed rgba(49, 130, 206, 0.35);
+    color: #365179;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
 .char-counter {
     text-align: right;
     font-size: 0.85rem;
@@ -626,6 +645,17 @@
     transform: translateY(-2px);
     color: white;
     text-decoration: none;
+}
+
+.social-platform.is-disabled {
+    opacity: 0.72;
+    cursor: default;
+    pointer-events: none;
+}
+
+.social-platform.is-disabled:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: none;
 }
 
 .platform-icon {
@@ -843,6 +873,88 @@
     color: #dbe7ff;
 }
 
+/* Coverage Modal */
+.coverage-modal-content {
+    width: min(760px, 100%);
+}
+
+.coverage-modal-header .contribute-modal-icon {
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+}
+
+.coverage-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.coverage-highlight-card {
+    padding: 1.4rem;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(37, 99, 235, 0.09));
+    border: 1px solid rgba(37, 99, 235, 0.15);
+}
+
+.coverage-highlight-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    color: #1e3a8a;
+    font-size: 1.15rem;
+}
+
+.coverage-highlight-card p {
+    margin: 0;
+    color: #475569;
+    line-height: 1.7;
+}
+
+.coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.coverage-item {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+    padding: 1rem 1.1rem;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.coverage-item i {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3182ce, #805ad5);
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.coverage-item strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #1e293b;
+}
+
+.coverage-item span {
+    display: block;
+    color: #64748b;
+    line-height: 1.5;
+    font-size: 0.94rem;
+}
+
+.coverage-modal-footer p {
+    color: #475569;
+}
+
 .cta-stats {
     display: flex;
     justify-content: center;
@@ -908,6 +1020,10 @@
     .cta-stats {
         gap: 1.5rem;
         flex-direction: column;
+    }
+
+    .coverage-grid {
+        grid-template-columns: 1fr;
     }
 
     .section-title {

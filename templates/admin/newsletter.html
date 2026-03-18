@@ -581,8 +581,10 @@
 
         <div class="templates-grid">
             <div class="template-card" data-id="1">
-                <div class="template-preview">
-                    <img src="{{ url_for('static', filename='images/admin/template1.jpg') }}" alt="Template Padrão">
+                <div class="template-preview template-1">
+                    <div class="template-header"></div>
+                    <div class="template-content"></div>
+                    <div class="template-footer"></div>
                 </div>
                 <div class="template-info">
                     <h3>Template Padrão</h3>
@@ -599,8 +601,10 @@
             </div>
 
             <div class="template-card" data-id="2">
-                <div class="template-preview">
-                    <img src="{{ url_for('static', filename='images/admin/template2.jpg') }}" alt="Template Promocional">
+                <div class="template-preview template-2">
+                    <div class="template-hero"></div>
+                    <div class="template-grid"></div>
+                    <div class="template-cta"></div>
                 </div>
                 <div class="template-info">
                     <h3>Template Promocional</h3>
@@ -617,8 +621,9 @@
             </div>
 
             <div class="template-card" data-id="3">
-                <div class="template-preview">
-                    <img src="{{ url_for('static', filename='images/admin/template3.jpg') }}" alt="Template Minimalista">
+                <div class="template-preview template-3">
+                    <div class="template-simple"></div>
+                    <div class="template-text"></div>
                 </div>
                 <div class="template-info">
                     <h3>Template Minimalista</h3>
@@ -659,7 +664,7 @@
 
                     <div class="form-group">
                         <label for="replyToEmail">Email de Resposta</label>
-                        <input type="email" id="replyToEmail" class="form-control" value="contato@mundodainformatica.com">
+                        <input type="email" id="replyToEmail" class="form-control" value="suporte@mundodainformatica.com">
                     </div>
                 </div>
 
@@ -1138,12 +1143,6 @@
         height: 180px;
         overflow: hidden;
         border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .template-preview img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
     }
 
     .template-info {

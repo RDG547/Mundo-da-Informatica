@@ -140,22 +140,26 @@
                                 </div>
                                 <p>Há várias maneiras de contribuir com o Mundo da Informática. Você pode compartilhar recursos técnicos, enviar tutoriais, reportar links quebrados ou erros, ou até mesmo ajudar a divulgar o site para outros profissionais.</p>
                                 <div class="contribution-ways">
-                                    <div class="contrib-item">
+                                    <a href="{{ url_for('contact', category='solicitacao') }}#contact-form-section" class="contrib-item">
                                         <i class="fas fa-share-alt"></i>
                                         <span>Compartilhar recursos</span>
-                                    </div>
-                                    <div class="contrib-item">
+                                    </a>
+                                    <a href="{{ url_for('contact', category='solicitacao') }}#contact-form-section" class="contrib-item">
                                         <i class="fas fa-book"></i>
                                         <span>Enviar tutoriais</span>
-                                    </div>
-                                    <div class="contrib-item">
+                                    </a>
+                                    <a href="{{ url_for('contact', category='problema') }}#contact-form-section" class="contrib-item">
                                         <i class="fas fa-bug"></i>
                                         <span>Reportar problemas</span>
-                                    </div>
+                                    </a>
+                                    <a href="{{ url_for('plans') }}" class="contrib-item">
+                                        <i class="fas fa-crown"></i>
+                                        <span>Assinar planos</span>
+                                    </a>
                                 </div>
                                 <div class="answer-actions">
-                                    <button class="answer-btn" id="openContributeModalFAQ">
-                                        <i class="fas fa-handshake"></i> Quero Contribuir
+                                    <button class="answer-btn" id="openContributeModalFAQ" type="button" data-open-contribute-modal>
+                                        <i class="fas fa-hand-holding-heart"></i> Quero Doar
                                     </button>
                                     <button class="answer-helpful" onclick="markHelpful(this)">
                                         <i class="fas fa-thumbs-up"></i> Útil
@@ -425,7 +429,7 @@
                     <div class="donation-widget" data-donation-widget>
                         <div class="donation-widget-header">
                             <h4><i class="fas fa-hand-holding-heart"></i> Fazer uma doacao pontual</h4>
-                            <p>Escolha qualquer valor a partir de R$ 5,00 para apoiar a manutencao da plataforma.</p>
+                            <p>Escolha o valor que desejar para apoiar a manutencao da plataforma.</p>
                         </div>
                         <div class="donation-presets" role="group" aria-label="Valores sugeridos para doacao">
                             <button type="button" class="donation-preset" data-donation-preset="10">R$ 10</button>
@@ -436,7 +440,7 @@
                         <label class="donation-input-label" for="donationAmountFaq">Valor da doacao</label>
                         <div class="donation-input-wrapper">
                             <span>R$</span>
-                            <input type="number" id="donationAmountFaq" data-donation-amount min="5" step="1" inputmode="decimal" placeholder="Digite o valor">
+                            <input type="text" id="donationAmountFaq" data-donation-amount inputmode="numeric" autocomplete="off" placeholder="0,00">
                         </div>
                         <div class="contribute-cta-buttons donation-actions">
                             <button type="button" class="btn btn-gradient secondary" data-donation-method="pix">
@@ -460,172 +464,6 @@
 
 {% endblock %}
 
-{% block scripts %}
-<script>
-// FAQ Fallback Script - Ensures FAQ works even if main script fails
-(function() {
-    'use strict';
-
-    // Debug logging
-    console.log('FAQ fallback script loaded');
-
-    // Simple FAQ toggle function
-    function initFAQFallback() {
-        console.log('Initializing FAQ fallback');
-
-        // Remove any existing event listeners and reset state
-        const faqItems = document.querySelectorAll('.faq-item');
-        console.log('Found FAQ items:', faqItems.length);
-
-        faqItems.forEach(function(item, index) {
-            console.log('Processing FAQ item', index);
-
-            // Reset state
-            item.classList.remove('active');
-            const answer = item.querySelector('.faq-answer');
-            const icon = item.querySelector('.faq-toggle i');
-
-            if (answer) {
-                answer.style.maxHeight = '0';
-                answer.style.opacity = '0';
-            }
-
-            if (icon) {
-                icon.className = 'fas fa-plus';
-            }
-
-            // Add click handler to question
-            const question = item.querySelector('.faq-question');
-            if (question) {
-                // Remove existing onclick to prevent conflicts
-                question.removeAttribute('onclick');
-
-                // Add new event listener
-                question.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    console.log('FAQ question clicked:', index);
-
-                    const isActive = item.classList.contains('active');
-
-                    // Close all other items
-                    faqItems.forEach(function(otherItem) {
-                        if (otherItem !== item) {
-                            otherItem.classList.remove('active');
-                            const otherAnswer = otherItem.querySelector('.faq-answer');
-                            const otherIcon = otherItem.querySelector('.faq-toggle i');
-
-                            if (otherAnswer) {
-                                otherAnswer.style.maxHeight = '0';
-                                otherAnswer.style.opacity = '0';
-                            }
-
-                            if (otherIcon) {
-                                otherIcon.className = 'fas fa-plus';
-                            }
-                        }
-                    });
-
-                    // Toggle current item
-                    if (isActive) {
-                        // Close current item
-                        item.classList.remove('active');
-                        if (answer) {
-                            answer.style.maxHeight = '0';
-                            answer.style.opacity = '0';
-                        }
-                        if (icon) {
-                            icon.className = 'fas fa-plus';
-                        }
-                        console.log('FAQ item closed');
-                    } else {
-                        // Open current item
-                        item.classList.add('active');
-                        if (answer) {
-                            answer.style.maxHeight = '2000px';
-                            answer.style.opacity = '1';
-                        }
-                        if (icon) {
-                            icon.className = 'fas fa-minus';
-                        }
-                        console.log('FAQ item opened');
-                    }
-                });
-
-                console.log('Event listener added to FAQ item', index);
-            }
-        });
-
-        console.log('FAQ fallback initialization complete');
-    }
-
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initFAQFallback);
-    } else {
-        initFAQFallback();
-    }
-
-    // Also initialize on window load as backup
-    window.addEventListener('load', function() {
-        setTimeout(initFAQFallback, 500);
-    });
-
-    console.log('FAQ fallback script setup complete');
-})();
-</script>
-
-<!-- Modal de Contribuição Script -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('contributeModal');
-    const openBtn = document.getElementById('openContributeModalFAQ');
-    const closeBtn = document.getElementById('closeContributeModal');
-    const overlay = modal?.querySelector('.contribute-modal-overlay');
-
-    function openModal() {
-        if (modal) {
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-    }
-
-    function closeModal() {
-        if (modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    }
-
-    if (openBtn) {
-        openBtn.addEventListener('click', openModal);
-    }
-
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeModal);
-    }
-
-    if (overlay) {
-        overlay.addEventListener('click', closeModal);
-    }
-
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal?.classList.contains('active')) {
-            closeModal();
-        }
-    });
-
-    // Restaurar scroll quando clicar em links dentro do modal
-    if (modal) {
-        const modalLinks = modal.querySelectorAll('a[href]');
-        modalLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                // Restaurar scroll antes da navegação
-                document.body.style.overflow = '';
-            });
-        });
-    }
-});
-</script>
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/about-modal.js') }}"></script>
 {% endblock %}

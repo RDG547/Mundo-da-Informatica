@@ -108,6 +108,7 @@
     data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
     data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
     data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
+    data-user-plan="{% if current_user.is_authenticated %}{{ current_user.plan }}{% else %}free{% endif %}"
     data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
     <!-- Preloader -->
     <div class="preloader">
@@ -262,6 +263,15 @@
                         </div>
                     </li>
                     <li>
+                        <a href="{{ url_for('vip_area') }}"
+                            class="dropdown-toggle {% if request.path == url_for('vip_area') %}active{% endif %}{% if current_user.is_authenticated and current_user.plan != 'vip' %} is-locked-feature{% endif %}"
+                            data-vip-link="true"
+                            data-vip-access="{% if current_user.is_authenticated and current_user.plan == 'vip' %}vip{% elif current_user.is_authenticated %}locked{% else %}guest{% endif %}"
+                            data-plans-url="{{ url_for('plans') }}">
+                            <i class="fas fa-gem"></i> Área VIP
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ url_for('plans') }}"
                             class="dropdown-toggle {% if request.path == url_for('plans') %}active{% endif %}">
                             <i class="fas fa-crown"></i> Planos
@@ -291,6 +301,7 @@
                             </a>
                             {% if current_user.role == 'admin' %}
                             <a href="{{ url_for('admin_dashboard') }}"
+                                data-no-dynamic="true"
                                 onclick="window.location.href=this.href; return false;">
                                 <i class="fas fa-tachometer-alt"></i>
                                 Painel Admin
@@ -405,6 +416,7 @@
     <script src="{{ url_for('static', filename='js/faq.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/feature-modals.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>
     {% block extra_js %}{% endblock %}
 
@@ -533,6 +545,25 @@
         .dropdown-toggle:hover {
             color: var(--primary-color);
             text-decoration: none;
+        }
+
+        .dropdown-toggle.is-locked-feature {
+            position: relative;
+        }
+
+        .dropdown-toggle.is-locked-feature::after {
+            content: 'VIP';
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            padding: 0.16rem 0.45rem;
+            border-radius: 999px;
+            background: rgba(245, 158, 11, 0.14);
+            color: #b45309;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
         }
 
         .dropdown-toggle i {
@@ -1073,6 +1104,177 @@
     </div>
 
     <script data-static-base-script="true">
+        window.showSiteToast = function (message, type = 'info', duration = 5000) {
+            const container = document.getElementById('flash-messages');
+            if (!container) {
+                return;
+            }
+
+            const normalizedType = type === 'error' ? 'danger' : type;
+            const icon = normalizedType === 'success'
+                ? 'check-circle'
+                : normalizedType === 'danger'
+                    ? 'exclamation-circle'
+                    : normalizedType === 'warning'
+                        ? 'exclamation-triangle'
+                        : 'info-circle';
+
+            const toast = document.createElement('div');
+            toast.className = `favorite-toast favorite-toast-${normalizedType} show`;
+            const iconElement = document.createElement('i');
+            iconElement.className = `fas fa-${icon}`;
+            const messageElement = document.createElement('span');
+            messageElement.textContent = String(message || '');
+
+            toast.appendChild(iconElement);
+            toast.appendChild(messageElement);
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, duration);
+        };
+
+        (function () {
+            let confirmState = null;
+            let confirmElements = null;
+
+            function getConfirmIcon(intent, icon) {
+                if (icon) {
+                    return icon;
+                }
+
+                if (intent === 'warning') {
+                    return 'fa-crown';
+                }
+
+                if (intent === 'danger') {
+                    return 'fa-triangle-exclamation';
+                }
+
+                return 'fa-circle-info';
+            }
+
+            function ensureSiteConfirm() {
+                if (confirmElements) {
+                    return confirmElements;
+                }
+
+                const overlay = document.createElement('div');
+                overlay.className = 'site-confirm-overlay';
+                overlay.hidden = true;
+                overlay.innerHTML = `
+                    <div class="site-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="siteConfirmTitle" tabindex="-1">
+                        <button type="button" class="site-confirm-close" aria-label="Fechar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <div class="site-confirm-icon">
+                            <i class="fas fa-circle-info"></i>
+                        </div>
+                        <div class="site-confirm-copy">
+                            <h4 id="siteConfirmTitle">Confirmar ação</h4>
+                            <p id="siteConfirmMessage">Deseja continuar?</p>
+                        </div>
+                        <div class="site-confirm-actions">
+                            <button type="button" class="site-confirm-btn is-secondary" data-site-confirm-cancel>Agora não</button>
+                            <button type="button" class="site-confirm-btn is-primary" data-site-confirm-accept>Prosseguir</button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(overlay);
+
+                const dialog = overlay.querySelector('.site-confirm-dialog');
+                const icon = overlay.querySelector('.site-confirm-icon i');
+                const title = overlay.querySelector('#siteConfirmTitle');
+                const message = overlay.querySelector('#siteConfirmMessage');
+                const close = overlay.querySelector('.site-confirm-close');
+                const cancel = overlay.querySelector('[data-site-confirm-cancel]');
+                const accept = overlay.querySelector('[data-site-confirm-accept]');
+
+                function closeConfirm(result) {
+                    if (!confirmState) {
+                        return;
+                    }
+
+                    const activeState = confirmState;
+                    confirmState = null;
+                    overlay.classList.remove('is-visible');
+                    window.setTimeout(() => {
+                        overlay.hidden = true;
+                    }, 180);
+
+                    if (activeState.previousOverflow !== null) {
+                        document.body.style.overflow = activeState.previousOverflow;
+                    } else {
+                        document.body.style.removeProperty('overflow');
+                    }
+
+                    activeState.resolve(Boolean(result));
+                }
+
+                close.addEventListener('click', () => closeConfirm(false));
+                cancel.addEventListener('click', () => closeConfirm(false));
+                accept.addEventListener('click', () => closeConfirm(true));
+                overlay.addEventListener('click', (event) => {
+                    if (event.target === overlay) {
+                        closeConfirm(false);
+                    }
+                });
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && confirmState) {
+                        closeConfirm(false);
+                    }
+                });
+
+                confirmElements = { overlay, dialog, icon, title, message, accept, cancel };
+                return confirmElements;
+            }
+
+            window.showSiteConfirm = function (options = {}) {
+                const elements = ensureSiteConfirm();
+                const intent = String(options.intent || 'primary');
+                elements.overlay.classList.remove('is-warning', 'is-danger');
+                if (intent === 'warning') {
+                    elements.overlay.classList.add('is-warning');
+                } else if (intent === 'danger') {
+                    elements.overlay.classList.add('is-danger');
+                }
+
+                elements.icon.className = `fas ${getConfirmIcon(intent, options.icon)}`;
+                elements.title.textContent = options.title || 'Confirmar ação';
+                elements.message.textContent = options.message || 'Deseja continuar?';
+                elements.accept.textContent = options.confirmLabel || 'Prosseguir';
+                elements.cancel.textContent = options.cancelLabel || 'Cancelar';
+                elements.accept.classList.toggle('is-danger', intent === 'danger');
+                elements.accept.classList.toggle('is-warning', intent === 'warning');
+                elements.accept.classList.toggle('is-primary', intent !== 'danger' && intent !== 'warning');
+
+                if (confirmState) {
+                    confirmState.resolve(false);
+                    confirmState = null;
+                }
+
+                const previousOverflow = document.body.style.overflow || null;
+                document.body.style.overflow = 'hidden';
+                elements.overlay.hidden = false;
+
+                requestAnimationFrame(() => {
+                    elements.overlay.classList.add('is-visible');
+                    elements.dialog.focus();
+                });
+
+                return new Promise((resolve) => {
+                    confirmState = { resolve, previousOverflow };
+                });
+            };
+        })();
+
         // Auto-dismiss flash messages
         document.addEventListener('DOMContentLoaded', function () {
             const toasts = document.querySelectorAll('.favorite-toast');
@@ -1083,6 +1285,38 @@
                         toast.remove();
                     }, 300); // Wait for transition
                 }, 5000); // 5 seconds
+            });
+
+            document.querySelectorAll('[data-vip-link]').forEach((link) => {
+                if (link.dataset.vipLinkBound === 'true') {
+                    return;
+                }
+
+                link.dataset.vipLinkBound = 'true';
+                link.addEventListener('click', async function (event) {
+                    if (this.dataset.vipAccess !== 'locked') {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const plansUrl = this.dataset.plansUrl || '{{ url_for("plans") }}';
+                    let shouldProceed = true;
+
+                    if (typeof window.showSiteConfirm === 'function') {
+                        shouldProceed = await window.showSiteConfirm({
+                            title: 'Área VIP exclusiva para assinantes VIP',
+                            message: 'Este recurso é exclusivo do plano VIP. Deseja conhecer o plano VIP agora para liberar esse acesso?',
+                            confirmLabel: 'Quero conhecer o VIP',
+                            cancelLabel: 'Agora não',
+                            intent: 'warning',
+                            icon: 'fa-gem'
+                        });
+                    }
+
+                    if (shouldProceed) {
+                        window.location.href = plansUrl;
+                    }
+                });
             });
         });
     </script>

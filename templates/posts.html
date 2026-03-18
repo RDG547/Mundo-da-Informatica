@@ -7,7 +7,7 @@
     <div class="hero-overlay"></div>
     <div class="container">
         <div class="hero-content text-center">
-            <div class="hero-icon animate-bounce">
+            <div class="hero-icon">
                 <i class="fas fa-file-alt"></i>
             </div>
             <h1 class="hero-title animate-fade-up">Todos os Posts</h1>
@@ -82,9 +82,10 @@
                     </div>
 
                     {% if posts.items %}
-                    <div class="posts-grid">
+                    <div class="posts-grid" id="all-posts-grid" data-load-more-endpoint="{{ url_for('api_posts') }}" data-next-page="{{ posts.next_num if posts.has_next else '' }}" data-has-next="{{ 'true' if posts.has_next else 'false' }}">
                         {% for post in posts.items %}
                         <div class="post-card">
+                            {% set dl_files = post.get_metadata('download_files') %}
                             <div class="post-image">
                                 {% if post.image_url %}
                                 <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}">
@@ -96,41 +97,56 @@
                             </div>
                             <div class="post-category">
                                 {% if post.category_rel and post.category_rel.icon %}
-                                    <i class="{{ post.category_rel.icon }}"></i>
+                                <i class="{{ post.category_rel.icon }}"></i>
                                 {% elif post.category_str == 'BIOS' %}
-                                    <i class="fas fa-microchip"></i>
+                                <i class="fas fa-microchip"></i>
                                 {% elif post.category_str == 'Esquemas' %}
-                                    <i class="fas fa-project-diagram"></i>
+                                <i class="fas fa-project-diagram"></i>
                                 {% elif post.category_str == 'Drivers' %}
-                                    <i class="fas fa-cogs"></i>
+                                <i class="fas fa-cogs"></i>
                                 {% elif post.category_str == 'Softwares' %}
-                                    <i class="fas fa-laptop-code"></i>
+                                <i class="fas fa-laptop-code"></i>
                                 {% elif post.category_str == 'Impressoras' %}
-                                    <i class="fas fa-print"></i>
+                                <i class="fas fa-print"></i>
                                 {% elif post.category_str == 'Cursos' %}
-                                    <i class="fas fa-graduation-cap"></i>
+                                <i class="fas fa-graduation-cap"></i>
                                 {% else %}
-                                    <i class="fas fa-folder"></i>
+                                <i class="fas fa-folder"></i>
                                 {% endif %}
                                 <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
+                                {% if dl_files and dl_files|length > 1 %}
+                                <span class="download-types-badge" style="margin-left:6px;background:rgba(var(--primary-rgb),0.15);color:var(--primary-color);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">
+                                    {{ dl_files|map(attribute='type')|join('/') }}
+                                </span>
+                                {% endif %}
                             </div>
                             <div class="post-content">
-                                <h3><a href="{{ url_for('post', post_id=post.id) }}" style="text-decoration: none; color: inherit;">{{ post.title }}</a></h3>
+                                <h3><a href="{{ post_url(post) }}" style="text-decoration: none; color: inherit;">{{ post.title }}</a></h3>
                                 <div class="post-meta">
                                     <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
                                     <span><i class="far fa-eye"></i> {{ post.views }}</span>
                                 </div>
                                 <div class="post-description-section">
                                     <div class="post-description-title">Descrição</div>
-                                    <div class="post-description-text">{{ post.content|striptags }}</div>
+                                    <div class="post-description-text">{{ (post.short_description or post.content)|striptags }}</div>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                     {% if post.download_link %}
+                                    {% if dl_files and dl_files|length > 1 %}
+                                    <button type="button" class="btn btn-download download-btn multi-download-trigger"
+                                        data-post-id="{{ post.id }}"
+                                        data-post-title="{{ post.title }}"
+                                        data-download-files='{{ dl_files|tojson }}'
+                                        style="flex: 1; min-width: 120px;">
+                                        <i class="fas fa-download"></i> Download
+                                    </button>
+                                    {% else %}
                                     <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn btn-download download-btn" data-action="download" style="flex: 1; min-width: 120px;">
                                         <i class="fas fa-download"></i> Download
                                     </a>
                                     {% endif %}
-                                    <a href="{{ url_for('post', post_id=post.id) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
+                                    {% endif %}
+                                    <a href="{{ post_url(post) }}" class="btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                                     {% if current_user.is_authenticated %}
                                     <button data-post-id="{{ post.id }}" onclick="toggleFavorite({{ post.id }})" class="favorite-btn-card {% if post.id in favorite_post_ids %}favorited{% endif %}" title="{% if post.id in favorite_post_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}">
                                         <i class="{% if post.id in favorite_post_ids %}fas{% else %}far{% endif %} fa-star"></i>
@@ -142,46 +158,11 @@
                         {% endfor %}
                     </div>
 
-                    <!-- Pagination -->
-                    {% if posts.pages > 1 %}
-                    <div class="pagination-wrapper" style="margin-top: 2rem;">
-                        <nav aria-label="Navegação de posts">
-                            <ul class="pagination justify-content-center">
-                                {% if posts.has_prev %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('posts', page=posts.prev_num) }}" aria-label="Anterior">
-                                        <span aria-hidden="true">&laquo;</span>
-                                    </a>
-                                </li>
-                                {% endif %}
-
-                                {% for page_num in posts.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                                    {% if page_num %}
-                                        {% if page_num != posts.page %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="{{ url_for('posts', page=page_num) }}">{{ page_num }}</a>
-                                        </li>
-                                        {% else %}
-                                        <li class="page-item active">
-                                            <span class="page-link">{{ page_num }}</span>
-                                        </li>
-                                        {% endif %}
-                                    {% else %}
-                                    <li class="page-item disabled">
-                                        <span class="page-link">...</span>
-                                    </li>
-                                    {% endif %}
-                                {% endfor %}
-
-                                {% if posts.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('posts', page=posts.next_num) }}" aria-label="Próxima">
-                                        <span aria-hidden="true">&raquo;</span>
-                                    </a>
-                                </li>
-                                {% endif %}
-                            </ul>
-                        </nav>
+                    {% if posts.has_next %}
+                    <div class="load-more-wrapper" id="load-more-wrapper">
+                        <button type="button" class="btn btn-load-more" id="load-more-btn">
+                            <i class="fas fa-plus-circle"></i> Carregar Mais
+                        </button>
                     </div>
                     {% endif %}
                     {% else %}
@@ -250,20 +231,31 @@ function toggleInlineSearch() {
     }
 }
 
-// Adicionar efeito hover no input
-document.addEventListener('DOMContentLoaded', function() {
+function initPostsInlineSearch() {
     const input = document.getElementById('inlineSearchInput');
-    if (input) {
-        input.addEventListener('focus', function() {
-            this.style.borderColor = '#667eea';
-            this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-        });
-        input.addEventListener('blur', function() {
-            this.style.borderColor = '#ddd';
-            this.style.boxShadow = 'none';
-        });
+    if (!input || input.dataset.postsSearchInit === 'true') {
+        return;
     }
-});
+
+    input.dataset.postsSearchInit = 'true';
+    input.addEventListener('focus', function() {
+        this.style.borderColor = '#667eea';
+        this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+    });
+    input.addEventListener('blur', function() {
+        this.style.borderColor = '#ddd';
+        this.style.boxShadow = 'none';
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPostsInlineSearch);
+} else {
+    initPostsInlineSearch();
+}
+
+document.addEventListener('contentLoaded', initPostsInlineSearch);
+document.addEventListener('pageLoaded', initPostsInlineSearch);
 </script>
 
 <!-- Modais de Informações das Features -->
@@ -283,7 +275,8 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
 <script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+<script src="{{ url_for('static', filename='js/load-more-posts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/categories-search.js') }}"></script>
-<script src="{{ url_for('static', filename='js/feature-modals.js') }}"></script>
 {% endblock %}

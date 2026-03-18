@@ -62,6 +62,10 @@
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Chat ao Vivo</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
                         <div class="feature-text">Pedir Conteúdo Específico</div>
                     </div>
                     <div class="feature-item excluded">
@@ -92,7 +96,7 @@
                     <h3 class="plan-name">Premium</h3>
                     <div class="plan-price">
                         <span class="currency">R$</span>
-                        <span class="amount">29,90</span>
+                        <span class="amount">{{ plan_pricing.premium.display_amount }}</span>
                         <span class="period">/mês</span>
                     </div>
                 </div>
@@ -121,6 +125,10 @@
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
                         <div class="feature-text">2 Comentários Diários</div>
+                    </div>
+                    <div class="feature-item excluded">
+                        <div class="feature-icon"><i class="fas fa-times"></i></div>
+                        <div class="feature-text">Chat ao Vivo</div>
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
@@ -155,7 +163,7 @@
                     <h3 class="plan-name">VIP</h3>
                     <div class="plan-price">
                         <span class="currency">R$</span>
-                        <span class="amount">49,90</span>
+                        <span class="amount">{{ plan_pricing.vip.display_amount }}</span>
                         <span class="period">/mês</span>
                     </div>
                 </div>
@@ -184,6 +192,10 @@
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
                         <div class="feature-text">Comentários Ilimitados</div>
+                    </div>
+                    <div class="feature-item included">
+                        <div class="feature-icon"><i class="fas fa-check"></i></div>
+                        <div class="feature-text">Chat ao Vivo</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
@@ -439,11 +451,15 @@
         height: 100%;
         background-color: rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(5px);
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        overflow-y: auto;
     }
 
     .modal-content {
         background-color: #fefefe;
-        margin: 15% auto;
+        margin: 0 auto;
         padding: 2rem;
         border-radius: 15px;
         width: 90%;
@@ -454,11 +470,36 @@
     }
 
     .modal-large {
-        margin: 50px auto;
+        margin: 0 auto;
         max-width: 1000px;
         width: 95%;
         max-height: 90vh;
         overflow-y: auto;
+    }
+
+    #stripeEmbeddedCheckoutModal {
+        z-index: 1300;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 90px);
+        padding-bottom: 1.5rem;
+    }
+
+    #stripeEmbeddedCheckoutModal .modal-content {
+        width: min(1000px, calc(100vw - 2rem));
+        max-height: calc(100vh - env(safe-area-inset-top, 0px) - 120px);
+        overflow: auto;
+    }
+
+    #stripeEmbeddedCheckoutModal .close-modal {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: inline-flex;
+        justify-content: flex-end;
+        width: 100%;
+        background: linear-gradient(180deg, rgba(254, 254, 254, 0.98), rgba(254, 254, 254, 0.82));
+        padding-bottom: 0.5rem;
     }
 
     @keyframes modalFadeIn {
@@ -502,6 +543,19 @@
         display: flex;
         justify-content: flex-end;
         gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        #stripeEmbeddedCheckoutModal {
+            padding-top: calc(env(safe-area-inset-top, 0px) + 82px);
+            padding-inline: 0.8rem;
+        }
+
+        #stripeEmbeddedCheckoutModal .modal-content {
+            width: calc(100vw - 1.6rem);
+            max-height: calc(100vh - env(safe-area-inset-top, 0px) - 104px);
+            padding: 1rem;
+        }
     }
 
     .btn-cancel {

@@ -56,14 +56,45 @@
         });
     }
 
+    function extractDigits(value) {
+        return String(value || '').replace(/\D/g, '');
+    }
+
+    function formatCents(cents) {
+        return (Number(cents || 0) / 100).toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function setMaskedAmount(input, cents) {
+        if (!input) return;
+
+        const normalized = Math.max(0, Number.parseInt(cents, 10) || 0);
+        if (normalized === 0) {
+            input.value = '';
+            input.dataset.donationCents = '';
+            return;
+        }
+
+        input.dataset.donationCents = String(normalized);
+        input.value = formatCents(normalized);
+
+        if (typeof input.setSelectionRange === 'function') {
+            const cursorPosition = input.value.length;
+            input.setSelectionRange(cursorPosition, cursorPosition);
+        }
+    }
+
     function parseDonationAmount(widget) {
         const input = widget?.querySelector('[data-donation-amount]');
-        const raw = String(input?.value || '').trim().replace(',', '.');
-        const amount = Number(raw);
+        const cents = Number.parseInt(input?.dataset.donationCents || extractDigits(input?.value), 10);
 
-        if (!raw || Number.isNaN(amount)) {
+        if (!cents || Number.isNaN(cents)) {
             return { valid: false, message: 'Informe um valor de doacao valido.' };
         }
+
+        const amount = cents / 100;
 
         if (amount < 5) {
             return { valid: false, message: 'A doacao minima e de R$ 5,00.' };
@@ -114,10 +145,30 @@
                 throw new Error(data.error || 'Nao foi possivel iniciar a doacao.');
             }
 
-            if (method === 'pix' && data.redirect_url) {
-                showFeedback(widget, 'Gerando checkout PIX...', 'success');
-                window.location.href = data.redirect_url;
-                return;
+            if (method === 'pix' && data.billing_id) {
+                const input = widget.querySelector('[data-donation-amount]');
+                const amountText = input?.value ? `R$ ${input.value}` : '';
+
+                if (typeof window.openPixCheckoutModal === 'function') {
+                    showFeedback(widget, 'Abrindo checkout PIX...', 'success');
+                    window.openPixCheckoutModal({
+                        billingId: data.billing_id,
+                        itemLabel: 'Contribuicao',
+                        itemValue: 'Apoio pontual',
+                        modeLabel: 'Modalidade',
+                        modeValue: 'Contribuicao unica',
+                        amountText,
+                        successMessage: 'Sua doacao sera confirmada automaticamente.',
+                        successRedirectUrl: data.success_redirect_url || `/pix-checkout-success?billing_id=${encodeURIComponent(data.billing_id)}&next=${encodeURIComponent(window.location.pathname)}`
+                    });
+                    return;
+                }
+
+                if (data.redirect_url) {
+                    showFeedback(widget, 'Gerando checkout PIX...', 'success');
+                    window.location.href = data.redirect_url;
+                    return;
+                }
             }
 
             if (method === 'card' && data.url) {
@@ -145,10 +196,10 @@
 
             widget.querySelectorAll('[data-donation-preset]').forEach((button) => {
                 button.addEventListener('click', () => {
-                    const amount = button.dataset.donationPreset || '';
                     const input = widget.querySelector('[data-donation-amount]');
                     if (input) {
-                        input.value = amount;
+                        const presetCents = Math.round(Number(button.dataset.donationPreset || '0') * 100);
+                        setMaskedAmount(input, presetCents);
                         input.dispatchEvent(new Event('input', { bubbles: true }));
                     }
                     widget.querySelectorAll('[data-donation-preset]').forEach((item) => item.classList.remove('active'));
@@ -160,10 +211,21 @@
             const input = widget.querySelector('[data-donation-amount]');
             if (input) {
                 input.addEventListener('input', () => {
+                    const digits = extractDigits(input.value).slice(0, 9);
+                    setMaskedAmount(input, digits);
+                    const currentCents = input.dataset.donationCents || '';
                     widget.querySelectorAll('[data-donation-preset]').forEach((item) => {
-                        item.classList.toggle('active', item.dataset.donationPreset === input.value.trim());
+                        const presetCents = String(Math.round(Number(item.dataset.donationPreset || '0') * 100));
+                        item.classList.toggle('active', presetCents === currentCents);
                     });
                     clearFeedback(widget);
+                });
+
+                input.addEventListener('blur', () => {
+                    if (!extractDigits(input.value)) {
+                        input.value = '';
+                        input.dataset.donationCents = '';
+                    }
                 });
             }
 
@@ -188,9 +250,9 @@
 
     function initModal() {
         const modal = document.getElementById('contributeModal');
-        const openBtn = document.getElementById('openContributeModal');
         const closeBtn = document.getElementById('closeContributeModal');
         const overlay = modal?.querySelector('.contribute-modal-overlay');
+        const openButtons = document.querySelectorAll('[data-open-contribute-modal]');
 
         if (!modal) return;
 
@@ -209,10 +271,13 @@
             document.body.style.overflow = '';
         }
 
-        if (openBtn && !openBtn.hasAttribute('data-modal-init')) {
-            openBtn.setAttribute('data-modal-init', 'true');
-            openBtn.addEventListener('click', openModal);
-        }
+        openButtons.forEach((button) => {
+            if (button.hasAttribute('data-modal-init')) {
+                return;
+            }
+            button.setAttribute('data-modal-init', 'true');
+            button.addEventListener('click', openModal);
+        });
 
         if (closeBtn && !closeBtn.hasAttribute('data-modal-init')) {
             closeBtn.setAttribute('data-modal-init', 'true');
@@ -275,5 +340,6 @@
         initModal();
     }
 
+    document.addEventListener('contentLoaded', initModal);
     document.addEventListener('pageLoaded', initModal);
 })();

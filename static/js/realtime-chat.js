@@ -5,6 +5,8 @@
     window.__realtimeChatInitialized = true;
 
     const EDIT_WINDOW_MS = 10 * 60 * 1000;
+    const ROOM_STATE_POLL_MS = 5000;
+    const ACTIVE_ROOM_POLL_MS = 3000;
 
     const elements = {
         button: document.getElementById('floating-chat-btn'),
@@ -28,9 +30,10 @@
     const userMeta = {
         isAuthenticated: document.body.dataset.authenticated === 'true',
         isAdmin: document.body.dataset.isAdmin === 'true',
-        userId: (document.body.dataset.userId || '').trim(),
-        userName: (document.body.dataset.userName || '').trim() || 'Usuario',
-        userAvatar: (document.body.dataset.userAvatar || '').trim()
+        userId: String(document.body.dataset.userId || '').trim(),
+        userName: String(document.body.dataset.userName || '').trim() || 'Usuario',
+        userAvatar: String(document.body.dataset.userAvatar || '').trim(),
+        userPlan: String(document.body.dataset.userPlan || 'free').trim().toLowerCase()
     };
 
     const tabBadges = {
@@ -44,26 +47,67 @@
         suporte: null
     };
 
+    const pollers = {
+        activeMessages: null,
+        roomState: null
+    };
+    const chatPermissions = {
+        publicWrite: userMeta.userPlan === 'vip',
+        supportWrite: true,
+        vipArea: userMeta.userPlan === 'vip'
+    };
+
     let supportTickets = [];
     let activeMessageDocs = [];
     let currentTab = 'todos';
     let currentRoomId = 'todos';
     let selectedTicketRoomId = '';
     let panelOpen = false;
-    let triedRepairTodos = false;
-
+    let bootstrapCompleted = false;
     let draftReply = null;
     let draftEdit = null;
+    let chatConfirmState = null;
+    let chatConfirmElements = null;
 
-    let firestore = null;
-    let auth = null;
+    function getCsrfToken() {
+        if (window.csrfUtils && typeof window.csrfUtils.getCsrfToken === 'function') {
+            return window.csrfUtils.getCsrfToken();
+        }
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
 
-    const unsubscribers = {
-        activeMessages: null,
-        todosMeta: null,
-        suporteMeta: null,
-        chamadosList: null
-    };
+    async function apiJson(url, options = {}) {
+        const requestOptions = {
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(options.headers || {})
+            },
+            ...options
+        };
+
+        if (requestOptions.body && typeof requestOptions.body !== 'string' && !(requestOptions.body instanceof FormData)) {
+            requestOptions.headers['Content-Type'] = 'application/json';
+            requestOptions.body = JSON.stringify(requestOptions.body);
+        }
+
+        const method = String(requestOptions.method || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD') {
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                requestOptions.headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
+        const response = await fetch(url, requestOptions);
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || payload.success === false) {
+            throw new Error(payload.message || payload.error || 'Falha ao processar a solicitacao.');
+        }
+
+        return payload;
+    }
 
     function tsToMillis(value) {
         if (!value) return 0;
@@ -72,9 +116,11 @@
             const parsed = Date.parse(value);
             return Number.isNaN(parsed) ? 0 : parsed;
         }
+        if (typeof value.updatedAtMs === 'number') return value.updatedAtMs;
+        if (typeof value.createdAtMs === 'number') return value.createdAtMs;
+        if (typeof value.editedAtMs === 'number') return value.editedAtMs;
         if (typeof value.toMillis === 'function') return value.toMillis();
         if (typeof value.toDate === 'function') return value.toDate().getTime();
-        if (typeof value.updatedAtMs === 'number') return value.updatedAtMs;
         return 0;
     }
 
@@ -87,6 +133,10 @@
     }
 
     function notifyUser(message, type) {
+        if (typeof window.showSiteToast === 'function') {
+            window.showSiteToast(message, type || 'info');
+            return;
+        }
         if (typeof window.showNotification === 'function') {
             window.showNotification(message, type || 'info');
             return;
@@ -103,6 +153,160 @@
             .replace(/'/g, '&#039;');
     }
 
+    function normalizePlan(value) {
+        const normalized = String(value || 'free').trim().toLowerCase();
+        return ['free', 'premium', 'vip', 'admin'].includes(normalized) ? normalized : 'free';
+    }
+
+    function getPlanBadgeData(plan, role) {
+        if (String(role || '').trim().toLowerCase() === 'admin') {
+            return {
+                key: 'admin',
+                label: 'Admin',
+                icon: 'fas fa-shield-halved'
+            };
+        }
+
+        const normalizedPlan = normalizePlan(plan);
+        if (normalizedPlan === 'vip') {
+            return {
+                key: 'vip',
+                label: 'VIP',
+                icon: 'fas fa-crown'
+            };
+        }
+
+        if (normalizedPlan === 'premium') {
+            return {
+                key: 'premium',
+                label: 'Premium',
+                icon: 'fas fa-star'
+            };
+        }
+
+        return {
+            key: 'free',
+            label: 'Gratis',
+            icon: 'fas fa-user'
+        };
+    }
+
+    function renderPlanBadge(plan, role, options = {}) {
+        const badge = getPlanBadgeData(plan, role);
+        const compactClass = options.compact ? ' is-compact' : '';
+        return `
+            <span class="chat-plan-badge is-${badge.key}${compactClass}">
+                <i class="${badge.icon}"></i>
+                ${escapeHtml(badge.label)}
+            </span>
+        `;
+    }
+
+    function resolveMessagePlan(data) {
+        const senderRole = String(data.senderRole || '').trim().toLowerCase();
+        if (senderRole === 'admin') {
+            return 'admin';
+        }
+
+        if (Object.prototype.hasOwnProperty.call(data, 'senderPlan')) {
+            return normalizePlan(data.senderPlan);
+        }
+
+        if (isMessageMine(data)) {
+            return normalizePlan(userMeta.userPlan);
+        }
+
+        const senderSiteUserId = String(data.senderSiteUserId || '');
+        const roomMeta = getRoomMeta(currentRoomId) || {};
+        const ownerSiteUserId = String(roomMeta.ownerSiteUserId || '');
+        if (senderSiteUserId && ownerSiteUserId && senderSiteUserId === ownerSiteUserId) {
+            return normalizePlan(roomMeta.ownerPlan);
+        }
+
+        return 'free';
+    }
+
+    function ensureChatConfirmDialog() {
+        if (chatConfirmElements) {
+            return chatConfirmElements;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'chat-confirm-overlay';
+        overlay.hidden = true;
+        overlay.innerHTML = `
+            <div class="chat-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="chat-confirm-title">
+                <div class="chat-confirm-icon">
+                    <i class="fas fa-trash-alt"></i>
+                </div>
+                <div class="chat-confirm-copy">
+                    <h5 id="chat-confirm-title">Confirmar exclusao</h5>
+                    <p id="chat-confirm-message">Deseja continuar com esta acao?</p>
+                </div>
+                <div class="chat-confirm-actions">
+                    <button type="button" class="chat-confirm-btn is-secondary" data-chat-confirm-cancel>Cancelar</button>
+                    <button type="button" class="chat-confirm-btn is-danger" data-chat-confirm-accept>Excluir</button>
+                </div>
+            </div>
+        `;
+
+        elements.panel.appendChild(overlay);
+
+        const title = overlay.querySelector('#chat-confirm-title');
+        const message = overlay.querySelector('#chat-confirm-message');
+        const cancel = overlay.querySelector('[data-chat-confirm-cancel]');
+        const accept = overlay.querySelector('[data-chat-confirm-accept]');
+
+        const closeConfirm = (confirmed) => {
+            if (!chatConfirmState) {
+                return;
+            }
+
+            const resolver = chatConfirmState.resolve;
+            chatConfirmState = null;
+            overlay.classList.remove('visible');
+            overlay.hidden = true;
+            if (resolver) {
+                resolver(Boolean(confirmed));
+            }
+        };
+
+        cancel.addEventListener('click', () => closeConfirm(false));
+        accept.addEventListener('click', () => closeConfirm(true));
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) {
+                closeConfirm(false);
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && chatConfirmState) {
+                closeConfirm(false);
+            }
+        });
+
+        chatConfirmElements = { overlay, title, message, cancel, accept };
+        return chatConfirmElements;
+    }
+
+    function showChatConfirm(options = {}) {
+        const confirmElements = ensureChatConfirmDialog();
+        confirmElements.title.textContent = options.title || 'Confirmar acao';
+        confirmElements.message.textContent = options.message || 'Deseja continuar com esta acao?';
+        confirmElements.accept.textContent = options.confirmLabel || 'Confirmar';
+        confirmElements.accept.classList.toggle('is-danger', options.intent !== 'primary');
+        confirmElements.accept.classList.toggle('is-primary', options.intent === 'primary');
+        confirmElements.overlay.hidden = false;
+
+        requestAnimationFrame(() => {
+            confirmElements.overlay.classList.add('visible');
+        });
+
+        return new Promise((resolve) => {
+            chatConfirmState = { resolve };
+        });
+    }
+
     function truncateText(value, limit) {
         const normalized = String(value || '').trim();
         if (!normalized) return '';
@@ -111,12 +315,13 @@
     }
 
     function formatMessageTime(createdAt) {
-        if (!createdAt || typeof createdAt.toDate !== 'function') {
+        const millis = tsToMillis(createdAt);
+        if (!millis) {
             return 'agora';
         }
 
         try {
-            return createdAt.toDate().toLocaleTimeString('pt-BR', {
+            return new Date(millis).toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
                 minute: '2-digit'
             });
@@ -134,41 +339,30 @@
         window.location.href = getLoginRedirectUrl();
     }
 
-    function readFirebaseConfig() {
-        const configEl = document.getElementById('firebase-config');
-        if (!configEl) return null;
-
-        try {
-            const parsed = JSON.parse(configEl.textContent || '{}');
-            if (!parsed.apiKey || !parsed.authDomain || !parsed.projectId || !parsed.appId) {
-                return null;
-            }
-            return parsed;
-        } catch (error) {
-            console.error('[CHAT] Config Firebase invalida:', error);
-            return null;
-        }
-    }
-
-    function getFirebaseApp() {
-        if (typeof firebase === 'undefined' || !firebase.initializeApp) {
-            return null;
-        }
-
-        if (firebase.apps && firebase.apps.length > 0) {
-            return firebase.app();
-        }
-
-        const config = readFirebaseConfig();
-        if (!config) {
-            return null;
-        }
-
-        return firebase.initializeApp(config);
-    }
-
     function getSupportRoomIdForUser(userId) {
         return `support_user_${userId}`;
+    }
+
+    function getPlansUrl() {
+        return document.querySelector('[data-vip-link]')?.dataset.plansUrl || '/planos';
+    }
+
+    function applyServerPermissions(permissions) {
+        if (!permissions || typeof permissions !== 'object') {
+            return;
+        }
+
+        if (typeof permissions.public_write === 'boolean') {
+            chatPermissions.publicWrite = permissions.public_write;
+        }
+
+        if (typeof permissions.support_write === 'boolean') {
+            chatPermissions.supportWrite = permissions.support_write;
+        }
+
+        if (typeof permissions.vip_area === 'boolean') {
+            chatPermissions.vipArea = permissions.vip_area;
+        }
     }
 
     function extractSupportUserId(roomId) {
@@ -322,13 +516,7 @@
 
     function isMessageMine(data) {
         const senderSiteUserId = String(data.senderSiteUserId || '');
-        const senderAuthUid = String(data.senderAuthUid || '');
-        const currentAuthUid = auth && auth.currentUser ? auth.currentUser.uid : '';
-
-        return (
-            (userMeta.userId && senderSiteUserId && userMeta.userId === senderSiteUserId) ||
-            (currentAuthUid && senderAuthUid && currentAuthUid === senderAuthUid)
-        );
+        return userMeta.userId && senderSiteUserId && userMeta.userId === senderSiteUserId;
     }
 
     function findMessageDocById(messageId) {
@@ -339,20 +527,92 @@
         if (!doc) return false;
         const data = doc.data() || {};
         if (!isMessageMine(data)) return false;
-        const createdAtMs = tsToMillis(data.createdAt);
+        const createdAtMs = tsToMillis(data.createdAt || data.createdAtMs);
         if (!createdAtMs) return false;
         return (Date.now() - createdAtMs) <= EDIT_WINDOW_MS;
     }
 
     function canDeleteMessageDoc(doc) {
         if (!doc) return false;
-        if (userMeta.isAdmin) return true;
+
+        if (currentRoomId.startsWith('support_user_') && userMeta.isAdmin) {
+            return true;
+        }
 
         const data = doc.data() || {};
         if (!isMessageMine(data)) return false;
-        const createdAtMs = tsToMillis(data.createdAt);
+        const createdAtMs = tsToMillis(data.createdAt || data.createdAtMs);
         if (!createdAtMs) return false;
         return (Date.now() - createdAtMs) <= EDIT_WINDOW_MS;
+    }
+
+    function canWriteRoom(roomId) {
+        if (!roomId) return false;
+        if (roomId === 'todos') return chatPermissions.publicWrite;
+        if (roomId.startsWith('support_user_')) {
+            return userMeta.isAdmin || (chatPermissions.supportWrite && extractSupportUserId(roomId) === userMeta.userId);
+        }
+        return false;
+    }
+
+    function getRoomRestriction(roomId) {
+        if (!roomId || canWriteRoom(roomId)) {
+            return null;
+        }
+
+        if (roomId === 'todos') {
+            return {
+                title: 'Sala Todos exclusiva para VIP',
+                message: 'Assine o plano VIP para participar do chat ao vivo com a comunidade. A aba Suporte continua liberada para todos os usuarios.',
+                ctaLabel: 'Conhecer plano VIP',
+                ctaKind: 'plans',
+                secondaryLabel: 'Ir para suporte',
+                secondaryKind: 'support'
+            };
+        }
+
+        return {
+            title: 'Envio indisponivel',
+            message: 'Voce nao tem permissao para enviar mensagens nesta conversa.',
+            secondaryLabel: 'Ir para suporte',
+            secondaryKind: 'support'
+        };
+    }
+
+    async function promptVipUpgrade(reason) {
+        const message = reason
+            || 'Este recurso e exclusivo de assinantes do plano VIP. Deseja conhecer o plano VIP agora?';
+
+        if (typeof window.showSiteConfirm === 'function') {
+            const confirmed = await window.showSiteConfirm({
+                title: 'Recurso exclusivo do plano VIP',
+                message,
+                confirmLabel: 'Quero assinar o VIP',
+                cancelLabel: 'Agora nao',
+                intent: 'warning',
+                icon: 'fa-crown'
+            });
+
+            if (confirmed) {
+                window.location.href = getPlansUrl();
+            }
+            return;
+        }
+
+        notifyUser(message, 'warning');
+    }
+
+    async function handleRoomRestrictionAttempt(restriction) {
+        if (!restriction) {
+            return;
+        }
+
+        if (restriction.ctaKind === 'plans') {
+            await promptVipUpgrade('O chat da comunidade e exclusivo para assinantes do plano VIP. Deseja conhecer o plano VIP agora?');
+            return;
+        }
+
+        notifyUser(restriction.message || 'Voce nao tem permissao para enviar mensagens nesta sala.', 'warning');
     }
 
     function clearComposerAction(shouldClearInput) {
@@ -366,6 +626,25 @@
 
     function renderComposerState() {
         if (!elements.composerState) {
+            updateInputState();
+            return;
+        }
+
+        const restriction = getRoomRestriction(currentRoomId);
+        if (restriction) {
+            elements.composerState.hidden = false;
+            elements.composerState.innerHTML = `
+                <div class="chat-composer-pill is-locked">
+                    <div class="chat-composer-copy">
+                        <strong>${escapeHtml(restriction.title)}</strong>
+                        <span>${escapeHtml(restriction.message)}</span>
+                    </div>
+                    <div class="chat-composer-actions">
+                        ${restriction.secondaryLabel ? `<button type="button" class="chat-composer-action-btn is-secondary" data-chat-cta="${escapeHtml(restriction.secondaryKind)}">${escapeHtml(restriction.secondaryLabel)}</button>` : ''}
+                        ${restriction.ctaLabel ? `<button type="button" class="chat-composer-action-btn" data-chat-cta="${escapeHtml(restriction.ctaKind)}">${escapeHtml(restriction.ctaLabel)}</button>` : ''}
+                    </div>
+                </div>
+            `;
             updateInputState();
             return;
         }
@@ -410,6 +689,14 @@
     }
 
     function startReply(messageId) {
+        if (!canWriteRoom(currentRoomId)) {
+            renderComposerState();
+            handleRoomRestrictionAttempt(getRoomRestriction(currentRoomId)).catch((error) => {
+                console.error('[CHAT] Erro ao tratar restricao de resposta:', error);
+            });
+            return;
+        }
+
         const doc = findMessageDocById(messageId);
         if (!doc) return;
         const data = doc.data() || {};
@@ -443,6 +730,21 @@
         elements.input.focus();
     }
 
+    function makeMessageDoc(message) {
+        const normalizedMessage = {
+            ...message,
+            createdAt: message.createdAtMs || message.createdAt || 0,
+            editedAt: message.editedAtMs || message.editedAt || 0
+        };
+
+        return {
+            id: String(message.id || ''),
+            data() {
+                return normalizedMessage;
+            }
+        };
+    }
+
     function renderMessages(docs) {
         if (!elements.messages) return;
 
@@ -453,6 +755,7 @@
             return;
         }
 
+        const canReplyInRoom = canWriteRoom(currentRoomId);
         const ordered = docs.slice().reverse();
         const html = ordered.map((doc) => {
             const data = doc.data() || {};
@@ -460,6 +763,7 @@
             const text = data.text || '';
             const mine = isMessageMine(data);
             const canEdit = canEditMessageDoc(doc);
+            const planBadge = renderPlanBadge(resolveMessagePlan(data), data.senderRole);
             const replyBlock = data.replyToMessageId || data.replyToText
                 ? `
                     <div class="chat-message-reply-preview">
@@ -470,6 +774,14 @@
                 : '';
             const editedBadge = data.isEdited
                 ? '<span class="chat-message-edited">editada</span>'
+                : '';
+            const replyButton = canReplyInRoom
+                ? `
+                    <button type="button" class="chat-message-action" data-chat-reply="${escapeHtml(doc.id)}">
+                        <i class="fas fa-reply"></i>
+                        Responder
+                    </button>
+                `
                 : '';
             const editButton = canEdit
                 ? `
@@ -491,8 +803,11 @@
             return `
                 <article class="chat-message${mine ? ' mine' : ''}" data-message-id="${escapeHtml(doc.id)}">
                     <div class="chat-message-header">
-                        <span class="chat-message-sender">${escapeHtml(senderName)}</span>
-                        <span class="chat-message-time">${escapeHtml(formatMessageTime(data.createdAt))}</span>
+                        <div class="chat-message-sender-wrap">
+                            <span class="chat-message-sender">${escapeHtml(senderName)}</span>
+                            ${planBadge}
+                        </div>
+                        <span class="chat-message-time">${escapeHtml(formatMessageTime(data.createdAt || data.createdAtMs))}</span>
                     </div>
                     <div class="chat-message-body">
                         ${replyBlock}
@@ -501,10 +816,7 @@
                     <div class="chat-message-footer">
                         <div class="chat-message-meta">${editedBadge}</div>
                         <div class="chat-message-actions">
-                            <button type="button" class="chat-message-action" data-chat-reply="${escapeHtml(doc.id)}">
-                                <i class="fas fa-reply"></i>
-                                Responder
-                            </button>
+                            ${replyButton}
                             ${editButton}
                             ${deleteButton}
                         </div>
@@ -536,6 +848,19 @@
         });
     }
 
+    function updateTodosTabState() {
+        const todosTab = elements.roomTabs?.querySelector('[data-chat-room="todos"]');
+        if (!todosTab) return;
+        const isLocked = !canWriteRoom('todos');
+        todosTab.classList.toggle('is-locked', isLocked);
+        todosTab.setAttribute(
+            'title',
+            isLocked
+                ? 'Sala Todos exclusiva para assinantes VIP'
+                : 'Sala publica da comunidade'
+        );
+    }
+
     function updateInputState() {
         let enabled = true;
         let placeholder = 'Digite sua mensagem...';
@@ -549,6 +874,12 @@
             placeholder = 'Edite sua mensagem...';
         } else if (draftReply) {
             placeholder = 'Digite sua resposta...';
+        }
+
+        const restriction = getRoomRestriction(currentRoomId);
+        if (restriction) {
+            enabled = false;
+            placeholder = restriction.title;
         }
 
         elements.input.disabled = !enabled;
@@ -578,11 +909,15 @@
             const ownerName = ticketData.ownerName || `Usuario ${ticketData.ownerSiteUserId || ''}`;
             const preview = truncateText(ticketData.lastMessage || 'Sem mensagens', 70);
             const activeClass = selectedTicketRoomId === ticket.id ? ' active' : '';
+            const planBadge = renderPlanBadge(ticketData.ownerPlan, 'user', { compact: true });
             return `
                 <div class="chat-ticket-row${activeClass}">
                     <button type="button" class="chat-ticket-item${activeClass}" data-ticket-room="${escapeHtml(ticket.id)}">
                         <div class="chat-ticket-main">
-                            <strong>${escapeHtml(ownerName)}</strong>
+                            <div class="chat-ticket-heading">
+                                <strong>${escapeHtml(ownerName)}</strong>
+                                ${planBadge}
+                            </div>
                             <span>${escapeHtml(preview)}</span>
                         </div>
                         ${unread > 0 ? `<span class="chat-ticket-unread">${unread > 99 ? '99+' : unread}</span>` : ''}
@@ -622,126 +957,33 @@
         }
     }
 
-    async function ensureRoomDoc(roomId, extraData) {
-        if (!firestore || !roomId) return false;
-        const baseData = {
-            id: roomId,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        try {
-            await firestore.collection('chat_rooms').doc(roomId).set({
-                ...baseData,
-                ...(extraData || {})
-            }, { merge: true });
-            return true;
-        } catch (error) {
-            console.warn(`[CHAT] Falha ao garantir sala ${roomId}:`, error);
-            return false;
-        }
-    }
-
     async function bootstrapRoomsFromServer() {
-        try {
-            const response = await fetch('/api/chat/bootstrap', {
-                method: 'GET',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin'
-            });
-            const data = await response.json().catch(() => ({}));
-            return !!(response.ok && data.success);
-        } catch (_error) {
-            return false;
-        }
+        const data = await apiJson('/api/chat/bootstrap');
+        applyServerPermissions(data.permissions);
+        bootstrapCompleted = !!data.success;
+        return data;
     }
 
-    async function ensureBaseRooms() {
-        const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
-        const bootstrapped = await bootstrapRoomsFromServer();
-
-        if (!bootstrapped) {
-            await ensureRoomDoc('todos', {
-                type: 'public',
-                name: 'Todos'
-            });
-
-            await ensureRoomDoc(supportRoomId, {
-                type: 'support',
-                name: `Suporte - ${userMeta.userName}`,
-                ownerSiteUserId: userMeta.userId,
-                ownerName: userMeta.userName
-            });
-        }
+    async function fetchChatState() {
+        return apiJson('/api/chat/state');
     }
 
-    async function fetchChatFirebaseToken() {
-        const response = await fetch('/api/chat/firebase-token', {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
-        });
+    async function refreshChatState() {
+        const state = await fetchChatState();
+        applyServerPermissions(state.permissions);
+        roomMetaCache.todos = state.rooms?.todos || null;
+        roomMetaCache.suporte = state.rooms?.support || null;
 
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.success || !data.token) {
-            throw new Error(data.message || 'Falha ao gerar token do chat.');
+        if (Array.isArray(state.tickets)) {
+            hydrateSupportTickets(state.tickets);
+        } else if (currentTab === 'chamados' && userMeta.isAdmin) {
+            hydrateSupportTickets([]);
         }
 
-        return data.token;
-    }
-
-    async function fetchAdminTicketsFromServer() {
-        if (!userMeta.isAdmin) return false;
-
-        try {
-            const response = await fetch('/api/chat/admin/tickets', {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin'
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || !data.success || !Array.isArray(data.tickets)) {
-                return false;
-            }
-            hydrateSupportTickets(data.tickets);
-            return true;
-        } catch (_error) {
-            return false;
-        }
-    }
-
-    async function ensureFirebaseReady() {
-        const app = getFirebaseApp();
-        if (!app || !firebase.auth || !firebase.firestore) {
-            return false;
-        }
-
-        auth = firebase.auth();
-        firestore = firebase.firestore();
-
-        const expectedUid = `site_user_${userMeta.userId}`;
-        const mustRefreshUser = !auth.currentUser || auth.currentUser.uid !== expectedUid;
-
-        if (mustRefreshUser) {
-            try {
-                const token = await fetchChatFirebaseToken();
-                await auth.signInWithCustomToken(token);
-            } catch (error) {
-                console.error('[CHAT] Falha ao autenticar no Firebase com token customizado:', error);
-                return false;
-            }
-        }
-
-        return !!(auth.currentUser && auth.currentUser.uid === expectedUid);
-    }
-
-    function clearActiveMessagesSubscription() {
-        if (typeof unsubscribers.activeMessages === 'function') {
-            unsubscribers.activeMessages();
-            unsubscribers.activeMessages = null;
-        }
+        updateTodosTabState();
+        refreshUnreadBadges();
+        updateInputState();
+        return state;
     }
 
     function hydrateSupportTickets(tickets) {
@@ -756,7 +998,6 @@
         if (currentTab === 'chamados') {
             if (!selectedTicketRoomId || !supportTickets.some((item) => item.id === selectedTicketRoomId)) {
                 selectedTicketRoomId = supportTickets.length ? supportTickets[0].id : '';
-                switchToRoom(selectedTicketRoomId);
             }
         }
 
@@ -775,7 +1016,72 @@
             return;
         }
 
+        const restriction = getRoomRestriction(currentRoomId);
+        if (restriction) {
+            elements.messages.innerHTML = `<div class="chat-empty-state">${escapeHtml(restriction.message)}</div>`;
+            return;
+        }
+
         elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta sala.</div>';
+    }
+
+    function clearPoller(pollerName) {
+        const activePoller = pollers[pollerName];
+        if (typeof activePoller === 'function') {
+            activePoller();
+        }
+        pollers[pollerName] = null;
+    }
+
+    function startPoller(pollerName, handler, intervalMs) {
+        clearPoller(pollerName);
+        let isActive = true;
+
+        const run = async () => {
+            if (!isActive) {
+                return;
+            }
+            try {
+                await handler();
+            } catch (error) {
+                console.error(`[CHAT] Erro no poller ${pollerName}:`, error);
+            }
+        };
+
+        run();
+        const intervalId = window.setInterval(run, intervalMs);
+        pollers[pollerName] = () => {
+            isActive = false;
+            window.clearInterval(intervalId);
+        };
+    }
+
+    function clearActiveMessagesSubscription() {
+        clearPoller('activeMessages');
+    }
+
+    async function loadRoomMessages(roomId) {
+        if (!roomId) {
+            currentRoomId = '';
+            showCurrentEmptyState();
+            updateInputState();
+            return;
+        }
+
+        const data = await apiJson(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages?limit=80`);
+        if (roomId !== currentRoomId) {
+            return;
+        }
+
+        const docs = Array.isArray(data.messages)
+            ? data.messages.map(makeMessageDoc)
+            : [];
+
+        renderMessages(docs);
+        setStatus(getConnectedMessage(roomId), 'ok');
+        if (panelOpen) {
+            markRoomAsRead(roomId);
+        }
     }
 
     function subscribeActiveRoom(roomId) {
@@ -783,7 +1089,7 @@
         clearComposerAction(true);
         activeMessageDocs = [];
 
-        if (!roomId || !firestore) {
+        if (!roomId) {
             currentRoomId = '';
             showCurrentEmptyState();
             updateInputState();
@@ -792,42 +1098,23 @@
 
         currentRoomId = roomId;
         setStatus(getConnectingMessage(roomId));
+        showCurrentEmptyState();
+        updateInputState();
 
-        const query = firestore
-            .collection('chat_rooms')
-            .doc(roomId)
-            .collection('messages')
-            .orderBy('createdAt', 'desc')
-            .limit(80);
-
-        unsubscribers.activeMessages = query.onSnapshot((snapshot) => {
-            renderMessages(snapshot.docs);
-            if (roomId === 'todos') {
-                triedRepairTodos = false;
-            }
-            setStatus(getConnectedMessage(roomId), 'ok');
-            if (panelOpen) {
-                markRoomAsRead(roomId);
-            }
-        }, async (error) => {
-            console.error('[CHAT] Erro ao receber mensagens em tempo real:', error);
-            activeMessageDocs = [];
-
-            if (roomId === 'todos' && !triedRepairTodos) {
-                triedRepairTodos = true;
-                setStatus('Reparando sala Todos...', 'error');
-                const ok = await bootstrapRoomsFromServer();
-                if (ok) {
-                    subscribeActiveRoom('todos');
-                    return;
+        startPoller('activeMessages', async () => {
+            try {
+                await loadRoomMessages(roomId);
+            } catch (error) {
+                if (roomId === currentRoomId) {
+                    activeMessageDocs = [];
+                    showCurrentEmptyState();
+                    setStatus(error.message || getConnectionErrorMessage(roomId), 'error');
+                    if (currentTab === 'chamados' && userMeta.isAdmin) {
+                        await refreshChatState();
+                    }
                 }
             }
-
-            setStatus(getConnectionErrorMessage(roomId), 'error');
-            if (currentTab === 'chamados' && userMeta.isAdmin) {
-                await fetchAdminTicketsFromServer();
-            }
-        });
+        }, ACTIVE_ROOM_POLL_MS);
     }
 
     async function switchToRoom(roomId) {
@@ -835,7 +1122,6 @@
             const fallbackRoomId = getDefaultRoomForCurrentTab();
             if (fallbackRoomId) {
                 subscribeActiveRoom(fallbackRoomId);
-                updateInputState();
                 if (panelOpen) {
                     markRoomAsRead(fallbackRoomId);
                 }
@@ -849,7 +1135,6 @@
         }
 
         subscribeActiveRoom(roomId);
-        updateInputState();
 
         if (panelOpen) {
             markRoomAsRead(roomId);
@@ -868,60 +1153,18 @@
 
         if (tabId === 'suporte') {
             renderTicketList();
-            const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
-            await ensureRoomDoc(supportRoomId, {
-                type: 'support',
-                name: `Suporte - ${userMeta.userName}`,
-                ownerSiteUserId: userMeta.userId,
-                ownerName: userMeta.userName
-            });
-            await switchToRoom(supportRoomId);
+            await switchToRoom(getSupportRoomIdForUser(userMeta.userId));
             return;
         }
 
         if (tabId === 'chamados' && userMeta.isAdmin) {
+            await refreshChatState();
             renderTicketList();
-            if (!supportTickets.length) {
-                await fetchAdminTicketsFromServer();
-            }
             if (!selectedTicketRoomId && supportTickets.length) {
                 selectedTicketRoomId = supportTickets[0].id;
             }
             await switchToRoom(selectedTicketRoomId);
         }
-    }
-
-    function buildRoomMetadataForMessage(roomId, messageText) {
-        const baseMeta = {
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastMessage: String(messageText || '').slice(0, 140),
-            lastSender: userMeta.userName,
-            lastSenderRole: userMeta.isAdmin ? 'admin' : 'user',
-            lastSenderSiteUserId: userMeta.userId
-        };
-
-        if (roomId === 'todos') {
-            return {
-                ...baseMeta,
-                type: 'public',
-                name: 'Todos'
-            };
-        }
-
-        if (roomId.startsWith('support_user_')) {
-            const ownerId = extractSupportUserId(roomId) || userMeta.userId;
-            const ticket = supportTickets.find((item) => item.id === roomId);
-            const ownerName = ticket?.data?.ownerName || (ownerId === userMeta.userId ? userMeta.userName : `Usuario ${ownerId}`);
-            return {
-                ...baseMeta,
-                type: 'support',
-                name: `Suporte - ${ownerName}`,
-                ownerSiteUserId: ownerId,
-                ownerName: ownerName
-            };
-        }
-
-        return baseMeta;
     }
 
     function buildReplyPayload() {
@@ -937,25 +1180,15 @@
     }
 
     async function createMessage(text) {
-        await firestore
-            .collection('chat_rooms')
-            .doc(currentRoomId)
-            .collection('messages')
-            .add({
+        await apiJson(`/api/chat/rooms/${encodeURIComponent(currentRoomId)}/messages`, {
+            method: 'POST',
+            body: {
                 text,
-                senderName: userMeta.userName,
-                senderAvatar: userMeta.userAvatar,
-                senderRole: userMeta.isAdmin ? 'admin' : 'user',
-                senderSiteUserId: userMeta.userId,
-                senderAuthUid: auth.currentUser.uid,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 ...buildReplyPayload()
-            });
-
-        await firestore.collection('chat_rooms').doc(currentRoomId).set(
-            buildRoomMetadataForMessage(currentRoomId, text),
-            { merge: true }
-        );
+            }
+        });
+        await refreshChatState();
+        await loadRoomMessages(currentRoomId);
     }
 
     async function editMessage(text) {
@@ -968,62 +1201,12 @@
             throw new Error('A janela de edicao desta mensagem expirou.');
         }
 
-        await firestore
-            .collection('chat_rooms')
-            .doc(currentRoomId)
-            .collection('messages')
-            .doc(draftEdit.messageId)
-            .update({
-                text,
-                isEdited: true,
-                editedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-        const latestMessage = activeMessageDocs.length ? activeMessageDocs[0] : null;
-        if (latestMessage && latestMessage.id === draftEdit.messageId) {
-            await syncRoomMetadataFromLatest(currentRoomId, text);
-        }
-    }
-
-    async function syncRoomMetadataFromLatest(roomId, fallbackText) {
-        if (!firestore || !roomId) return;
-
-        const latestSnapshot = await firestore
-            .collection('chat_rooms')
-            .doc(roomId)
-            .collection('messages')
-            .orderBy('createdAt', 'desc')
-            .limit(1)
-            .get();
-
-        if (latestSnapshot.empty) {
-            const roomDoc = firestore.collection('chat_rooms').doc(roomId);
-            const roomMeta = getRoomMeta(roomId) || {};
-            await roomDoc.set({
-                ...roomMeta,
-                id: roomId,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastMessage: '',
-                lastSender: '',
-                lastSenderRole: '',
-                lastSenderSiteUserId: ''
-            }, { merge: true });
-            return;
-        }
-
-        const latestDoc = latestSnapshot.docs[0];
-        const latestData = latestDoc.data() || {};
-        const latestText = String(latestData.text || fallbackText || '').slice(0, 140);
-
-        await firestore.collection('chat_rooms').doc(roomId).set(
-            {
-                ...buildRoomMetadataForMessage(roomId, latestText),
-                lastSender: latestData.senderName || userMeta.userName,
-                lastSenderRole: latestData.senderRole || (userMeta.isAdmin ? 'admin' : 'user'),
-                lastSenderSiteUserId: latestData.senderSiteUserId || userMeta.userId
-            },
-            { merge: true }
-        );
+        await apiJson(`/api/chat/rooms/${encodeURIComponent(currentRoomId)}/messages/${encodeURIComponent(draftEdit.messageId)}`, {
+            method: 'PATCH',
+            body: { text }
+        });
+        await refreshChatState();
+        await loadRoomMessages(currentRoomId);
     }
 
     async function deleteMessage(messageId) {
@@ -1032,18 +1215,18 @@
             throw new Error('Voce nao pode excluir esta mensagem.');
         }
 
-        const data = targetDoc.data() || {};
-        const confirmed = window.confirm('Deseja excluir esta mensagem do chat?');
+        const confirmed = await showChatConfirm({
+            title: 'Excluir mensagem?',
+            message: 'Deseja excluir esta mensagem do chat?',
+            confirmLabel: 'Excluir'
+        });
         if (!confirmed) {
             return;
         }
 
-        await firestore
-            .collection('chat_rooms')
-            .doc(currentRoomId)
-            .collection('messages')
-            .doc(messageId)
-            .delete();
+        await apiJson(`/api/chat/rooms/${encodeURIComponent(currentRoomId)}/messages/${encodeURIComponent(messageId)}`, {
+            method: 'DELETE'
+        });
 
         if (draftReply && draftReply.messageId === messageId) {
             draftReply = null;
@@ -1054,11 +1237,8 @@
             elements.input.value = '';
         }
 
-        const latestMessage = activeMessageDocs.length ? activeMessageDocs[0] : null;
-        if (latestMessage && latestMessage.id === messageId) {
-            await syncRoomMetadataFromLatest(currentRoomId, data.text || '');
-        }
-
+        await refreshChatState();
+        await loadRoomMessages(currentRoomId);
         renderComposerState();
     }
 
@@ -1067,23 +1247,18 @@
             throw new Error('Voce nao pode excluir este chamado.');
         }
 
-        const confirmed = window.confirm('Deseja excluir este chamado inteiro? Todas as mensagens serao removidas.');
+        const confirmed = await showChatConfirm({
+            title: 'Excluir chamado?',
+            message: 'Deseja excluir este chamado inteiro? Todas as mensagens serao removidas.',
+            confirmLabel: 'Excluir chamado'
+        });
         if (!confirmed) {
             return;
         }
 
-        const response = await fetch(`/api/chat/admin/tickets/${encodeURIComponent(roomId)}`, {
-            method: 'DELETE',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
+        const data = await apiJson(`/api/chat/admin/tickets/${encodeURIComponent(roomId)}`, {
+            method: 'DELETE'
         });
-
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Nao foi possivel excluir o chamado.');
-        }
 
         supportTickets = supportTickets.filter((ticket) => ticket.id !== roomId);
         renderTicketList();
@@ -1100,8 +1275,15 @@
     }
 
     async function sendMessage(text) {
-        if (!firestore || !auth || !auth.currentUser || !currentRoomId) {
+        if (!currentRoomId) {
             throw new Error('Chat ainda esta conectando.');
+        }
+
+        const restriction = getRoomRestriction(currentRoomId);
+        if (restriction) {
+            renderComposerState();
+            await handleRoomRestrictionAttempt(restriction);
+            return false;
         }
 
         if (draftEdit) {
@@ -1111,39 +1293,16 @@
         }
 
         clearComposerAction(false);
+        return true;
     }
 
-    function subscribeRoomMeta() {
-        if (!firestore) return;
+    function openPlansForVip() {
+        window.location.href = getPlansUrl();
+    }
 
-        const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
-
-        unsubscribers.todosMeta = firestore.collection('chat_rooms').doc('todos').onSnapshot((docSnap) => {
-            roomMetaCache.todos = docSnap.exists ? (docSnap.data() || null) : null;
-            refreshUnreadBadges();
-        });
-
-        unsubscribers.suporteMeta = firestore.collection('chat_rooms').doc(supportRoomId).onSnapshot((docSnap) => {
-            roomMetaCache.suporte = docSnap.exists ? (docSnap.data() || null) : null;
-            refreshUnreadBadges();
-        });
-
-        if (userMeta.isAdmin) {
-            fetchAdminTicketsFromServer();
-            unsubscribers.chamadosList = firestore
-                .collection('chat_rooms')
-                .where('type', '==', 'support')
-                .limit(100)
-                .onSnapshot((snapshot) => {
-                    hydrateSupportTickets(snapshot.docs.map((doc) => ({
-                        id: doc.id,
-                        data: doc.data() || {}
-                    })));
-                }, async (error) => {
-                    console.error('[CHAT] Erro ao listar chamados:', error);
-                    await fetchAdminTicketsFromServer();
-                });
-        }
+    async function goToSupportTab() {
+        await switchTab('suporte');
+        openPanel();
     }
 
     function openPanel() {
@@ -1154,6 +1313,9 @@
 
         if (currentRoomId) {
             markRoomAsRead(currentRoomId);
+            loadRoomMessages(currentRoomId).catch((error) => {
+                console.error('[CHAT] Erro ao carregar mensagens ao abrir painel:', error);
+            });
         }
 
         setTimeout(() => {
@@ -1171,19 +1333,16 @@
     }
 
     async function initializeChatConnection() {
-        const ready = await ensureFirebaseReady();
-        if (!ready) {
-            setStatus('Falha ao conectar com o chat.', 'error');
-            return;
-        }
+        setStatus('Preparando salas do chat...');
 
         try {
-            await ensureBaseRooms();
-            subscribeRoomMeta();
+            await bootstrapRoomsFromServer();
+            await refreshChatState();
             await switchTab('todos');
+            startPoller('roomState', refreshChatState, ROOM_STATE_POLL_MS);
         } catch (error) {
             console.error('[CHAT] Erro ao inicializar chat em tempo real:', error);
-            setStatus('Falha ao inicializar o chat.', 'error');
+            setStatus(error.message || 'Falha ao inicializar o chat.', 'error');
         }
     }
 
@@ -1195,6 +1354,7 @@
             return false;
         }
 
+        updateTodosTabState();
         updateInputState();
         return true;
     }
@@ -1276,8 +1436,25 @@
         if (elements.composerState) {
             elements.composerState.addEventListener('click', (event) => {
                 const cancelButton = event.target.closest('[data-chat-cancel-composer]');
-                if (!cancelButton) return;
-                clearComposerAction(!!draftEdit);
+                if (cancelButton) {
+                    clearComposerAction(!!draftEdit);
+                    return;
+                }
+
+                const ctaButton = event.target.closest('[data-chat-cta]');
+                if (!ctaButton) return;
+
+                const ctaType = ctaButton.dataset.chatCta;
+                if (ctaType === 'plans') {
+                    promptVipUpgrade('O envio de mensagens na sala Todos e exclusivo para assinantes VIP. Deseja conhecer o plano VIP agora?').catch((error) => {
+                        console.error('[CHAT] Erro ao abrir convite VIP:', error);
+                    });
+                    return;
+                }
+
+                if (ctaType === 'support') {
+                    goToSupportTab();
+                }
             });
         }
 
@@ -1289,9 +1466,11 @@
 
             elements.send.disabled = true;
             try {
-                await sendMessage(text);
-                elements.input.value = '';
-                markRoomAsRead(currentRoomId);
+                const wasSent = await sendMessage(text);
+                if (wasSent) {
+                    elements.input.value = '';
+                    markRoomAsRead(currentRoomId);
+                }
             } catch (error) {
                 console.error('[CHAT] Erro ao enviar mensagem:', error);
                 notifyUser(error.message || 'Nao foi possivel enviar a mensagem. Tente novamente.', 'error');

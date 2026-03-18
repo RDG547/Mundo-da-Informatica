@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_assets import Environment
 from webassets.bundle import Bundle
 from flask_compress import Compress
+from flask_mail import Mail, Message
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -25,7 +26,7 @@ import urllib.request
 import urllib.error
 import stripe
 from stripe import error as stripe_error
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple, cast
 
 # Para compatibilidade, criar alias
 SignatureVerificationError = stripe_error.SignatureVerificationError  # type: ignore[attr-defined]
@@ -82,6 +83,7 @@ if python_version.major == 3 and python_version.minor >= 13:
 
 # Carregar variáveis de ambiente
 load_dotenv()
+DEFAULT_SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'suporte@mundodainformatica.com').strip() or 'suporte@mundodainformatica.com'
 
 def is_production_environment():
     """Detecta ambiente de produção com a convenção oficial do projeto."""
@@ -112,6 +114,7 @@ app.config['SESSION_COOKIE_SECURE'] = is_production_environment()  # HTTPS apena
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Não acessível via JavaScript
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Proteção CSRF
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira em 24h
+app.config['SUPPORT_EMAIL'] = DEFAULT_SUPPORT_EMAIL
 
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -160,6 +163,20 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 300,
 }
 
+# Configuração de e-mail
+app.config['MAIL_SERVER'] = (os.environ.get('MAIL_SERVER') or '').strip() or None
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ('true', '1', 'yes', 'y', 'on')
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'false').lower() in ('true', '1', 'yes', 'y', 'on')
+app.config['MAIL_USERNAME'] = (os.environ.get('MAIL_USERNAME') or '').strip() or None
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = (
+    (os.environ.get('MAIL_DEFAULT_SENDER') or '').strip()
+    or app.config['MAIL_USERNAME']
+    or DEFAULT_SUPPORT_EMAIL
+)
+app.config['MAIL_SUPPRESS_SEND'] = not app.config['MAIL_SERVER'] and not is_production_environment()
+
 # Configuração de Timezone para horário de Brasília
 BRAZIL_TZ = pytz.timezone('America/Sao_Paulo')
 
@@ -170,6 +187,12 @@ def get_brazil_time():
 # Definição de constantes
 UPLOAD_FOLDER = 'static/uploads/profiles'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+CONTACT_ALLOWED_EXTENSIONS = {
+    'bin', 'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
+    'rar', 'rom', 'txt', 'webp', 'xls', 'xlsx', 'zip', '7z'
+}
+CONTACT_MAX_ATTACHMENTS = 5
+CONTACT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 
 # Configurações adicionais
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -179,6 +202,7 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB máximo
 db = SQLAlchemy(app)
 compress = Compress(app)
 assets = Environment(app)
+mail = Mail(app)
 
 # Proteção CSRF
 app.config['WTF_CSRF_ENABLED'] = True
@@ -436,6 +460,94 @@ def parse_donation_amount_to_cents(raw_amount: Any) -> tuple[bool, int | None, s
 
     cents = int((amount * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     return True, cents, None
+
+
+def allowed_contact_attachment(filename: str) -> bool:
+    if not filename or '.' not in filename:
+        return False
+    extension = filename.rsplit('.', 1)[1].lower()
+    return extension in CONTACT_ALLOWED_EXTENSIONS
+
+
+def prepare_contact_email_attachments(uploaded_files) -> tuple[bool, list[tuple[str, str, bytes]], str | None]:
+    files = [
+        uploaded_file for uploaded_file in (uploaded_files or [])
+        if uploaded_file and getattr(uploaded_file, 'filename', '').strip()
+    ]
+
+    if len(files) > CONTACT_MAX_ATTACHMENTS:
+        return False, [], f'Voce pode anexar no maximo {CONTACT_MAX_ATTACHMENTS} arquivos.'
+
+    attachments: list[tuple[str, str, bytes]] = []
+    for uploaded_file in files:
+        filename = secure_filename(uploaded_file.filename or '')
+        if not filename:
+            return False, [], 'Um dos arquivos anexados possui um nome invalido.'
+
+        if not allowed_contact_attachment(filename):
+            return False, [], f'Tipo de arquivo nao permitido: {filename}.'
+
+        file_bytes = uploaded_file.read()
+        if not file_bytes:
+            continue
+
+        if len(file_bytes) > CONTACT_MAX_ATTACHMENT_BYTES:
+            return False, [], f'O arquivo {filename} excede o limite de 5MB.'
+
+        attachments.append((
+            filename,
+            uploaded_file.mimetype or 'application/octet-stream',
+            file_bytes,
+        ))
+
+    return True, attachments, None
+
+
+def send_contact_support_email(
+    *,
+    name: str,
+    email: str,
+    phone: str,
+    category: str,
+    subject: str,
+    message: str,
+    attachments: list[tuple[str, str, bytes]],
+) -> None:
+    category_labels = {
+        'suporte': 'Suporte Tecnico',
+        'solicitacao': 'Solicitacao de Recurso',
+        'problema': 'Reportar Problema',
+        'sugestao': 'Sugestao',
+        'parcerias': 'Parcerias',
+        'outros': 'Outros',
+    }
+    normalized_category = category_labels.get(category, category or 'Nao informado')
+    support_email = app.config.get('SUPPORT_EMAIL') or DEFAULT_SUPPORT_EMAIL
+
+    email_body = "\n".join([
+        "Nova mensagem enviada pelo formulario de contato do site.",
+        "",
+        f"Nome: {name}",
+        f"Email: {email}",
+        f"Telefone: {phone or 'Nao informado'}",
+        f"Categoria: {normalized_category}",
+        f"Assunto: {subject}",
+        "",
+        "Mensagem:",
+        message,
+    ])
+
+    msg = Message(
+        subject=f"[Contato] {subject}",
+        recipients=[support_email],
+        reply_to=email,
+        body=email_body,
+    )
+
+    for filename, mimetype, file_bytes in attachments:
+        msg.attach(filename, mimetype, file_bytes)
+
+    mail.send(msg)
 
 
 def serialize_post_for_admin(post):
@@ -1981,20 +2093,45 @@ class SiteConfig(db.Model):
             defaults = {
                 'site_name': 'Mundo da Informática',
                 'site_description': 'Portal de tecnologia e informática',
-                'contact_email': 'contato@mundodainformatica.com',
+                'contact_email': DEFAULT_SUPPORT_EMAIL,
+                'contact_phone': '(21) 97879-4705',
                 'social_facebook': '#',
                 'social_twitter': '#',
                 'social_instagram': '#',
                 'social_youtube': '#',
-                'phone': '(11) 99999-9999',
-                'whatsapp': '5511999999999',
-                'address': 'São Paulo - SP'
+                'phone': '(21) 97879-4705',
+                'whatsapp': '5521978794705',
+                'address': 'Internet - Brasil',
+                'social_links': {
+                    'facebook': '',
+                    'instagram': '',
+                    'twitter': '',
+                    'youtube': 'https://www.youtube.com/@_RDTech'
+                },
+                'plan_price_premium': 29.90,
+                'plan_price_vip': 49.90
             }
 
             # Mesclar com valores padrão
             for key, default_value in defaults.items():
                 if key not in config_dict:
                     config_dict[key] = default_value
+
+            if not config_dict.get('contact_email') or config_dict.get('contact_email') == 'contato@mundodainformatica.com':
+                config_dict['contact_email'] = DEFAULT_SUPPORT_EMAIL
+
+            if not config_dict.get('contact_phone'):
+                config_dict['contact_phone'] = '(21) 97879-4705'
+
+            social_links = config_dict.get('social_links')
+            if not isinstance(social_links, dict):
+                social_links = {}
+            config_dict['social_links'] = {
+                'facebook': social_links.get('facebook', ''),
+                'instagram': social_links.get('instagram', ''),
+                'twitter': social_links.get('twitter', ''),
+                'youtube': social_links.get('youtube', 'https://www.youtube.com/@_RDTech')
+            }
 
             return config_dict
 
@@ -2003,14 +2140,23 @@ class SiteConfig(db.Model):
             return {
                 'site_name': 'Mundo da Informática',
                 'site_description': 'Portal de tecnologia e informática',
-                'contact_email': 'contato@mundodainformatica.com',
+                'contact_email': DEFAULT_SUPPORT_EMAIL,
+                'contact_phone': '(21) 97879-4705',
                 'social_facebook': '#',
                 'social_twitter': '#',
                 'social_instagram': '#',
                 'social_youtube': '#',
-                'phone': '(11) 99999-9999',
-                'whatsapp': '5511999999999',
-                'address': 'São Paulo - SP'
+                'phone': '(21) 97879-4705',
+                'whatsapp': '5521978794705',
+                'address': 'Internet - Brasil',
+                'social_links': {
+                    'facebook': '',
+                    'instagram': '',
+                    'twitter': '',
+                    'youtube': 'https://www.youtube.com/@_RDTech'
+                },
+                'plan_price_premium': 29.90,
+                'plan_price_vip': 49.90
             }
 
     @staticmethod
@@ -2039,6 +2185,195 @@ class SiteConfig(db.Model):
 
         db.session.commit()
         return config
+
+
+PLAN_METADATA = {
+    'free': {
+        'label': 'Grátis',
+        'icon': 'fas fa-user',
+        'theme': 'free'
+    },
+    'premium': {
+        'label': 'Premium',
+        'icon': 'fas fa-star',
+        'theme': 'premium'
+    },
+    'vip': {
+        'label': 'VIP',
+        'icon': 'fas fa-crown',
+        'theme': 'vip'
+    }
+}
+
+DEFAULT_PLAN_PRICE_CENTS = {
+    'premium': 2990,
+    'vip': 4990
+}
+
+STRIPE_PLAN_PRODUCT_IDS = {
+    'premium': 'prod_TWO90kFHcUFjHq',
+    'vip': 'prod_TWOCCLcm6V4BRN'
+}
+
+STRIPE_PLAN_PRICE_CACHE_TTL_SECONDS = 300
+CHAT_PUBLIC_ROOM_ID = 'todos'
+CHAT_MESSAGE_LIMIT = 80
+CHAT_MESSAGE_EDIT_WINDOW_MS = 10 * 60 * 1000
+
+_stripe_plan_price_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def normalize_plan_key(plan: str | None) -> str:
+    normalized = str(plan or 'free').strip().lower()
+    return normalized if normalized in PLAN_METADATA else 'free'
+
+
+def get_plan_metadata(plan: str | None) -> dict[str, str]:
+    return PLAN_METADATA.get(normalize_plan_key(plan), PLAN_METADATA['free'])
+
+
+def format_brl_from_cents(amount_cents: int) -> str:
+    amount = Decimal(max(0, int(amount_cents or 0))) / Decimal('100')
+    formatted = f'{amount:,.2f}'
+    return formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def get_plan_price_cents(plan: str | None, config_values: Mapping[str, Any] | None = None) -> int:
+    plan_key = normalize_plan_key(plan)
+    default_cents = DEFAULT_PLAN_PRICE_CENTS.get(plan_key, 0)
+    if plan_key not in DEFAULT_PLAN_PRICE_CENTS:
+        return default_cents
+
+    config_key = f'plan_price_{plan_key}'
+    raw_value = (
+        config_values.get(config_key)
+        if config_values is not None and config_key in config_values
+        else SiteConfig.get_value(config_key, Decimal(default_cents) / Decimal('100'))
+    )
+
+    try:
+        amount = Decimal(str(raw_value).replace(',', '.'))
+    except (InvalidOperation, TypeError, ValueError):
+        amount = Decimal(default_cents) / Decimal('100')
+
+    if amount < 0:
+        amount = Decimal('0')
+
+    return int((amount * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+
+
+def get_plan_pricing_config(config_values: Mapping[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    pricing: dict[str, dict[str, Any]] = {
+        'free': {
+            **get_plan_metadata('free'),
+            'amount_cents': 0,
+            'display_amount': '0'
+        }
+    }
+
+    for plan_key in DEFAULT_PLAN_PRICE_CENTS:
+        amount_cents = get_plan_price_cents(plan_key, config_values=config_values)
+        pricing[plan_key] = {
+            **get_plan_metadata(plan_key),
+            'amount_cents': amount_cents,
+            'display_amount': format_brl_from_cents(amount_cents)
+        }
+
+    return pricing
+
+
+def get_stripe_product_id_for_plan(plan: str | None) -> str | None:
+    return STRIPE_PLAN_PRODUCT_IDS.get(normalize_plan_key(plan))
+
+
+def _extract_valid_stripe_subscription_price(price_data: Any, expected_product_id: str | None = None) -> dict[str, Any] | None:
+    if not price_data:
+        return None
+
+    try:
+        price_id = str(price_data.get('id') or '')
+        product_id = str(price_data.get('product') or '')
+        currency = str(price_data.get('currency') or 'brl').lower()
+        unit_amount = int(price_data.get('unit_amount') or 0)
+        recurring = price_data.get('recurring') or {}
+        is_active = bool(price_data.get('active', True))
+    except Exception:
+        return None
+
+    if not price_id or unit_amount <= 0 or not is_active:
+        return None
+
+    if expected_product_id and product_id and product_id != expected_product_id:
+        return None
+
+    if str(recurring.get('interval') or '').lower() != 'month':
+        return None
+
+    return {
+        'price_id': price_id,
+        'product_id': product_id or expected_product_id or '',
+        'currency': currency,
+        'unit_amount': unit_amount,
+    }
+
+
+def get_stripe_subscription_price(plan: str | None) -> dict[str, Any] | None:
+    plan_key = normalize_plan_key(plan)
+    product_id = get_stripe_product_id_for_plan(plan_key)
+    if not product_id or not stripe.api_key:
+        return None
+
+    now_ts = datetime.utcnow().timestamp()
+    cached = _stripe_plan_price_cache.get(plan_key)
+    if cached and (now_ts - cached[0]) < STRIPE_PLAN_PRICE_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    resolved_price: dict[str, Any] | None = None
+
+    try:
+        product = stripe.Product.retrieve(product_id, expand=['default_price'])
+        default_price = product.get('default_price')
+        if isinstance(default_price, str):
+            default_price = stripe.Price.retrieve(default_price)
+
+        resolved_price = _extract_valid_stripe_subscription_price(default_price, expected_product_id=product_id)
+
+        if not resolved_price:
+            price_list = stripe.Price.list(
+                product=product_id,
+                active=True,
+                type='recurring',
+                limit=10
+            )
+
+            fallback_price = None
+            for price_data in price_list.get('data', []):
+                parsed_price = _extract_valid_stripe_subscription_price(price_data, expected_product_id=product_id)
+                if not parsed_price:
+                    continue
+                if parsed_price['currency'] == 'brl':
+                    resolved_price = parsed_price
+                    break
+                if fallback_price is None:
+                    fallback_price = parsed_price
+
+            if not resolved_price:
+                resolved_price = fallback_price
+    except Exception as exc:
+        app.logger.error(f'Erro ao obter preço Stripe do plano {plan_key}: {exc}')
+        return None
+
+    if resolved_price:
+        _stripe_plan_price_cache[plan_key] = (now_ts, resolved_price)
+
+    return resolved_price
+
+
+def get_effective_plan_charge_cents(plan: str | None) -> int:
+    stripe_price = get_stripe_subscription_price(plan)
+    if stripe_price:
+        return int(stripe_price.get('unit_amount') or 0)
+    return DEFAULT_PLAN_PRICE_CENTS.get(normalize_plan_key(plan), 0)
 
 # Modelo para tracking de atividades administrativas
 class AdminActivity(db.Model):
@@ -2202,6 +2537,7 @@ def inject_global_data():
 
     # Configurações do site
     config = SiteConfig.get_config()
+    plan_pricing = get_plan_pricing_config(config)
 
     # Estatísticas para o frontend
     stats = {
@@ -2242,6 +2578,7 @@ def inject_global_data():
         config=config,
         site_configs=config,  # Adicionar alias para compatibilidade
         stats=stats,
+        plan_pricing=plan_pricing,
         firebase_public_config=firebase_public_config,
         current_year=datetime.now().year,
         datetime=datetime,  # Adicionar datetime para uso em templates
@@ -3329,7 +3666,11 @@ def get_user_permissions():
             'active': user.active_sessions
         },
         'can_request_content': can_request_specific_content(user),
-        'vip_area': user.plan == 'vip'
+        'vip_area': user.plan == 'vip',
+        'live_chat': {
+            'community': _can_user_write_public_chat(user),
+            'support': True
+        }
     }
 
     return jsonify(permissions)
@@ -3351,21 +3692,20 @@ def create_checkout_session():
         debug_log(f'Stripe Checkout - Dados recebidos: {data}')
         debug_log(f'Stripe Checkout - Plano: {plan_type}')
 
-        # Define prices (Replace with your actual Stripe Price IDs from env)
-        prices = {
-            'premium': os.environ.get('STRIPE_PRICE_PREMIUM', 'price_premium_placeholder'),
-            'vip': os.environ.get('STRIPE_PRICE_VIP', 'price_vip_placeholder')
-        }
-
-        price_id = prices.get(plan_type)
-        if not price_id:
+        plan_key = normalize_plan_key(plan_type)
+        if plan_key not in DEFAULT_PLAN_PRICE_CENTS:
             debug_log(f'Stripe Checkout - Plano inválido: {plan_type}')
             return jsonify({'error': 'Plano inválido'}), 400
+
+        stripe_price = get_stripe_subscription_price(plan_key)
+        if not stripe_price or not stripe_price.get('price_id'):
+            debug_log(f'Stripe Checkout - Preço Stripe não encontrado para plano: {plan_key}')
+            return jsonify({'error': 'Não foi possível localizar o preço oficial deste plano na Stripe.'}), 400
 
         checkout_session = stripe.checkout.Session.create(
             line_items=[
                 {
-                    'price': price_id,
+                    'price': stripe_price['price_id'],
                     'quantity': 1,
                 },
             ],
@@ -3376,7 +3716,7 @@ def create_checkout_session():
             customer_email=current_user.email,
             metadata={
                 'user_id': str(current_user.id),
-                'plan': plan_type
+                'plan': plan_key
             }
         )
         return jsonify({'clientSecret': checkout_session.client_secret})
@@ -3576,21 +3916,19 @@ def create_pix_checkout():
         print(f'[PIX] Plano: {plan_type}')
         print(f'[PIX] User ID: {current_user.id}')
 
-        if plan_type not in ['premium', 'vip']:
+        plan_key = normalize_plan_key(plan_type)
+        if plan_key not in DEFAULT_PLAN_PRICE_CENTS:
             print(f'[PIX] ERRO - Plano inválido: {plan_type}')
             return jsonify({'error': 'Plano inválido'}), 400
 
-        # Define preços em centavos
-        prices = {
-            'premium': 2990,  # R$ 29,90
-            'vip': 4990       # R$ 49,90
-        }
-
-        amount = prices.get(plan_type)
+        amount = get_plan_price_cents(plan_key)
+        if amount <= 0:
+            print(f'[PIX] ERRO - Preço inválido para plano: {plan_key}')
+            return jsonify({'error': 'Preço do plano inválido. Ajuste o valor visual no painel administrativo.'}), 400
         print(f'[PIX] Amount: {amount}')
 
         # Gerar ID único para o PIX
-        pix_id = f'{plan_type}_{current_user.id}_{int(datetime.utcnow().timestamp())}'
+        pix_id = f'{plan_key}_{current_user.id}_{int(datetime.utcnow().timestamp())}'
         print(f'[PIX] PIX ID gerado: {pix_id}')
 
         # Criar transação pendente IMEDIATAMENTE para redirecionamento rápido
@@ -3599,7 +3937,7 @@ def create_pix_checkout():
                 user_id=current_user.id,
                 payment_gateway='abacatepay',
                 abacatepay_billing_id=pix_id,
-                plan_type=plan_type,
+                plan_type=plan_key,
                 amount=amount,
                 currency='brl',
                 status='processing'  # Status temporário até API responder
@@ -3627,7 +3965,8 @@ def create_pix_checkout():
         return jsonify({
             'billing_id': pix_id,
             'transaction_id': transaction.id,
-            'redirect_url': redirect_url
+            'redirect_url': redirect_url,
+            'success_redirect_url': url_for('pix_checkout_success', billing_id=pix_id, next=url_for('plans'))
         })
 
     except Exception as e:
@@ -3669,7 +4008,8 @@ def create_donation_pix_checkout():
             'success': True,
             'billing_id': pix_id,
             'transaction_id': transaction.id,
-            'redirect_url': url_for('pix_checkout_page', billing_id=pix_id, next=next_path, _external=True)
+            'redirect_url': url_for('pix_checkout_page', billing_id=pix_id, next=next_path, _external=True),
+            'success_redirect_url': url_for('pix_checkout_success', billing_id=pix_id, next=next_path)
         })
     except Exception:
         db.session.rollback()
@@ -4334,10 +4674,38 @@ def terms_of_service():
 def privacy_policy():
     return render_template('politica-de-privacidade.html', title='Política de Privacidade')
 
+@app.route('/area-vip')
+@login_required
+def vip_area():
+    if current_user.plan != 'vip':
+        flash('A Área VIP é exclusiva para assinantes VIP. Conheça o plano VIP para liberar esse acesso.', 'warning')
+        return redirect(url_for('plans'))
+
+    return render_template('vip-area.html', title='Área VIP')
+
 @app.route('/contato', methods=['GET', 'POST'])
 def contact():
     if request.method == 'POST':
         category = sanitize_input(request.form.get('category', ''))
+        raw_phone = request.form.get('phone', '').strip()
+        phone_digits = re.sub(r'\D', '', raw_phone)
+        if len(phone_digits) > 11:
+            phone_digits = phone_digits[:11]
+
+        if phone_digits:
+            if len(phone_digits) not in (10, 11):
+                error_msg = 'Telefone inválido'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': error_msg})
+                flash(error_msg, 'danger')
+                return redirect(url_for('contact'))
+
+            if len(phone_digits) == 11:
+                phone = f'({phone_digits[:2]}) {phone_digits[2:7]}-{phone_digits[7:11]}'
+            else:
+                phone = f'({phone_digits[:2]}) {phone_digits[2:6]}-{phone_digits[6:10]}'
+        else:
+            phone = ''
 
         # Verificar plano apenas para categoria 'solicitacao'
         if category == 'solicitacao' and current_user.is_authenticated and current_user.plan == 'free':
@@ -4379,6 +4747,13 @@ def contact():
             flash(error_msg, 'danger')
             return redirect(url_for('contact'))
 
+        if phone and len(phone) > 30:
+            error_msg = 'Telefone inválido ou muito longo'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': error_msg})
+            flash(error_msg, 'danger')
+            return redirect(url_for('contact'))
+
         if not message or len(message) > 5000:
             error_msg = 'Mensagem inválida ou muito longa'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -4386,18 +4761,56 @@ def contact():
             flash(error_msg, 'danger')
             return redirect(url_for('contact'))
 
-        new_contact = Contact(name=name, email=email, subject=subject, message=message)
+        attachments_valid, attachments, attachments_error = prepare_contact_email_attachments(
+            request.files.getlist('attachments')
+        )
+        if not attachments_valid:
+            attachments_error_message = attachments_error or 'Nao foi possivel processar os anexos enviados.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': attachments_error_message})
+            flash(attachments_error_message, 'danger')
+            return redirect(url_for('contact'))
+
+        message_prefix = []
+        if category:
+            message_prefix.append(f'Categoria: {category}')
+        if phone:
+            message_prefix.append(f'Telefone: {phone}')
+        if attachments:
+            attachment_names = ', '.join(filename for filename, _, _ in attachments)
+            message_prefix.append(f'Anexos: {attachment_names}')
+
+        stored_message = f"{chr(10).join(message_prefix)}{chr(10) * 2}{message}" if message_prefix else message
+        new_contact = Contact(name=name, email=email, subject=subject, message=stored_message)
         db.session.add(new_contact)
         db.session.commit()
+
+        try:
+            send_contact_support_email(
+                name=name,
+                email=email,
+                phone=phone,
+                category=category,
+                subject=subject,
+                message=message,
+                attachments=attachments,
+            )
+        except Exception:
+            app.logger.exception('Erro ao enviar formulario de contato por email')
+            error_msg = 'Nao foi possivel encaminhar sua mensagem ao suporte agora. Tente novamente em instantes.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': error_msg}), 500
+            flash(error_msg, 'danger')
+            return redirect(url_for('contact'))
 
         # Retornar JSON se for AJAX
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': True,
-                'message': 'Sua mensagem foi enviada com sucesso! Entraremos em contato em breve.'
+                'message': f'Sua mensagem foi enviada com sucesso para {app.config["SUPPORT_EMAIL"]}!'
             })
 
-        flash('Sua mensagem foi enviada com sucesso! Entraremos em contato em breve.', 'success')
+        flash(f'Sua mensagem foi enviada com sucesso para {app.config["SUPPORT_EMAIL"]}!', 'success')
         return redirect(url_for('contact'))
 
     return render_template('contact.html', title='Contato')
@@ -4431,7 +4844,7 @@ def posts():
     """Página que lista todos os posts ativos"""
     page = request.args.get('page', 1, type=int)
     posts = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc()).paginate(
-        page=page, per_page=12, error_out=False
+        page=page, per_page=8, error_out=False
     )
 
     # Lista de IDs de posts favoritados pelo usuário atual
@@ -4446,8 +4859,24 @@ def posts():
 
 @app.route('/api/posts')
 def api_posts():
-    posts = Post.query.order_by(Post.date_posted.desc()).limit(10).all()
-    return jsonify([post.to_dict() for post in posts])
+    page = request.args.get('page', 1, type=int)
+    posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())
+    posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
+
+    favorite_post_ids = []
+    if current_user.is_authenticated:
+        favorite_post_ids = [f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()]
+
+    posts_data = _serialize_posts(posts_paginated.items, favorite_post_ids)
+
+    return jsonify({
+        'success': True,
+        'posts': posts_data,
+        'has_next': posts_paginated.has_next,
+        'next_page': posts_paginated.next_num,
+        'total': posts_paginated.total,
+        'is_authenticated': current_user.is_authenticated
+    })
 
 @app.route('/api/recent-posts')
 def api_recent_posts():
@@ -5106,12 +5535,21 @@ def initialize_db():
             default_configs = [
                 SiteConfig(key='site_name', value='Mundo da Informática'),
                 SiteConfig(key='site_description', value='Seu portal de tecnologia'),
-                SiteConfig(key='contact_email', value='contato@mundodainformatica.com'),
+                SiteConfig(key='contact_email', value=DEFAULT_SUPPORT_EMAIL),
+                SiteConfig(key='contact_phone', value='(21) 97879-4705'),
                 SiteConfig(key='admin_email', value='admin@mundodainformatica.com'),
                 SiteConfig(key='site_keywords', value='tecnologia, informática, downloads, software'),
                 SiteConfig(key='enable_comments', value='true'),
                 SiteConfig(key='posts_per_page', value='10'),
-                SiteConfig(key='site_theme', value='default')
+                SiteConfig(key='site_theme', value='default'),
+                SiteConfig(key='social_links', value=json.dumps({
+                    'facebook': '',
+                    'instagram': '',
+                    'twitter': '',
+                    'youtube': 'https://www.youtube.com/@_RDTech'
+                }), value_type='json'),
+                SiteConfig(key='plan_price_premium', value='29.90', value_type='float'),
+                SiteConfig(key='plan_price_vip', value='49.90', value_type='float')
             ]
 
             for config in default_configs:
@@ -5401,6 +5839,12 @@ def _get_firestore_client():
         return None
 
 
+def _get_firestore_document_snapshot(document_ref):
+    # O SDK do Firestore expõe tipos dinâmicos e o Pylance pode inferir a variante assíncrona aqui.
+    # Fazemos o cast para manter o comportamento síncrono real usado pelo projeto.
+    return cast(Any, document_ref.get())
+
+
 def _delete_chat_room_recursive(db_firestore, room_id: str) -> None:
     room_ref = db_firestore.collection('chat_rooms').document(room_id)
     messages = list(room_ref.collection('messages').stream())
@@ -5445,6 +5889,258 @@ def _firestore_timestamp_to_millis(value):
     return 0
 
 
+def _is_chat_admin(user) -> bool:
+    return bool(getattr(user, 'role', '') == 'admin')
+
+
+def _get_chat_support_room_id(user_id: int | str) -> str:
+    return f"support_user_{user_id}"
+
+
+def _extract_chat_support_owner_id(room_id: str) -> str:
+    room_value = str(room_id or '')
+    if not room_value.startswith('support_user_'):
+        return ''
+    return room_value.replace('support_user_', '', 1)
+
+
+def _chat_actor_name(user) -> str:
+    return (user.get_full_name() or user.username or f'Usuario {user.id}')[:80]
+
+
+def _chat_actor_role(user) -> str:
+    return 'admin' if _is_chat_admin(user) else 'user'
+
+
+def _can_user_write_public_chat(user) -> bool:
+    return normalize_plan_key(user.plan) == 'vip'
+
+
+def _get_chat_permissions_for_user(user) -> dict[str, Any]:
+    return {
+        'public_read': True,
+        'public_write': _can_user_write_public_chat(user),
+        'support_read': True,
+        'support_write': True,
+        'vip_area': normalize_plan_key(user.plan) == 'vip'
+    }
+
+
+def _validate_chat_room_access(user, room_id: str, *, write: bool = False) -> tuple[bool, str, int]:
+    normalized_room_id = str(room_id or '').strip()
+    if not normalized_room_id:
+        return False, 'Sala de chat inválida.', 400
+
+    if normalized_room_id == CHAT_PUBLIC_ROOM_ID:
+        if write and not _can_user_write_public_chat(user):
+            return (
+                False,
+                'A sala Todos e exclusiva para assinantes VIP. Use a aba Suporte ou assine o plano VIP para participar.',
+                403
+            )
+        return True, '', 200
+
+    owner_id = _extract_chat_support_owner_id(normalized_room_id)
+    if owner_id:
+        if _is_chat_admin(user) or owner_id == str(user.id):
+            return True, '', 200
+        return False, 'Este chamado pertence a outro usuário.', 403
+
+    return False, 'Sala de chat inválida.', 400
+
+
+def _serialize_chat_room(room_id: str, data: Mapping[str, Any] | None) -> dict[str, Any]:
+    room_data = dict(data or {})
+    return {
+        'id': str(room_data.get('id') or room_id),
+        'type': str(room_data.get('type') or ('public' if room_id == CHAT_PUBLIC_ROOM_ID else 'support')),
+        'name': str(room_data.get('name') or ('Todos' if room_id == CHAT_PUBLIC_ROOM_ID else 'Suporte')),
+        'ownerName': str(room_data.get('ownerName') or ''),
+        'ownerSiteUserId': str(room_data.get('ownerSiteUserId') or ''),
+        'ownerPlan': normalize_plan_key(room_data.get('ownerPlan')),
+        'lastMessage': str(room_data.get('lastMessage') or ''),
+        'lastSender': str(room_data.get('lastSender') or ''),
+        'lastSenderRole': str(room_data.get('lastSenderRole') or ''),
+        'lastSenderSiteUserId': str(room_data.get('lastSenderSiteUserId') or ''),
+        'lastSenderPlan': normalize_plan_key(room_data.get('lastSenderPlan')),
+        'updatedAtMs': _firestore_timestamp_to_millis(room_data.get('updatedAt')) or int(room_data.get('updatedAtMs') or 0)
+    }
+
+
+def _serialize_chat_message(message_doc) -> dict[str, Any]:
+    data = message_doc.to_dict() or {}
+    return {
+        'id': str(message_doc.id),
+        'text': str(data.get('text') or ''),
+        'senderName': str(data.get('senderName') or 'Usuario'),
+        'senderAvatar': str(data.get('senderAvatar') or ''),
+        'senderRole': str(data.get('senderRole') or 'user'),
+        'senderPlan': normalize_plan_key(data.get('senderPlan')),
+        'senderSiteUserId': str(data.get('senderSiteUserId') or ''),
+        'senderAuthUid': str(data.get('senderAuthUid') or ''),
+        'createdAtMs': _firestore_timestamp_to_millis(data.get('createdAt')),
+        'editedAtMs': _firestore_timestamp_to_millis(data.get('editedAt')),
+        'isEdited': bool(data.get('isEdited')),
+        'replyToMessageId': str(data.get('replyToMessageId') or ''),
+        'replyToSenderName': str(data.get('replyToSenderName') or ''),
+        'replyToText': str(data.get('replyToText') or '')
+    }
+
+
+def _build_chat_room_metadata(room_id: str, actor_user, last_message: str, existing_room_data: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    room_data = dict(existing_room_data or {})
+    base_metadata = {
+        'id': room_id,
+        'updatedAt': _firestore_server_timestamp(),
+        'lastMessage': str(last_message or '')[:140],
+        'lastSender': _chat_actor_name(actor_user),
+        'lastSenderRole': _chat_actor_role(actor_user),
+        'lastSenderSiteUserId': str(actor_user.id),
+        'lastSenderPlan': normalize_plan_key(actor_user.plan)
+    }
+
+    if room_id == CHAT_PUBLIC_ROOM_ID:
+        return {
+            **base_metadata,
+            'type': 'public',
+            'name': 'Todos'
+        }
+
+    owner_id = _extract_chat_support_owner_id(room_id)
+    owner_name = str(room_data.get('ownerName') or _chat_actor_name(actor_user))
+    owner_plan = normalize_plan_key(room_data.get('ownerPlan') or actor_user.plan)
+
+    if owner_id and owner_id != str(actor_user.id):
+        try:
+            ticket_owner = db.session.get(User, int(owner_id))
+        except (TypeError, ValueError):
+            ticket_owner = None
+
+        if ticket_owner is not None:
+            owner_name = _chat_actor_name(ticket_owner)
+            owner_plan = normalize_plan_key(ticket_owner.plan)
+
+    return {
+        **base_metadata,
+        'type': 'support',
+        'name': f'Suporte - {owner_name}',
+        'ownerSiteUserId': owner_id or str(actor_user.id),
+        'ownerName': owner_name,
+        'ownerPlan': owner_plan
+    }
+
+
+def _sync_chat_room_metadata_from_latest(db_firestore, room_id: str) -> None:
+    room_ref = db_firestore.collection('chat_rooms').document(room_id)
+    room_snapshot = _get_firestore_document_snapshot(room_ref)
+    existing_room_data = room_snapshot.to_dict() or {}
+    query_direction = getattr(getattr(firebase_firestore, 'Query', None), 'DESCENDING', 'DESCENDING')
+    latest_docs = list(
+        room_ref.collection('messages')
+        .order_by('createdAt', direction=query_direction)
+        .limit(1)
+        .stream()
+    )
+
+    if not latest_docs:
+        serialized_room = _serialize_chat_room(room_id, existing_room_data)
+        room_ref.set({
+            'id': serialized_room['id'],
+            'type': serialized_room['type'],
+            'name': serialized_room['name'],
+            'ownerName': serialized_room['ownerName'],
+            'ownerSiteUserId': serialized_room['ownerSiteUserId'],
+            'ownerPlan': serialized_room['ownerPlan'],
+            'updatedAt': _firestore_server_timestamp(),
+            'lastMessage': '',
+            'lastSender': '',
+            'lastSenderRole': '',
+            'lastSenderSiteUserId': '',
+            'lastSenderPlan': ''
+        }, merge=True)
+        return
+
+    latest_data = latest_docs[0].to_dict() or {}
+    actor_user = None
+    sender_site_user_id = str(latest_data.get('senderSiteUserId') or '')
+    if sender_site_user_id.isdigit():
+        actor_user = db.session.get(User, int(sender_site_user_id))
+    if actor_user is None:
+        actor_user = current_user
+
+    room_ref.set({
+        **_build_chat_room_metadata(
+            room_id,
+            actor_user,
+            str(latest_data.get('text') or ''),
+            existing_room_data=existing_room_data
+        ),
+        'lastSender': str(latest_data.get('senderName') or ''),
+        'lastSenderRole': str(latest_data.get('senderRole') or ''),
+        'lastSenderSiteUserId': str(latest_data.get('senderSiteUserId') or ''),
+        'lastSenderPlan': normalize_plan_key(latest_data.get('senderPlan'))
+    }, merge=True)
+
+
+def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
+    tickets = []
+    docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream()
+
+    for doc in docs:
+        data = doc.to_dict() or {}
+        room_id = str(data.get('id') or doc.id)
+        if not room_id.startswith('support_user_'):
+            continue
+
+        owner_site_user_id = str(data.get('ownerSiteUserId') or '')
+        owner_plan = normalize_plan_key(data.get('ownerPlan'))
+        if owner_site_user_id and owner_plan == 'free':
+            try:
+                ticket_owner = db.session.get(User, int(owner_site_user_id))
+            except (TypeError, ValueError):
+                ticket_owner = None
+
+            if ticket_owner is not None:
+                owner_plan = normalize_plan_key(ticket_owner.plan)
+
+        tickets.append({
+            'id': room_id,
+            'data': {
+                **_serialize_chat_room(room_id, data),
+                'ownerPlan': owner_plan
+            }
+        })
+
+    tickets.sort(key=lambda item: int(item['data'].get('updatedAtMs') or 0), reverse=True)
+    return tickets
+
+
+def _ensure_chat_base_rooms_for_user(db_firestore, user) -> tuple[str, str]:
+    support_room_id = _get_chat_support_room_id(user.id)
+    owner_name = _chat_actor_name(user)
+    owner_plan = normalize_plan_key(user.plan)
+    server_timestamp = _firestore_server_timestamp()
+
+    db_firestore.collection('chat_rooms').document(CHAT_PUBLIC_ROOM_ID).set({
+        'id': CHAT_PUBLIC_ROOM_ID,
+        'type': 'public',
+        'name': 'Todos',
+        'updatedAt': server_timestamp
+    }, merge=True)
+
+    db_firestore.collection('chat_rooms').document(support_room_id).set({
+        'id': support_room_id,
+        'type': 'support',
+        'name': f'Suporte - {owner_name}',
+        'ownerSiteUserId': str(user.id),
+        'ownerName': owner_name,
+        'ownerPlan': owner_plan,
+        'updatedAt': server_timestamp
+    }, merge=True)
+
+    return CHAT_PUBLIC_ROOM_ID, support_room_id
+
+
 @app.route('/api/chat/bootstrap', methods=['GET'])
 @login_required
 @limiter.limit("120 per minute")
@@ -5459,36 +6155,200 @@ def chat_bootstrap():
     if db_firestore is None:
         return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
 
-    support_room_id = f"support_user_{current_user.id}"
-    owner_name = (current_user.get_full_name() or current_user.username or f'Usuario {current_user.id}')[:80]
-    server_timestamp = _firestore_server_timestamp()
-
     try:
-        db_firestore.collection('chat_rooms').document('todos').set({
-            'id': 'todos',
-            'type': 'public',
-            'name': 'Todos',
-            'updatedAt': server_timestamp
-        }, merge=True)
-
-        db_firestore.collection('chat_rooms').document(support_room_id).set({
-            'id': support_room_id,
-            'type': 'support',
-            'name': f'Suporte - {owner_name}',
-            'ownerSiteUserId': str(current_user.id),
-            'ownerName': owner_name,
-            'updatedAt': server_timestamp
-        }, merge=True)
+        todos_room_id, support_room_id = _ensure_chat_base_rooms_for_user(db_firestore, current_user)
 
         return jsonify({
             'success': True,
-            'todos_room_id': 'todos',
+            'todos_room_id': todos_room_id,
             'support_room_id': support_room_id,
-            'is_admin': bool(current_user.role == 'admin')
+            'is_admin': _is_chat_admin(current_user),
+            'permissions': _get_chat_permissions_for_user(current_user)
         })
     except Exception as e:
         app.logger.error(f'Erro no bootstrap das salas de chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao preparar salas do chat.'}), 500
+
+
+@app.route('/api/chat/state', methods=['GET'])
+@login_required
+@limiter.limit("120 per minute")
+def chat_state():
+    if not current_user.is_active:
+        return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+
+    db_firestore = _get_firestore_client()
+    if db_firestore is None:
+        return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
+
+    try:
+        todos_room_id, support_room_id = _ensure_chat_base_rooms_for_user(db_firestore, current_user)
+        todos_snapshot = _get_firestore_document_snapshot(
+            db_firestore.collection('chat_rooms').document(todos_room_id)
+        )
+        support_snapshot = _get_firestore_document_snapshot(
+            db_firestore.collection('chat_rooms').document(support_room_id)
+        )
+
+        payload = {
+            'success': True,
+            'todos_room_id': todos_room_id,
+            'support_room_id': support_room_id,
+            'is_admin': _is_chat_admin(current_user),
+            'permissions': _get_chat_permissions_for_user(current_user),
+            'rooms': {
+                'todos': _serialize_chat_room(todos_room_id, todos_snapshot.to_dict() if todos_snapshot.exists else {}),
+                'support': _serialize_chat_room(support_room_id, support_snapshot.to_dict() if support_snapshot.exists else {})
+            }
+        }
+
+        if _is_chat_admin(current_user):
+            payload['tickets'] = _get_chat_support_tickets(db_firestore)
+
+        return jsonify(payload)
+    except Exception as e:
+        app.logger.error(f'Erro ao carregar estado do chat: {e}')
+        return jsonify({'success': False, 'message': 'Falha ao carregar o estado do chat.'}), 500
+
+
+@app.route('/api/chat/rooms/<string:room_id>/messages', methods=['GET', 'POST'])
+@login_required
+@limiter.limit("240 per minute")
+def chat_room_messages(room_id):
+    if not current_user.is_active:
+        return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+
+    db_firestore = _get_firestore_client()
+    if db_firestore is None:
+        return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
+
+    wants_write = request.method == 'POST'
+    allowed, denial_message, denial_status = _validate_chat_room_access(current_user, room_id, write=wants_write)
+    if not allowed:
+        return jsonify({'success': False, 'message': denial_message}), denial_status
+
+    try:
+        _ensure_chat_base_rooms_for_user(db_firestore, current_user)
+        room_ref = db_firestore.collection('chat_rooms').document(room_id)
+
+        if request.method == 'GET':
+            message_limit = request.args.get('limit', CHAT_MESSAGE_LIMIT, type=int) or CHAT_MESSAGE_LIMIT
+            message_limit = max(1, min(message_limit, CHAT_MESSAGE_LIMIT))
+            query_direction = getattr(getattr(firebase_firestore, 'Query', None), 'DESCENDING', 'DESCENDING')
+            docs = room_ref.collection('messages').order_by('createdAt', direction=query_direction).limit(message_limit).stream()
+            messages = [_serialize_chat_message(doc) for doc in docs]
+            return jsonify({'success': True, 'messages': messages})
+
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'message': 'JSON inválido.'}), 400
+
+        text = sanitize_input(str(data.get('text') or ''))[:500].strip()
+        if not text:
+            return jsonify({'success': False, 'message': 'Digite uma mensagem para continuar.'}), 400
+
+        payload = {
+            'text': text,
+            'senderName': _chat_actor_name(current_user),
+            'senderAvatar': get_image_url_for_response(current_user.profile_image, folder='profiles', default='default_profile.jpg'),
+            'senderRole': _chat_actor_role(current_user),
+            'senderPlan': normalize_plan_key(current_user.plan),
+            'senderSiteUserId': str(current_user.id),
+            'senderAuthUid': f'site_user_{current_user.id}',
+            'createdAt': _firestore_server_timestamp()
+        }
+
+        reply_message_id = str(data.get('replyToMessageId') or '').strip()
+        if reply_message_id:
+            payload.update({
+                'replyToMessageId': reply_message_id,
+                'replyToSenderName': sanitize_input(str(data.get('replyToSenderName') or 'Usuario'))[:80],
+                'replyToText': sanitize_input(str(data.get('replyToText') or ''))[:180]
+            })
+
+        new_message_ref = room_ref.collection('messages').document()
+        new_message_ref.set(payload)
+        _sync_chat_room_metadata_from_latest(db_firestore, room_id)
+
+        created_doc = _get_firestore_document_snapshot(new_message_ref)
+        return jsonify({
+            'success': True,
+            'message': _serialize_chat_message(created_doc) if created_doc.exists else {**payload, 'id': new_message_ref.id}
+        })
+    except Exception as e:
+        app.logger.error(f'Erro ao processar mensagens da sala {room_id}: {e}')
+        return jsonify({'success': False, 'message': 'Falha ao processar a mensagem.'}), 500
+
+
+@app.route('/api/chat/rooms/<string:room_id>/messages/<string:message_id>', methods=['PATCH', 'DELETE'])
+@login_required
+@limiter.limit("180 per minute")
+def chat_room_message_actions(room_id, message_id):
+    if not current_user.is_active:
+        return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+
+    db_firestore = _get_firestore_client()
+    if db_firestore is None:
+        return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
+
+    allowed, denial_message, denial_status = _validate_chat_room_access(current_user, room_id, write=True)
+    if not allowed:
+        return jsonify({'success': False, 'message': denial_message}), denial_status
+
+    try:
+        message_ref = (
+            db_firestore.collection('chat_rooms')
+            .document(room_id)
+            .collection('messages')
+            .document(message_id)
+        )
+        message_snapshot = _get_firestore_document_snapshot(message_ref)
+        if not message_snapshot.exists:
+            return jsonify({'success': False, 'message': 'Mensagem não encontrada.'}), 404
+
+        message_data = message_snapshot.to_dict() or {}
+        is_admin_delete = request.method == 'DELETE' and _is_chat_admin(current_user)
+        sender_site_user_id = str(message_data.get('senderSiteUserId') or '')
+        created_at_ms = _firestore_timestamp_to_millis(message_data.get('createdAt'))
+        can_manage_own_message = (
+            sender_site_user_id == str(current_user.id)
+            and created_at_ms > 0
+            and (int(datetime.utcnow().timestamp() * 1000) - created_at_ms) <= CHAT_MESSAGE_EDIT_WINDOW_MS
+        )
+
+        if request.method == 'PATCH':
+            if not can_manage_own_message:
+                return jsonify({'success': False, 'message': 'Você só pode editar mensagens próprias enviadas há menos de 10 minutos.'}), 403
+
+            data = request.get_json(silent=True) or {}
+            if not isinstance(data, dict):
+                return jsonify({'success': False, 'message': 'JSON inválido.'}), 400
+
+            text = sanitize_input(str(data.get('text') or ''))[:500].strip()
+            if not text:
+                return jsonify({'success': False, 'message': 'Digite uma mensagem válida para editar.'}), 400
+
+            message_ref.update({
+                'text': text,
+                'isEdited': True,
+                'editedAt': _firestore_server_timestamp()
+            })
+            _sync_chat_room_metadata_from_latest(db_firestore, room_id)
+            updated_snapshot = _get_firestore_document_snapshot(message_ref)
+            return jsonify({
+                'success': True,
+                'message': _serialize_chat_message(updated_snapshot) if updated_snapshot.exists else None
+            })
+
+        if not (is_admin_delete or can_manage_own_message):
+            return jsonify({'success': False, 'message': 'Você não pode excluir esta mensagem.'}), 403
+
+        message_ref.delete()
+        _sync_chat_room_metadata_from_latest(db_firestore, room_id)
+        return jsonify({'success': True, 'message': 'Mensagem excluída com sucesso.'})
+    except Exception as e:
+        app.logger.error(f'Erro ao processar ação da mensagem {message_id} na sala {room_id}: {e}')
+        return jsonify({'success': False, 'message': 'Falha ao processar a mensagem.'}), 500
 
 
 @app.route('/api/chat/admin/tickets', methods=['GET'])
@@ -5503,34 +6363,7 @@ def chat_admin_tickets():
         return jsonify({'success': False, 'message': 'Firestore indisponível no servidor.'}), 503
 
     try:
-        tickets = []
-        docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream()
-
-        for doc in docs:
-            data = doc.to_dict() or {}
-            room_id = str(data.get('id') or doc.id)
-            if not room_id.startswith('support_user_'):
-                continue
-
-            updated_at_ms = _firestore_timestamp_to_millis(data.get('updatedAt'))
-            tickets.append({
-                'id': room_id,
-                'data': {
-                    'id': room_id,
-                    'type': str(data.get('type') or 'support'),
-                    'name': str(data.get('name') or ''),
-                    'ownerName': str(data.get('ownerName') or ''),
-                    'ownerSiteUserId': str(data.get('ownerSiteUserId') or ''),
-                    'lastMessage': str(data.get('lastMessage') or ''),
-                    'lastSender': str(data.get('lastSender') or ''),
-                    'lastSenderRole': str(data.get('lastSenderRole') or ''),
-                    'lastSenderSiteUserId': str(data.get('lastSenderSiteUserId') or ''),
-                    'updatedAtMs': updated_at_ms
-                }
-            })
-
-        tickets.sort(key=lambda item: int(item['data'].get('updatedAtMs') or 0), reverse=True)
-        return jsonify({'success': True, 'tickets': tickets})
+        return jsonify({'success': True, 'tickets': _get_chat_support_tickets(db_firestore)})
     except Exception as e:
         app.logger.error(f'Erro ao listar chamados do chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao carregar chamados.'}), 500
@@ -8126,6 +8959,7 @@ def admin_settings():
     return render_template('admin/settings.html',
                          title="Configurações",
                          site_configs=site_configs,
+                         plan_product_ids=STRIPE_PLAN_PRODUCT_IDS,
                          **sidebar_stats)
 
 @app.route("/admin/save_settings", methods=['POST'])

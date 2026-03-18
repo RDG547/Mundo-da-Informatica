@@ -261,11 +261,11 @@ function initializeSearchSuggestions() {
     }
 
         // Initialize for hero search bar
-        const heroInput = document.querySelector('.hero .search-bar input[name="q"]');
+        const heroInput = document.querySelector('.hero .search-bar input[name="q"]:not(#home-search-input)');
         const homeSearchInput = document.getElementById('home-search-input');
 
-        if (heroInput || homeSearchInput) {
-            const input = heroInput || homeSearchInput;
+        if (heroInput) {
+            const input = heroInput;
             if (!input.hasAttribute('data-suggestions-initialized')) {
                 new window.SearchSuggestions(`#${input.id || 'home-search-input'}`);
                 input.setAttribute('data-suggestions-initialized', 'true');
@@ -273,13 +273,17 @@ function initializeSearchSuggestions() {
         }
 
         // Initialize for any other search inputs
-        const otherSearchInputs = document.querySelectorAll('input[name="q"]:not([data-suggestions-initialized])');
+        const otherSearchInputs = document.querySelectorAll('input[name="q"]:not([data-suggestions-initialized]):not(#home-search-input)');
         otherSearchInputs.forEach(input => {
             if (input.id) {
                 new window.SearchSuggestions(`#${input.id}`, null);
                 input.setAttribute('data-suggestions-initialized', 'true');
             }
         });
+
+        if (homeSearchInput) {
+            homeSearchInput.setAttribute('data-search-suggestions-skip', 'true');
+        }
 }
 
 if (document.readyState === 'loading') {

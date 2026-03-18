@@ -116,7 +116,7 @@ window.initializePlansPage = function () {
                         // Open Modal
                         const modal = document.getElementById('stripeEmbeddedCheckoutModal');
                         if (modal) {
-                            modal.style.display = 'block';
+                            modal.style.display = 'flex';
                             document.body.style.overflow = 'hidden';
 
                             // Mount Checkout
@@ -161,7 +161,7 @@ window.initializePlansPage = function () {
             paymentMethodModal = document.getElementById('paymentMethodModal');
         }
         if (paymentMethodModal) {
-            paymentMethodModal.style.display = "block";
+            paymentMethodModal.style.display = "flex";
             document.body.style.overflow = "hidden";
         }
     };
@@ -217,9 +217,20 @@ window.initializePlansPage = function () {
             .then(response => response.json())
             .then(data => {
                 console.log('Resposta recebida:', data);
+                const planDetails = getPlanPixDetails(plan);
 
-                // Verificar se há redirect_url (mesmo com erro)
-                if (data.redirect_url) {
+                if (data.billing_id && typeof window.openPixCheckoutModal === 'function') {
+                    window.openPixCheckoutModal({
+                        billingId: data.billing_id,
+                        itemLabel: 'Plano',
+                        itemValue: planDetails.label,
+                        modeLabel: 'Periodo',
+                        modeValue: 'Mensal',
+                        amountText: planDetails.amountText,
+                        successMessage: `Pagamento confirmado. O ${planDetails.label} sera ativado automaticamente.`,
+                        successRedirectUrl: data.success_redirect_url || `/pix-checkout-success?billing_id=${encodeURIComponent(data.billing_id)}&next=${encodeURIComponent('/planos')}`
+                    });
+                } else if (data.redirect_url) {
                     window.location.href = data.redirect_url;
                 } else if (data.error && typeof data.error === 'string') {
                     alert(data.error);
@@ -231,6 +242,22 @@ window.initializePlansPage = function () {
                 console.error('Error:', error);
                 alert('Erro ao criar pagamento PIX. Por favor, tente novamente.');
             });
+    }
+
+    function getPlanPixDetails(plan) {
+        const normalizedPlan = String(plan || '').trim().toLowerCase();
+        const amountElement = document.querySelector(`.plan-card.${normalizedPlan} .plan-price .amount`);
+        const amountText = amountElement ? `R$ ${amountElement.textContent.trim()}` : '';
+
+        if (normalizedPlan === 'vip') {
+            return { label: 'Plano VIP', amountText };
+        }
+
+        if (normalizedPlan === 'premium') {
+            return { label: 'Plano Premium', amountText };
+        }
+
+        return { label: 'Plano', amountText };
     }
 
     // FAQ Toggle
@@ -276,7 +303,7 @@ window.initializePlansPage = function () {
         }
 
         if (modal) {
-            modal.style.display = "block";
+            modal.style.display = "flex";
             document.body.style.overflow = "hidden"; // Prevent scrolling
         } else {
             console.error('Modal element not found');
@@ -373,15 +400,21 @@ window.initializePlansPage = function () {
         return container;
     }
 
-    // Close modal when clicking outside
-    window.onclick = function (event) {
-        if (modal && event.target == modal) {
-            window.closeDowngradeModal();
-        }
-        if (paymentMethodModal && event.target == paymentMethodModal) {
-            window.closePaymentMethodModal();
-        }
-    };
+    if (!window.__plansPageOutsideClickBound) {
+        window.__plansPageOutsideClickBound = true;
+        window.addEventListener('click', function (event) {
+            const downgradeModal = document.getElementById('downgradeModal');
+            const paymentModal = document.getElementById('paymentMethodModal');
+
+            if (downgradeModal && event.target === downgradeModal) {
+                window.closeDowngradeModal();
+            }
+
+            if (paymentModal && event.target === paymentModal) {
+                window.closePaymentMethodModal();
+            }
+        });
+    }
 };
 
 // Auto-initialize if loaded directly

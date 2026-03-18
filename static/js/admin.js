@@ -397,14 +397,21 @@ function openModal(modalId) {
         modal.style.display = 'flex';
         setTimeout(() => {
             modal.classList.add('show');
+            modal.dispatchEvent(new CustomEvent('show', {
+                bubbles: false,
+                detail: { modalId }
+            }));
         }, 10);
 
         // Fechar modal ao clicar fora do conteúdo
-        modal.addEventListener('click', function (e) {
-            if (e.target === modal) {
-                closeModal(modalId);
-            }
-        });
+        if (modal.dataset.overlayCloseBound !== 'true') {
+            modal.dataset.overlayCloseBound = 'true';
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) {
+                    closeModal(modalId);
+                }
+            });
+        }
 
         // Fechar modal ao pressionar ESC
         document.addEventListener('keydown', function escKeyHandler(e) {
@@ -422,6 +429,10 @@ function openModal(modalId) {
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
+        modal.dispatchEvent(new CustomEvent('hide', {
+            bubbles: false,
+            detail: { modalId }
+        }));
         modal.classList.remove('show');
         setTimeout(() => {
             modal.style.display = 'none';
@@ -434,37 +445,31 @@ function closeModal(modalId) {
  * Gerencie todas as modais da interface
  */
 function handleModals() {
-    // Abrir modal ao clicar em botões com data-modal
-    document.querySelectorAll('[data-modal]:not([data-modal-initialized])').forEach(button => {
-        button.setAttribute('data-modal-initialized', 'true');
-        button.addEventListener('click', function () {
-            const modalId = this.getAttribute('data-modal');
-            openModal(modalId);
-        });
-    });
+    if (document.body.dataset.adminModalDelegationBound === 'true') {
+        return;
+    }
 
-    // Fechar modal ao clicar no botão de fechar
-    document.querySelectorAll('.close-modal:not([data-close-initialized])').forEach(button => {
-        button.setAttribute('data-close-initialized', 'true');
-        button.addEventListener('click', function (e) {
-            e.preventDefault();
-            const modal = this.closest('.modal');
+    document.body.dataset.adminModalDelegationBound = 'true';
+
+    document.addEventListener('click', function (event) {
+        const openTrigger = event.target.closest('[data-modal]');
+        if (openTrigger) {
+            event.preventDefault();
+            const modalId = openTrigger.getAttribute('data-modal');
+            if (modalId) {
+                openModal(modalId);
+            }
+            return;
+        }
+
+        const closeTrigger = event.target.closest('.close-modal, [data-bs-dismiss="modal"], [data-dismiss="modal"]');
+        if (closeTrigger) {
+            const modal = closeTrigger.closest('.modal');
             if (modal) {
+                event.preventDefault();
                 closeModal(modal.id);
             }
-        });
-    });
-
-    // Fechar modal ao clicar em botões com data-bs-dismiss="modal" ou data-dismiss="modal"
-    document.querySelectorAll('[data-bs-dismiss="modal"]:not([data-dismiss-initialized]), [data-dismiss="modal"]:not([data-dismiss-initialized])').forEach(button => {
-        button.setAttribute('data-dismiss-initialized', 'true');
-        button.addEventListener('click', function (e) {
-            e.preventDefault();
-            const modal = this.closest('.modal');
-            if (modal) {
-                closeModal(modal.id);
-            }
-        });
+        }
     });
 }
 
@@ -574,6 +579,19 @@ function initPageSpecificFunctions() {
     }
 }
 
+function reinitializeAdminShell() {
+    handleModals();
+    initNotifications();
+    initTooltips();
+    handleProfileImages();
+
+    if (document.querySelector('.admin-table')) {
+        initTables();
+    }
+
+    initPageSpecificFunctions();
+}
+
 function updateDashboardStats() {
     // Simulação de atualização de estatísticas em tempo real
     const statsElements = document.querySelectorAll('.stat-info h3');
@@ -645,3 +663,5 @@ window.openModal = openModal;
 window.closeModal = closeModal;
 window.showNotification = showNotification;
 window.handleModals = handleModals;
+
+document.addEventListener('adminPageLoaded', reinitializeAdminShell);

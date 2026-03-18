@@ -39,13 +39,13 @@
                                 <h3>Email Suporte</h3>
                                 <p>Para dúvidas técnicas, solicitações e suporte geral</p>
                                 <div class="method-info">
-                                    <span class="contact-detail">suporte@mundodainformatica.com</span>
+                                    <span class="contact-detail">{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}</span>
                                     <div class="response-time">
                                         <i class="fas fa-clock"></i>
                                         <span>Resposta rápida</span>
                                     </div>
                                 </div>
-                                <a href="mailto:suporte@mundodainformatica.com" class="method-action">
+                                <a href="mailto:{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}" class="method-action">
                                     <i class="fas fa-paper-plane"></i> Enviar Email
                                 </a>
                             </div>
@@ -59,7 +59,7 @@
                                 <h3>WhatsApp</h3>
                                 <p>Para suporte técnico imediato e orientação direta com nossa equipe</p>
                                 <div class="method-info">
-                                    <span class="contact-detail">(21) 97879-4705</span>
+                                    <span class="contact-detail">{{ site_configs.get('contact_phone', '(21) 97879-4705') }}</span>
                                     <div class="availability">
                                         <i class="fas fa-calendar-alt"></i>
                                         <span>Seg-Sex: 9h às 18h</span>
@@ -94,7 +94,7 @@
                 </div>
 
                 <!-- Contact Form Section -->
-                <div class="contact-form-section">
+                <div class="contact-form-section" id="contact-form-section">
                     <div class="form-header text-center">
                         <h2>
                             <i class="fas fa-comments"></i>
@@ -105,21 +105,39 @@
 
                     <div class="form-container">
                         <div class="form-wrapper">
-                            <form id="contact-form" class="contact-form">
+                            <form id="contact-form" class="contact-form" action="{{ url_for('contact') }}" method="post" enctype="multipart/form-data">
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="name">
                                             <i class="fas fa-user"></i>
                                             Nome Completo
                                         </label>
-                                        <input type="text" id="name" name="name" placeholder="Digite seu nome completo" required>
+                                        <input
+                                            type="text"
+                                            id="name"
+                                            name="name"
+                                            placeholder="Digite seu nome completo"
+                                            value="{% if current_user.is_authenticated %}{{ current_user.get_full_name() or current_user.username }}{% endif %}"
+                                            data-contact-default="{% if current_user.is_authenticated %}{{ current_user.get_full_name() or current_user.username }}{% endif %}"
+                                            autocomplete="name"
+                                            required>
                                     </div>
                                     <div class="form-group">
                                         <label for="email">
                                             <i class="fas fa-envelope"></i>
                                             Email
                                         </label>
-                                        <input type="email" id="email" name="email" placeholder="seu.email@exemplo.com" required>
+                                        <input
+                                            type="email"
+                                            id="email"
+                                            name="email"
+                                            placeholder="seu.email@exemplo.com"
+                                            value="{% if current_user.is_authenticated %}{{ current_user.email or '' }}{% endif %}"
+                                            data-contact-default="{% if current_user.is_authenticated %}{{ current_user.email or '' }}{% endif %}"
+                                            inputmode="email"
+                                            autocomplete="email"
+                                            spellcheck="false"
+                                            required>
                                     </div>
                                 </div>
 
@@ -129,7 +147,16 @@
                                             <i class="fas fa-phone"></i>
                                             Telefone (Opcional)
                                         </label>
-                                        <input type="tel" id="phone" name="phone" placeholder="(00) 00000-0000">
+                                        <input
+                                            type="tel"
+                                            id="phone"
+                                            name="phone"
+                                            placeholder="(00) 00000-0000"
+                                            value="{% if current_user.is_authenticated %}{{ current_user.phone or '' }}{% endif %}"
+                                            data-contact-default="{% if current_user.is_authenticated %}{{ current_user.phone or '' }}{% endif %}"
+                                            inputmode="numeric"
+                                            autocomplete="tel"
+                                            maxlength="15">
                                     </div>
                                     <div class="form-group">
                                         <label for="category">
@@ -163,8 +190,25 @@
                                     </label>
                                     <textarea id="message" name="message" rows="6" placeholder="Descreva detalhadamente sua solicitação, problema ou dúvida..." required></textarea>
                                     <div class="char-counter">
-                                        <span id="char-count">0</span>/1000 caracteres
+                                        <span id="char-count">0</span>/5000 caracteres
                                     </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="attachments">
+                                        <i class="fas fa-paperclip"></i>
+                                        Anexar Arquivos (Opcional)
+                                    </label>
+                                    <input
+                                        type="file"
+                                        id="attachments"
+                                        name="attachments"
+                                        multiple
+                                        accept=".7z,.bin,.csv,.doc,.docx,.gif,.jpeg,.jpg,.pdf,.png,.rar,.rom,.txt,.webp,.xls,.xlsx,.zip">
+                                    <div class="form-helper">
+                                        Os anexos do formulário são encaminhados para <strong>suporte@mundodainformatica.com</strong>. Você pode enviar até 5 arquivos de até 5MB cada.
+                                    </div>
+                                    <div class="attachments-summary" id="attachments-summary">Nenhum arquivo selecionado.</div>
                                 </div>
 
                                 <div class="form-actions">
@@ -172,7 +216,7 @@
                                         <i class="fas fa-eraser"></i> Limpar
                                     </button>
                                     <button type="submit" class="btn btn-gradient primary">
-                                        <i class="fas fa-paper-plane"></i> Enviar Mensagem
+                                        <i class="fas fa-paper-plane"></i> Enviar Formulário
                                     </button>
                                 </div>
                             </form>
@@ -230,7 +274,7 @@
                             </div>
                         </a>
 
-                        <a href="#" class="social-platform instagram">
+                        <a href="{{ site_configs.get('social_links', {}).get('instagram') or '#' }}" class="social-platform instagram {% if not site_configs.get('social_links', {}).get('instagram') %}is-disabled{% endif %}" {% if site_configs.get('social_links', {}).get('instagram') %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}>
                             <div class="platform-icon">
                                 <i class="fab fa-instagram"></i>
                             </div>
@@ -243,7 +287,7 @@
                             </div>
                         </a>
 
-                        <a href="https://www.youtube.com/@_RDTech" class="social-platform youtube" target="_blank" rel="noopener noreferrer">
+                        <a href="{{ site_configs.get('social_links', {}).get('youtube') or 'https://www.youtube.com/@_RDTech' }}" class="social-platform youtube" target="_blank" rel="noopener noreferrer">
                             <div class="platform-icon">
                                 <i class="fab fa-youtube"></i>
                             </div>
@@ -335,6 +379,65 @@
                     </div>
                 </div>
 
+                <div id="coverageModal" class="contribute-modal coverage-modal" aria-hidden="true">
+                    <div class="contribute-modal-overlay" data-coverage-close></div>
+                    <div class="contribute-modal-content coverage-modal-content">
+                        <button class="contribute-modal-close" id="closeCoverageModal" type="button" data-coverage-close>
+                            <i class="fas fa-times"></i>
+                        </button>
+
+                        <div class="contribute-modal-header coverage-modal-header">
+                            <div class="contribute-modal-icon">
+                                <i class="fas fa-globe-americas"></i>
+                            </div>
+                            <h2>Cobertura Nacional</h2>
+                            <p>Atendemos clientes de qualquer estado do Brasil com suporte remoto e canais digitais.</p>
+                        </div>
+
+                        <div class="contribute-modal-body coverage-modal-body">
+                            <div class="coverage-highlight-card">
+                                <h3><i class="fas fa-wifi"></i> Atendimento 100% Online</h3>
+                                <p>Nossa cobertura abrange todo o território nacional através da internet, com suporte por email, WhatsApp e formulário.</p>
+                            </div>
+
+                            <div class="coverage-grid">
+                                <div class="coverage-item">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    <div>
+                                        <strong>Brasil inteiro</strong>
+                                        <span>Sem limitação por cidade ou estado</span>
+                                    </div>
+                                </div>
+                                <div class="coverage-item">
+                                    <i class="fas fa-headset"></i>
+                                    <div>
+                                        <strong>Suporte especializado</strong>
+                                        <span>Atendimento remoto para dúvidas, recursos e orientações técnicas</span>
+                                    </div>
+                                </div>
+                                <div class="coverage-item">
+                                    <i class="fas fa-envelope"></i>
+                                    <div>
+                                        <strong>Email oficial</strong>
+                                        <span>suporte@mundodainformatica.com</span>
+                                    </div>
+                                </div>
+                                <div class="coverage-item">
+                                    <i class="fab fa-whatsapp"></i>
+                                    <div>
+                                        <strong>Canal direto</strong>
+                                        <span>WhatsApp disponível para contato rápido em horário comercial</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="contribute-modal-footer coverage-modal-footer">
+                            <p><i class="fas fa-check-circle"></i> Se preferir, use o formulário acima e nossa equipe retorna pelo canal informado.</p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -344,68 +447,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/download-control.js') }}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const contactForm = document.getElementById('contact-form');
-
-        if (contactForm) {
-            contactForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-
-                // Preparar dados do formulário
-                const formData = new FormData(contactForm);
-
-                // Enviar via AJAX
-                fetch('{{ url_for("contact") }}', {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.requires_upgrade) {
-                        // Mostrar modal de upgrade personalizado
-                        if (typeof showContentRequestModal === 'function') {
-                            showContentRequestModal(data.message);
-                        } else {
-                            showDownloadLimitModal(data.message);
-                        }
-                    } else if (data.success) {
-                        // Mensagem de sucesso
-                        alert('Mensagem enviada com sucesso!');
-                        contactForm.reset();
-                        const charCount = document.getElementById('char-count');
-                        if (charCount) charCount.textContent = '0';
-                    } else {
-                        // Erro genérico
-                        alert(data.message || 'Erro ao enviar mensagem. Tente novamente.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    alert('Erro ao enviar mensagem. Tente novamente.');
-                });
-            });
-        }
-
-        // Contador de caracteres para textarea
-        const messageTextarea = document.getElementById('message');
-        const charCount = document.getElementById('char-count');
-
-        if (messageTextarea && charCount) {
-            messageTextarea.addEventListener('input', function() {
-                const length = this.value.length;
-                charCount.textContent = length;
-
-                // Limitar a 1000 caracteres
-                if (length > 1000) {
-                    this.value = this.value.substring(0, 1000);
-                    charCount.textContent = '1000';
-                }
-            });
-        }
-    });
-</script>
+<script src="{{ url_for('static', filename='js/contact-page.js') }}"></script>
 {% endblock %}

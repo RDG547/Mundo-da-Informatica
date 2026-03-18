@@ -5,288 +5,491 @@
 {% endblock %}
 
 {% block content %}
-<!-- Enhanced Header -->
-<div class="admin-header slide-in-up">
-    <div class="header-content">
-        <div class="header-main">
-            <h1><i class="fas fa-cog"></i> Configurações do Site</h1>
-            <p class="header-subtitle">Personalize e configure todos os aspectos do seu site</p>
-        </div>
-        <div class="header-actions">
-            <div class="quick-stats">
-                <div class="stat-item">
-                    <span class="stat-number">{{ site_configs|length }}</span>
-                    <span class="stat-label">Configurações</span>
+<div class="settings-page" id="adminSettingsPage">
+    <div class="admin-header slide-in-up settings-page-header">
+        <div class="header-content">
+            <div class="header-main">
+                <div class="settings-kicker">
+                    <i class="fas fa-sliders-h"></i>
+                    Centro de Configuração
                 </div>
-                <div class="stat-item">
-                    <span class="stat-number">5</span>
-                    <span class="stat-label">Seções</span>
-                </div>
+                <h1><i class="fas fa-cog"></i> Configurações do Site</h1>
+                <p class="header-subtitle">Gerencie identidade visual, atendimento, precos exibidos, redes sociais e ajustes tecnicos em um painel no mesmo ritmo visual do dashboard.</p>
             </div>
-            <div class="action-buttons">
-                <button class="btn-admin btn-admin-outline" onclick="resetToDefaults()">
-                    <i class="fas fa-undo"></i> Restaurar Padrões
+            <div class="header-actions settings-header-actions">
+                <button class="btn-admin btn-admin-outline" type="button" onclick="resetToDefaults()">
+                    <i class="fas fa-rotate-left"></i> Restaurar Padrões
                 </button>
-                <button class="btn-admin btn-admin-success" onclick="previewChanges()">
-                    <i class="fas fa-eye"></i> Visualizar
+                <button class="btn-admin btn-admin-success" type="button" onclick="previewChanges()">
+                    <i class="fas fa-eye"></i> Visualizar Site
                 </button>
-                <button class="btn-admin btn-admin-primary" onclick="saveAllSettings()">
+                <button class="btn-admin btn-admin-primary" type="button" onclick="saveAllSettings()" data-settings-save>
                     <i class="fas fa-save"></i> Salvar Alterações
                 </button>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Redesigned Settings Layout -->
-<div class="row">
-    <!-- Left Sidebar: Menu and Status -->
-    <div class="col-md-3">
-        <!-- Settings Menu -->
-        <div class="admin-card slide-in-up" style="position: sticky; top: 20px;">
-            <div class="admin-card-header">
-                <h2 class="admin-card-title">
-                    <i class="fas fa-list"></i> Menu
-                </h2>
-            </div>
-            <div class="settings-nav">
-                <a href="#general" class="nav-item active" onclick="scrollToSection('general', event)">
-                    <i class="fas fa-home"></i>
-                    <span>Geral</span>
-                </a>
-                <a href="#appearance" class="nav-item" onclick="scrollToSection('appearance', event)">
-                    <i class="fas fa-palette"></i>
-                    <span>Aparência</span>
-                </a>
-                <a href="#contact" class="nav-item" onclick="scrollToSection('contact', event)">
-                    <i class="fas fa-envelope"></i>
-                    <span>Contato</span>
-                </a>
-                <a href="#social" class="nav-item" onclick="scrollToSection('social', event)">
-                    <i class="fas fa-share-alt"></i>
-                    <span>Redes Sociais</span>
-                </a>
-                <a href="#advanced" class="nav-item" onclick="scrollToSection('advanced', event)">
-                    <i class="fas fa-cogs"></i>
-                    <span>Avançado</span>
-                </a>
-            </div>
-
-            <!-- Quick Status (Moved inside sidebar) -->
-            <div class="mt-4 pt-4 border-top">
-                <h6 class="text-muted mb-3 px-3">STATUS DO SISTEMA</h6>
-                <div class="px-3">
-                    <div class="d-flex align-items-center mb-2">
-                        <div class="status-indicator success me-2" style="width: 10px; height: 10px; border-radius: 50%; background: #28a745;"></div>
-                        <span class="small">Sistema Online</span>
-                    </div>
-                    {% if site_configs.get('maintenance_mode') %}
-                    <div class="d-flex align-items-center mb-2">
-                        <div class="status-indicator warning me-2" style="width: 10px; height: 10px; border-radius: 50%; background: #ffc107;"></div>
-                        <span class="small">Manutenção Ativa</span>
-                    </div>
-                    {% endif %}
+    <div class="stats-grid enhanced settings-stats-grid slide-in-up">
+        <article class="stat-card settings-stat-card brand" style="animation-delay: 0.1s">
+            <div class="stat-header">
+                <div class="stat-icon">
+                    <i class="fas fa-signature"></i>
+                </div>
+                <div class="stat-trend neutral">
+                    <i class="fas fa-swatchbook"></i>
+                    <span>Branding</span>
                 </div>
             </div>
-        </div>
+            <div class="stat-info">
+                <h3 class="stat-number">{{ site_configs.get('site_name', 'Mundo da Informática') }}</h3>
+                <p class="stat-label">Marca principal do site</p>
+                <div class="stat-details">
+                    <span class="detail-item">
+                        <i class="fas fa-envelope"></i>
+                        {{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}
+                    </span>
+                </div>
+            </div>
+        </article>
+
+        <article class="stat-card settings-stat-card premium" style="animation-delay: 0.2s">
+            <div class="stat-header">
+                <div class="stat-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-trend positive">
+                    <i class="fas fa-desktop"></i>
+                    <span>Visual</span>
+                </div>
+            </div>
+            <div class="stat-info">
+                <h3 class="stat-number">R$ {{ site_configs.get('plan_price_premium', 29.90) }}</h3>
+                <p class="stat-label">Card do Plano Premium</p>
+                <div class="stat-details">
+                    <span class="detail-item">
+                        <i class="fas fa-link"></i>
+                        Stripe: {{ plan_product_ids.premium }}
+                    </span>
+                </div>
+            </div>
+        </article>
+
+        <article class="stat-card settings-stat-card vip" style="animation-delay: 0.3s">
+            <div class="stat-header">
+                <div class="stat-icon">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <div class="stat-trend positive">
+                    <i class="fas fa-gem"></i>
+                    <span>VIP</span>
+                </div>
+            </div>
+            <div class="stat-info">
+                <h3 class="stat-number">R$ {{ site_configs.get('plan_price_vip', 49.90) }}</h3>
+                <p class="stat-label">Card do Plano VIP</p>
+                <div class="stat-details">
+                    <span class="detail-item">
+                        <i class="fas fa-link"></i>
+                        Stripe: {{ plan_product_ids.vip }}
+                    </span>
+                </div>
+            </div>
+        </article>
+
+        <article class="stat-card settings-stat-card maintenance" style="animation-delay: 0.4s">
+            <div class="stat-header">
+                <div class="stat-icon">
+                    <i class="fas fa-tools"></i>
+                </div>
+                <div class="stat-trend {% if site_configs.get('maintenance_mode', False) %}negative{% else %}neutral{% endif %}">
+                    <i class="fas fa-{% if site_configs.get('maintenance_mode', False) %}lock{% else %}globe{% endif %}"></i>
+                    <span>{{ 'Restrito' if site_configs.get('maintenance_mode', False) else 'Online' }}</span>
+                </div>
+            </div>
+            <div class="stat-info">
+                <h3 class="stat-number">{{ 'Ativo' if site_configs.get('maintenance_mode', False) else 'Desativado' }}</h3>
+                <p class="stat-label">Modo de manutenção</p>
+                <div class="stat-details">
+                    <span class="detail-item">
+                        <i class="fas fa-shield-alt"></i>
+                        {{ 'Somente admins acessam o site.' if site_configs.get('maintenance_mode', False) else 'Frontend liberado para todos.' }}
+                    </span>
+                </div>
+            </div>
+        </article>
     </div>
 
-    <!-- Right Content: All Settings Stacked -->
-    <div class="col-md-9">
-        <div class="settings-content slide-in-up">
+    <div class="settings-overview-grid slide-in-up">
+        <section class="admin-card settings-overview-card">
+            <div class="admin-card-header">
+                <div>
+                    <h2 class="admin-card-title"><i class="fas fa-layer-group"></i> Visao Operacional</h2>
+                    <p class="settings-panel-subtitle">Organize o trabalho por blocos, como no dashboard e na tela de analytics.</p>
+                </div>
+            </div>
+            <div class="admin-card-body">
+                <div class="settings-overview-items">
+                    <article class="settings-overview-item">
+                        <div class="settings-overview-icon"><i class="fas fa-palette"></i></div>
+                        <div>
+                            <strong>Aparencia</strong>
+                            <p>Cores principais, home e rodape com preview em tempo real.</p>
+                        </div>
+                    </article>
+                    <article class="settings-overview-item">
+                        <div class="settings-overview-icon"><i class="fas fa-headset"></i></div>
+                        <div>
+                            <strong>Atendimento</strong>
+                            <p>Email, telefone e cobertura exibidos no contato e no footer.</p>
+                        </div>
+                    </article>
+                    <article class="settings-overview-item">
+                        <div class="settings-overview-icon"><i class="fas fa-credit-card"></i></div>
+                        <div>
+                            <strong>Planos</strong>
+                            <p>Os valores daqui atualizam os cards e tambem o PIX; no cartao, o checkout continua lendo o valor oficial da Stripe.</p>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
 
-            <!-- Section: General -->
-            <div class="admin-card mb-4" id="general">
+        <section class="admin-card settings-overview-card is-accent">
+            <div class="admin-card-header">
+                <div>
+                    <h2 class="admin-card-title"><i class="fas fa-bolt"></i> Regra de Cobranca</h2>
+                    <p class="settings-panel-subtitle">Fonte oficial dos precos usados no checkout.</p>
+                </div>
+            </div>
+            <div class="admin-card-body">
+                <div class="settings-billing-stack">
+                    <div class="settings-billing-row">
+                        <span class="settings-billing-label">Premium</span>
+                        <code>{{ plan_product_ids.premium }}</code>
+                    </div>
+                    <div class="settings-billing-row">
+                        <span class="settings-billing-label">VIP</span>
+                        <code>{{ plan_product_ids.vip }}</code>
+                    </div>
+                    <p class="settings-billing-note">
+                        No cartao, o checkout usa o preco oficial vinculado a estes produtos na Stripe. No PIX Abacate Pay, o valor segue o preco definido aqui no painel.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="settings-workspace">
+        <aside class="settings-sidebar slide-in-up">
+            <div class="admin-card settings-sidebar-card">
                 <div class="admin-card-header">
-                    <h2 class="admin-card-title"><i class="fas fa-home me-2"></i> Configurações Gerais</h2>
+                    <h2 class="admin-card-title"><i class="fas fa-compass"></i> Navegação</h2>
+                </div>
+                <div class="settings-nav">
+                    <button type="button" class="settings-nav-item active" data-settings-nav="general">
+                        <i class="fas fa-home"></i>
+                        <span>Geral</span>
+                        <small>Marca, home e rodapé</small>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-settings-nav="appearance">
+                        <i class="fas fa-palette"></i>
+                        <span>Aparência</span>
+                        <small>Cores e tema</small>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-settings-nav="contact">
+                        <i class="fas fa-envelope"></i>
+                        <span>Contato</span>
+                        <small>Email, telefone e endereço</small>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-settings-nav="plans">
+                        <i class="fas fa-crown"></i>
+                        <span>Planos</span>
+                        <small>Cards e IDs oficiais</small>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-settings-nav="social">
+                        <i class="fas fa-share-alt"></i>
+                        <span>Redes Sociais</span>
+                        <small>Canais públicos do site</small>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-settings-nav="advanced">
+                        <i class="fas fa-cogs"></i>
+                        <span>Avançado</span>
+                        <small>Analytics e manutenção</small>
+                    </button>
+                </div>
+
+                <div class="settings-sidebar-note">
+                    <h3><i class="fas fa-lightbulb"></i> Dica</h3>
+                    <p>Os valores configurados aqui atualizam a exibicao dos cards e o valor do PIX. No checkout por cartao, Premium e VIP continuam vinculados aos produtos fixos da Stripe.</p>
+                </div>
+            </div>
+        </aside>
+
+        <div class="settings-main">
+            <section class="admin-card settings-panel slide-in-up" id="general" data-settings-section>
+                <div class="admin-card-header">
+                    <div>
+                        <h2 class="admin-card-title"><i class="fas fa-home"></i> Configurações Gerais</h2>
+                        <p class="settings-panel-subtitle">Defina a identidade principal do site e os textos da home.</p>
+                    </div>
                 </div>
                 <div class="admin-card-body">
-                    <div class="settings-form">
-                        <div class="form-group">
+                    <div class="settings-fields-grid two-columns">
+                        <div class="settings-field">
                             <label for="site_name">Nome do Site</label>
                             <input type="text" id="site_name" class="form-control"
                                 value="{{ site_configs.get('site_name', 'Mundo da Informática') }}"
-                                data-key="site_name" data-type="string">
-                            <small class="form-text text-muted">Nome exibido no título das páginas e no cabeçalho</small>
+                                data-key="site_name" data-type="string" data-default-value="Mundo da Informática">
                         </div>
-                        <div class="form-group mt-3">
-                            <label for="site_description">Descrição do Site</label>
-                            <textarea id="site_description" class="form-control" rows="2"
-                                    data-key="site_description" data-type="string">{{ site_configs.get('site_description', 'Seu portal de recursos para técnicos de informática') }}</textarea>
-                            <small class="form-text text-muted">Descrição usada em meta tags e SEO</small>
-                        </div>
-                        <div class="form-group mt-3">
+                        <div class="settings-field">
                             <label for="footer_text">Texto do Rodapé</label>
                             <input type="text" id="footer_text" class="form-control"
                                 value="{{ site_configs.get('footer_text', 'Mundo da Informática - Todos os direitos reservados') }}"
-                                data-key="footer_text" data-type="string">
+                                data-key="footer_text" data-type="string" data-default-value="Mundo da Informática - Todos os direitos reservados">
                         </div>
-                        <div class="row mt-3">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="home_hero_title">Título Principal (Home)</label>
-                                    <input type="text" id="home_hero_title" class="form-control"
-                                        value="{{ site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') }}"
-                                        data-key="home_hero_title" data-type="string">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="home_hero_subtitle">Subtítulo (Home)</label>
-                                    <input type="text" id="home_hero_subtitle" class="form-control"
-                                        value="{{ site_configs.get('home_hero_subtitle', 'Recursos essenciais para técnicos') }}"
-                                        data-key="home_hero_subtitle" data-type="string">
-                                </div>
-                            </div>
+                        <div class="settings-field full-width">
+                            <label for="site_description">Descrição do Site</label>
+                            <textarea id="site_description" class="form-control" rows="3"
+                                data-key="site_description" data-type="string" data-default-value="Seu portal de recursos para técnicos de informática">{{ site_configs.get('site_description', 'Seu portal de recursos para técnicos de informática') }}</textarea>
+                        </div>
+                        <div class="settings-field">
+                            <label for="home_hero_title">Título Principal da Home</label>
+                            <input type="text" id="home_hero_title" class="form-control"
+                                value="{{ site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') }}"
+                                data-key="home_hero_title" data-type="string" data-default-value="Bem-vindo ao Mundo da Informática">
+                        </div>
+                        <div class="settings-field">
+                            <label for="home_hero_subtitle">Subtítulo da Home</label>
+                            <input type="text" id="home_hero_subtitle" class="form-control"
+                                value="{{ site_configs.get('home_hero_subtitle', 'Recursos essenciais para técnicos') }}"
+                                data-key="home_hero_subtitle" data-type="string" data-default-value="Recursos essenciais para técnicos">
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Section: Appearance -->
-            <div class="admin-card mb-4" id="appearance">
+            <section class="admin-card settings-panel slide-in-up" id="appearance" data-settings-section>
                 <div class="admin-card-header">
-                    <h2 class="admin-card-title"><i class="fas fa-palette me-2"></i> Aparência</h2>
+                    <div>
+                        <h2 class="admin-card-title"><i class="fas fa-palette"></i> Aparência</h2>
+                        <p class="settings-panel-subtitle">Personalize o tema e as cores visuais utilizadas no frontend.</p>
+                    </div>
                 </div>
                 <div class="admin-card-body">
-                    <div class="settings-form">
-                        <div class="form-group">
-                            <label for="enable_dark_mode" class="d-flex align-items-center justify-content-between cursor-pointer">
-                                <span>Habilitar Modo Escuro</span>
-                                <div class="form-check form-switch">
-                                    <input type="checkbox" id="enable_dark_mode" class="form-check-input"
-                                        {{ 'checked' if site_configs.get('enable_dark_mode', True) else '' }}
-                                        data-key="enable_dark_mode" data-type="bool">
-                                </div>
-                            </label>
-                            <small class="form-text text-muted">Permite aos usuários alternar o tema do site</small>
+                    <div class="settings-toggle-card">
+                        <div>
+                            <h3>Modo Escuro</h3>
+                            <p>Permite que os usuários alternem entre tema claro e escuro no site.</p>
                         </div>
+                        <label class="settings-switch">
+                            <input type="checkbox" id="enable_dark_mode"
+                                {{ 'checked' if site_configs.get('enable_dark_mode', True) else '' }}
+                                data-key="enable_dark_mode" data-type="bool" data-default-value="true">
+                            <span class="settings-switch-slider"></span>
+                        </label>
+                    </div>
 
-                        <div class="row mt-4">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Cor Primária</label>
-                                    <div class="input-group">
-                                        <input type="color" id="primary_color" class="form-control form-control-color color-picker"
-                                            value="{{ site_configs.get('primary_color', '#3a86ff') }}"
-                                            data-key="primary_color" data-type="string" title="Escolher cor">
-                                        <input type="text" id="primary_color_text" class="form-control"
-                                            value="{{ site_configs.get('primary_color', '#3a86ff') }}">
-                                    </div>
-                                </div>
+                    <div class="settings-fields-grid two-columns">
+                        <div class="settings-field">
+                            <label for="primary_color">Cor Primária</label>
+                            <div class="settings-color-row">
+                                <input type="color" id="primary_color" class="settings-color-picker"
+                                    value="{{ site_configs.get('primary_color', '#3a86ff') }}"
+                                    data-key="primary_color" data-type="string" data-default-value="#3a86ff">
+                                <input type="text" id="primary_color_text" class="form-control"
+                                    value="{{ site_configs.get('primary_color', '#3a86ff') }}">
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Cor Secundária</label>
-                                    <div class="input-group">
-                                        <input type="color" id="secondary_color" class="form-control form-control-color color-picker"
-                                            value="{{ site_configs.get('secondary_color', '#8338ec') }}"
-                                            data-key="secondary_color" data-type="string" title="Escolher cor">
-                                        <input type="text" id="secondary_color_text" class="form-control"
-                                            value="{{ site_configs.get('secondary_color', '#8338ec') }}">
-                                    </div>
+                        </div>
+                        <div class="settings-field">
+                            <label for="secondary_color">Cor Secundária</label>
+                            <div class="settings-color-row">
+                                <input type="color" id="secondary_color" class="settings-color-picker"
+                                    value="{{ site_configs.get('secondary_color', '#8338ec') }}"
+                                    data-key="secondary_color" data-type="string" data-default-value="#8338ec">
+                                <input type="text" id="secondary_color_text" class="form-control"
+                                    value="{{ site_configs.get('secondary_color', '#8338ec') }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-preview-card" id="themePreviewCard">
+                        <div class="preview-surface">
+                            <div class="preview-topbar"></div>
+                            <div class="preview-body">
+                                <div class="preview-chip"></div>
+                                <div class="preview-title"></div>
+                                <div class="preview-line"></div>
+                                <div class="preview-line short"></div>
+                                <div class="preview-actions">
+                                    <span class="preview-action primary"></span>
+                                    <span class="preview-action secondary"></span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Section: Contact -->
-            <div class="admin-card mb-4" id="contact">
+            <section class="admin-card settings-panel slide-in-up" id="contact" data-settings-section>
                 <div class="admin-card-header">
-                    <h2 class="admin-card-title"><i class="fas fa-envelope me-2"></i> Contato</h2>
+                    <div>
+                        <h2 class="admin-card-title"><i class="fas fa-address-book"></i> Contato e Atendimento</h2>
+                        <p class="settings-panel-subtitle">Informações exibidas no rodapé, formulários e páginas de contato.</p>
+                    </div>
                 </div>
                 <div class="admin-card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="contact_email">Email</label>
-                                <input type="email" id="contact_email" class="form-control"
-                                    value="{{ site_configs.get('contact_email', 'contato@mundodainformatica.com') }}"
-                                    data-key="contact_email" data-type="string">
-                            </div>
+                    <div class="settings-fields-grid two-columns">
+                        <div class="settings-field">
+                            <label for="contact_email">Email de Suporte</label>
+                            <input type="email" id="contact_email" class="form-control"
+                                value="{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}"
+                                data-key="contact_email" data-type="string" data-default-value="suporte@mundodainformatica.com">
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="contact_phone">Telefone</label>
-                                <input type="text" id="contact_phone" class="form-control"
-                                    value="{{ site_configs.get('contact_phone', '(00) 1234-5678') }}"
-                                    data-key="contact_phone" data-type="string">
-                            </div>
+                        <div class="settings-field">
+                            <label for="contact_phone">Telefone / WhatsApp</label>
+                            <input type="text" id="contact_phone" class="form-control"
+                                value="{{ site_configs.get('contact_phone', '(21) 97879-4705') }}"
+                                data-key="contact_phone" data-type="string" data-default-value="(21) 97879-4705">
                         </div>
-                    </div>
-                    <div class="form-group mt-3">
-                        <label for="contact_address">Endereço</label>
-                        <input type="text" id="contact_address" class="form-control"
-                                value="{{ site_configs.get('contact_address', 'Av. Tecnologia, 123 - SP') }}"
-                                data-key="contact_address" data-type="string">
+                        <div class="settings-field full-width">
+                            <label for="contact_address">Endereço / Cobertura</label>
+                            <input type="text" id="contact_address" class="form-control"
+                                value="{{ site_configs.get('contact_address', 'Internet - Brasil') }}"
+                                data-key="contact_address" data-type="string" data-default-value="Internet - Brasil">
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Section: Social -->
-            <div class="admin-card mb-4" id="social">
+            <section class="admin-card settings-panel slide-in-up" id="plans" data-settings-section>
                 <div class="admin-card-header">
-                    <h2 class="admin-card-title"><i class="fas fa-share-alt me-2"></i> Redes Sociais</h2>
+                    <div>
+                        <h2 class="admin-card-title"><i class="fas fa-crown"></i> Planos e Cobrança</h2>
+                        <p class="settings-panel-subtitle">Ajuste os precos exibidos nos cards e usados no PIX. No cartao, a cobranca oficial continua sendo lida a partir dos produtos Stripe fixos.</p>
+                    </div>
                 </div>
                 <div class="admin-card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label><i class="fab fa-facebook me-2"></i> Facebook</label>
+                    <div class="settings-plan-grid">
+                        <article class="settings-plan-card premium">
+                            <div class="settings-plan-icon"><i class="fas fa-star"></i></div>
+                            <div class="settings-field">
+                                <label for="plan_price_premium">Preço do Plano Premium</label>
+                                <div class="settings-money-input">
+                                    <span>R$</span>
+                                    <input type="number" id="plan_price_premium" class="form-control"
+                                        value="{{ site_configs.get('plan_price_premium', 29.90) }}"
+                                        min="0" step="0.01"
+                                        data-key="plan_price_premium" data-type="float" data-default-value="29.90">
+                                </div>
+                            </div>
+                            <div class="settings-plan-meta">
+                                <span><i class="fas fa-tv"></i> Card / PIX</span>
+                                <code>{{ plan_product_ids.premium }}</code>
+                            </div>
+                            <p>Use este campo para a vitrine do plano e para o PIX. No cartao, o checkout oficial continua lendo o preco real pela Stripe.</p>
+                        </article>
+
+                        <article class="settings-plan-card vip">
+                            <div class="settings-plan-icon"><i class="fas fa-gem"></i></div>
+                            <div class="settings-field">
+                                <label for="plan_price_vip">Preço do Plano VIP</label>
+                                <div class="settings-money-input">
+                                    <span>R$</span>
+                                    <input type="number" id="plan_price_vip" class="form-control"
+                                        value="{{ site_configs.get('plan_price_vip', 49.90) }}"
+                                        min="0" step="0.01"
+                                        data-key="plan_price_vip" data-type="float" data-default-value="49.90">
+                                </div>
+                            </div>
+                            <div class="settings-plan-meta">
+                                <span><i class="fas fa-tv"></i> Card / PIX</span>
+                                <code>{{ plan_product_ids.vip }}</code>
+                            </div>
+                            <p>Deixe aqui o valor de apresentacao do card e do PIX. No cartao, a cobranca continua alinhada ao valor oficial definido na Stripe.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-card settings-panel slide-in-up" id="social" data-settings-section>
+                <div class="admin-card-header">
+                    <div>
+                        <h2 class="admin-card-title"><i class="fas fa-share-alt"></i> Redes Sociais</h2>
+                        <p class="settings-panel-subtitle">Configure os links públicos exibidos no site para cada rede social.</p>
+                    </div>
+                </div>
+                <div class="admin-card-body">
+                    <div class="settings-fields-grid two-columns">
+                        <div class="settings-field">
+                            <label for="facebook_url">Facebook</label>
                             <input type="url" class="form-control" id="facebook_url"
                                 value="{{ site_configs.get('social_links', {}).get('facebook', '') }}"
-                                data-social="facebook" placeholder="https://facebook.com/...">
+                                data-social="facebook" data-default-value="">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label><i class="fab fa-instagram me-2"></i> Instagram</label>
+                        <div class="settings-field">
+                            <label for="instagram_url">Instagram</label>
                             <input type="url" class="form-control" id="instagram_url"
                                 value="{{ site_configs.get('social_links', {}).get('instagram', '') }}"
-                                data-social="instagram" placeholder="https://instagram.com/...">
+                                data-social="instagram" data-default-value="">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label><i class="fab fa-twitter me-2"></i> Twitter</label>
+                        <div class="settings-field">
+                            <label for="twitter_url">Twitter</label>
                             <input type="url" class="form-control" id="twitter_url"
                                 value="{{ site_configs.get('social_links', {}).get('twitter', '') }}"
-                                data-social="twitter" placeholder="https://twitter.com/...">
+                                data-social="twitter" data-default-value="">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label><i class="fab fa-youtube me-2"></i> YouTube</label>
+                        <div class="settings-field">
+                            <label for="youtube_url">YouTube</label>
                             <input type="url" class="form-control" id="youtube_url"
-                                value="{{ site_configs.get('social_links', {}).get('youtube', '') }}"
-                                data-social="youtube" placeholder="https://youtube.com/...">
+                                value="{{ site_configs.get('social_links', {}).get('youtube', 'https://www.youtube.com/@_RDTech') }}"
+                                data-social="youtube" data-default-value="https://www.youtube.com/@_RDTech">
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Section: Advanced -->
-            <div class="admin-card mb-4" id="advanced">
+            <section class="admin-card settings-panel slide-in-up" id="advanced" data-settings-section>
                 <div class="admin-card-header">
-                    <h2 class="admin-card-title"><i class="fas fa-cogs me-2"></i> Avançado</h2>
+                    <div>
+                        <h2 class="admin-card-title"><i class="fas fa-cogs"></i> Avançado</h2>
+                        <p class="settings-panel-subtitle">Opções técnicas para analytics e controle de visibilidade do site.</p>
+                    </div>
                 </div>
                 <div class="admin-card-body">
-                    <div class="form-group">
-                        <label for="google_analytics">Google Analytics ID</label>
-                        <input type="text" id="google_analytics" class="form-control"
-                            value="{{ site_configs.get('google_analytics', '') }}"
-                            data-key="google_analytics" data-type="string" placeholder="UA-XXXXX-Y">
+                    <div class="settings-fields-grid">
+                        <div class="settings-field full-width">
+                            <label for="google_analytics">Google Analytics ID</label>
+                            <input type="text" id="google_analytics" class="form-control"
+                                value="{{ site_configs.get('google_analytics', '') }}"
+                                data-key="google_analytics" data-type="string" data-default-value=""
+                                placeholder="G-XXXXXXXXXX">
+                        </div>
                     </div>
 
-                    <div class="form-group mt-3">
-                        <label for="maintenance_mode" class="d-flex align-items-center justify-content-between cursor-pointer text-danger">
-                            <span><i class="fas fa-tools me-2"></i> Modo de Manutenção</span>
-                            <div class="form-check form-switch">
-                                <input type="checkbox" id="maintenance_mode" class="form-check-input"
-                                    {{ 'checked' if site_configs.get('maintenance_mode', False) else '' }}
-                                    data-key="maintenance_mode" data-type="bool">
-                            </div>
+                    <div class="settings-toggle-card danger">
+                        <div>
+                            <h3>Modo de Manutenção</h3>
+                            <p>Quando ativado, apenas administradores conseguem visualizar o site.</p>
+                        </div>
+                        <label class="settings-switch">
+                            <input type="checkbox" id="maintenance_mode"
+                                {{ 'checked' if site_configs.get('maintenance_mode', False) else '' }}
+                                data-key="maintenance_mode" data-type="bool" data-default-value="false">
+                            <span class="settings-switch-slider"></span>
                         </label>
-                        <small class="form-text text-muted">Quando ativo, o site ficará visível apenas para administradores.</small>
                     </div>
                 </div>
-            </div>
+            </section>
 
+            <div class="settings-footer-actions slide-in-up">
+                <button class="btn-admin btn-admin-outline" type="button" onclick="resetToDefaults()">
+                    <i class="fas fa-rotate-left"></i> Restaurar Padrões
+                </button>
+                <button class="btn-admin btn-admin-primary" type="button" onclick="saveAllSettings()" data-settings-save>
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -294,140 +497,246 @@
 
 {% block scripts %}
 <script>
-    function scrollToSection(sectionId, event) {
-        event.preventDefault();
-        const element = document.getElementById(sectionId);
-        const headerOffset = 100;
-        const elementPosition = element.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+(() => {
+    const DEFAULT_VALUES = {
+        site_name: 'Mundo da Informática',
+        site_description: 'Seu portal de recursos para técnicos de informática',
+        footer_text: 'Mundo da Informática - Todos os direitos reservados',
+        home_hero_title: 'Bem-vindo ao Mundo da Informática',
+        home_hero_subtitle: 'Recursos essenciais para técnicos',
+        enable_dark_mode: true,
+        primary_color: '#3a86ff',
+        secondary_color: '#8338ec',
+        contact_email: 'suporte@mundodainformatica.com',
+        contact_phone: '(21) 97879-4705',
+        contact_address: 'Internet - Brasil',
+        plan_price_premium: '29.90',
+        plan_price_vip: '49.90',
+        google_analytics: '',
+        maintenance_mode: false,
+        social_links: {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            youtube: 'https://www.youtube.com/@_RDTech'
+        }
+    };
 
-        window.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth"
-        });
-
-        // Update active class
-        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        event.currentTarget.classList.add('active');
+    function showSettingsNotification(message, type) {
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(message, type || 'info');
+            return;
+        }
+        window.alert(message);
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Highlight active section on scroll
-        const sections = document.querySelectorAll('.admin-card[id]');
-        const navItems = document.querySelectorAll('.nav-item');
+    function updateThemePreview() {
+        const preview = document.getElementById('themePreviewCard');
+        const primary = document.getElementById('primary_color')?.value || DEFAULT_VALUES.primary_color;
+        const secondary = document.getElementById('secondary_color')?.value || DEFAULT_VALUES.secondary_color;
+        if (!preview) return;
+        preview.style.setProperty('--settings-preview-primary', primary);
+        preview.style.setProperty('--settings-preview-secondary', secondary);
+    }
 
-        window.addEventListener('scroll', () => {
-            let current = '';
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop;
-                const sectionHeight = section.clientHeight;
-                if (pageYOffset >= (sectionTop - 150)) {
-                    current = section.getAttribute('id');
+    function syncColorInputs(colorId, textId) {
+        const colorInput = document.getElementById(colorId);
+        const textInput = document.getElementById(textId);
+        if (!colorInput || !textInput || colorInput.dataset.syncInit === 'true') {
+            return;
+        }
+
+        colorInput.dataset.syncInit = 'true';
+
+        colorInput.addEventListener('input', () => {
+            textInput.value = colorInput.value;
+            updateThemePreview();
+        });
+
+        textInput.addEventListener('change', () => {
+            const normalized = textInput.value.trim();
+            if (/^#[0-9A-F]{6}$/i.test(normalized)) {
+                colorInput.value = normalized;
+                updateThemePreview();
+            } else {
+                textInput.value = colorInput.value;
+            }
+        });
+    }
+
+    function applyDefaultValue(field, value) {
+        if (!field) return;
+
+        if (field.type === 'checkbox') {
+            field.checked = value === true || value === 'true';
+            return;
+        }
+
+        field.value = value ?? '';
+    }
+
+    function collectSettingsPayload(page) {
+        const settings = {};
+
+        page.querySelectorAll('[data-key]').forEach((input) => {
+            const key = input.dataset.key;
+            const type = input.dataset.type || 'string';
+            const value = input.type === 'checkbox' ? input.checked : input.value;
+            settings[key] = { value, type };
+        });
+
+        const socialLinks = {};
+        page.querySelectorAll('[data-social]').forEach((input) => {
+            socialLinks[input.dataset.social] = input.value.trim();
+        });
+
+        settings.social_links = {
+            value: socialLinks,
+            type: 'json'
+        };
+
+        return settings;
+    }
+
+    function setActiveNav(page, sectionId) {
+        page.querySelectorAll('[data-settings-nav]').forEach((button) => {
+            button.classList.toggle('active', button.dataset.settingsNav === sectionId);
+        });
+    }
+
+    function scrollToSettingsSection(page, sectionId) {
+        const target = page.querySelector(`#${sectionId}`);
+        if (!target) return;
+
+        const top = target.getBoundingClientRect().top + window.scrollY - 110;
+        window.scrollTo({
+            top: Math.max(top, 0),
+            behavior: 'smooth'
+        });
+        setActiveNav(page, sectionId);
+    }
+
+    function bindScrollSpy(page) {
+        const sections = Array.from(page.querySelectorAll('[data-settings-section]'));
+        if (!sections.length || page.dataset.scrollSpyInit === 'true') {
+            return;
+        }
+
+        page.dataset.scrollSpyInit = 'true';
+
+        const handleScroll = () => {
+            let activeSection = sections[0].id;
+
+            sections.forEach((section) => {
+                const sectionTop = section.getBoundingClientRect().top;
+                if (sectionTop <= 160) {
+                    activeSection = section.id;
                 }
             });
 
-            navItems.forEach(nav => {
-                nav.classList.remove('active');
-                if (nav.getAttribute('href') === '#' + current) {
-                    nav.classList.add('active');
-                }
+            setActiveNav(page, activeSection);
+        };
+
+        if (window.__adminSettingsScrollSpyHandler) {
+            window.removeEventListener('scroll', window.__adminSettingsScrollSpyHandler);
+        }
+
+        window.__adminSettingsScrollSpyHandler = handleScroll;
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
+    }
+
+    function initializeAdminSettingsPage() {
+        const page = document.getElementById('adminSettingsPage');
+        if (!page || page.dataset.settingsInit === 'true') {
+            return;
+        }
+
+        page.dataset.settingsInit = 'true';
+
+        syncColorInputs('primary_color', 'primary_color_text');
+        syncColorInputs('secondary_color', 'secondary_color_text');
+        updateThemePreview();
+        bindScrollSpy(page);
+
+        page.querySelectorAll('[data-settings-nav]').forEach((button) => {
+            button.addEventListener('click', () => {
+                scrollToSettingsSection(page, button.dataset.settingsNav);
             });
         });
 
-        // Preview changes function
-        window.previewChanges = function() {
-            const previewWindow = window.open('/', '_blank');
-            showNotification('Abrindo preview do site em nova aba...', 'info');
+        window.previewChanges = function () {
+            window.open('/', '_blank', 'noopener');
+            showSettingsNotification('Abrindo o site em uma nova aba para pré-visualização.', 'info');
         };
 
-        // Reset to defaults function
-        window.resetToDefaults = function() {
-            if (confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão? Esta ação não pode ser desfeita.')) {
-                // Reset form values to defaults here if needed or reload page with a query param to reset backend side
-                // For now, reload
-                alert("Para resetar os valores, por favor implemente a rota de reset no backend.");
+        window.resetToDefaults = function () {
+            if (!window.confirm('Deseja aplicar os valores padrão nesta tela? As alterações só serão gravadas quando você clicar em salvar.')) {
+                return;
             }
+
+            page.querySelectorAll('[data-key]').forEach((field) => {
+                const key = field.dataset.key;
+                const fallback = Object.prototype.hasOwnProperty.call(DEFAULT_VALUES, key)
+                    ? DEFAULT_VALUES[key]
+                    : (field.dataset.defaultValue || '');
+                applyDefaultValue(field, fallback);
+            });
+
+            page.querySelectorAll('[data-social]').forEach((field) => {
+                const socialKey = field.dataset.social;
+                field.value = DEFAULT_VALUES.social_links[socialKey] || '';
+            });
+
+            document.getElementById('primary_color_text').value = document.getElementById('primary_color').value;
+            document.getElementById('secondary_color_text').value = document.getElementById('secondary_color').value;
+            updateThemePreview();
+            showSettingsNotification('Valores padrão aplicados localmente. Clique em salvar para persistir.', 'info');
         };
 
-        // Sincronizar inputs de cor texto/picker
-        const colorInputs = document.querySelectorAll('.color-picker');
-        colorInputs.forEach(input => {
-            const textInput = document.getElementById(`${input.id}_text`);
+        window.saveAllSettings = async function () {
+            const saveButtons = Array.from(page.querySelectorAll('[data-settings-save]'));
+            const originalHtml = saveButtons.map((button) => button.innerHTML);
 
-            if(textInput) {
-                input.addEventListener('input', () => {
-                    textInput.value = input.value;
+            saveButtons.forEach((button) => {
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            });
+
+            try {
+                const response = await fetch('/admin/save_settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(collectSettingsPayload(page))
                 });
 
-                textInput.addEventListener('change', () => {
-                    // Validar se é um valor hexadecimal válido
-                    const isValidHex = /^#[0-9A-F]{6}$/i.test(textInput.value);
-                    if (isValidHex) {
-                        input.value = textInput.value;
-                    } else {
-                        textInput.value = input.value;
-                    }
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Erro ao salvar configurações.');
+                }
+
+                showSettingsNotification(data.message || 'Configurações salvas com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao salvar configurações:', error);
+                showSettingsNotification(error.message || 'Erro ao salvar configurações.', 'error');
+            } finally {
+                saveButtons.forEach((button, index) => {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml[index];
                 });
             }
-        });
-
-        // Função para salvar configurações
-        window.saveAllSettings = function() {
-            const settings = {};
-
-            // Coletar valores dos inputs simples
-            document.querySelectorAll('[data-key]').forEach(input => {
-                const key = input.getAttribute('data-key');
-                const type = input.getAttribute('data-type');
-
-                let value;
-                if (input.type === 'checkbox') {
-                    value = input.checked;
-                } else {
-                    value = input.value;
-                }
-
-                settings[key] = {
-                    value: value,
-                    type: type
-                };
-            });
-
-            // Coletar valores das redes sociais
-            const socialLinks = {};
-            document.querySelectorAll('[data-social]').forEach(input => {
-                const network = input.getAttribute('data-social');
-                socialLinks[network] = input.value;
-            });
-
-            settings['social_links'] = {
-                value: socialLinks,
-                type: 'json'
-            };
-
-            // Enviar para o servidor via fetch API
-            fetch('/admin/save_settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(settings)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification('Configurações salvas com sucesso!', 'success');
-                } else {
-                    showNotification('Erro ao salvar configurações.', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification('Erro ao salvar configurações.', 'error');
-            });
         };
+    }
 
-        // showNotification global é definida em admin.js
-    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeAdminSettingsPage);
+    } else {
+        initializeAdminSettingsPage();
+    }
+
+    document.addEventListener('adminPageLoaded', initializeAdminSettingsPage);
+})();
 </script>
 {% endblock %}

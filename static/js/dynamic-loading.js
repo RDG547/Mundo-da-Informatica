@@ -536,6 +536,16 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         reinitializeAdminComponents() {
+            document.querySelectorAll('[data-modal-initialized]').forEach((element) => {
+                element.removeAttribute('data-modal-initialized');
+            });
+            document.querySelectorAll('[data-close-initialized]').forEach((element) => {
+                element.removeAttribute('data-close-initialized');
+            });
+            document.querySelectorAll('[data-dismiss-initialized]').forEach((element) => {
+                element.removeAttribute('data-dismiss-initialized');
+            });
+
             // Re-initialize modal handlers
             if (typeof window.handleModals === 'function') {
                 window.handleModals();
@@ -549,6 +559,16 @@ if (typeof window.DynamicLoader !== 'undefined') {
             // Re-initialize profile images
             if (typeof window.initializeProfileImages === 'function') {
                 window.initializeProfileImages();
+            }
+
+            const addPostModal = document.getElementById('addPostModal');
+            if (addPostModal) {
+                addPostModal.removeAttribute('data-post-wizard-initialized');
+                addPostModal.removeAttribute('data-postWizardInitialized');
+            }
+
+            if (typeof window.initPostWizard === 'function') {
+                window.initPostWizard();
             }
 
             // Re-initialize admin-specific functionality
@@ -886,69 +906,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         initializeContributeModalFAQ() {
-            const modal = document.getElementById('contributeModal');
-            const openBtn = document.getElementById('openContributeModalFAQ');
-            const closeBtn = document.getElementById('closeContributeModal');
-            const overlay = modal?.querySelector('.contribute-modal-overlay');
-
-            if (!modal || !openBtn) return;
-
-            // Remove event listeners anteriores se existirem
-            const newOpenBtn = openBtn.cloneNode(true);
-            const newCloseBtn = closeBtn?.cloneNode(true);
-
-            openBtn.parentNode?.replaceChild(newOpenBtn, openBtn);
-
-            if (closeBtn && newCloseBtn) {
-                closeBtn.parentNode?.replaceChild(newCloseBtn, closeBtn);
+            if (window.ContributeModal && typeof window.ContributeModal.init === 'function') {
+                window.ContributeModal.init();
             }
-
-            // Função para abrir o modal
-            const openModal = () => {
-                if (modal) {
-                    modal.classList.add('active');
-                    document.body.style.overflow = 'hidden';
-                }
-            };
-
-            // Função para fechar o modal
-            const closeModal = () => {
-                if (modal) {
-                    modal.classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            };
-
-            // Event listeners
-            newOpenBtn.addEventListener('click', openModal);
-
-            if (newCloseBtn) {
-                newCloseBtn.addEventListener('click', closeModal);
-            }
-
-            if (overlay) {
-                overlay.addEventListener('click', closeModal);
-            }
-
-            // Fechar com ESC
-            const escHandler = (e) => {
-                if (e.key === 'Escape' && modal?.classList.contains('active')) {
-                    closeModal();
-                }
-            };
-
-            document.removeEventListener('keydown', escHandler);
-            document.addEventListener('keydown', escHandler);
-
-            // Restaurar scroll quando clicar em links dentro do modal
-            const modalLinks = modal.querySelectorAll('a[href]');
-            modalLinks.forEach(link => {
-                link.addEventListener('click', function () {
-                    // Restaurar scroll antes da navegação
-                    document.body.style.overflow = '';
-                    closeModal();
-                });
-            });
         }
 
         initializeContactForm() {
@@ -958,49 +918,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 contactCSS.media = 'all';
             }
 
-            // Initialize contact form functionality
             setTimeout(() => {
-                const messageTextarea = document.getElementById('message');
-                const charCounter = document.getElementById('char-count');
-
-                if (messageTextarea && charCounter && !messageTextarea.hasAttribute('data-contact-initialized')) {
-                    messageTextarea.setAttribute('data-contact-initialized', 'true');
-                    messageTextarea.addEventListener('input', function () {
-                        const currentLength = this.value.length;
-                        charCounter.textContent = currentLength;
-
-                        if (currentLength > 800) {
-                            charCounter.style.color = '#ff6b6b';
-                        } else if (currentLength > 600) {
-                            charCounter.style.color = '#ffa726';
-                        } else {
-                            charCounter.style.color = '#666';
-                        }
-                    });
-                }
-
-                // Form validation and submission
-                const contactForm = document.getElementById('contact-form');
-                if (contactForm && !contactForm.hasAttribute('data-form-initialized')) {
-                    contactForm.setAttribute('data-form-initialized', 'true');
-                    contactForm.addEventListener('submit', function (e) {
-                        e.preventDefault();
-
-                        // Add loading state
-                        const submitBtn = this.querySelector('button[type="submit"]');
-                        const originalText = submitBtn.innerHTML;
-                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-                        submitBtn.disabled = true;
-
-                        // Simulate form submission
-                        setTimeout(() => {
-                            alert('Mensagem enviada com sucesso! Entraremos em contato em breve.');
-                            submitBtn.innerHTML = originalText;
-                            submitBtn.disabled = false;
-                            this.reset();
-                            if (charCounter) charCounter.textContent = '0';
-                        }, 2000);
-                    });
+                if (window.ContactPage && typeof window.ContactPage.init === 'function') {
+                    window.ContactPage.init();
                 }
 
                 // Initialize particles for contact hero
@@ -1136,7 +1056,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             document.querySelectorAll('.admin-nav-item[href]').forEach((link) => {
                 try {
                     const rawHref = link.getAttribute('href');
-                    if (!rawHref || rawHref === '#') {
+                    if (!rawHref || rawHref === '#' || rawHref.startsWith('#')) {
                         link.classList.remove('active');
                         return;
                     }
@@ -1900,6 +1820,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
 // Global functions
 window.showCoverageMap = function () {
+    if (window.ContactPage && typeof window.ContactPage.openCoverageModal === 'function') {
+        window.ContactPage.openCoverageModal();
+        return;
+    }
+
     alert('Nossa cobertura abrange todo o território nacional através da internet. Atendemos clientes de qualquer estado do Brasil!');
 };
 

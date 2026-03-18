@@ -353,7 +353,7 @@
                             <h3>Pronto para contribuir?</h3>
                             <p>Sua experiência e conhecimento podem ajudar milhares de profissionais</p>
                             <div class="cta-buttons">
-                                <button class="btn btn-gradient primary" id="openContributeModal">
+                                <button class="btn btn-gradient primary" id="openContributeModal" type="button" data-open-contribute-modal>
                                     <i class="fas fa-handshake"></i> Quero Contribuir
                                 </button>
                                 <a href="{{ url_for('register') }}" class="btn btn-gradient secondary">
@@ -478,7 +478,7 @@
                     <div class="donation-widget" data-donation-widget>
                         <div class="donation-widget-header">
                             <h4><i class="fas fa-hand-holding-heart"></i> Fazer uma doacao pontual</h4>
-                            <p>Escolha qualquer valor a partir de R$ 5,00 para apoiar a manutencao da plataforma.</p>
+                            <p>Escolha o valor que desejar para apoiar a manutencao da plataforma.</p>
                         </div>
                         <div class="donation-presets" role="group" aria-label="Valores sugeridos para doacao">
                             <button type="button" class="donation-preset" data-donation-preset="10">R$ 10</button>
@@ -489,7 +489,7 @@
                         <label class="donation-input-label" for="donationAmountAbout">Valor da doacao</label>
                         <div class="donation-input-wrapper">
                             <span>R$</span>
-                            <input type="number" id="donationAmountAbout" data-donation-amount min="5" step="1" inputmode="decimal" placeholder="Digite o valor">
+                            <input type="text" id="donationAmountAbout" data-donation-amount inputmode="numeric" autocomplete="off" placeholder="0,00">
                         </div>
                         <div class="contribute-cta-buttons donation-actions">
                             <button type="button" class="btn btn-gradient secondary" data-donation-method="pix">

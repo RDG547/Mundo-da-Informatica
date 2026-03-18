@@ -98,13 +98,13 @@
                     <span class="admin-nav-text">Dashboard</span>
                 </a>
 
-                <a href="#favorites-section" class="admin-nav-item" onclick="event.preventDefault(); document.getElementById('favorites-section')?.scrollIntoView({behavior: 'smooth'});">
+                <a href="#favorites-section" class="admin-nav-item" data-profile-section-link="favorites-section">
                     <i class="fas fa-star admin-icon"></i>
                     <span class="admin-nav-text">Favoritos</span>
                 </a>
 
                 {% if current_user.plan in ['premium', 'vip'] %}
-                <a href="#downloads-section" class="admin-nav-item" onclick="event.preventDefault(); document.getElementById('downloads-section')?.scrollIntoView({behavior: 'smooth'});">
+                <a href="#download-history-section" class="admin-nav-item" data-profile-section-link="download-history-section">
                     <i class="fas fa-download admin-icon"></i>
                     <span class="admin-nav-text">Histórico de Downloads</span>
                     {% if current_user.plan == 'premium' %}

@@ -441,6 +441,8 @@ function initPostWizard() {
     }
 }
 
+window.initPostWizard = initPostWizard;
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initPostWizard);
 } else {

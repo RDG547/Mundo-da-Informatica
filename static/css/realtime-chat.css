@@ -166,6 +166,19 @@
     color: #15803d;
 }
 
+.chat-room-tab.is-locked {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.chat-room-tab.is-locked::after {
+    content: '\f023';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    font-size: 0.68rem;
+}
+
 .chat-tab-unread {
     min-width: 18px;
     height: 18px;
@@ -257,6 +270,13 @@
     flex-direction: column;
     gap: 0.2rem;
     overflow: hidden;
+}
+
+.chat-ticket-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
 }
 
 .chat-ticket-main strong {
@@ -356,6 +376,13 @@
     font-size: 0.72rem;
 }
 
+.chat-message-sender-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.42rem;
+    min-width: 0;
+}
+
 .chat-message-sender {
     font-weight: 700;
     color: #1e3a8a;
@@ -366,6 +393,57 @@
 
 .chat-message.mine .chat-message-sender {
     color: #dbeafe;
+}
+
+.chat-plan-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    border-radius: 999px;
+    padding: 0.18rem 0.5rem;
+    font-size: 0.64rem;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.chat-plan-badge i {
+    font-size: 0.62rem;
+}
+
+.chat-plan-badge.is-compact {
+    padding: 0.15rem 0.42rem;
+    font-size: 0.6rem;
+}
+
+.chat-plan-badge.is-free {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.chat-plan-badge.is-premium {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+
+.chat-plan-badge.is-vip {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+.chat-plan-badge.is-admin {
+    background: #ede9fe;
+    border-color: #c4b5fd;
+    color: #6d28d9;
+}
+
+.chat-message.mine .chat-plan-badge {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(191, 219, 254, 0.35);
+    color: #eff6ff;
 }
 
 .chat-message-time {
@@ -530,6 +608,11 @@
     border-left: 4px solid #2563eb;
 }
 
+.chat-composer-pill.is-locked {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(135deg, #fffaf0, #ffffff);
+}
+
 .chat-composer-copy {
     display: flex;
     flex-direction: column;
@@ -567,6 +650,37 @@
 .chat-composer-cancel:hover {
     border-color: #94a3b8;
     color: #0f172a;
+}
+
+.chat-composer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.chat-composer-action-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 0.48rem 0.8rem;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: #eff6ff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.chat-composer-action-btn.is-secondary {
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #d7e2ee;
+}
+
+.chat-composer-action-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
 }
 
 .chat-input-row {
@@ -615,6 +729,100 @@
     cursor: not-allowed;
 }
 
+.chat-confirm-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 5;
+}
+
+.chat-confirm-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.chat-confirm-dialog {
+    width: min(320px, 100%);
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #dbe3ee;
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.2);
+    padding: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.chat-confirm-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    color: #dc2626;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.chat-confirm-copy h5 {
+    margin: 0 0 0.35rem;
+    color: #0f172a;
+    font-size: 0.98rem;
+}
+
+.chat-confirm-copy p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+.chat-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+}
+
+.chat-confirm-btn {
+    border-radius: 10px;
+    padding: 0.58rem 0.9rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.chat-confirm-btn.is-secondary {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.chat-confirm-btn.is-primary {
+    background: #2563eb;
+    color: #eff6ff;
+}
+
+.chat-confirm-btn.is-danger {
+    background: #dc2626;
+    color: #fff7f7;
+}
+
+.chat-confirm-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+}
+
 @media (max-width: 768px) {
     .floating-chat-panel {
         right: 12px;
@@ -629,5 +837,10 @@
 
     .chat-message {
         max-width: 92%;
+    }
+
+    .chat-composer-actions {
+        width: 100%;
+        justify-content: flex-start;
     }
 }

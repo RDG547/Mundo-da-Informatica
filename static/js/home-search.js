@@ -104,6 +104,7 @@ function initializeHomeSearch() {
         return; // Already initialized
     }
     searchInput.setAttribute('data-home-search-initialized', 'true');
+    searchInput.setAttribute('data-suggestions-initialized', 'true');
 
     let debounceTimer = null;
     let selectedIndex = -1;
@@ -221,14 +222,15 @@ function initializeHomeSearch() {
 
         let html = '';
 
-        suggestions.forEach((item, index) => {
+        dedupeSuggestions(suggestions, searchInput.value).forEach((item, index) => {
             // Use icon from API or determine from type
             const icon = item.icon || getCategoryIcon(item.type);
             const itemType = item.type === 'category' ? 'Categoria' : 'Post';
             const description = item.description || '';
+            const typeClass = item.type === 'category' ? 'suggestion-category' : 'suggestion-post';
 
             html += `
-                <div class="suggestion-item" data-index="${index}" data-url="${item.url}">
+                <div class="suggestion-item ${typeClass}" data-index="${index}" data-url="${item.url}">
                     ${renderSuggestionLeading(item, icon)}
                     <div class="suggestion-content">
                         <div class="suggestion-title">${highlightMatch(item.title, searchInput.value)}</div>
@@ -284,6 +286,45 @@ function initializeHomeSearch() {
         selectedIndex = -1;
     }
 
+    function dedupeSuggestions(suggestions, query) {
+        const normalizedQuery = String(query || '').trim().toLowerCase();
+        const seen = new Set();
+        const baseItems = (suggestions || []).filter((item) => {
+            const key = `${item?.type || ''}::${item?.url || ''}::${String(item?.title || '').trim().toLowerCase()}`;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+
+        const categoryAnchors = baseItems.filter((item) => {
+            const normalizedTitle = String(item?.title || '').trim().toLowerCase();
+            return item?.type === 'category' && normalizedQuery && normalizedTitle.startsWith(normalizedQuery);
+        });
+
+        if (!categoryAnchors.length) {
+            return baseItems;
+        }
+
+        const matchedCategoryNames = new Set(
+            categoryAnchors.map((item) => String(item?.title || '').trim().toLowerCase()).filter(Boolean)
+        );
+
+        return baseItems.filter((item) => {
+            if (item?.type !== 'post') {
+                return true;
+            }
+            const postTitle = String(item?.title || '').trim().toLowerCase();
+            const postCategory = String(item?.category || item?.description || '').trim().toLowerCase();
+            return !Array.from(matchedCategoryNames).some((categoryName) => (
+                postTitle.startsWith(categoryName) ||
+                postCategory === categoryName ||
+                postCategory.endsWith(` ${categoryName}`)
+            ));
+        });
+    }
+
     // Update selected item
     function updateSelection(items) {
         items.forEach((item, index) => {
@@ -316,7 +357,7 @@ function initializeHomeSearch() {
         if (!query) return text;
 
         const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-        return text.replace(regex, '<strong>$1</strong>');
+        return text.replace(regex, '<mark>$1</mark>');
     }
 
     // Escape regex special characters

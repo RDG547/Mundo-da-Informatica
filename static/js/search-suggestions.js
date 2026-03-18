@@ -18,6 +18,10 @@ window.SearchSuggestions = class SearchSuggestions {
             return;
         }
 
+        if (this.input.id === 'home-search-input' || this.input.dataset.searchSuggestionsSkip === 'true') {
+            return;
+        }
+
         this.createSuggestionsContainer();
         this.bindEvents();
         this.debounceTimer = null;
@@ -260,9 +264,15 @@ function initializeSearchSuggestions() {
         return;
     }
 
+        const homeSearchInput = document.getElementById('home-search-input');
+        if (homeSearchInput) {
+            homeSearchInput.setAttribute('data-search-suggestions-skip', 'true');
+            homeSearchInput.setAttribute('data-suggestions-initialized', 'true');
+            return;
+        }
+
         // Initialize for hero search bar
         const heroInput = document.querySelector('.hero .search-bar input[name="q"]:not(#home-search-input)');
-        const homeSearchInput = document.getElementById('home-search-input');
 
         if (heroInput) {
             const input = heroInput;
@@ -281,9 +291,6 @@ function initializeSearchSuggestions() {
             }
         });
 
-        if (homeSearchInput) {
-            homeSearchInput.setAttribute('data-search-suggestions-skip', 'true');
-        }
 }
 
 if (document.readyState === 'loading') {

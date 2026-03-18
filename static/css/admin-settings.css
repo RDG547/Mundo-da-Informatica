@@ -36,16 +36,83 @@
 .settings-stats-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
+    align-items: stretch;
 }
 
 .settings-stat-card {
     min-height: 100%;
+    overflow: hidden;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.9rem;
 }
 
 .settings-stat-card .stat-number {
-    font-size: clamp(1.2rem, 2vw, 1.55rem);
+    font-size: clamp(1.15rem, 1.6vw, 1.8rem);
+    line-height: 1.15;
     white-space: normal;
     word-break: break-word;
+    overflow-wrap: anywhere;
+    margin: 0;
+    width: 100%;
+}
+
+.settings-stat-card .stat-header {
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin-bottom: 0;
+}
+
+.settings-stat-card .stat-info {
+    min-width: 0;
+    width: 100%;
+    margin-left: 0;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.55rem;
+}
+
+.settings-stat-card .stat-label {
+    line-height: 1.45;
+    margin: 0;
+}
+
+.settings-stat-card .stat-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.15rem;
+    width: 100%;
+}
+
+.settings-stat-card .detail-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    line-height: 1.45;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.settings-stat-card .detail-item i {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+
+.settings-stat-card .stat-trend {
+    flex-shrink: 0;
+    max-width: 100%;
+}
+
+.settings-stat-card.brand .stat-number {
+    font-size: clamp(1.1rem, 1.45vw, 1.55rem);
 }
 
 .settings-stat-card.brand .stat-icon {

@@ -142,7 +142,7 @@
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error(data.error || 'Nao foi possivel iniciar a doacao.');
+                throw new Error(data.error || 'Não foi possível iniciar a doação.');
             }
 
             if (method === 'pix' && data.billing_id) {
@@ -153,12 +153,12 @@
                     showFeedback(widget, 'Abrindo checkout PIX...', 'success');
                     window.openPixCheckoutModal({
                         billingId: data.billing_id,
-                        itemLabel: 'Contribuicao',
+                        itemLabel: 'Contribuição',
                         itemValue: 'Apoio pontual',
                         modeLabel: 'Modalidade',
-                        modeValue: 'Contribuicao unica',
+                        modeValue: 'Contribuição única',
                         amountText,
-                        successMessage: 'Sua doacao sera confirmada automaticamente.',
+                        successMessage: 'Sua doação será confirmada automaticamente.',
                         successRedirectUrl: data.success_redirect_url || `/pix-checkout-success?billing_id=${encodeURIComponent(data.billing_id)}&next=${encodeURIComponent(window.location.pathname)}`
                     });
                     return;
@@ -180,7 +180,7 @@
             throw new Error('Resposta de pagamento incompleta.');
         } catch (error) {
             console.error('Erro ao iniciar doacao:', error);
-            showFeedback(widget, error.message || 'Nao foi possivel iniciar a doacao.', 'error');
+            showFeedback(widget, error.message || 'Não foi possível iniciar a doação.', 'error');
         } finally {
             setDonationBusy(widget, false);
         }

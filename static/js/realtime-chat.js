@@ -240,8 +240,8 @@
                     <i class="fas fa-trash-alt"></i>
                 </div>
                 <div class="chat-confirm-copy">
-                    <h5 id="chat-confirm-title">Confirmar exclusao</h5>
-                    <p id="chat-confirm-message">Deseja continuar com esta acao?</p>
+                    <h5 id="chat-confirm-title">Confirmar exclusão</h5>
+                    <p id="chat-confirm-message">Deseja continuar com esta ação?</p>
                 </div>
                 <div class="chat-confirm-actions">
                     <button type="button" class="chat-confirm-btn is-secondary" data-chat-confirm-cancel>Cancelar</button>
@@ -291,8 +291,8 @@
 
     function showChatConfirm(options = {}) {
         const confirmElements = ensureChatConfirmDialog();
-        confirmElements.title.textContent = options.title || 'Confirmar acao';
-        confirmElements.message.textContent = options.message || 'Deseja continuar com esta acao?';
+        confirmElements.title.textContent = options.title || 'Confirmar ação';
+        confirmElements.message.textContent = options.message || 'Deseja continuar com esta ação?';
         confirmElements.accept.textContent = options.confirmLabel || 'Confirmar';
         confirmElements.accept.classList.toggle('is-danger', options.intent !== 'primary');
         confirmElements.accept.classList.toggle('is-primary', options.intent === 'primary');
@@ -564,7 +564,7 @@
             return {
                 title: 'Sala Todos exclusiva para VIP',
                 message: 'Assine o plano VIP para participar do chat ao vivo com a comunidade. A aba Suporte continua liberada para todos os usuarios.',
-                ctaLabel: 'Conhecer plano VIP',
+                ctaLabel: 'Assinar plano VIP',
                 ctaKind: 'plans',
                 secondaryLabel: 'Ir para suporte',
                 secondaryKind: 'support'
@@ -581,14 +581,16 @@
 
     async function promptVipUpgrade(reason) {
         const message = reason
-            || 'Este recurso e exclusivo de assinantes do plano VIP. Deseja conhecer o plano VIP agora?';
+            || 'Este recurso é exclusivo de assinantes do plano VIP. Deseja assinar o plano VIP agora?';
 
         if (typeof window.showSiteConfirm === 'function') {
             const confirmed = await window.showSiteConfirm({
                 title: 'Recurso exclusivo do plano VIP',
                 message,
-                confirmLabel: 'Quero assinar o VIP',
-                cancelLabel: 'Agora nao',
+                confirmLabel: 'Quero assinar VIP',
+                cancelLabel: 'Cancelar',
+                confirmIcon: 'fa-crown',
+                cancelIcon: 'fa-circle-xmark',
                 intent: 'warning',
                 icon: 'fa-crown'
             });
@@ -608,7 +610,7 @@
         }
 
         if (restriction.ctaKind === 'plans') {
-            await promptVipUpgrade('O chat da comunidade e exclusivo para assinantes do plano VIP. Deseja conhecer o plano VIP agora?');
+            await promptVipUpgrade('O envio de mensagens na sala Todos é exclusivo para assinantes VIP. Deseja assinar o plano VIP agora?');
             return;
         }
 
@@ -630,7 +632,9 @@
             return;
         }
 
-        const restriction = getRoomRestriction(currentRoomId);
+        const restriction = currentTab === 'todos' && currentRoomId === 'todos'
+            ? getRoomRestriction(currentRoomId)
+            : null;
         if (restriction) {
             elements.composerState.hidden = false;
             elements.composerState.innerHTML = `
@@ -1013,16 +1017,21 @@
             } else {
                 elements.messages.innerHTML = '<div class="chat-empty-state">Selecione um chamado para comecar.</div>';
             }
+            renderComposerState();
             return;
         }
 
-        const restriction = getRoomRestriction(currentRoomId);
+        const restriction = currentTab === 'todos' && currentRoomId === 'todos'
+            ? getRoomRestriction(currentRoomId)
+            : null;
         if (restriction) {
             elements.messages.innerHTML = `<div class="chat-empty-state">${escapeHtml(restriction.message)}</div>`;
+            renderComposerState();
             return;
         }
 
         elements.messages.innerHTML = '<div class="chat-empty-state">Ainda nao ha mensagens nesta sala.</div>';
+        renderComposerState();
     }
 
     function clearPoller(pollerName) {
@@ -1143,6 +1152,7 @@
 
     async function switchTab(tabId) {
         setActiveTab(tabId);
+        currentRoomId = getDefaultRoomForCurrentTab();
         clearComposerAction(true);
 
         if (tabId === 'todos') {
@@ -1212,7 +1222,7 @@
     async function deleteMessage(messageId) {
         const targetDoc = findMessageDocById(messageId);
         if (!targetDoc || !canDeleteMessageDoc(targetDoc)) {
-            throw new Error('Voce nao pode excluir esta mensagem.');
+            throw new Error('Você não pode excluir esta mensagem.');
         }
 
         const confirmed = await showChatConfirm({
@@ -1244,12 +1254,12 @@
 
     async function deleteTicket(roomId) {
         if (!userMeta.isAdmin || !roomId) {
-            throw new Error('Voce nao pode excluir este chamado.');
+            throw new Error('Você não pode excluir este chamado.');
         }
 
         const confirmed = await showChatConfirm({
             title: 'Excluir chamado?',
-            message: 'Deseja excluir este chamado inteiro? Todas as mensagens serao removidas.',
+            message: 'Deseja excluir este chamado inteiro? Todas as mensagens serão removidas.',
             confirmLabel: 'Excluir chamado'
         });
         if (!confirmed) {
@@ -1271,7 +1281,7 @@
             updateInputState();
         }
 
-        notifyUser(data.message || 'Chamado excluido com sucesso.', 'success');
+        notifyUser(data.message || 'Chamado excluído com sucesso.', 'success');
     }
 
     async function sendMessage(text) {
@@ -1396,7 +1406,7 @@
                     event.stopPropagation();
                     deleteTicket(deleteButton.dataset.ticketDelete).catch((error) => {
                         console.error('[CHAT] Erro ao excluir chamado:', error);
-                        notifyUser(error.message || 'Nao foi possivel excluir o chamado.', 'error');
+                        notifyUser(error.message || 'Não foi possível excluir o chamado.', 'error');
                     });
                     return;
                 }
@@ -1427,7 +1437,7 @@
                 if (deleteButton) {
                     deleteMessage(deleteButton.dataset.chatDelete).catch((error) => {
                         console.error('[CHAT] Erro ao excluir mensagem:', error);
-                        notifyUser(error.message || 'Nao foi possivel excluir a mensagem.', 'error');
+                        notifyUser(error.message || 'Não foi possível excluir a mensagem.', 'error');
                     });
                 }
             });
@@ -1446,7 +1456,7 @@
 
                 const ctaType = ctaButton.dataset.chatCta;
                 if (ctaType === 'plans') {
-                    promptVipUpgrade('O envio de mensagens na sala Todos e exclusivo para assinantes VIP. Deseja conhecer o plano VIP agora?').catch((error) => {
+                    promptVipUpgrade('O envio de mensagens na sala Todos é exclusivo para assinantes VIP. Deseja assinar o plano VIP agora?').catch((error) => {
                         console.error('[CHAT] Erro ao abrir convite VIP:', error);
                     });
                     return;
@@ -1473,7 +1483,7 @@
                 }
             } catch (error) {
                 console.error('[CHAT] Erro ao enviar mensagem:', error);
-                notifyUser(error.message || 'Nao foi possivel enviar a mensagem. Tente novamente.', 'error');
+                notifyUser(error.message || 'Não foi possível enviar a mensagem. Tente novamente.', 'error');
             } finally {
                 renderComposerState();
                 updateInputState();

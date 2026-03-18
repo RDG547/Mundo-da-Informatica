@@ -3781,6 +3781,11 @@ a.download-card-category:hover {
     transition: opacity 0.2s ease;
 }
 
+.site-confirm-overlay[hidden],
+.site-pix-overlay[hidden] {
+    display: none !important;
+}
+
 .site-confirm-overlay.is-visible,
 .site-pix-overlay.is-visible {
     opacity: 1;
@@ -3806,6 +3811,7 @@ a.download-card-category:hover {
 
 .site-confirm-dialog {
     padding: 2rem;
+    text-align: center;
 }
 
 .site-confirm-close,
@@ -3831,6 +3837,18 @@ a.download-card-category:hover {
     background: #ffffff;
     color: #1e293b;
     transform: translateY(-1px);
+}
+
+.site-pix-close {
+    border-color: #fecaca;
+    background: #fff5f5;
+    color: #dc2626;
+}
+
+.site-pix-close:hover {
+    color: #b91c1c;
+    border-color: #fca5a5;
+    background: #fff1f2;
 }
 
 .site-confirm-icon {
@@ -3871,10 +3889,15 @@ a.download-card-category:hover {
     line-height: 1.65;
 }
 
+.site-confirm-copy {
+    max-width: 420px;
+    margin: 0 auto;
+}
+
 .site-confirm-actions,
 .site-pix-actions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 0.85rem;
     margin-top: 1.5rem;
 }
@@ -3887,6 +3910,14 @@ a.download-card-category:hover {
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.site-confirm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    min-width: 200px;
 }
 
 .site-confirm-btn:hover,
@@ -3919,6 +3950,12 @@ a.download-card-category:hover {
     box-shadow: 0 18px 30px rgba(220, 38, 38, 0.24);
 }
 
+.site-pix-btn.is-close {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #ffffff;
+    box-shadow: 0 18px 30px rgba(220, 38, 38, 0.2);
+}
+
 .site-pix-dialog {
     width: min(640px, 100%);
     max-height: min(88vh, 760px);
@@ -3935,6 +3972,20 @@ a.download-card-category:hover {
 .site-pix-header {
     padding-right: 3rem;
     margin-bottom: 1.35rem;
+    text-align: center;
+}
+
+.site-pix-header-icon {
+    width: 74px;
+    height: 74px;
+    border-radius: 24px;
+    margin: 0 auto 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(50, 188, 173, 0.16), rgba(37, 99, 235, 0.16));
+    color: #14b8a6;
+    font-size: 2rem;
 }
 
 .site-pix-summary {
@@ -3952,16 +4003,64 @@ a.download-card-category:hover {
     gap: 1rem;
     color: #0f172a;
     font-weight: 600;
+    align-items: center;
 }
 
 .site-pix-summary-row span:first-child {
     color: #64748b;
     font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.site-pix-summary-row strong {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    text-align: right;
+    min-width: 0;
 }
 
 .site-pix-summary-row.is-amount strong {
     color: #0f766e;
     font-size: 1.28rem;
+}
+
+.site-pix-plan-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+#sitePixItemValue .site-pix-plan-badge.is-vip,
+.site-pix-summary-row strong .site-pix-plan-badge.is-vip {
+    color: #d97706 !important;
+}
+
+#sitePixItemValue .site-pix-plan-badge.is-premium,
+.site-pix-summary-row strong .site-pix-plan-badge.is-premium {
+    color: #2563eb !important;
+}
+
+#sitePixItemValue .site-pix-plan-badge.is-donation,
+.site-pix-summary-row strong .site-pix-plan-badge.is-donation {
+    color: #16a34a !important;
+}
+
+.site-pix-plan-badge.is-vip {
+    color: #d97706;
+}
+
+.site-pix-plan-badge.is-premium {
+    color: #2563eb;
+}
+
+.site-pix-plan-badge.is-donation {
+    color: #16a34a;
 }
 
 .site-pix-status {
@@ -4050,11 +4149,21 @@ a.download-card-category:hover {
     margin: 0 0 0.8rem;
     color: #0f172a;
     font-size: 0.98rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .site-pix-code-actions {
     display: flex;
     gap: 0.75rem;
+}
+
+.site-pix-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 .site-pix-code {
@@ -4090,6 +4199,11 @@ a.download-card-category:hover {
     .site-confirm-dialog,
     .site-pix-shell {
         padding: 1.25rem;
+    }
+
+    .site-confirm-btn {
+        min-width: 0;
+        width: 100%;
     }
 
     .site-confirm-actions,

@@ -266,6 +266,7 @@
                         <a href="{{ url_for('vip_area') }}"
                             class="dropdown-toggle {% if request.path == url_for('vip_area') %}active{% endif %}{% if current_user.is_authenticated and current_user.plan != 'vip' %} is-locked-feature{% endif %}"
                             data-vip-link="true"
+                            data-no-dynamic="true"
                             data-vip-access="{% if current_user.is_authenticated and current_user.plan == 'vip' %}vip{% elif current_user.is_authenticated %}locked{% else %}guest{% endif %}"
                             data-plans-url="{{ url_for('plans') }}">
                             <i class="fas fa-gem"></i> Área VIP
@@ -1143,6 +1144,16 @@
             let confirmState = null;
             let confirmElements = null;
 
+            function renderButtonContent(label, icon) {
+                const safeLabel = String(label || '');
+                const safeIcon = String(icon || '').trim();
+                if (!safeIcon) {
+                    return safeLabel;
+                }
+
+                return `<i class="fas ${safeIcon}" aria-hidden="true"></i><span>${safeLabel}</span>`;
+            }
+
             function getConfirmIcon(intent, icon) {
                 if (icon) {
                     return icon;
@@ -1249,8 +1260,8 @@
                 elements.icon.className = `fas ${getConfirmIcon(intent, options.icon)}`;
                 elements.title.textContent = options.title || 'Confirmar ação';
                 elements.message.textContent = options.message || 'Deseja continuar?';
-                elements.accept.textContent = options.confirmLabel || 'Prosseguir';
-                elements.cancel.textContent = options.cancelLabel || 'Cancelar';
+                elements.accept.innerHTML = renderButtonContent(options.confirmLabel || 'Prosseguir', options.confirmIcon || '');
+                elements.cancel.innerHTML = renderButtonContent(options.cancelLabel || 'Cancelar', options.cancelIcon || '');
                 elements.accept.classList.toggle('is-danger', intent === 'danger');
                 elements.accept.classList.toggle('is-warning', intent === 'warning');
                 elements.accept.classList.toggle('is-primary', intent !== 'danger' && intent !== 'warning');
@@ -1294,23 +1305,32 @@
 
                 link.dataset.vipLinkBound = 'true';
                 link.addEventListener('click', async function (event) {
+                    event.preventDefault();
+
                     if (this.dataset.vipAccess !== 'locked') {
+                        window.location.href = this.href;
                         return;
                     }
 
-                    event.preventDefault();
                     const plansUrl = this.dataset.plansUrl || '{{ url_for("plans") }}';
-                    let shouldProceed = true;
+                    let shouldProceed = false;
 
                     if (typeof window.showSiteConfirm === 'function') {
                         shouldProceed = await window.showSiteConfirm({
-                            title: 'Área VIP exclusiva para assinantes VIP',
-                            message: 'Este recurso é exclusivo do plano VIP. Deseja conhecer o plano VIP agora para liberar esse acesso?',
-                            confirmLabel: 'Quero conhecer o VIP',
-                            cancelLabel: 'Agora não',
+                            title: 'Recurso exclusivo do plano VIP',
+                            message: 'Este recurso é exclusivo para assinantes do plano VIP. Deseja prosseguir para a página de planos e assinar o VIP?',
+                            confirmLabel: 'Quero assinar VIP',
+                            cancelLabel: 'Cancelar',
+                            confirmIcon: 'fa-crown',
+                            cancelIcon: 'fa-circle-xmark',
                             intent: 'warning',
                             icon: 'fa-gem'
                         });
+                    } else {
+                        window.showSiteToast(
+                            'Este recurso é exclusivo para assinantes do plano VIP.',
+                            'warning'
+                        );
                     }
 
                     if (shouldProceed) {

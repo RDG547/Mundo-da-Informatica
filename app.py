@@ -3748,7 +3748,7 @@ def create_donation_checkout_session():
                         'unit_amount': amount_cents,
                         'product_data': {
                             'name': 'Doacao para o Mundo da Informatica',
-                            'description': 'Contribuicao avulsa para apoiar a plataforma.'
+                            'description': 'Contribuição avulsa para apoiar a plataforma.'
                         }
                     },
                     'quantity': 1
@@ -3885,7 +3885,7 @@ def donation_success():
     except Exception:
         db.session.rollback()
         app.logger.exception('Erro ao confirmar doacao Stripe')
-        flash('Nao foi possivel confirmar a doação agora. Tente novamente em instantes.', 'danger')
+        flash('Não foi possível confirmar a doação agora. Tente novamente em instantes.', 'danger')
 
     return redirect(next_path)
 
@@ -4765,7 +4765,7 @@ def contact():
             request.files.getlist('attachments')
         )
         if not attachments_valid:
-            attachments_error_message = attachments_error or 'Nao foi possivel processar os anexos enviados.'
+            attachments_error_message = attachments_error or 'Não foi possível processar os anexos enviados.'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'success': False, 'message': attachments_error_message})
             flash(attachments_error_message, 'danger')
@@ -4797,7 +4797,7 @@ def contact():
             )
         except Exception:
             app.logger.exception('Erro ao enviar formulario de contato por email')
-            error_msg = 'Nao foi possivel encaminhar sua mensagem ao suporte agora. Tente novamente em instantes.'
+            error_msg = 'Não foi possível encaminhar sua mensagem ao suporte agora. Tente novamente em instantes.'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'success': False, 'message': error_msg}), 500
             flash(error_msg, 'danger')
@@ -5013,6 +5013,8 @@ def api_post(post_id):
 def search_suggestions():
     query = request.args.get('q', '').strip()
     category = request.args.get('category', '').strip()
+    normalized_query = query.lower()
+    matched_category_names = set()
 
     debug_log(f" Search query: '{query}', category: '{category}'")  # DEBUG
 
@@ -5040,6 +5042,12 @@ def search_suggestions():
             categories = categories_starts + categories_contains
         else:
             categories = categories_starts
+
+        matched_category_names = {
+            str(cat.name).strip().lower()
+            for cat in categories
+            if str(cat.name or '').strip().lower().startswith(normalized_query)
+        }
 
         for cat in categories:
             suggestions.append({
@@ -5099,6 +5107,9 @@ def search_suggestions():
     for post in posts:
         category_name = post.category_str or (post.category_rel.name if post.category_rel else 'Sem categoria')
 
+        if not category and matched_category_names and category_name.strip().lower() in matched_category_names:
+            continue
+
         # Determinar o ícone baseado na categoria
         category_icon = 'fas fa-file-alt'
         if post.category_str == 'BIOS':
@@ -5124,7 +5135,20 @@ def search_suggestions():
             'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg')
         })
 
-    return jsonify(suggestions[:8])  # Limitar a 8 sugestões
+    unique_suggestions = []
+    seen_suggestions = set()
+    for item in suggestions:
+        key = (
+            str(item.get('type') or ''),
+            str(item.get('url') or ''),
+            str(item.get('title') or '').strip().lower()
+        )
+        if key in seen_suggestions:
+            continue
+        seen_suggestions.add(key)
+        unique_suggestions.append(item)
+
+    return jsonify(unique_suggestions[:8])  # Limitar a 8 sugestões
 
 @app.route('/admin/posts/<int:post_id>/toggle-active', methods=['POST'])
 @login_required

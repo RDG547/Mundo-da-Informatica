@@ -74,6 +74,8 @@
     font-size: 3rem;
     backdrop-filter: blur(10px);
     border: 2px solid rgba(255, 255, 255, 0.3);
+    animation: none !important;
+    transform: none !important;
 }
 
 .category-hero .hero-title {

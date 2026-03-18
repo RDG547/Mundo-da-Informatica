@@ -24,7 +24,10 @@
                             rel="noopener noreferrer"
                             aria-label="WhatsApp {{ footer_whatsapp_number }}"
                             title="WhatsApp {{ footer_whatsapp_number }}">
-                            <i class="fab fa-whatsapp"></i>
+                            <span class="footer-social-icon">
+                                <i class="fab fa-whatsapp"></i>
+                            </span>
+                            <span class="footer-social-label">WhatsApp</span>
                         </a>
                         <a href="{{ footer_youtube_link }}"
                             class="footer-social-button"
@@ -32,13 +35,19 @@
                             rel="noopener noreferrer"
                             aria-label="Canal no YouTube"
                             title="YouTube">
-                            <i class="fab fa-youtube"></i>
+                            <span class="footer-social-icon">
+                                <i class="fab fa-youtube"></i>
+                            </span>
+                            <span class="footer-social-label">YouTube</span>
                         </a>
                         <a href="mailto:{{ footer_email }}"
                             class="footer-social-button"
                             aria-label="Enviar email para {{ footer_email }}"
                             title="{{ footer_email }}">
-                            <i class="fas fa-envelope"></i>
+                            <span class="footer-social-icon">
+                                <i class="fas fa-envelope"></i>
+                            </span>
+                            <span class="footer-social-label">Email</span>
                         </a>
                         {% if footer_instagram_link %}
                         <a href="{{ footer_instagram_link }}"
@@ -47,11 +56,17 @@
                             rel="noopener noreferrer"
                             aria-label="Instagram"
                             title="Instagram">
-                            <i class="fab fa-instagram"></i>
+                            <span class="footer-social-icon">
+                                <i class="fab fa-instagram"></i>
+                            </span>
+                            <span class="footer-social-label">Instagram</span>
                         </a>
                         {% else %}
                         <span class="footer-social-button is-disabled" aria-disabled="true" title="Instagram em breve">
-                            <i class="fab fa-instagram"></i>
+                            <span class="footer-social-icon">
+                                <i class="fab fa-instagram"></i>
+                            </span>
+                            <span class="footer-social-label">Instagram</span>
                         </span>
                         {% endif %}
                     </div>
@@ -156,44 +171,80 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.85rem;
+    align-items: flex-start;
 }
 
 .footer-social-button {
-    width: 52px;
-    height: 52px;
+    width: 88px;
+    min-height: 82px;
+    flex: 0 0 88px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.48rem;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    transition: transform 0.25s ease, filter 0.25s ease;
+    backdrop-filter: none;
+}
+
+.footer-social-icon {
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 16px;
-    text-decoration: none;
-    color: #f8fbff;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
-    backdrop-filter: blur(10px);
 }
 
 .footer-social-button:hover {
     transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(79, 140, 255, 0.55);
-    color: #ffffff;
+    filter: brightness(1.08);
 }
 
 .footer-social-button i {
-    font-size: 1.2rem;
+    font-size: 1.34rem;
+    line-height: 1;
+    display: block;
+}
+
+.footer-social-button .fa-whatsapp {
+    color: #25D366;
+}
+
+.footer-social-button .fa-youtube {
+    color: #FF0000;
+}
+
+.footer-social-button .fa-envelope {
     color: #66d9a6;
+    transform: none;
+}
+
+.footer-social-button .fa-instagram {
+    color: #E4405F;
 }
 
 .footer-social-button.is-disabled {
-    opacity: 0.68;
+    opacity: 0.62;
     cursor: default;
 }
 
 .footer-social-button.is-disabled:hover {
     transform: none;
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.1);
+    filter: none;
+}
+
+.footer-social-label {
+    display: block;
+    width: 100%;
+    font-size: 0.72rem;
+    color: #b9c7d8;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    margin: 0;
 }
 
 .footer-title {

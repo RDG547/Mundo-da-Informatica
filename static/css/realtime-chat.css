@@ -611,6 +611,8 @@
 .chat-composer-pill.is-locked {
     border-left: 4px solid #f59e0b;
     background: linear-gradient(135deg, #fffaf0, #ffffff);
+    flex-direction: column;
+    align-items: stretch;
 }
 
 .chat-composer-copy {
@@ -628,9 +630,10 @@
 .chat-composer-copy span {
     font-size: 0.78rem;
     color: #64748b;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.45;
 }
 
 .chat-composer-cancel {
@@ -655,12 +658,15 @@
 .chat-composer-actions {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
     justify-content: flex-end;
 }
 
 .chat-composer-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: none;
     border-radius: 999px;
     padding: 0.48rem 0.8rem;
@@ -670,6 +676,19 @@
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.16s ease, filter 0.16s ease;
+    text-align: center;
+    min-height: 36px;
+}
+
+.chat-composer-pill.is-locked .chat-composer-actions {
+    width: 100%;
+    justify-content: stretch;
+}
+
+.chat-composer-pill.is-locked .chat-composer-action-btn {
+    flex: 1 1 145px;
+    padding: 0.72rem 1rem;
+    font-size: 0.78rem;
 }
 
 .chat-composer-action-btn.is-secondary {
@@ -750,15 +769,17 @@
 }
 
 .chat-confirm-dialog {
-    width: min(320px, 100%);
+    width: min(360px, 100%);
     background: #ffffff;
     border-radius: 18px;
     border: 1px solid #dbe3ee;
     box-shadow: 0 18px 36px rgba(15, 23, 42, 0.2);
-    padding: 1.1rem;
+    padding: 1.2rem;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
+    gap: 1rem;
+    text-align: center;
+    align-items: center;
 }
 
 .chat-confirm-icon {
@@ -771,35 +792,41 @@
     align-items: center;
     justify-content: center;
     font-size: 1.1rem;
+    margin: 0 auto;
 }
 
 .chat-confirm-copy h5 {
     margin: 0 0 0.35rem;
     color: #0f172a;
-    font-size: 0.98rem;
+    font-size: 1rem;
 }
 
 .chat-confirm-copy p {
     margin: 0;
     color: #475569;
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     line-height: 1.5;
 }
 
 .chat-confirm-actions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 0.55rem;
+    width: 100%;
+    flex-wrap: wrap;
 }
 
 .chat-confirm-btn {
     border-radius: 10px;
-    padding: 0.58rem 0.9rem;
-    font-size: 0.78rem;
+    padding: 0.68rem 1rem;
+    font-size: 0.8rem;
     font-weight: 700;
     border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.18s ease;
+    min-width: 142px;
+    min-height: 44px;
+    flex: 1 1 142px;
 }
 
 .chat-confirm-btn.is-secondary {

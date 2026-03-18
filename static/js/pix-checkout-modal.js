@@ -39,20 +39,23 @@
                 </button>
                 <div class="site-pix-shell">
                     <div class="site-pix-header">
+                        <div class="site-pix-header-icon">
+                            <i class="fas fa-qrcode"></i>
+                        </div>
                         <h4 id="sitePixTitle">Pagamento via PIX</h4>
-                        <p id="sitePixSubtitle">Escaneie o QR Code ou copie o codigo PIX.</p>
+                        <p id="sitePixSubtitle">Escaneie o QR Code ou copie o código PIX.</p>
                     </div>
                     <div class="site-pix-summary">
                         <div class="site-pix-summary-row">
-                            <span id="sitePixItemLabel">Item</span>
+                            <span id="sitePixItemLabel"><i class="fas fa-layer-group"></i> Item</span>
                             <strong id="sitePixItemValue">Pagamento</strong>
                         </div>
                         <div class="site-pix-summary-row">
-                            <span id="sitePixModeLabel">Modalidade</span>
-                            <strong id="sitePixModeValue">Unica</strong>
+                            <span id="sitePixModeLabel"><i class="fas fa-repeat"></i> Modalidade</span>
+                            <strong id="sitePixModeValue">Única</strong>
                         </div>
                         <div class="site-pix-summary-row is-amount">
-                            <span>Valor</span>
+                            <span><i class="fas fa-money-bill-wave"></i> Valor</span>
                             <strong id="sitePixAmount">R$ 0,00</strong>
                         </div>
                     </div>
@@ -60,7 +63,7 @@
                         <i class="fas fa-spinner fa-spin"></i>
                         <div>
                             <strong>Preparando pagamento</strong>
-                            <p>Estamos gerando o seu QR Code PIX com seguranca.</p>
+                            <p>Estamos gerando o seu QR Code PIX com segurança.</p>
                         </div>
                     </div>
                     <div class="site-pix-body">
@@ -71,25 +74,28 @@
                             </div>
                         </div>
                         <div class="site-pix-code-card">
-                            <h5>Codigo PIX copia e cola</h5>
+                            <h5><i class="fas fa-copy"></i> Código PIX copia e cola</h5>
                             <div class="site-pix-code-actions">
-                                <textarea class="site-pix-code" id="sitePixCode" readonly placeholder="O codigo PIX aparecera aqui."></textarea>
-                                <button type="button" class="site-pix-btn is-primary" id="sitePixCopyBtn">Copiar codigo</button>
+                                <textarea class="site-pix-code" id="sitePixCode" readonly placeholder="O código PIX aparecerá aqui."></textarea>
+                                <button type="button" class="site-pix-btn is-primary" id="sitePixCopyBtn">
+                                    <i class="fas fa-copy"></i>
+                                    <span>Copiar código</span>
+                                </button>
                             </div>
                         </div>
                         <div class="site-pix-steps">
-                            <h5>Como pagar</h5>
+                            <h5><i class="fas fa-info-circle"></i> Como pagar</h5>
                             <ol>
-                                <li>Abra o aplicativo do seu banco.</li>
-                                <li>Escolha a opcao PIX.</li>
-                                <li>Escaneie o QR Code ou use o codigo copia e cola.</li>
-                                <li>Confirme o pagamento no app do banco.</li>
-                                <li id="sitePixFinalStep">Pronto! A confirmacao sera processada automaticamente.</li>
+                                <li>Abra o aplicativo do seu banco</li>
+                                <li>Escolha a opção PIX</li>
+                                <li>Escaneie o QR Code acima OU copie e cole o código PIX</li>
+                                <li>Confirme o pagamento</li>
+                                <li id="sitePixFinalStep">Pronto! Seu plano será ativado automaticamente</li>
                             </ol>
                         </div>
                     </div>
                     <div class="site-pix-actions">
-                        <button type="button" class="site-pix-btn is-secondary" id="sitePixCloseBtn">Fechar</button>
+                        <button type="button" class="site-pix-btn is-close" id="sitePixCloseBtn">Fechar</button>
                     </div>
                 </div>
             </div>
@@ -124,24 +130,24 @@
             const pixCode = String(pixCodeField.value || '').trim();
             if (!pixCode) {
                 if (typeof window.showSiteToast === 'function') {
-                    window.showSiteToast('O codigo PIX ainda nao esta disponivel.', 'warning');
+                    window.showSiteToast('O código PIX ainda não está disponível.', 'warning');
                 }
                 return;
             }
 
             try {
                 await navigator.clipboard.writeText(pixCode);
-                const originalLabel = copyButton.textContent;
-                copyButton.textContent = 'Codigo copiado';
+                const originalHtml = copyButton.innerHTML;
+                copyButton.innerHTML = '<i class="fas fa-check"></i><span>Código copiado</span>';
                 if (typeof window.showSiteToast === 'function') {
-                    window.showSiteToast('Codigo PIX copiado com sucesso.', 'success');
+                    window.showSiteToast('Código PIX copiado com sucesso.', 'success');
                 }
                 window.setTimeout(() => {
-                    copyButton.textContent = originalLabel;
+                    copyButton.innerHTML = originalHtml;
                 }, 1800);
             } catch (_error) {
                 if (typeof window.showSiteToast === 'function') {
-                    window.showSiteToast('Nao foi possivel copiar o codigo PIX.', 'danger');
+                    window.showSiteToast('Não foi possível copiar o código PIX.', 'danger');
                 }
             }
         });
@@ -163,6 +169,24 @@
         };
 
         return modalElements;
+    }
+
+    function getItemBadgeHtml(itemValue) {
+        const normalized = String(itemValue || '').trim().toLowerCase();
+
+        if (normalized.includes('vip')) {
+            return `<span class="site-pix-plan-badge is-vip"><i class="fas fa-crown"></i> ${itemValue}</span>`;
+        }
+
+        if (normalized.includes('premium')) {
+            return `<span class="site-pix-plan-badge is-premium"><i class="fas fa-star"></i> ${itemValue}</span>`;
+        }
+
+        if (normalized.includes('apoio') || normalized.includes('doação') || normalized.includes('contribuição')) {
+                        return `<span class="site-pix-plan-badge is-donation"><i class="fas fa-hand-holding-heart"></i> ${itemValue}</span>`;
+        }
+
+        return `<span class="site-pix-plan-badge"><i class="fas fa-layer-group"></i> ${itemValue}</span>`;
     }
 
     function setStatus(title, message, type, iconClass) {
@@ -195,7 +219,7 @@
         qr.innerHTML = `
             <div class="site-pix-loading">
                 <i class="fas fa-triangle-exclamation"></i>
-                <span>${message || 'Nao foi possivel gerar o QR Code PIX.'}</span>
+                <span>${message || 'Não foi possível gerar o QR Code PIX.'}</span>
             </div>
         `;
     }
@@ -267,7 +291,7 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error(data.error || 'Nao foi possivel verificar o status do pagamento.');
+                throw new Error(data.error || 'Não foi possível verificar o status do pagamento.');
             }
 
             if (data.paid) {
@@ -283,7 +307,7 @@
             }
 
             if (data.status === 'cancelled') {
-                setStatus('Pagamento cancelado', 'O checkout PIX foi cancelado. Se desejar, voce pode iniciar novamente.', 'error', 'fa-xmark-circle');
+                setStatus('Pagamento cancelado', 'O checkout PIX foi cancelado. Se desejar, você pode iniciar novamente.', 'error', 'fa-xmark-circle');
                 cleanupState({ cancelPending: false });
             }
         } catch (error) {
@@ -300,7 +324,7 @@
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok || data.status === 'error') {
-            throw new Error(data.message || data.error || 'Nao foi possivel preparar o pagamento PIX.');
+            throw new Error(data.message || data.error || 'Não foi possível preparar o pagamento PIX.');
         }
 
         if (data.qr_code || data.pix_code) {
@@ -320,14 +344,14 @@
 
         const elements = ensureModal();
         elements.title.textContent = options.title || 'Pagamento via PIX';
-        elements.subtitle.textContent = options.subtitle || 'Escaneie o QR Code ou copie o codigo PIX para concluir o pagamento.';
-        elements.itemLabel.textContent = options.itemLabel || 'Item';
-        elements.itemValue.textContent = options.itemValue || 'Pagamento';
-        elements.modeLabel.textContent = options.modeLabel || 'Modalidade';
-        elements.modeValue.textContent = options.modeValue || 'Unica';
+        elements.subtitle.textContent = options.subtitle || 'Escaneie o QR Code ou copie o código PIX para concluir o pagamento.';
+        elements.itemLabel.innerHTML = `<i class="fas fa-layer-group"></i> ${options.itemLabel || 'Item'}`;
+        elements.itemValue.innerHTML = getItemBadgeHtml(options.itemValue || 'Pagamento');
+        elements.modeLabel.innerHTML = `<i class="fas fa-repeat"></i> ${options.modeLabel || 'Modalidade'}`;
+        elements.modeValue.textContent = options.modeValue || 'Única';
         elements.amount.textContent = options.amountText || 'R$ 0,00';
         elements.code.value = '';
-        elements.finalStep.textContent = options.finalStep || 'Pronto! A confirmacao sera processada automaticamente.';
+        elements.finalStep.textContent = options.finalStep || 'Pronto! Seu plano será ativado automaticamente';
 
         modalState = {
             billingId,
@@ -337,7 +361,7 @@
             poller: null
         };
 
-        setStatus('Preparando pagamento', 'Estamos gerando o seu QR Code PIX com seguranca.', '', 'fa-spinner fa-spin');
+        setStatus('Preparando pagamento', 'Estamos gerando o seu QR Code PIX com segurança.', '', 'fa-spinner fa-spin');
         setQrLoading(options.loadingMessage || 'Gerando QR Code de pagamento...');
 
         document.body.style.overflow = 'hidden';
@@ -353,13 +377,13 @@
                 return;
             }
 
-            setStatus('Aguardando pagamento', 'Escaneie o QR Code ou copie o codigo PIX para pagar.', '', 'fa-hourglass-half');
+            setStatus('Aguardando pagamento', 'Escaneie o QR Code ou copie o código PIX para pagar.', '', 'fa-hourglass-half');
             modalState.poller = window.setInterval(pollPaymentStatus, 5000);
             pollPaymentStatus();
         } catch (error) {
             console.error('[PIX MODAL] Erro ao preparar checkout PIX:', error);
-            setStatus('Nao foi possivel iniciar o PIX', error.message || 'Tente novamente em alguns instantes.', 'error', 'fa-triangle-exclamation');
-            setQrError(error.message || 'Nao foi possivel gerar o QR Code PIX.');
+            setStatus('Não foi possível iniciar o PIX', error.message || 'Tente novamente em alguns instantes.', 'error', 'fa-triangle-exclamation');
+            setQrError(error.message || 'Não foi possível gerar o QR Code PIX.');
         }
     };
 })();

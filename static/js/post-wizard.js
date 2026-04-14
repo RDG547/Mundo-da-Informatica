@@ -28,11 +28,17 @@ function initPostWizard() {
     const saveBtn = document.getElementById('savePostBtn');
     const richEditor = document.getElementById('postContentEditor');
     const hiddenTextarea = document.getElementById('postContent');
+    const addPostForm = document.getElementById('addPostForm');
     const saveBtnDefaultHtml = saveBtn ? saveBtn.innerHTML : '';
+    const VALIDATABLE_FIELDS_SELECTOR = 'input, select, textarea';
 
     if (!nextBtn || !prevBtn || !saveBtn) {
         console.error('Botões do wizard não encontrados!');
         return;
+    }
+
+    if (addPostForm) {
+        addPostForm.noValidate = true;
     }
 
     function setSubmitState(isSubmitting) {
@@ -42,32 +48,166 @@ function initPostWizard() {
             : saveBtnDefaultHtml;
     }
 
+    function syncRichEditorContent() {
+        if (richEditor && hiddenTextarea) {
+            hiddenTextarea.value = richEditor.innerHTML;
+        }
+    }
+
+    function getRichEditorText() {
+        if (!richEditor) {
+            return hiddenTextarea?.value?.trim() || '';
+        }
+
+        return richEditor.textContent
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function normalizeDownloadSizeValue(rawValue) {
+        const trimmedValue = typeof rawValue === 'string' ? rawValue.trim() : '';
+
+        if (!trimmedValue) {
+            return '';
+        }
+
+        const normalizedValue = trimmedValue.replace(',', '.').replace(/\s+/g, '');
+
+        if (!/^\d+(?:\.\d+)?$/.test(normalizedValue)) {
+            return null;
+        }
+
+        return normalizedValue;
+    }
+
+    function markFieldInvalid(field) {
+        field.classList.add('is-invalid');
+    }
+
+    function clearFieldInvalid(field) {
+        field.classList.remove('is-invalid');
+    }
+
+    function shouldSkipFieldValidation(field, options = {}) {
+        if (!field || field.disabled || field === hiddenTextarea) {
+            return true;
+        }
+
+        const fieldType = (field.getAttribute('type') || '').toLowerCase();
+        if (['hidden', 'button', 'submit', 'reset', 'file'].includes(fieldType)) {
+            return true;
+        }
+
+        const stepContent = field.closest('.step-content');
+        let currentNode = field;
+
+        while (currentNode && currentNode !== stepContent) {
+            if (currentNode.hidden) {
+                return true;
+            }
+
+            const style = window.getComputedStyle(currentNode);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+                return true;
+            }
+
+            currentNode = currentNode.parentElement;
+        }
+
+        return !options.ignoreWizardVisibility
+            && stepContent
+            && !stepContent.classList.contains('active');
+    }
+
+    function validateRichEditor() {
+        syncRichEditorContent();
+
+        const hasContent = getRichEditorText().length > 0;
+        const target = richEditor || hiddenTextarea;
+
+        if (target) {
+            target.classList.toggle('is-invalid', !hasContent);
+        }
+
+        if (hiddenTextarea) {
+            hiddenTextarea.classList.toggle('is-invalid', !hasContent);
+        }
+
+        return hasContent;
+    }
+
+    function validateDownloadSizeField(field) {
+        const normalizedValue = normalizeDownloadSizeValue(field.value);
+
+        if (normalizedValue === null) {
+            markFieldInvalid(field);
+            return false;
+        }
+
+        if (normalizedValue) {
+            field.value = normalizedValue;
+        }
+
+        clearFieldInvalid(field);
+        return true;
+    }
+
+    function validateField(field, options = {}) {
+        if (shouldSkipFieldValidation(field, options)) {
+            return true;
+        }
+
+        if (field.classList.contains('download-size-input')) {
+            return validateDownloadSizeField(field);
+        }
+
+        const fieldType = (field.getAttribute('type') || '').toLowerCase();
+        const rawValue = typeof field.value === 'string' ? field.value.trim() : '';
+        const hasValue = fieldType === 'checkbox' || fieldType === 'radio'
+            ? field.checked
+            : rawValue.length > 0;
+
+        if (!field.required && !hasValue) {
+            clearFieldInvalid(field);
+            return true;
+        }
+
+        if (!field.checkValidity()) {
+            markFieldInvalid(field);
+            return false;
+        }
+
+        clearFieldInvalid(field);
+        return true;
+    }
+
     function showStep(step) {
         // Ocultar todos os step-content
-        document.querySelectorAll('.step-content').forEach(content => {
+        addPostModal.querySelectorAll('.step-content').forEach(content => {
             content.classList.remove('active');
         });
 
         // Remover active de todos os steps
-        document.querySelectorAll('.form-steps .step').forEach(stepEl => {
+        addPostModal.querySelectorAll('.form-steps .step').forEach(stepEl => {
             stepEl.classList.remove('active', 'completed');
         });
 
         // Mostrar o step atual
-        const currentContent = document.querySelector(`.step-content[data-step="${step}"]`);
+        const currentContent = addPostModal.querySelector(`.step-content[data-step="${step}"]`);
         if (currentContent) {
             currentContent.classList.add('active');
         }
 
         // Marcar step atual como ativo
-        const currentStepEl = document.querySelector(`.form-steps .step[data-step="${step}"]`);
+        const currentStepEl = addPostModal.querySelector(`.form-steps .step[data-step="${step}"]`);
         if (currentStepEl) {
             currentStepEl.classList.add('active');
         }
 
         // Marcar steps anteriores como completados
         for (let i = 1; i < step; i++) {
-            const prevStepEl = document.querySelector(`.form-steps .step[data-step="${i}"]`);
+            const prevStepEl = addPostModal.querySelector(`.form-steps .step[data-step="${i}"]`);
             if (prevStepEl) {
                 prevStepEl.classList.add('completed');
             }
@@ -92,7 +232,7 @@ function initPostWizard() {
     }
 
     // Permitir clicar nos números das etapas para navegar
-    document.querySelectorAll('.form-steps .step').forEach(stepEl => {
+    addPostModal.querySelectorAll('.form-steps .step').forEach(stepEl => {
         stepEl.style.cursor = 'pointer';
         stepEl.addEventListener('click', function() {
             const targetStep = parseInt(this.getAttribute('data-step'));
@@ -135,26 +275,21 @@ function initPostWizard() {
             return;
         }
 
+        syncRichEditorContent();
+        collectDownloadData();
+
         // Validar TODOS os steps antes de salvar
-        if (validateAllSteps()) {
-            // Sincronizar editor com textarea antes de enviar
-            if (richEditor && hiddenTextarea) {
-                hiddenTextarea.value = richEditor.innerHTML;
-            }
-
-            // Coletar dados de multi-download antes de submeter
-            collectDownloadData();
-
+        const validationResult = validateAllSteps();
+        if (validationResult.isValid) {
             // Submeter o formulário
-            const form = document.getElementById('addPostForm');
-            if (form) {
+            if (addPostForm) {
                 setSubmitState(true);
                 clearDraft(); // Limpar rascunho antes de enviar
                 try {
-                    if (typeof form.requestSubmit === 'function') {
-                        form.requestSubmit();
+                    if (typeof addPostForm.requestSubmit === 'function') {
+                        addPostForm.requestSubmit();
                     } else {
-                        form.submit();
+                        addPostForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
                     }
                 } catch (error) {
                     setSubmitState(false);
@@ -162,70 +297,72 @@ function initPostWizard() {
                 }
             }
         } else {
-            // Ir para o primeiro step com erro
-            for (let step = 1; step <= totalSteps; step++) {
-                if (!validateStep(step)) {
-                    showStep(step);
-                    scrollToFirstInvalidField();
-                    alert('Por favor, preencha todos os campos obrigatórios antes de concluir.');
-                    break;
-                }
+            if (validationResult.firstInvalidStep) {
+                showStep(validationResult.firstInvalidStep);
+            }
+
+            scrollToFirstInvalidField();
+
+            if (typeof showNotification !== 'undefined') {
+                showNotification(validationResult.message || 'Revise os campos obrigatórios antes de concluir.', 'warning');
+            } else {
+                alert(validationResult.message || 'Revise os campos obrigatórios antes de concluir.');
             }
         }
     });
 
     // Validar todos os steps
     function validateAllSteps() {
-        let allValid = true;
+        let firstInvalidStep = null;
+
         for (let step = 1; step <= totalSteps; step++) {
-            if (!validateStep(step)) {
-                allValid = false;
+            if (!validateStep(step, { ignoreWizardVisibility: true }) && firstInvalidStep === null) {
+                firstInvalidStep = step;
             }
         }
-        return allValid;
+
+        return {
+            isValid: firstInvalidStep === null,
+            firstInvalidStep,
+            message: 'Revise os campos obrigatórios e use apenas números no tamanho do download. Ex: 1.5'
+        };
     }
 
     // Validação de cada step
-    function validateStep(step) {
-        const currentContent = document.querySelector(`.step-content[data-step="${step}"]`);
+    function validateStep(step, options = {}) {
+        const currentContent = addPostModal.querySelector(`.step-content[data-step="${step}"]`);
 
         if (!currentContent) {
             return true;
         }
 
-        const requiredFields = currentContent.querySelectorAll('[required]');
         let isValid = true;
+        const fields = currentContent.querySelectorAll(VALIDATABLE_FIELDS_SELECTOR);
 
-        requiredFields.forEach(field => {
-            const isVisible = field.offsetParent !== null;
-            const fieldValue = field.value ? field.value.trim() : '';
+        if (step === 1 && !validateRichEditor()) {
+            isValid = false;
+        }
 
-            if (isVisible) {
-                if (!fieldValue) {
-                    field.classList.add('is-invalid');
-                    isValid = false;
-                } else {
-                    field.classList.remove('is-invalid');
-                }
+        fields.forEach(field => {
+            if (!validateField(field, options)) {
+                isValid = false;
             }
         });
-
-        if (!isValid && typeof showNotification !== 'undefined') {
-            showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
-        }
 
         return isValid;
     }
 
     // Função para rolar até o primeiro campo inválido
     function scrollToFirstInvalidField() {
-        const firstInvalid = document.querySelector('.step-content.active .is-invalid');
+        const firstInvalid = addPostModal.querySelector('.step-content.active .is-invalid');
         if (firstInvalid) {
             firstInvalid.scrollIntoView({
                 behavior: 'smooth',
                 block: 'center'
             });
-            firstInvalid.focus();
+            if (typeof firstInvalid.focus === 'function') {
+                firstInvalid.focus();
+            }
         }
     }
 
@@ -269,28 +406,84 @@ function initPostWizard() {
     }
 
     function resetForm() {
-        const form = document.getElementById('addPostForm');
-        if (form) {
-            form.reset();
+        if (addPostForm) {
+            addPostForm.reset();
+            addPostForm.querySelectorAll('.is-invalid, .is-valid').forEach(field => {
+                field.classList.remove('is-invalid', 'is-valid');
+            });
+
             if (richEditor) {
                 richEditor.innerHTML = '';
             }
+
+            if (hiddenTextarea) {
+                hiddenTextarea.value = '';
+            }
+
+            const downloadFilesData = document.getElementById('downloadFilesData');
+            const downloadLinkField = document.getElementById('postDownloadLink');
+
+            if (downloadFilesData) {
+                downloadFilesData.value = '';
+            }
+
+            if (downloadLinkField) {
+                downloadLinkField.value = '';
+            }
         }
+
         setSubmitState(false);
     }
 
     // Sincronizar editor rich text com textarea oculto
     if (richEditor && hiddenTextarea) {
         richEditor.addEventListener('input', function() {
-            hiddenTextarea.value = richEditor.innerHTML;
+            syncRichEditorContent();
+            richEditor.classList.remove('is-invalid');
+            hiddenTextarea.classList.remove('is-invalid');
         });
 
         richEditor.addEventListener('paste', function() {
             setTimeout(() => {
-                hiddenTextarea.value = richEditor.innerHTML;
+                syncRichEditorContent();
+                richEditor.classList.remove('is-invalid');
+                hiddenTextarea.classList.remove('is-invalid');
             }, 100);
         });
     }
+
+    addPostModal.addEventListener('input', function(event) {
+        const target = event.target;
+
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        if (target.classList.contains('download-size-input')) {
+            const normalizedValue = normalizeDownloadSizeValue(target.value);
+            if (normalizedValue !== null) {
+                clearFieldInvalid(target);
+            }
+            return;
+        }
+
+        if (target.matches(VALIDATABLE_FIELDS_SELECTOR) && target.checkValidity()) {
+            clearFieldInvalid(target);
+        }
+    }, true);
+
+    addPostModal.addEventListener('focusout', function(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || !target.classList.contains('download-size-input')) {
+            return;
+        }
+
+        const normalizedValue = normalizeDownloadSizeValue(target.value);
+        if (normalizedValue) {
+            target.value = normalizedValue;
+            clearFieldInvalid(target);
+        }
+    }, true);
 
     // Resetar wizard ao abrir modal
     if (addPostModal) {
@@ -306,7 +499,6 @@ function initPostWizard() {
     }
 
     // Limpar rascunho ao submeter formulário
-    const addPostForm = document.getElementById('addPostForm');
     if (addPostForm) {
         addPostForm.addEventListener('submit', function() {
             clearDraft();
@@ -356,7 +548,7 @@ function initPostWizard() {
                     </button>
                 </div>
                 <div class="download-size-row">
-                    <input type="number" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0">
+                    <input type="text" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
                     <select name="download_size_unit_${idx}" class="form-select download-size-unit">
                         <option value="MB">MB</option>
                         <option value="GB">GB</option>
@@ -414,9 +606,16 @@ function initPostWizard() {
             const typeSelect = entry.querySelector('select');
             const urlInput = entry.querySelector('input[type="url"]');
             if (typeSelect && urlInput && urlInput.value.trim()) {
-                const sizeInput = entry.querySelector('input[type="number"]');
+                const sizeInput = entry.querySelector('.download-size-input');
                 const unitSelect = entry.querySelectorAll('select')[1];
                 let size = '';
+                if (sizeInput) {
+                    const normalizedSize = normalizeDownloadSizeValue(sizeInput.value);
+                    if (normalizedSize) {
+                        sizeInput.value = normalizedSize;
+                    }
+                }
+
                 if (sizeInput && sizeInput.value) {
                     const unit = unitSelect ? unitSelect.value : 'MB';
                     size = sizeInput.value + ' ' + unit;
@@ -435,8 +634,8 @@ function initPostWizard() {
         if (downloadFilesData) {
             downloadFilesData.value = JSON.stringify(files);
         }
-        if (downloadLinkField && files.length > 0) {
-            downloadLinkField.value = files[0].url;
+        if (downloadLinkField) {
+            downloadLinkField.value = files.length > 0 ? files[0].url : '';
         }
     }
 }

@@ -1042,26 +1042,36 @@
         pollers[pollerName] = null;
     }
 
+    const MAX_BACKOFF_MS = 60000;
+    let pollerBackoff = {};
+
     function startPoller(pollerName, handler, intervalMs) {
         clearPoller(pollerName);
+        pollerBackoff[pollerName] = intervalMs;
         let isActive = true;
+        let timerId = null;
+
+        const schedule = () => {
+            if (!isActive) return;
+            timerId = window.setTimeout(run, pollerBackoff[pollerName]);
+        };
 
         const run = async () => {
-            if (!isActive) {
-                return;
-            }
+            if (!isActive) return;
             try {
                 await handler();
+                pollerBackoff[pollerName] = intervalMs;
             } catch (error) {
+                pollerBackoff[pollerName] = Math.min(pollerBackoff[pollerName] * 2, MAX_BACKOFF_MS);
                 console.error(`[CHAT] Erro no poller ${pollerName}:`, error);
             }
+            schedule();
         };
 
         run();
-        const intervalId = window.setInterval(run, intervalMs);
         pollers[pollerName] = () => {
             isActive = false;
-            window.clearInterval(intervalId);
+            if (timerId !== null) window.clearTimeout(timerId);
         };
     }
 

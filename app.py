@@ -5851,15 +5851,41 @@ def chat_firebase_token():
         return jsonify({'success': False, 'message': 'Não foi possível conectar ao chat agora.'}), 500
 
 
+# ---------------------------------------------------------------------------
+# Circuit breaker para Firestore – evita crash loop quando quota é atingida.
+# Quando uma chamada falha (429/timeout/rede), o circuito abre por 5 minutos
+# e _get_firestore_client() retorna None, fazendo todas as rotas de chat
+# retornarem 503 imediatamente sem tentar o gRPC.
+# ---------------------------------------------------------------------------
+import time as _cb_time
+
+_firestore_circuit_open_until: float = 0.0
+_FIRESTORE_CIRCUIT_COOLDOWN = 300  # 5 minutos
+
+
+def _trip_firestore_circuit() -> None:
+    global _firestore_circuit_open_until
+    _firestore_circuit_open_until = _cb_time.monotonic() + _FIRESTORE_CIRCUIT_COOLDOWN
+    app.logger.warning(
+        f'Firestore circuit breaker ABERTO por {_FIRESTORE_CIRCUIT_COOLDOWN}s '
+        f'– chamadas serão ignoradas até o cooldown.'
+    )
+
+
 def _get_firestore_client():
     if firebase_firestore is None:
         return None
     if not initialize_firebase_admin():
         return None
+    # Circuit breaker: se Firestore falhou recentemente, não tenta reconectar
+    import time as _time
+    if _time.monotonic() < _firestore_circuit_open_until:
+        return None
     try:
         return firebase_firestore.client()
     except Exception as e:
         app.logger.error(f'Erro ao obter cliente Firestore: {e}')
+        _trip_firestore_circuit()
         return None
 
 
@@ -6106,6 +6132,7 @@ def _sync_chat_room_metadata_from_latest(db_firestore, room_id: str) -> None:
             'lastSenderPlan': normalize_plan_key(latest_data.get('senderPlan'))
         }, merge=True, timeout=5)
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.warning(f'Firestore indisponível ao sincronizar metadados da sala {room_id}: {e}')
 
 
@@ -6114,6 +6141,7 @@ def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
     try:
         docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream(timeout=10)
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.warning(f'Firestore indisponível ao listar tickets de suporte: {e}')
         return tickets
 
@@ -6186,6 +6214,7 @@ def _ensure_chat_base_rooms_for_user(db_firestore, user) -> tuple[str, str]:
 
         _chat_rooms_ensured_cache[cache_key] = now
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.warning(f'Firestore indisponível ao garantir salas de chat (quota/rede): {e}')
         # Mesmo com erro, retorna os IDs — as salas provavelmente já existem
 
@@ -6217,6 +6246,7 @@ def chat_bootstrap():
             'permissions': _get_chat_permissions_for_user(current_user)
         })
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.error(f'Erro no bootstrap das salas de chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao preparar salas do chat.'}), 500
 
@@ -6258,6 +6288,7 @@ def chat_state():
 
         return jsonify(payload)
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.error(f'Erro ao carregar estado do chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao carregar o estado do chat.'}), 500
 
@@ -6327,6 +6358,7 @@ def chat_room_messages(room_id):
             'message': _serialize_chat_message(created_doc) if created_doc.exists else {**payload, 'id': new_message_ref.id}
         })
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.error(f'Erro ao processar mensagens da sala {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Falha ao processar a mensagem.'}), 500
 
@@ -6398,6 +6430,7 @@ def chat_room_message_actions(room_id, message_id):
         _sync_chat_room_metadata_from_latest(db_firestore, room_id)
         return jsonify({'success': True, 'message': 'Mensagem excluída com sucesso.'})
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.error(f'Erro ao processar ação da mensagem {message_id} na sala {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Falha ao processar a mensagem.'}), 500
 
@@ -6416,6 +6449,7 @@ def chat_admin_tickets():
     try:
         return jsonify({'success': True, 'tickets': _get_chat_support_tickets(db_firestore)})
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.error(f'Erro ao listar chamados do chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao carregar chamados.'}), 500
 
@@ -6438,6 +6472,7 @@ def chat_admin_delete_ticket(room_id):
         _delete_chat_room_recursive(db_firestore, room_id)
         return jsonify({'success': True, 'message': 'Chamado excluído com sucesso.', 'room_id': room_id})
     except BaseException as e:
+        _trip_firestore_circuit()
         app.logger.error(f'Erro ao excluir chamado do chat {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Falha ao excluir o chamado.'}), 500
 

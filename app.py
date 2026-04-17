@@ -5866,12 +5866,12 @@ def _get_firestore_client():
 def _get_firestore_document_snapshot(document_ref):
     # O SDK do Firestore expõe tipos dinâmicos e o Pylance pode inferir a variante assíncrona aqui.
     # Fazemos o cast para manter o comportamento síncrono real usado pelo projeto.
-    return cast(Any, document_ref.get())
+    return cast(Any, document_ref.get(timeout=10))
 
 
 def _delete_chat_room_recursive(db_firestore, room_id: str) -> None:
     room_ref = db_firestore.collection('chat_rooms').document(room_id)
-    messages = list(room_ref.collection('messages').stream())
+    messages = list(room_ref.collection('messages').stream(timeout=10))
 
     if messages:
         batch = db_firestore.batch()
@@ -5880,13 +5880,13 @@ def _delete_chat_room_recursive(db_firestore, room_id: str) -> None:
             batch.delete(message_doc.reference)
             operations += 1
             if operations >= 400:
-                batch.commit()
+                batch.commit(timeout=10)
                 batch = db_firestore.batch()
                 operations = 0
         if operations:
-            batch.commit()
+            batch.commit(timeout=10)
 
-    room_ref.delete()
+    room_ref.delete(timeout=10)
 
 
 def _firestore_server_timestamp():
@@ -6055,60 +6055,67 @@ def _build_chat_room_metadata(room_id: str, actor_user, last_message: str, exist
 
 
 def _sync_chat_room_metadata_from_latest(db_firestore, room_id: str) -> None:
-    room_ref = db_firestore.collection('chat_rooms').document(room_id)
-    room_snapshot = _get_firestore_document_snapshot(room_ref)
-    existing_room_data = room_snapshot.to_dict() or {}
-    query_direction = getattr(getattr(firebase_firestore, 'Query', None), 'DESCENDING', 'DESCENDING')
-    latest_docs = list(
-        room_ref.collection('messages')
-        .order_by('createdAt', direction=query_direction)
-        .limit(1)
-        .stream()
-    )
+    try:
+        room_ref = db_firestore.collection('chat_rooms').document(room_id)
+        room_snapshot = _get_firestore_document_snapshot(room_ref)
+        existing_room_data = room_snapshot.to_dict() or {}
+        query_direction = getattr(getattr(firebase_firestore, 'Query', None), 'DESCENDING', 'DESCENDING')
+        latest_docs = list(
+            room_ref.collection('messages')
+            .order_by('createdAt', direction=query_direction)
+            .limit(1)
+            .stream(timeout=5)
+        )
 
-    if not latest_docs:
-        serialized_room = _serialize_chat_room(room_id, existing_room_data)
+        if not latest_docs:
+            serialized_room = _serialize_chat_room(room_id, existing_room_data)
+            room_ref.set({
+                'id': serialized_room['id'],
+                'type': serialized_room['type'],
+                'name': serialized_room['name'],
+                'ownerName': serialized_room['ownerName'],
+                'ownerSiteUserId': serialized_room['ownerSiteUserId'],
+                'ownerPlan': serialized_room['ownerPlan'],
+                'updatedAt': _firestore_server_timestamp(),
+                'lastMessage': '',
+                'lastSender': '',
+                'lastSenderRole': '',
+                'lastSenderSiteUserId': '',
+                'lastSenderPlan': ''
+            }, merge=True, timeout=5)
+            return
+
+        latest_data = latest_docs[0].to_dict() or {}
+        actor_user = None
+        sender_site_user_id = str(latest_data.get('senderSiteUserId') or '')
+        if sender_site_user_id.isdigit():
+            actor_user = db.session.get(User, int(sender_site_user_id))
+        if actor_user is None:
+            actor_user = current_user
+
         room_ref.set({
-            'id': serialized_room['id'],
-            'type': serialized_room['type'],
-            'name': serialized_room['name'],
-            'ownerName': serialized_room['ownerName'],
-            'ownerSiteUserId': serialized_room['ownerSiteUserId'],
-            'ownerPlan': serialized_room['ownerPlan'],
-            'updatedAt': _firestore_server_timestamp(),
-            'lastMessage': '',
-            'lastSender': '',
-            'lastSenderRole': '',
-            'lastSenderSiteUserId': '',
-            'lastSenderPlan': ''
-        }, merge=True)
-        return
-
-    latest_data = latest_docs[0].to_dict() or {}
-    actor_user = None
-    sender_site_user_id = str(latest_data.get('senderSiteUserId') or '')
-    if sender_site_user_id.isdigit():
-        actor_user = db.session.get(User, int(sender_site_user_id))
-    if actor_user is None:
-        actor_user = current_user
-
-    room_ref.set({
-        **_build_chat_room_metadata(
-            room_id,
-            actor_user,
-            str(latest_data.get('text') or ''),
-            existing_room_data=existing_room_data
-        ),
-        'lastSender': str(latest_data.get('senderName') or ''),
-        'lastSenderRole': str(latest_data.get('senderRole') or ''),
-        'lastSenderSiteUserId': str(latest_data.get('senderSiteUserId') or ''),
-        'lastSenderPlan': normalize_plan_key(latest_data.get('senderPlan'))
-    }, merge=True)
+            **_build_chat_room_metadata(
+                room_id,
+                actor_user,
+                str(latest_data.get('text') or ''),
+                existing_room_data=existing_room_data
+            ),
+            'lastSender': str(latest_data.get('senderName') or ''),
+            'lastSenderRole': str(latest_data.get('senderRole') or ''),
+            'lastSenderSiteUserId': str(latest_data.get('senderSiteUserId') or ''),
+            'lastSenderPlan': normalize_plan_key(latest_data.get('senderPlan'))
+        }, merge=True, timeout=5)
+    except BaseException as e:
+        app.logger.warning(f'Firestore indisponível ao sincronizar metadados da sala {room_id}: {e}')
 
 
 def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
     tickets = []
-    docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream()
+    try:
+        docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream(timeout=10)
+    except BaseException as e:
+        app.logger.warning(f'Firestore indisponível ao listar tickets de suporte: {e}')
+        return tickets
 
     for doc in docs:
         data = doc.to_dict() or {}
@@ -6165,7 +6172,7 @@ def _ensure_chat_base_rooms_for_user(db_firestore, user) -> tuple[str, str]:
             'type': 'public',
             'name': 'Todos',
             'updatedAt': server_timestamp
-        }, merge=True)
+        }, merge=True, timeout=5)
 
         db_firestore.collection('chat_rooms').document(support_room_id).set({
             'id': support_room_id,
@@ -6175,10 +6182,10 @@ def _ensure_chat_base_rooms_for_user(db_firestore, user) -> tuple[str, str]:
             'ownerName': owner_name,
             'ownerPlan': owner_plan,
             'updatedAt': server_timestamp
-        }, merge=True)
+        }, merge=True, timeout=5)
 
         _chat_rooms_ensured_cache[cache_key] = now
-    except Exception as e:
+    except BaseException as e:
         app.logger.warning(f'Firestore indisponível ao garantir salas de chat (quota/rede): {e}')
         # Mesmo com erro, retorna os IDs — as salas provavelmente já existem
 
@@ -6209,7 +6216,7 @@ def chat_bootstrap():
             'is_admin': _is_chat_admin(current_user),
             'permissions': _get_chat_permissions_for_user(current_user)
         })
-    except Exception as e:
+    except BaseException as e:
         app.logger.error(f'Erro no bootstrap das salas de chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao preparar salas do chat.'}), 500
 
@@ -6250,7 +6257,7 @@ def chat_state():
             payload['tickets'] = _get_chat_support_tickets(db_firestore)
 
         return jsonify(payload)
-    except Exception as e:
+    except BaseException as e:
         app.logger.error(f'Erro ao carregar estado do chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao carregar o estado do chat.'}), 500
 
@@ -6279,7 +6286,7 @@ def chat_room_messages(room_id):
             message_limit = request.args.get('limit', CHAT_MESSAGE_LIMIT, type=int) or CHAT_MESSAGE_LIMIT
             message_limit = max(1, min(message_limit, CHAT_MESSAGE_LIMIT))
             query_direction = getattr(getattr(firebase_firestore, 'Query', None), 'DESCENDING', 'DESCENDING')
-            docs = room_ref.collection('messages').order_by('createdAt', direction=query_direction).limit(message_limit).stream()
+            docs = room_ref.collection('messages').order_by('createdAt', direction=query_direction).limit(message_limit).stream(timeout=10)
             messages = [_serialize_chat_message(doc) for doc in docs]
             return jsonify({'success': True, 'messages': messages})
 
@@ -6311,7 +6318,7 @@ def chat_room_messages(room_id):
             })
 
         new_message_ref = room_ref.collection('messages').document()
-        new_message_ref.set(payload)
+        new_message_ref.set(payload, timeout=5)
         _sync_chat_room_metadata_from_latest(db_firestore, room_id)
 
         created_doc = _get_firestore_document_snapshot(new_message_ref)
@@ -6319,7 +6326,7 @@ def chat_room_messages(room_id):
             'success': True,
             'message': _serialize_chat_message(created_doc) if created_doc.exists else {**payload, 'id': new_message_ref.id}
         })
-    except Exception as e:
+    except BaseException as e:
         app.logger.error(f'Erro ao processar mensagens da sala {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Falha ao processar a mensagem.'}), 500
 
@@ -6376,7 +6383,7 @@ def chat_room_message_actions(room_id, message_id):
                 'text': text,
                 'isEdited': True,
                 'editedAt': _firestore_server_timestamp()
-            })
+            }, timeout=5)
             _sync_chat_room_metadata_from_latest(db_firestore, room_id)
             updated_snapshot = _get_firestore_document_snapshot(message_ref)
             return jsonify({
@@ -6387,10 +6394,10 @@ def chat_room_message_actions(room_id, message_id):
         if not (is_admin_delete or can_manage_own_message):
             return jsonify({'success': False, 'message': 'Você não pode excluir esta mensagem.'}), 403
 
-        message_ref.delete()
+        message_ref.delete(timeout=5)
         _sync_chat_room_metadata_from_latest(db_firestore, room_id)
         return jsonify({'success': True, 'message': 'Mensagem excluída com sucesso.'})
-    except Exception as e:
+    except BaseException as e:
         app.logger.error(f'Erro ao processar ação da mensagem {message_id} na sala {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Falha ao processar a mensagem.'}), 500
 
@@ -6408,7 +6415,7 @@ def chat_admin_tickets():
 
     try:
         return jsonify({'success': True, 'tickets': _get_chat_support_tickets(db_firestore)})
-    except Exception as e:
+    except BaseException as e:
         app.logger.error(f'Erro ao listar chamados do chat: {e}')
         return jsonify({'success': False, 'message': 'Falha ao carregar chamados.'}), 500
 
@@ -6430,7 +6437,7 @@ def chat_admin_delete_ticket(room_id):
     try:
         _delete_chat_room_recursive(db_firestore, room_id)
         return jsonify({'success': True, 'message': 'Chamado excluído com sucesso.', 'room_id': room_id})
-    except Exception as e:
+    except BaseException as e:
         app.logger.error(f'Erro ao excluir chamado do chat {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Falha ao excluir o chamado.'}), 500
 

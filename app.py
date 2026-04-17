@@ -6139,28 +6139,48 @@ def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
     return tickets
 
 
+# Cache in-memory para evitar escritas repetidas ao Firestore em cada request
+_chat_rooms_ensured_cache: dict[str, float] = {}
+_CHAT_ROOMS_CACHE_TTL = 300  # 5 minutos
+
+
 def _ensure_chat_base_rooms_for_user(db_firestore, user) -> tuple[str, str]:
+    import time as _time
+
     support_room_id = _get_chat_support_room_id(user.id)
+    cache_key = f'{CHAT_PUBLIC_ROOM_ID}:{support_room_id}'
+    now = _time.monotonic()
+
+    # Se já garantimos as salas recentemente, pula as escritas no Firestore
+    if cache_key in _chat_rooms_ensured_cache and (now - _chat_rooms_ensured_cache[cache_key]) < _CHAT_ROOMS_CACHE_TTL:
+        return CHAT_PUBLIC_ROOM_ID, support_room_id
+
     owner_name = _chat_actor_name(user)
     owner_plan = normalize_plan_key(user.plan)
     server_timestamp = _firestore_server_timestamp()
 
-    db_firestore.collection('chat_rooms').document(CHAT_PUBLIC_ROOM_ID).set({
-        'id': CHAT_PUBLIC_ROOM_ID,
-        'type': 'public',
-        'name': 'Todos',
-        'updatedAt': server_timestamp
-    }, merge=True)
+    try:
+        db_firestore.collection('chat_rooms').document(CHAT_PUBLIC_ROOM_ID).set({
+            'id': CHAT_PUBLIC_ROOM_ID,
+            'type': 'public',
+            'name': 'Todos',
+            'updatedAt': server_timestamp
+        }, merge=True)
 
-    db_firestore.collection('chat_rooms').document(support_room_id).set({
-        'id': support_room_id,
-        'type': 'support',
-        'name': f'Suporte - {owner_name}',
-        'ownerSiteUserId': str(user.id),
-        'ownerName': owner_name,
-        'ownerPlan': owner_plan,
-        'updatedAt': server_timestamp
-    }, merge=True)
+        db_firestore.collection('chat_rooms').document(support_room_id).set({
+            'id': support_room_id,
+            'type': 'support',
+            'name': f'Suporte - {owner_name}',
+            'ownerSiteUserId': str(user.id),
+            'ownerName': owner_name,
+            'ownerPlan': owner_plan,
+            'updatedAt': server_timestamp
+        }, merge=True)
+
+        _chat_rooms_ensured_cache[cache_key] = now
+    except Exception as e:
+        app.logger.warning(f'Firestore indisponível ao garantir salas de chat (quota/rede): {e}')
+        # Mesmo com erro, retorna os IDs — as salas provavelmente já existem
 
     return CHAT_PUBLIC_ROOM_ID, support_room_id
 

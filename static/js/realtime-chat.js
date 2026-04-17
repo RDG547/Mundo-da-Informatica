@@ -68,6 +68,8 @@
     let draftEdit = null;
     let chatConfirmState = null;
     let chatConfirmElements = null;
+    let chatUnavailable = false;
+    let chatRetryTimer = null;
 
     function getCsrfToken() {
         if (window.csrfUtils && typeof window.csrfUtils.getCsrfToken === 'function') {
@@ -102,11 +104,47 @@
         const response = await fetch(url, requestOptions);
         const payload = await response.json().catch(() => ({}));
 
+        if (response.status === 503 && payload.chatUnavailable) {
+            enterUnavailableMode(response.headers.get('Retry-After'));
+            throw new Error(payload.message || 'Chat temporariamente indisponível.');
+        }
+
         if (!response.ok || payload.success === false) {
             throw new Error(payload.message || payload.error || 'Falha ao processar a solicitacao.');
         }
 
         return payload;
+    }
+
+    function enterUnavailableMode(retryAfterHeader) {
+        if (chatUnavailable) return;
+        chatUnavailable = true;
+
+        clearPoller('activeMessages');
+        clearPoller('roomState');
+
+        setStatus('Chat temporariamente indisponivel. Tentando reconectar...', 'error');
+        elements.messages.innerHTML = '<div class="chat-empty-state">Chat temporariamente indisponivel.<br>Reconexao automatica em breve.</div>';
+
+        if (elements.input) elements.input.disabled = true;
+        if (elements.send) elements.send.disabled = true;
+
+        var retrySec = parseInt(retryAfterHeader, 10);
+        if (!retrySec || retrySec < 30) retrySec = 60;
+
+        if (chatRetryTimer) clearTimeout(chatRetryTimer);
+        chatRetryTimer = setTimeout(function () {
+            chatRetryTimer = null;
+            exitUnavailableMode();
+        }, retrySec * 1000);
+    }
+
+    function exitUnavailableMode() {
+        chatUnavailable = false;
+        if (elements.input) elements.input.disabled = false;
+        if (elements.send) elements.send.disabled = false;
+        setStatus('Reconectando...', 'warning');
+        initializeChatConnection();
     }
 
     function tsToMillis(value) {
@@ -1358,11 +1396,14 @@
         try {
             await bootstrapRoomsFromServer();
             await refreshChatState();
+            chatUnavailable = false;
             await switchTab('todos');
             startPoller('roomState', refreshChatState, ROOM_STATE_POLL_MS);
         } catch (error) {
             console.error('[CHAT] Erro ao inicializar chat em tempo real:', error);
-            setStatus(error.message || 'Falha ao inicializar o chat.', 'error');
+            if (!chatUnavailable) {
+                setStatus(error.message || 'Falha ao inicializar o chat.', 'error');
+            }
         }
     }
 

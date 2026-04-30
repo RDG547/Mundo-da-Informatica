@@ -1159,7 +1159,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 display: none;
                 justify-content: center;
                 align-items: center;
-                z-index: 9999;
+                z-index: 900;
                 backdrop-filter: blur(5px);
                 pointer-events: auto;
             }
@@ -1230,7 +1230,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             const headerRect = header?.getBoundingClientRect();
             const top = Math.max(rect.top, headerRect ? headerRect.bottom : 0, 0);
             const left = Math.max(rect.left, 0);
-            const width = Math.max(rect.width, window.innerWidth);
+            const width = Math.max(rect.width, 320);
             const height = Math.max(Math.min(rect.bottom, window.innerHeight) - top, 240);
 
             if (loader.parentNode !== document.body) {

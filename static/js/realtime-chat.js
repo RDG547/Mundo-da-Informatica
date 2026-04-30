@@ -5,8 +5,12 @@
     window.__realtimeChatInitialized = true;
 
     const EDIT_WINDOW_MS = 10 * 60 * 1000;
-    const ROOM_STATE_POLL_MS = 5000;
-    const ACTIVE_ROOM_POLL_MS = 3000;
+    const ROOM_STATE_POLL_OPEN_MS = 45000;
+    const ROOM_STATE_POLL_CLOSED_MS = 300000;
+    const ACTIVE_ROOM_POLL_ACTIVE_MS = 15000;
+    const ACTIVE_ROOM_POLL_IDLE_MS = 45000;
+    const CHAT_ACTIVITY_WINDOW_MS = 90000;
+    const CHAT_FIREBASE_APP_NAME = 'chat-live';
 
     const elements = {
         button: document.getElementById('floating-chat-btn'),
@@ -70,6 +74,17 @@
     let chatConfirmElements = null;
     let chatUnavailable = false;
     let chatRetryTimer = null;
+    let lastChatActivityAt = 0;
+    let chatRealtimeInitPromise = null;
+    let chatRealtimeReady = false;
+    let chatRealtimeDb = null;
+    let chatRealtimeAuth = null;
+    let chatRealtimeStateUnsubscribers = {
+        todos: null,
+        support: null,
+        tickets: null
+    };
+    let chatRealtimeActiveRoomUnsubscribe = null;
 
     function getCsrfToken() {
         if (window.csrfUtils && typeof window.csrfUtils.getCsrfToken === 'function') {
@@ -114,6 +129,208 @@
         }
 
         return payload;
+    }
+
+    function readFirebaseConfig() {
+        const configScript = document.getElementById('firebase-config');
+        if (!configScript) return null;
+
+        try {
+            const parsed = JSON.parse(configScript.textContent || '{}');
+            if (!parsed || !parsed.apiKey || !parsed.authDomain || !parsed.projectId || !parsed.appId) {
+                return null;
+            }
+            return parsed;
+        } catch (error) {
+            console.error('[CHAT] Config Firebase inválida:', error);
+            return null;
+        }
+    }
+
+    function clearRealtimeUnsubscribe(unsubscribe) {
+        if (typeof unsubscribe === 'function') {
+            try {
+                unsubscribe();
+            } catch (error) {
+                console.warn('[CHAT] Erro ao encerrar listener realtime:', error);
+            }
+        }
+        return null;
+    }
+
+    function clearRealtimeActiveRoomListener() {
+        chatRealtimeActiveRoomUnsubscribe = clearRealtimeUnsubscribe(chatRealtimeActiveRoomUnsubscribe);
+    }
+
+    function clearRealtimeStateListeners() {
+        chatRealtimeStateUnsubscribers.todos = clearRealtimeUnsubscribe(chatRealtimeStateUnsubscribers.todos);
+        chatRealtimeStateUnsubscribers.support = clearRealtimeUnsubscribe(chatRealtimeStateUnsubscribers.support);
+        chatRealtimeStateUnsubscribers.tickets = clearRealtimeUnsubscribe(chatRealtimeStateUnsubscribers.tickets);
+    }
+
+    function normalizeRealtimeRoomMeta(roomId, roomData) {
+        const normalizedData = roomData && typeof roomData === 'object' ? { ...roomData } : {};
+        return {
+            id: roomId,
+            ...normalizedData,
+            updatedAtMs: tsToMillis(normalizedData.updatedAt || normalizedData.updatedAtMs)
+        };
+    }
+
+    function handleRealtimeStateFailure(error) {
+        console.error('[CHAT] Falha no listener realtime de estado:', error);
+        clearRealtimeStateListeners();
+        startRoomStatePolling();
+    }
+
+    function handleRealtimeRoomFailure(roomId, error) {
+        console.error(`[CHAT] Falha no listener realtime da sala ${roomId}:`, error);
+        clearRealtimeActiveRoomListener();
+        if (roomId === currentRoomId) {
+            startActiveMessagesPoller(roomId);
+        }
+    }
+
+    function attachRealtimeRoomMetaListeners() {
+        if (!chatRealtimeReady || !chatRealtimeDb) {
+            return false;
+        }
+
+        if (!chatRealtimeStateUnsubscribers.todos) {
+            chatRealtimeStateUnsubscribers.todos = chatRealtimeDb
+                .collection('chat_rooms')
+                .doc('todos')
+                .onSnapshot((snapshot) => {
+                    roomMetaCache.todos = snapshot.exists
+                        ? normalizeRealtimeRoomMeta('todos', snapshot.data())
+                        : null;
+                    updateTodosTabState();
+                    refreshUnreadBadges();
+                    updateInputState();
+                }, handleRealtimeStateFailure);
+        }
+
+        const supportRoomId = getSupportRoomIdForUser(userMeta.userId);
+        if (supportRoomId && !chatRealtimeStateUnsubscribers.support) {
+            chatRealtimeStateUnsubscribers.support = chatRealtimeDb
+                .collection('chat_rooms')
+                .doc(supportRoomId)
+                .onSnapshot((snapshot) => {
+                    roomMetaCache.suporte = snapshot.exists
+                        ? normalizeRealtimeRoomMeta(supportRoomId, snapshot.data())
+                        : null;
+                    refreshUnreadBadges();
+                    updateInputState();
+                }, handleRealtimeStateFailure);
+        }
+
+        if (userMeta.isAdmin && !chatRealtimeStateUnsubscribers.tickets) {
+            chatRealtimeStateUnsubscribers.tickets = chatRealtimeDb
+                .collection('chat_rooms')
+                .where('type', '==', 'support')
+                .limit(100)
+                .onSnapshot((snapshot) => {
+                    const tickets = snapshot.docs.map((doc) => ({
+                        id: String(doc.id || ''),
+                        data: normalizeRealtimeRoomMeta(doc.id, doc.data())
+                    }));
+                    hydrateSupportTickets(tickets);
+                }, handleRealtimeStateFailure);
+        }
+
+        return true;
+    }
+
+    function attachRealtimeActiveRoomListener(roomId) {
+        clearRealtimeActiveRoomListener();
+        if (!chatRealtimeReady || !chatRealtimeDb || !roomId || !panelOpen || document.visibilityState === 'hidden') {
+            return false;
+        }
+
+        chatRealtimeActiveRoomUnsubscribe = chatRealtimeDb
+            .collection('chat_rooms')
+            .doc(roomId)
+            .collection('messages')
+            .orderBy('createdAt', 'desc')
+            .limit(80)
+            .onSnapshot((snapshot) => {
+                if (roomId !== currentRoomId) {
+                    return;
+                }
+
+                renderMessages(snapshot.docs);
+                setStatus(getConnectedMessage(roomId), 'ok');
+                if (panelOpen) {
+                    markRoomAsRead(roomId);
+                }
+            }, (error) => handleRealtimeRoomFailure(roomId, error));
+
+        return true;
+    }
+
+    function syncRealtimeBindings() {
+        if (!chatRealtimeReady) {
+            return false;
+        }
+
+        attachRealtimeRoomMetaListeners();
+
+        if (panelOpen && currentRoomId && document.visibilityState !== 'hidden') {
+            attachRealtimeActiveRoomListener(currentRoomId);
+        } else {
+            clearRealtimeActiveRoomListener();
+        }
+
+        return true;
+    }
+
+    async function initializeChatRealtime() {
+        if (chatRealtimeReady && chatRealtimeDb) {
+            return true;
+        }
+
+        if (chatRealtimeInitPromise) {
+            return chatRealtimeInitPromise;
+        }
+
+        chatRealtimeInitPromise = (async () => {
+            const firebaseConfig = readFirebaseConfig();
+            if (!firebaseConfig || typeof firebase === 'undefined' || !firebase?.initializeApp) {
+                return false;
+            }
+
+            let firebaseApp = firebase.apps.find((app) => app.name === CHAT_FIREBASE_APP_NAME);
+            if (!firebaseApp) {
+                firebaseApp = firebase.initializeApp(firebaseConfig, CHAT_FIREBASE_APP_NAME);
+            }
+
+            const auth = firebaseApp.auth();
+            const tokenData = await apiJson('/api/chat/firebase-token');
+            if (!tokenData?.token) {
+                return false;
+            }
+
+            if (!auth.currentUser || auth.currentUser.uid !== tokenData.uid) {
+                await auth.signInWithCustomToken(tokenData.token);
+            }
+
+            chatRealtimeAuth = auth;
+            chatRealtimeDb = firebaseApp.firestore();
+            chatRealtimeReady = true;
+            return true;
+        })().catch((error) => {
+            console.error('[CHAT] Não foi possível inicializar realtime via Firebase:', error);
+            chatRealtimeReady = false;
+            chatRealtimeDb = null;
+            chatRealtimeAuth = null;
+            clearRealtimeActiveRoomListener();
+            clearRealtimeStateListeners();
+            return false;
+        }).finally(() => {
+            chatRealtimeInitPromise = null;
+        });
+
+        return chatRealtimeInitPromise;
     }
 
     function enterUnavailableMode(retryAfterHeader) {
@@ -189,6 +406,16 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    function getDeletedMessageNotice(data) {
+        const adminName = String(data.deletedByName || '').trim();
+        if (data.deletedByAdmin) {
+            return adminName
+                ? `Mensagem apagada por admin ${adminName}.`
+                : 'Mensagem apagada por um admin.';
+        }
+        return 'Mensagem apagada.';
     }
 
     function normalizePlan(value) {
@@ -564,6 +791,7 @@
     function canEditMessageDoc(doc) {
         if (!doc) return false;
         const data = doc.data() || {};
+        if (data.isDeleted) return false;
         if (!isMessageMine(data)) return false;
         const createdAtMs = tsToMillis(data.createdAt || data.createdAtMs);
         if (!createdAtMs) return false;
@@ -572,12 +800,13 @@
 
     function canDeleteMessageDoc(doc) {
         if (!doc) return false;
+        const data = doc.data() || {};
+        if (data.isDeleted) return false;
 
-        if (currentRoomId.startsWith('support_user_') && userMeta.isAdmin) {
+        if (userMeta.isAdmin) {
             return true;
         }
 
-        const data = doc.data() || {};
         if (!isMessageMine(data)) return false;
         const createdAtMs = tsToMillis(data.createdAt || data.createdAtMs);
         if (!createdAtMs) return false;
@@ -742,6 +971,10 @@
         const doc = findMessageDocById(messageId);
         if (!doc) return;
         const data = doc.data() || {};
+        if (data.isDeleted) {
+            notifyUser('Esta mensagem foi apagada e nao pode ser respondida.', 'warning');
+            return;
+        }
         draftReply = {
             messageId,
             roomId: currentRoomId,
@@ -803,10 +1036,11 @@
             const data = doc.data() || {};
             const senderName = data.senderName || 'Usuario';
             const text = data.text || '';
+            const isDeleted = Boolean(data.isDeleted);
             const mine = isMessageMine(data);
             const canEdit = canEditMessageDoc(doc);
             const planBadge = renderPlanBadge(resolveMessagePlan(data), data.senderRole);
-            const replyBlock = data.replyToMessageId || data.replyToText
+            const replyBlock = !isDeleted && (data.replyToMessageId || data.replyToText)
                 ? `
                     <div class="chat-message-reply-preview">
                         <span class="chat-message-reply-name">${escapeHtml(data.replyToSenderName || 'Mensagem respondida')}</span>
@@ -814,10 +1048,18 @@
                     </div>
                 `
                 : '';
-            const editedBadge = data.isEdited
+            const editedBadge = !isDeleted && data.isEdited
                 ? '<span class="chat-message-edited">editada</span>'
                 : '';
-            const replyButton = canReplyInRoom
+            const messageTextHtml = isDeleted
+                ? `
+                    <div class="chat-message-deleted">
+                        <i class="fas fa-ban"></i>
+                        <span>${escapeHtml(getDeletedMessageNotice(data))}</span>
+                    </div>
+                `
+                : `<div class="chat-message-text">${escapeHtml(text)}</div>`;
+            const replyButton = !isDeleted && canReplyInRoom
                 ? `
                     <button type="button" class="chat-message-action" data-chat-reply="${escapeHtml(doc.id)}">
                         <i class="fas fa-reply"></i>
@@ -843,7 +1085,7 @@
                 : '';
 
             return `
-                <article class="chat-message${mine ? ' mine' : ''}" data-message-id="${escapeHtml(doc.id)}">
+                <article class="chat-message${mine ? ' mine' : ''}${isDeleted ? ' is-deleted' : ''}" data-message-id="${escapeHtml(doc.id)}">
                     <div class="chat-message-header">
                         <div class="chat-message-sender-wrap">
                             <span class="chat-message-sender">${escapeHtml(senderName)}</span>
@@ -853,7 +1095,7 @@
                     </div>
                     <div class="chat-message-body">
                         ${replyBlock}
-                        <div class="chat-message-text">${escapeHtml(text)}</div>
+                        ${messageTextHtml}
                     </div>
                     <div class="chat-message-footer">
                         <div class="chat-message-meta">${editedBadge}</div>
@@ -991,6 +1233,7 @@
     }
 
     function selectTicket(roomId) {
+        touchChatActivity();
         selectedTicketRoomId = roomId || '';
         renderTicketList();
         clearComposerAction(true);
@@ -1026,6 +1269,14 @@
         refreshUnreadBadges();
         updateInputState();
         return state;
+    }
+
+    function startRoomStatePolling() {
+        startPoller('roomState', refreshChatState, () => (
+            panelOpen && document.visibilityState !== 'hidden'
+                ? ROOM_STATE_POLL_OPEN_MS
+                : ROOM_STATE_POLL_CLOSED_MS
+        ));
     }
 
     function hydrateSupportTickets(tickets) {
@@ -1085,12 +1336,21 @@
 
     function startPoller(pollerName, handler, intervalMs) {
         clearPoller(pollerName);
-        pollerBackoff[pollerName] = intervalMs;
+        const resolveInterval = () => {
+            if (typeof intervalMs === 'function') {
+                const value = Number(intervalMs());
+                return Number.isFinite(value) && value > 0 ? value : ACTIVE_ROOM_POLL_IDLE_MS;
+            }
+            return Number(intervalMs) || ACTIVE_ROOM_POLL_IDLE_MS;
+        };
+
+        pollerBackoff[pollerName] = resolveInterval();
         let isActive = true;
         let timerId = null;
 
         const schedule = () => {
             if (!isActive) return;
+            pollerBackoff[pollerName] = resolveInterval();
             timerId = window.setTimeout(run, pollerBackoff[pollerName]);
         };
 
@@ -1098,7 +1358,7 @@
             if (!isActive) return;
             try {
                 await handler();
-                pollerBackoff[pollerName] = intervalMs;
+                pollerBackoff[pollerName] = resolveInterval();
             } catch (error) {
                 pollerBackoff[pollerName] = Math.min(pollerBackoff[pollerName] * 2, MAX_BACKOFF_MS);
                 console.error(`[CHAT] Erro no poller ${pollerName}:`, error);
@@ -1115,6 +1375,50 @@
 
     function clearActiveMessagesSubscription() {
         clearPoller('activeMessages');
+    }
+
+    function touchChatActivity() {
+        lastChatActivityAt = Date.now();
+    }
+
+    function getActiveRoomPollInterval() {
+        if (!lastChatActivityAt) {
+            return ACTIVE_ROOM_POLL_IDLE_MS;
+        }
+
+        return (Date.now() - lastChatActivityAt) <= CHAT_ACTIVITY_WINDOW_MS
+            ? ACTIVE_ROOM_POLL_ACTIVE_MS
+            : ACTIVE_ROOM_POLL_IDLE_MS;
+    }
+
+    function shouldPollActiveMessages() {
+        return panelOpen && document.visibilityState !== 'hidden' && Boolean(currentRoomId);
+    }
+
+    function startActiveMessagesPoller(roomId) {
+        clearActiveMessagesSubscription();
+        if (!roomId || !shouldPollActiveMessages()) {
+            return;
+        }
+
+        if (chatRealtimeReady && attachRealtimeActiveRoomListener(roomId)) {
+            return;
+        }
+
+        startPoller('activeMessages', async () => {
+            try {
+                await loadRoomMessages(roomId);
+            } catch (error) {
+                if (roomId === currentRoomId) {
+                    activeMessageDocs = [];
+                    showCurrentEmptyState();
+                    setStatus(error.message || getConnectionErrorMessage(roomId), 'error');
+                    if (currentTab === 'chamados' && userMeta.isAdmin) {
+                        await refreshChatState();
+                    }
+                }
+            }
+        }, getActiveRoomPollInterval);
     }
 
     async function loadRoomMessages(roomId) {
@@ -1143,6 +1447,7 @@
 
     function subscribeActiveRoom(roomId) {
         clearActiveMessagesSubscription();
+        clearRealtimeActiveRoomListener();
         clearComposerAction(true);
         activeMessageDocs = [];
 
@@ -1157,27 +1462,14 @@
         setStatus(getConnectingMessage(roomId));
         showCurrentEmptyState();
         updateInputState();
-
-        startPoller('activeMessages', async () => {
-            try {
-                await loadRoomMessages(roomId);
-            } catch (error) {
-                if (roomId === currentRoomId) {
-                    activeMessageDocs = [];
-                    showCurrentEmptyState();
-                    setStatus(error.message || getConnectionErrorMessage(roomId), 'error');
-                    if (currentTab === 'chamados' && userMeta.isAdmin) {
-                        await refreshChatState();
-                    }
-                }
-            }
-        }, ACTIVE_ROOM_POLL_MS);
+        startActiveMessagesPoller(roomId);
     }
 
     async function switchToRoom(roomId) {
         if (!roomId) {
             const fallbackRoomId = getDefaultRoomForCurrentTab();
             if (fallbackRoomId) {
+                touchChatActivity();
                 subscribeActiveRoom(fallbackRoomId);
                 if (panelOpen) {
                     markRoomAsRead(fallbackRoomId);
@@ -1191,6 +1483,7 @@
             return;
         }
 
+        touchChatActivity();
         subscribeActiveRoom(roomId);
 
         if (panelOpen) {
@@ -1199,6 +1492,7 @@
     }
 
     async function switchTab(tabId) {
+        touchChatActivity();
         setActiveTab(tabId);
         currentRoomId = getDefaultRoomForCurrentTab();
         clearComposerAction(true);
@@ -1238,6 +1532,7 @@
     }
 
     async function createMessage(text) {
+        touchChatActivity();
         await apiJson(`/api/chat/rooms/${encodeURIComponent(currentRoomId)}/messages`, {
             method: 'POST',
             body: {
@@ -1259,6 +1554,7 @@
             throw new Error('A janela de edicao desta mensagem expirou.');
         }
 
+        touchChatActivity();
         await apiJson(`/api/chat/rooms/${encodeURIComponent(currentRoomId)}/messages/${encodeURIComponent(draftEdit.messageId)}`, {
             method: 'PATCH',
             body: { text }
@@ -1275,13 +1571,16 @@
 
         const confirmed = await showChatConfirm({
             title: 'Excluir mensagem?',
-            message: 'Deseja excluir esta mensagem do chat?',
+            message: userMeta.isAdmin
+                ? 'A mensagem ficara marcada no chat como apagada por admin.'
+                : 'Deseja excluir esta mensagem do chat?',
             confirmLabel: 'Excluir'
         });
         if (!confirmed) {
             return;
         }
 
+        touchChatActivity();
         await apiJson(`/api/chat/rooms/${encodeURIComponent(currentRoomId)}/messages/${encodeURIComponent(messageId)}`, {
             method: 'DELETE'
         });
@@ -1344,6 +1643,7 @@
             return false;
         }
 
+        touchChatActivity();
         if (draftEdit) {
             await editMessage(text);
         } else {
@@ -1365,15 +1665,16 @@
 
     function openPanel() {
         panelOpen = true;
+        touchChatActivity();
         elements.panel.classList.add('open');
         elements.panel.setAttribute('aria-hidden', 'false');
         elements.button.classList.add('active');
 
         if (currentRoomId) {
             markRoomAsRead(currentRoomId);
-            loadRoomMessages(currentRoomId).catch((error) => {
-                console.error('[CHAT] Erro ao carregar mensagens ao abrir painel:', error);
-            });
+            if (!syncRealtimeBindings()) {
+                startActiveMessagesPoller(currentRoomId);
+            }
         }
 
         setTimeout(() => {
@@ -1388,6 +1689,8 @@
         elements.panel.classList.remove('open');
         elements.panel.setAttribute('aria-hidden', 'true');
         elements.button.classList.remove('active');
+        clearActiveMessagesSubscription();
+        clearRealtimeActiveRoomListener();
     }
 
     async function initializeChatConnection() {
@@ -1397,8 +1700,18 @@
             await bootstrapRoomsFromServer();
             await refreshChatState();
             chatUnavailable = false;
-            await switchTab('todos');
-            startPoller('roomState', refreshChatState, ROOM_STATE_POLL_MS);
+            setActiveTab('todos');
+            currentRoomId = 'todos';
+            showCurrentEmptyState();
+            updateInputState();
+
+            const realtimeEnabled = await initializeChatRealtime();
+            if (realtimeEnabled) {
+                clearPoller('roomState');
+                syncRealtimeBindings();
+            } else {
+                startRoomStatePolling();
+            }
         } catch (error) {
             console.error('[CHAT] Erro ao inicializar chat em tempo real:', error);
             if (!chatUnavailable) {
@@ -1436,6 +1749,24 @@
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && elements.panel.classList.contains('open')) {
                 closePanel();
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                clearActiveMessagesSubscription();
+                clearRealtimeActiveRoomListener();
+                return;
+            }
+
+            if (panelOpen && currentRoomId) {
+                touchChatActivity();
+                if (!syncRealtimeBindings()) {
+                    loadRoomMessages(currentRoomId).catch((error) => {
+                        console.error('[CHAT] Erro ao atualizar mensagens apos retorno da aba:', error);
+                    });
+                    startActiveMessagesPoller(currentRoomId);
+                }
             }
         });
 

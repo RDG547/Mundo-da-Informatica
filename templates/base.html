@@ -346,8 +346,25 @@
         <span class="floating-chat-unread" id="floating-chat-unread" hidden>0</span>
     </button>
 
-    <!-- Floating Beta Tag -->
-    <div class="floating-beta-tag">Beta</div>
+    <!-- Floating Construction Notice -->
+    <aside class="floating-beta-notice is-open" id="floating-beta-notice" aria-label="Aviso de construção">
+        <button type="button" class="floating-beta-toggle" id="floating-beta-toggle" aria-expanded="true"
+            title="Aviso Beta">
+            <i class="fas fa-cog"></i>
+            <span>Beta</span>
+        </button>
+        <div class="floating-beta-content">
+            <div class="floating-beta-content-header">
+                <strong>Estamos em construção</strong>
+                <span class="floating-beta-countdown" id="floating-beta-countdown" aria-live="polite">Recolhe em 7s</span>
+            </div>
+            <p>Algumas áreas podem apresentar bugs. Reporte qualquer problema: estamos em constante atualização e contamos com você.</p>
+            <a href="{{ url_for('contact') }}">
+                <i class="fas fa-paper-plane"></i>
+                Reportar problema
+            </a>
+        </div>
+    </aside>
 
     <!-- Floating Chat Panel -->
     <div class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
@@ -1338,6 +1355,80 @@
                     }
                 });
             });
+
+            const betaNotice = document.getElementById('floating-beta-notice');
+            const betaToggle = document.getElementById('floating-beta-toggle');
+            const betaCountdown = document.getElementById('floating-beta-countdown');
+            if (betaNotice && betaToggle && betaNotice.dataset.initialized !== 'true') {
+                const BETA_AUTO_COLLAPSE_MS = 6500;
+                const BETA_COUNTDOWN_STEP_MS = 250;
+                let betaCollapseTimer = null;
+                let betaCountdownTimer = null;
+
+                betaNotice.dataset.initialized = 'true';
+
+                const clearBetaTimers = () => {
+                    if (betaCollapseTimer) {
+                        window.clearTimeout(betaCollapseTimer);
+                        betaCollapseTimer = null;
+                    }
+                    if (betaCountdownTimer) {
+                        window.clearInterval(betaCountdownTimer);
+                        betaCountdownTimer = null;
+                    }
+                };
+
+                const updateBetaCountdown = (remainingMs) => {
+                    if (!betaCountdown) return;
+                    const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+                    betaCountdown.textContent = `Recolhe em ${remainingSeconds}s`;
+                };
+
+                const scheduleBetaCollapse = () => {
+                    clearBetaTimers();
+                    const startAt = Date.now();
+                    updateBetaCountdown(BETA_AUTO_COLLAPSE_MS);
+
+                    betaCountdownTimer = window.setInterval(() => {
+                        const elapsedMs = Date.now() - startAt;
+                        const remainingMs = BETA_AUTO_COLLAPSE_MS - elapsedMs;
+                        if (remainingMs <= 0) {
+                            clearBetaTimers();
+                            setBetaOpen(false, { preserveCountdownLabel: false });
+                            return;
+                        }
+                        updateBetaCountdown(remainingMs);
+                    }, BETA_COUNTDOWN_STEP_MS);
+
+                    betaCollapseTimer = window.setTimeout(() => {
+                        clearBetaTimers();
+                        setBetaOpen(false, { preserveCountdownLabel: false });
+                    }, BETA_AUTO_COLLAPSE_MS);
+                };
+
+                const setBetaOpen = (isOpen, options = {}) => {
+                    const preserveCountdownLabel = options.preserveCountdownLabel !== false;
+                    betaNotice.classList.toggle('is-open', isOpen);
+                    betaToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+                    if (isOpen) {
+                        scheduleBetaCollapse();
+                        return;
+                    }
+
+                    clearBetaTimers();
+                    if (betaCountdown && !preserveCountdownLabel) {
+                        betaCountdown.textContent = 'Expanda para ver o aviso novamente';
+                    }
+                };
+
+                betaToggle.addEventListener('click', () => {
+                    const shouldOpen = !betaNotice.classList.contains('is-open');
+                    setBetaOpen(shouldOpen, { preserveCountdownLabel: shouldOpen });
+                });
+
+                setBetaOpen(true);
+            }
         });
     </script>
 

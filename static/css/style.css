@@ -677,15 +677,74 @@ section {
     animation: fadeUp 1s forwards 0.3s;
 }
 
-/* Título 3D Simples */
+/* Título 3D da home */
 .hero-title-3d {
+    position: relative;
+    isolation: isolate;
     font-size: clamp(2.8rem, 5vw, 4.5rem) !important;
     margin-bottom: 2rem !important;
-    line-height: 1.1 !important;
+    line-height: 1.08 !important;
     font-weight: 800;
     text-align: center;
-    color: white;
-    perspective: 500px;
+    color: #f8fbff;
+    perspective: 900px;
+    transform-style: preserve-3d;
+    letter-spacing: 0;
+    text-shadow:
+        0 1px 0 #dbe7ff,
+        0 2px 0 #b8cbff,
+        0 3px 0 #7fa1ff,
+        0 4px 0 #4f73dc,
+        0 10px 18px rgba(13, 27, 74, 0.42),
+        0 22px 46px rgba(16, 185, 129, 0.18);
+    filter: drop-shadow(0 18px 28px rgba(15, 23, 42, 0.28));
+    will-change: transform;
+}
+
+.hero-title-3d .hero-line,
+.hero-title-3d .hero-line-3d {
+    --hero-shadow-opacity: 1;
+    display: block;
+    position: relative;
+    transform: rotateX(7deg) rotateY(-7deg) translateZ(0);
+    transform-style: preserve-3d;
+}
+
+.hero-title-3d .hero-line::before,
+.hero-title-3d .hero-line-3d::before {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    color: rgba(19, 38, 95, 0.74);
+    transform: translate3d(8px, 9px, -24px);
+    opacity: var(--hero-shadow-opacity);
+    text-shadow: none;
+    pointer-events: none;
+}
+
+.hero-title-3d .hero-line::after,
+.hero-title-3d .hero-line-3d::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    color: rgba(34, 197, 94, 0.16);
+    filter: blur(10px);
+    transform: translate3d(16px, 18px, -42px);
+    opacity: calc(var(--hero-shadow-opacity) * 0.88);
+    text-shadow: none;
+    pointer-events: none;
+}
+
+.hero-title-3d .hero-word-3d,
+.hero-title-3d .hero-char-3d {
+    transform-style: preserve-3d;
+}
+
+.hero-title-3d .hero-char-3d {
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .hero-subtitle-split {
@@ -798,9 +857,7 @@ section {
     }
 }
 
-/* Efeitos de hover removidos - título completamente estático */
-
-/* Efeito de brilho adicional */
+/* Brilho adicional do título */
 .hero-title-3d::before {
     content: '';
     position: absolute;
@@ -815,6 +872,7 @@ section {
     animation: shimmer 4s ease-in-out infinite;
     z-index: -1;
     border-radius: 50%;
+    pointer-events: none;
 }
 
 @keyframes shimmer {
@@ -2478,24 +2536,154 @@ footer {
     bottom: 90px;
 }
 
-/* Floating Beta Tag */
-.floating-beta-tag {
+/* Floating construction notice */
+.floating-beta-notice {
     position: fixed;
-    bottom: 30px;
-    left: 30px;
-    background: rgba(102, 126, 234, 0.25);
-    color: rgba(102, 126, 234, 0.85);
-    padding: 6px 18px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
+    left: 24px;
+    bottom: 24px;
     z-index: 99;
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(102, 126, 234, 0.2);
+    width: min(320px, calc(100vw - 48px));
+    max-width: calc(100vw - 48px);
+    border: 1px solid rgba(58, 134, 255, 0.24);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    transform-origin: left bottom;
+    transition: width 0.26s ease, border-radius 0.24s ease, transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.floating-beta-toggle {
+    width: 100%;
+    min-height: 54px;
+    border: none;
+    background: linear-gradient(135deg, #2563eb, #22c55e);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.6rem;
+    padding: 0.76rem 0.95rem;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 0.86rem;
+    letter-spacing: 0;
+    transition: padding 0.22s ease, gap 0.22s ease, justify-content 0.22s ease;
+}
+
+.floating-beta-toggle i {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.18);
+    flex: 0 0 28px;
+}
+
+.floating-beta-content {
+    padding: 0.95rem;
+    color: #334155;
+    display: grid;
+    gap: 0.6rem;
+    max-height: 240px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.26s ease, opacity 0.18s ease, padding 0.18s ease;
+}
+
+.floating-beta-content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.floating-beta-content strong {
+    color: #0f172a;
+    font-size: 0.96rem;
+}
+
+.floating-beta-countdown {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 118px;
+    padding: 0.28rem 0.58rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+    font-size: 0.73rem;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.floating-beta-content p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+.floating-beta-content a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    background: rgba(58, 134, 255, 0.1);
+    color: var(--primary-color);
+    padding: 0.62rem 0.85rem;
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 800;
+    transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.floating-beta-content a:hover {
+    background: rgba(58, 134, 255, 0.16);
+    transform: translateY(-1px);
+}
+
+.floating-beta-notice:not(.is-open) {
+    width: 108px;
+    border-radius: 999px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.floating-beta-notice:not(.is-open) .floating-beta-toggle {
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.7rem 0.9rem;
+}
+
+.floating-beta-notice:not(.is-open) .floating-beta-content {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
     pointer-events: none;
-    user-select: none;
+}
+
+@media (max-width: 576px) {
+    .floating-beta-notice {
+        left: 12px;
+        bottom: 16px;
+        max-width: calc(100vw - 24px);
+    }
+
+    .floating-beta-content-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .floating-beta-countdown {
+        min-width: 0;
+    }
 }
 
 /* Tema Escuro */

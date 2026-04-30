@@ -4,7 +4,7 @@
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
-        <h1 class="hero-title-3d hero-split-text"><span class="hero-line">Bem-vindo ao</span><span class="hero-line">Mundo da</span><span class="hero-line">Informática</span></h1>
+        <h1 class="hero-title-3d hero-split-text" aria-label="Bem-vindo ao Mundo da Informática"><span class="hero-line" data-text="Bem-vindo ao">Bem-vindo ao</span><span class="hero-line" data-text="Mundo da">Mundo da</span><span class="hero-line" data-text="Informática">Informática</span></h1>
         <p class="hero-subtitle-split">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
@@ -24,6 +24,8 @@
         for (var l = 0; l < lines.length; l++) {
             var container = lines.length > 1 ? document.createElement('div') : el;
             if (lines.length > 1) {
+                container.className = 'hero-line hero-line-3d';
+                container.setAttribute('data-text', lines[l].trim());
                 container.style.display = 'block';
                 el.appendChild(container);
             }
@@ -37,10 +39,12 @@
                     chars.push(sp);
                 }
                 var wordWrap = document.createElement('span');
+                wordWrap.className = 'hero-word-3d';
                 wordWrap.style.display = 'inline-block';
                 wordWrap.style.whiteSpace = 'nowrap';
                 for (var c = 0; c < words[w].length; c++) {
                     var cs = document.createElement('span');
+                    cs.className = 'hero-char-3d';
                     cs.style.display = 'inline-block';
                     cs.textContent = words[w][c];
                     wordWrap.appendChild(cs);
@@ -68,12 +72,51 @@
 
         // Title: explicit 3 lines
         var titleChars = splitIntoChars(titleEl, ['Bem-vindo ao', 'Mundo da', 'Informática']);
-        gsap.from(titleChars, {
-            x: 150,
+        var titleLines = Array.prototype.slice.call(titleEl.querySelectorAll('.hero-line, .hero-line-3d'));
+
+        gsap.fromTo(titleLines, {
+            x: 72,
+            y: 14,
+            z: -70,
+            rotationY: -20,
+            rotationX: 10,
             opacity: 0,
-            duration: 0.7,
-            ease: "power4",
-            stagger: 0.04
+            '--hero-shadow-opacity': 0
+        }, {
+            x: 0,
+            y: 0,
+            z: 0,
+            rotationY: -7,
+            rotationX: 7,
+            opacity: 1,
+            '--hero-shadow-opacity': 1,
+            duration: 0.92,
+            ease: 'power3.out',
+            stagger: 0.08
+        });
+
+        gsap.from(titleChars, {
+            x: 118,
+            z: -96,
+            rotationY: -55,
+            rotationX: 16,
+            opacity: 0,
+            transformOrigin: "50% 50% -40px",
+            duration: 0.85,
+            ease: "power4.out",
+            stagger: 0.04,
+            delay: 0.04
+        });
+
+        gsap.to(titleEl, {
+            y: -5,
+            rotationY: 2.5,
+            rotationX: -1.5,
+            duration: 4.2,
+            ease: "sine.inOut",
+            repeat: -1,
+            yoyo: true,
+            delay: 1.1
         });
 
         // Subtitle: single line, word-grouped

@@ -275,6 +275,7 @@
                     </td>
                     <td>
                         <div class="tracking-cell">
+                            {% set user_display_name = user.name or ((user.first_name ~ ' ' ~ user.last_name) if user.first_name else user.username) %}
                             <div class="tracking-info">
                                 {% if user.ip_address %}
                                 <small class="tracking-item">
@@ -301,6 +302,27 @@
                                 <small class="text-muted">Sem dados</small>
                                 {% endif %}
                             </div>
+                            <button type="button"
+                                class="tracking-info-btn"
+                                title="Informações do usuário"
+                                aria-label="Ver informações de {{ user.username }}"
+                                data-user-info="true"
+                                data-user-id="{{ user.id }}"
+                                data-username="{{ user.username|e }}"
+                                data-name="{{ user_display_name|trim|e }}"
+                                data-email="{{ user.email|e }}"
+                                data-role="{{ user.role|e }}"
+                                data-plan="{{ user.plan|e }}"
+                                data-status="{% if user.is_active %}Ativo{% else %}Inativo{% endif %}"
+                                data-joined="{% if user.date_joined %}{{ user.date_joined.strftime('%d/%m/%Y %H:%M') }}{% else %}N/A{% endif %}"
+                                data-last-login="{% if user.last_login %}{{ user.last_login.strftime('%d/%m/%Y %H:%M') }}{% else %}N/A{% endif %}"
+                                data-ip="{{ (user.ip_address or '')|e }}"
+                                data-browser="{{ (user.browser or '')|e }}"
+                                data-os="{{ (user.operating_system or '')|e }}"
+                                data-referrer="{{ (user.referrer or '')|e }}"
+                                onclick="openUserInfoModal(this)">
+                                <i class="fas fa-info"></i>
+                            </button>
                         </div>
                     </td>
                     <td class="actions-cell">
@@ -325,13 +347,18 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <div class="dropdown-menu">
-                                    <a href="#" class="dropdown-item"
-                                        onclick="resetUserPassword('{{ user.id }}', '{{ user.username }}')">
+                                    <button type="button" class="dropdown-item"
+                                        data-admin-action="reset-password"
+                                        data-user-id="{{ user.id }}"
+                                        data-username="{{ user.username|e }}">
                                         <i class="fas fa-key"></i> Redefinir Senha
-                                    </a>
-                                    <a href="#" class="dropdown-item" onclick="sendWelcomeEmail('{{ user.id }}')">
+                                    </button>
+                                    <button type="button" class="dropdown-item"
+                                        data-admin-action="send-welcome"
+                                        data-user-id="{{ user.id }}"
+                                        data-username="{{ user.username|e }}">
                                         <i class="fas fa-envelope"></i> Enviar Boas-vindas
-                                    </a>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -884,17 +911,91 @@
 
 <!-- Modal de confirmação para exclusão -->
 <div class="modal" id="deleteModal">
-    <div class="modal-content">
+    <div class="modal-content admin-action-modal">
         <div class="modal-header">
-            <h3>Confirmar Exclusão</h3>
-            <button class="close-modal">&times;</button>
+            <h3><i class="fas fa-trash-alt"></i> Confirmar Exclusão</h3>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
         </div>
         <div class="modal-body">
-            <p>Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.</p>
+            <div class="admin-action-icon is-danger">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <p id="deleteUserMessage">Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.</p>
         </div>
         <div class="modal-footer">
-            <button class="btn-admin btn-admin-outline" data-dismiss="modal">Cancelar</button>
-            <button class="btn-admin btn-admin-danger" id="confirmDelete">Excluir</button>
+            <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-admin btn-admin-danger" id="confirmDelete">
+                <i class="fas fa-trash-alt"></i> Excluir Usuário
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para redefinir senha -->
+<div class="modal" id="resetPasswordModal">
+    <div class="modal-content admin-action-modal">
+        <div class="modal-header">
+            <h3><i class="fas fa-key"></i> Redefinir Senha</h3>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="admin-action-icon is-warning">
+                <i class="fas fa-lock"></i>
+            </div>
+            <p id="resetPasswordMessage">Informe a nova senha para este usuário.</p>
+            <input type="hidden" id="resetPasswordUserId">
+            <input type="hidden" id="resetPasswordUsername">
+            <div class="form-group text-left">
+                <label for="resetPasswordValue" class="form-label">
+                    <i class="fas fa-lock"></i> Nova senha
+                </label>
+                <div class="input-group admin-password-input">
+                    <input type="password" id="resetPasswordValue" class="form-control" minlength="6"
+                        placeholder="Digite a nova senha">
+                    <button type="button" class="btn-admin btn-admin-outline" id="toggleResetPassword"
+                        title="Mostrar/Ocultar senha">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <small class="form-text">Use pelo menos 6 caracteres e uma senha segura.</small>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-admin btn-admin-primary" id="confirmResetPassword">
+                <i class="fas fa-save"></i> Redefinir Senha
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de informações do usuário -->
+<div class="modal" id="userInfoModal">
+    <div class="modal-content admin-action-modal user-info-modal">
+        <div class="modal-header">
+            <h3><i class="fas fa-info-circle"></i> Informações do Usuário</h3>
+            <button class="close-modal" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="user-info-modal-header">
+                <div class="admin-action-icon is-info">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div>
+                    <h4 id="userInfoName">Usuário</h4>
+                    <p id="userInfoEmail">email@exemplo.com</p>
+                </div>
+            </div>
+            <div class="user-info-grid" id="userInfoGrid"></div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-admin btn-admin-primary" data-dismiss="modal">
+                <i class="fas fa-check"></i> Entendi
+            </button>
         </div>
     </div>
 </div>
@@ -1112,6 +1213,59 @@
         display: block;
     }
 
+    .tracking-cell {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        min-width: 190px;
+    }
+
+    .tracking-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.24rem;
+        min-width: 0;
+    }
+
+    .tracking-item {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: var(--admin-text-light);
+        font-size: 0.74rem;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .tracking-item i {
+        color: var(--admin-primary);
+        width: 14px;
+        text-align: center;
+        flex: 0 0 14px;
+    }
+
+    .tracking-info-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid rgba(58, 134, 255, 0.24);
+        background: rgba(58, 134, 255, 0.1);
+        color: var(--admin-primary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 32px;
+        cursor: pointer;
+        transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .tracking-info-btn:hover {
+        background: rgba(58, 134, 255, 0.16);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(58, 134, 255, 0.16);
+    }
+
     .action-buttons {
         display: flex;
         gap: 4px;
@@ -1182,6 +1336,8 @@
         border: none;
         width: 100%;
         text-align: left;
+        cursor: pointer;
+        font-family: inherit;
     }
 
     .dropdown-item:hover {
@@ -1194,6 +1350,32 @@
     .dropdown-item i {
         width: 16px;
         text-align: center;
+    }
+
+    .admin-action-dropdown-portal {
+        position: fixed !important;
+        z-index: 2147483647 !important;
+        min-width: 210px !important;
+        padding: 0.35rem !important;
+        border-radius: 10px !important;
+        border: 1px solid var(--admin-border-color, #dee2e6) !important;
+        background: var(--admin-card-bg, #ffffff) !important;
+        box-shadow: 0 16px 38px rgba(15, 23, 42, 0.22) !important;
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+
+    .admin-action-dropdown-portal .dropdown-item {
+        border-radius: 8px;
+        color: var(--admin-text, #334155);
+        padding: 0.68rem 0.8rem;
+    }
+
+    .admin-action-dropdown-portal .dropdown-item:hover {
+        background: rgba(58, 134, 255, 0.08) !important;
+        color: var(--admin-primary);
     }
 
     /* Clickable Badges */
@@ -1334,6 +1516,158 @@
         border-top: 1px solid #e9ecef;
     }
 
+    .admin-action-modal {
+        max-width: 560px;
+        border-radius: 18px;
+        overflow: hidden;
+    }
+
+    .admin-action-modal .modal-body {
+        text-align: center;
+    }
+
+    .admin-action-modal .modal-footer {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .admin-action-icon {
+        width: 68px;
+        height: 68px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.55rem;
+        color: var(--admin-primary);
+        background: rgba(58, 134, 255, 0.12);
+    }
+
+    .admin-action-icon.is-danger {
+        color: #dc2626;
+        background: rgba(220, 38, 38, 0.12);
+    }
+
+    .admin-action-icon.is-warning {
+        color: #d97706;
+        background: rgba(245, 158, 11, 0.14);
+    }
+
+    .admin-action-icon.is-info {
+        color: var(--admin-primary);
+        background: rgba(58, 134, 255, 0.12);
+    }
+
+    .admin-password-input {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .admin-password-input .form-control {
+        flex: 1;
+    }
+
+    .admin-password-input .btn-admin {
+        width: 46px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .user-info-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        text-align: left;
+        margin-bottom: 1.35rem;
+    }
+
+    .user-info-modal-header .admin-action-icon {
+        margin: 0;
+        flex: 0 0 68px;
+    }
+
+    .user-info-modal-header h4 {
+        margin: 0 0 0.25rem;
+        color: var(--admin-text);
+        font-size: 1.15rem;
+    }
+
+    .user-info-modal-header p {
+        margin: 0;
+        color: var(--admin-text-light);
+        font-size: 0.9rem;
+    }
+
+    .user-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        text-align: left;
+    }
+
+    .user-info-item {
+        border: 1px solid var(--admin-border-color, #dee2e6);
+        border-radius: 12px;
+        padding: 0.82rem;
+        background: var(--admin-bg-light, #f8fafc);
+        min-width: 0;
+    }
+
+    .user-info-item strong {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--admin-text);
+        font-size: 0.78rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .user-info-item strong i {
+        color: var(--admin-primary);
+        width: 16px;
+        text-align: center;
+    }
+
+    .user-info-item span {
+        display: block;
+        color: var(--admin-text-light);
+        font-size: 0.86rem;
+        overflow-wrap: anywhere;
+    }
+
+    #editUserModal .form-label,
+    #editUserModal label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 600;
+        color: var(--admin-text);
+    }
+
+    #editUserModal .form-label i,
+    #editUserModal label i {
+        color: var(--admin-primary);
+        width: 16px;
+        text-align: center;
+    }
+
+    @media (max-width: 768px) {
+        .tracking-cell {
+            min-width: 160px;
+        }
+
+        .user-info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .user-info-modal-header {
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+    }
+
     /* Bulk Actions Styles */
     .bulk-actions {
         display: flex;
@@ -1434,33 +1768,9 @@
         font-size: 0.875rem;
     }
 
-    /* Modal fixes for Users - Simplified */
-    #editUserModal {
-        display: none !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        z-index: 9999 !important;
-        align-items: center !important;
-        justify-content: center !important;
+    .user-edit-modal .modal-content {
+        max-width: 520px;
     }
-
-    #editUserModal.show {
-        display: flex !important;
-        opacity: 1 !important;
-    }
-
-    #editUserModal .modal-content {
-        background: white !important;
-        border-radius: 8px !important;
-        padding: 0 !important;
-        max-width: 500px !important;
-        width: 90% !important;
-        z-index: 10000 !important;
-        position: relative !important;
 </style>
 
 <script>
@@ -1473,6 +1783,235 @@
 
     // showNotification é definida globalmente em admin.js (10s padrão, duração configurável)
     // Não redefinir aqui para manter o padrão consistente do projeto
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function openAdminModal(modalId) {
+        if (typeof window.openModal === 'function') {
+            window.openModal(modalId);
+            return;
+        }
+
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        modal.style.display = 'flex';
+        requestAnimationFrame(() => modal.classList.add('show'));
+    }
+
+    function closeAdminModal(modalId) {
+        if (typeof window.closeModal === 'function') {
+            window.closeModal(modalId);
+            return;
+        }
+
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 220);
+    }
+
+    let pendingDeleteUser = null;
+
+    function submitDeleteUser(userId) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/users/${userId}/delete`;
+        form.style.display = 'none';
+
+        const csrfToken = window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function closeActionDropdownPortal() {
+        document.getElementById('adminActionDropdownPortal')?.remove();
+    }
+
+    function runActionDropdownCommand(action, payload = {}) {
+        if (action === 'reset-password') {
+            window.resetUserPassword?.(payload.userId, payload.username || '');
+            return;
+        }
+
+        if (action === 'send-welcome') {
+            window.sendWelcomeEmail?.(payload.userId, payload.username || '');
+        }
+    }
+
+    function getConfirmIcon(intent, icon) {
+        if (icon) return icon;
+        if (intent === 'danger') return 'fa-exclamation-triangle';
+        if (intent === 'warning') return 'fa-exclamation-circle';
+        return 'fa-info-circle';
+    }
+
+    function ensureAdminConfirmModal() {
+        let modal = document.getElementById('adminConfirmModal');
+        if (modal) return modal;
+
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal" id="adminConfirmModal">
+                <div class="modal-content admin-action-modal">
+                    <div class="modal-header">
+                        <h3 id="adminConfirmTitle"><i class="fas fa-info-circle"></i> Confirmar ação</h3>
+                        <button class="close-modal" data-admin-confirm-cancel>&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="admin-action-icon is-info" id="adminConfirmIconBox">
+                            <i class="fas fa-info-circle" id="adminConfirmIcon"></i>
+                        </div>
+                        <p id="adminConfirmMessage">Deseja continuar?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-admin btn-admin-outline" data-admin-confirm-cancel>
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button type="button" class="btn-admin btn-admin-primary" id="adminConfirmAccept">
+                            <i class="fas fa-check"></i> Confirmar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        return document.getElementById('adminConfirmModal');
+    }
+
+    window.showAdminConfirm = function (options = {}) {
+        const modal = ensureAdminConfirmModal();
+        const title = modal.querySelector('#adminConfirmTitle');
+        const message = modal.querySelector('#adminConfirmMessage');
+        const iconBox = modal.querySelector('#adminConfirmIconBox');
+        const icon = modal.querySelector('#adminConfirmIcon');
+        const accept = modal.querySelector('#adminConfirmAccept');
+        const cancelButtons = modal.querySelectorAll('[data-admin-confirm-cancel]');
+        const intent = String(options.intent || 'primary');
+
+        title.innerHTML = `<i class="fas ${getConfirmIcon(intent, options.icon)}"></i> ${escapeHtml(options.title || 'Confirmar ação')}`;
+        message.textContent = options.message || 'Deseja continuar?';
+        icon.className = `fas ${getConfirmIcon(intent, options.icon)}`;
+        iconBox.className = `admin-action-icon ${intent === 'danger' ? 'is-danger' : intent === 'warning' ? 'is-warning' : 'is-info'}`;
+        accept.className = `btn-admin ${intent === 'danger' ? 'btn-admin-danger' : intent === 'warning' ? 'btn-admin-warning' : 'btn-admin-primary'}`;
+        accept.innerHTML = `<i class="fas ${options.confirmIcon || 'fa-check'}"></i> ${escapeHtml(options.confirmLabel || 'Confirmar')}`;
+
+        openAdminModal('adminConfirmModal');
+
+        return new Promise((resolve) => {
+            const cleanup = (result) => {
+                accept.removeEventListener('click', acceptHandler);
+                cancelButtons.forEach((button) => button.removeEventListener('click', cancelHandler));
+                modal.removeEventListener('click', overlayHandler);
+                closeAdminModal('adminConfirmModal');
+                resolve(Boolean(result));
+            };
+            const acceptHandler = () => cleanup(true);
+            const cancelHandler = () => cleanup(false);
+            const overlayHandler = (event) => {
+                if (event.target === modal) cleanup(false);
+            };
+
+            accept.addEventListener('click', acceptHandler);
+            cancelButtons.forEach((button) => button.addEventListener('click', cancelHandler));
+            modal.addEventListener('click', overlayHandler);
+        });
+    };
+
+    function openActionDropdownPortal(button) {
+        closeActionDropdownPortal();
+
+        const sourceMenu = button.closest('.action-dropdown')?.querySelector('.dropdown-menu');
+        if (!sourceMenu) return;
+
+        const portal = sourceMenu.cloneNode(true);
+        const rect = button.getBoundingClientRect();
+        const portalWidth = 220;
+        const left = Math.min(
+            Math.max(12, rect.right - portalWidth),
+            window.innerWidth - portalWidth - 12
+        );
+        const top = Math.min(rect.bottom + 8, window.innerHeight - 120);
+
+        portal.id = 'adminActionDropdownPortal';
+        portal.classList.add('admin-action-dropdown-portal', 'show');
+        portal.style.left = `${left}px`;
+        portal.style.top = `${top}px`;
+        portal.style.width = `${portalWidth}px`;
+
+        document.body.appendChild(portal);
+
+        portal.addEventListener('click', (event) => {
+            const item = event.target.closest('[data-admin-action]');
+            if (item) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeActionDropdownPortal();
+                runActionDropdownCommand(item.dataset.adminAction, {
+                    userId: item.dataset.userId,
+                    username: item.dataset.username
+                });
+            }
+        });
+
+        setTimeout(() => {
+            document.addEventListener('click', function closePortal(event) {
+                if (!portal.contains(event.target) && event.target !== button && !button.contains(event.target)) {
+                    closeActionDropdownPortal();
+                    document.removeEventListener('click', closePortal);
+                }
+            });
+        }, 0);
+    }
+
+    window.openUserInfoModal = function (button) {
+        const data = button.dataset || {};
+        const items = [
+            ['fas fa-id-card', 'Usuário', data.username],
+            ['fas fa-signature', 'Nome', data.name],
+            ['fas fa-envelope', 'Email', data.email],
+            ['fas fa-user-shield', 'Papel', data.role],
+            ['fas fa-gem', 'Plano', data.plan],
+            ['fas fa-toggle-on', 'Status', data.status],
+            ['fas fa-calendar-plus', 'Cadastro', data.joined],
+            ['fas fa-clock', 'Último acesso', data.lastLogin],
+            ['fas fa-network-wired', 'IP', data.ip || 'Sem dados'],
+            ['fas fa-globe', 'Navegador', data.browser || 'Sem dados'],
+            ['fas fa-desktop', 'Sistema', data.os || 'Sem dados'],
+            ['fas fa-external-link-alt', 'Origem', data.referrer || 'Sem dados']
+        ];
+
+        const title = document.getElementById('userInfoName');
+        const email = document.getElementById('userInfoEmail');
+        const grid = document.getElementById('userInfoGrid');
+
+        if (title) title.textContent = data.name || data.username || 'Usuário';
+        if (email) email.textContent = data.email || 'Email não informado';
+        if (grid) {
+            grid.innerHTML = items.map(([icon, label, value]) => `
+                <div class="user-info-item">
+                    <strong><i class="${icon}"></i> ${escapeHtml(label)}</strong>
+                    <span>${escapeHtml(value || 'Sem dados')}</span>
+                </div>
+            `).join('');
+        }
+
+        openAdminModal('userInfoModal');
+    };
 
     // Toggle dropdown de cargo - Portal approach
     window.toggleRoleDropdown = function (badgeElement, event) {
@@ -1773,50 +2312,120 @@
             window.location.href = '/admin/users/export';
         };
 
-        window.sendWelcomeEmails = function () {
+        window.sendWelcomeEmails = async function () {
             const newUsers = document.querySelectorAll('[data-status="active"]');
-            if (confirm(`Enviar email de boas-vindas para ${newUsers.length} usuários ativos?`)) {
+            const confirmed = await showAdminConfirm({
+                title: 'Enviar boas-vindas?',
+                message: `Enviar email de boas-vindas para ${newUsers.length} usuários ativos?`,
+                confirmLabel: 'Enviar',
+                confirmIcon: 'fa-envelope',
+                intent: 'primary',
+                icon: 'fa-envelope-open-text'
+            });
+            if (confirmed) {
                 showNotification('Emails enviados com sucesso!', 'success');
             }
         };
 
         // Função para redefinir senha do usuário (pelo admin)
         window.resetUserPassword = function (userId, username) {
-            const newPassword = prompt(`Digite a nova senha para o usuário "${username}":`);
-            if (newPassword && newPassword.length >= 6) {
-                if (confirm(`Confirma a redefinição da senha para o usuário "${username}"?`)) {
-                    fetch(`/admin/users/${userId}/reset-password`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            new_password: newPassword
-                        })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                showNotification('Senha redefinida com sucesso!', 'success');
-                            } else {
-                                showNotification(data.message || 'Erro ao redefinir senha', 'error');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Erro:', error);
-                            showNotification('Erro ao redefinir senha', 'error');
-                        });
-                }
-            } else if (newPassword !== null) {
-                alert('A senha deve ter pelo menos 6 caracteres.');
+            closeActionDropdownPortal();
+
+            const userIdInput = document.getElementById('resetPasswordUserId');
+            const usernameInput = document.getElementById('resetPasswordUsername');
+            const passwordInput = document.getElementById('resetPasswordValue');
+            const message = document.getElementById('resetPasswordMessage');
+
+            if (userIdInput) userIdInput.value = userId;
+            if (usernameInput) usernameInput.value = username;
+            if (passwordInput) passwordInput.value = '';
+            if (message) {
+                message.textContent = `Informe a nova senha para o usuário "${username}".`;
             }
+
+            openAdminModal('resetPasswordModal');
+            setTimeout(() => passwordInput?.focus(), 150);
         };
 
-        window.sendWelcomeEmail = function (userId) {
-            if (confirm('Enviar email de boas-vindas?')) {
+        window.sendWelcomeEmail = async function (userId, fallbackUsername) {
+            closeActionDropdownPortal();
+            const row = document.querySelector(`[data-id="${userId}"]`);
+            const username = row?.querySelector('.username')?.textContent?.trim() || fallbackUsername || 'este usuário';
+            const confirmed = await showAdminConfirm({
+                title: 'Enviar boas-vindas?',
+                message: `Enviar email de boas-vindas para "${username}"?`,
+                confirmLabel: 'Enviar',
+                confirmIcon: 'fa-envelope',
+                intent: 'primary',
+                icon: 'fa-envelope'
+            });
+            if (confirmed) {
                 showNotification('Email de boas-vindas enviado!', 'success');
             }
         };
+
+        document.getElementById('toggleResetPassword')?.addEventListener('click', function () {
+            const input = document.getElementById('resetPasswordValue');
+            if (!input) return;
+            input.type = input.type === 'password' ? 'text' : 'password';
+            this.querySelector('i').className = input.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+        });
+
+        document.getElementById('confirmResetPassword')?.addEventListener('click', async function () {
+            const userId = document.getElementById('resetPasswordUserId')?.value;
+            const username = document.getElementById('resetPasswordUsername')?.value || 'usuário';
+            const passwordInput = document.getElementById('resetPasswordValue');
+            const newPassword = (passwordInput?.value || '').trim();
+
+            if (!userId) {
+                showNotification('Usuário não encontrado para redefinir senha.', 'error');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showNotification('A senha deve ter pelo menos 6 caracteres.', 'warning');
+                passwordInput?.focus();
+                return;
+            }
+
+            const confirmed = await showAdminConfirm({
+                title: 'Confirmar redefinição',
+                message: `Redefinir a senha do usuário "${username}" agora?`,
+                confirmLabel: 'Redefinir',
+                confirmIcon: 'fa-key',
+                intent: 'warning',
+                icon: 'fa-key'
+            });
+
+            if (!confirmed) return;
+
+            this.disabled = true;
+            try {
+                const response = await fetch(`/admin/users/${userId}/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        new_password: newPassword
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification('Senha redefinida com sucesso!', 'success');
+                    closeAdminModal('resetPasswordModal');
+                    if (passwordInput) passwordInput.value = '';
+                } else {
+                    showNotification(data.message || 'Erro ao redefinir senha', 'error');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showNotification('Erro ao redefinir senha', 'error');
+            } finally {
+                this.disabled = false;
+            }
+        });
 
         // Função para editar usuário
         window.editUser = function (userId) {
@@ -1875,10 +2484,6 @@
                             activeCheck.parentElement.appendChild(helper);
                         }
                     }
-
-                    // Show Modal
-                    modal.classList.add('show');
-                    modal.style.display = 'flex';
 
                     // Populate Download Stats (from previous update logic)
                     if (document.getElementById('currentDailyDownloads')) document.getElementById('currentDailyDownloads').textContent = data.daily_downloads || 0;
@@ -1963,75 +2568,50 @@
                 return;
             }
 
-            // Mostrar modal usando função unificada
-            openUserModal('editUserModal');
+            // Mostrar modal usando o fluxo global do admin
+            openAdminModal('editUserModal');
         }
 
         // Função unificada para abrir modais de usuário
         function openUserModal(modalId) {
-            console.log('Tentando abrir modal de usuário:', modalId); // Debug
-            const modal = document.getElementById(modalId);
-            console.log('Modal encontrado na função openUserModal:', modal); // Debug
-
-            if (modal) {
-                console.log('Aplicando estilos ao modal de usuário...'); // Debug
-                modal.style.display = 'flex';
-                modal.style.visibility = 'visible';
-                modal.style.opacity = '1';
-                modal.classList.add('show');
-                document.body.style.overflow = 'hidden';
-
-                // Força o reflow para garantir que a animação funcione
-                modal.offsetHeight;
-                console.log('Modal de usuário aberto com sucesso!'); // Debug
-            } else {
-                console.error('Modal não encontrado:', modalId); // Debug
-            }
+            openAdminModal(modalId);
         }
 
         // Função unificada para fechar modais de usuário
         function closeUserModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.remove('show');
-                document.body.style.overflow = '';
-                // Aguarda a animação antes de esconder
-                setTimeout(() => {
-                    modal.style.display = 'none';
-                }, 300);
-            }
+            closeAdminModal(modalId);
         }
 
         // Função para criar modal de edição
         function createEditUserModal() {
             const modalHTML = `
-                <div class="modal" id="editUserModal">
+                <div class="modal user-edit-modal" id="editUserModal">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3><i class="fas fa-user-edit"></i> Editar Usuário</h3>
-                            <button class="close-modal" onclick="closeEditUserModal()">&times;</button>
+                            <button class="close-modal" data-dismiss="modal">&times;</button>
                         </div>
                         <form id="editUserForm" onsubmit="saveUser(event)">
                             <div class="modal-body">
                                 <input type="hidden" id="editUserId" name="user_id">
 
                                 <div class="form-group">
-                                    <label for="editUsername">Nome de Usuário</label>
+                                    <label for="editUsername" class="form-label"><i class="fas fa-at"></i> Nome de Usuário</label>
                                     <input type="text" id="editUsername" name="username" class="form-control" required>
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="editName">Nome Completo</label>
+                                    <label for="editName" class="form-label"><i class="fas fa-id-card"></i> Nome Completo</label>
                                     <input type="text" id="editName" name="name" class="form-control">
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="editEmail">Email</label>
+                                    <label for="editEmail" class="form-label"><i class="fas fa-envelope"></i> Email</label>
                                     <input type="email" id="editEmail" name="email" class="form-control" required>
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="editRole">Função</label>
+                                    <label for="editRole" class="form-label"><i class="fas fa-user-shield"></i> Função</label>
                                     <select id="editRole" name="role" class="form-control">
                                         <option value="user">Usuário</option>
                                         <option value="editor">Editor</option>
@@ -2040,7 +2620,7 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="editPlan">Plano</label>
+                                    <label for="editPlan" class="form-label"><i class="fas fa-gem"></i> Plano</label>
                                     <select id="editPlan" name="plan" class="form-control">
                                         <option value="free">Grátis</option>
                                         <option value="premium">Premium</option>
@@ -2051,12 +2631,12 @@
                                 <div class="form-group">
                                     <div class="form-check">
                                         <input type="checkbox" id="editIsActive" name="is_active" class="form-check-input">
-                                        <label for="editIsActive" class="form-check-label">Usuário Ativo</label>
+                                        <label for="editIsActive" class="form-check-label"><i class="fas fa-toggle-on"></i> Usuário Ativo</label>
                                     </div>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn-admin btn-admin-outline" onclick="closeEditUserModal()">
+                                <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
                                     <i class="fas fa-times"></i> Cancelar
                                 </button>
                                 <button type="submit" class="btn-admin btn-admin-primary">
@@ -2120,30 +2700,22 @@
         });
 
 
-        // Criar overlay para dropdowns
-        let dropdownOverlay = document.createElement('div');
-        dropdownOverlay.className = 'dropdown-overlay';
-        document.body.appendChild(dropdownOverlay);
-
         // Função para fechar todos os dropdowns
         function closeAllDropdowns() {
+            closeActionDropdownPortal();
             document.querySelectorAll('.dropdown-menu').forEach(menu => {
                 menu.style.display = 'none';
                 menu.classList.remove('show');
             });
-            dropdownOverlay.classList.remove('show');
         }
 
         // Dropdown "Mais opções" functionality
         document.addEventListener('click', function (e) {
             // Fechar todos os dropdowns quando clicar fora
-            if (!e.target.closest('.action-dropdown')) {
+            if (!e.target.closest('.action-dropdown') && !e.target.closest('#adminActionDropdownPortal')) {
                 closeAllDropdowns();
             }
         });
-
-        // Click no overlay fecha dropdowns
-        dropdownOverlay.addEventListener('click', closeAllDropdowns);
 
         // Adicionar event listeners para botões "Mais opções"
         document.querySelectorAll('.btn-more').forEach(btn => {
@@ -2151,18 +2723,19 @@
                 e.preventDefault();
                 e.stopPropagation();
 
-                const dropdown = this.nextElementSibling;
-                const isVisible = dropdown.style.display === 'block';
-
-                // Fechar todos os outros dropdowns
-                closeAllDropdowns();
-
-                // Toggle do dropdown atual
-                if (!isVisible) {
-                    dropdown.style.display = 'block';
-                    dropdown.classList.add('show');
-                    dropdownOverlay.classList.add('show');
+                const activePortal = document.getElementById('adminActionDropdownPortal');
+                if (activePortal && activePortal.dataset.sourceButtonId === this.dataset.dropdownButtonId) {
+                    closeActionDropdownPortal();
+                    return;
                 }
+
+                if (!this.dataset.dropdownButtonId) {
+                    this.dataset.dropdownButtonId = `more-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                }
+
+                openActionDropdownPortal(this);
+                const portal = document.getElementById('adminActionDropdownPortal');
+                if (portal) portal.dataset.sourceButtonId = this.dataset.dropdownButtonId;
             });
         });
 
@@ -2348,18 +2921,27 @@
         }
 
         // Bulk actions
-        document.getElementById('applyBulkAction')?.addEventListener('click', function () {
+        document.getElementById('applyBulkAction')?.addEventListener('click', async function () {
             const action = document.getElementById('bulkActionSelect').value;
             const checkedBoxes = document.querySelectorAll('.user-checkbox:checked');
 
             if (!action || checkedBoxes.length === 0) {
-                alert('Selecione uma ação e pelo menos um usuário.');
+                showNotification('Selecione uma ação e pelo menos um usuário.', 'warning');
                 return;
             }
 
             const userIds = Array.from(checkedBoxes).map(cb => cb.value);
 
-            if (confirm(`Tem certeza que deseja ${action} ${userIds.length} usuários?`)) {
+            const confirmed = await showAdminConfirm({
+                title: 'Confirmar ação em massa',
+                message: `Tem certeza que deseja executar "${action}" para ${userIds.length} usuários?`,
+                confirmLabel: 'Aplicar',
+                confirmIcon: 'fa-check',
+                intent: action === 'delete' ? 'danger' : 'warning',
+                icon: action === 'delete' ? 'fa-trash-alt' : 'fa-tasks'
+            });
+
+            if (confirmed) {
                 userIds.forEach(id => {
                     const row = document.querySelector(`[data-id="${id}"]`);
 
@@ -2413,16 +2995,25 @@
                 const userName = this.getAttribute('data-user-name');
                 console.log('User ID:', userId, 'Username:', userName); // Debug
 
-                if (confirm(`Tem certeza que deseja excluir o usuário "${userName}"? Esta ação não pode ser desfeita.`)) {
-                    // Criar um formulário para enviar via POST
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = `/admin/users/${userId}/delete`;
-                    form.style.display = 'none';
-                    document.body.appendChild(form);
-                    form.submit();
+                pendingDeleteUser = { userId, userName };
+                const message = document.getElementById('deleteUserMessage');
+                if (message) {
+                    message.textContent = `Tem certeza que deseja excluir o usuário "${userName}"? Esta ação não pode ser desfeita.`;
                 }
+                openAdminModal('deleteModal');
             });
+        });
+
+        document.getElementById('confirmDelete')?.addEventListener('click', function () {
+            if (!pendingDeleteUser?.userId) {
+                closeAdminModal('deleteModal');
+                return;
+            }
+
+            const { userId } = pendingDeleteUser;
+            pendingDeleteUser = null;
+            closeAdminModal('deleteModal');
+            submitDeleteUser(userId);
         });
 
 

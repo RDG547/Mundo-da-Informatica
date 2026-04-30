@@ -15,7 +15,7 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.14.2
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL

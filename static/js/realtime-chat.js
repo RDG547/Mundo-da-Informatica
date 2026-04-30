@@ -37,7 +37,8 @@
         userId: String(document.body.dataset.userId || '').trim(),
         userName: String(document.body.dataset.userName || '').trim() || 'Usuario',
         userAvatar: String(document.body.dataset.userAvatar || '').trim(),
-        userPlan: String(document.body.dataset.userPlan || 'free').trim().toLowerCase()
+        userPlan: String(document.body.dataset.userPlan || 'free').trim().toLowerCase(),
+        chatBackendEnabled: document.body.dataset.chatBackendEnabled === 'true'
     };
 
     const tabBadges = {
@@ -741,6 +742,7 @@
 
     function getUnreadFromTicket(ticket) {
         if (!ticket || !ticket.id || !ticket.data) return 0;
+        if (!hasTicketMessage(ticket.data)) return 0;
 
         const updatedAtMs = tsToMillis(ticket.data.updatedAt || ticket.data.updatedAtMs);
         if (!updatedAtMs) return 0;
@@ -755,6 +757,10 @@
         if (userMeta.isAdmin && lastSenderRole === 'admin') return 0;
 
         return 1;
+    }
+
+    function hasTicketMessage(ticketData) {
+        return Boolean(String(ticketData?.lastMessage || '').trim());
     }
 
     function refreshUnreadBadges() {
@@ -1286,6 +1292,7 @@
                 data: ticket.data || {}
             }))
             .filter((ticket) => ticket.id.startsWith('support_user_'))
+            .filter((ticket) => hasTicketMessage(ticket.data))
             .sort((a, b) => tsToMillis(b.data.updatedAt || b.data.updatedAtMs) - tsToMillis(a.data.updatedAt || a.data.updatedAtMs));
 
         if (currentTab === 'chamados') {
@@ -1697,7 +1704,16 @@
         setStatus('Preparando salas do chat...');
 
         try {
-            await bootstrapRoomsFromServer();
+            const bootstrapData = await bootstrapRoomsFromServer();
+            if (bootstrapData.chatUnavailable || bootstrapData.chatDisabled) {
+                chatUnavailable = true;
+                setStatus('Chat nao configurado no servidor.', 'error');
+                elements.messages.innerHTML = '<div class="chat-empty-state">Chat indisponivel no momento.</div>';
+                if (elements.input) elements.input.disabled = true;
+                if (elements.send) elements.send.disabled = true;
+                return;
+            }
+
             await refreshChatState();
             chatUnavailable = false;
             setActiveTab('todos');
@@ -1721,11 +1737,24 @@
     }
 
     function setupAccessControl() {
+        elements.button.style.display = '';
+
         if (!userMeta.isAuthenticated || !userMeta.userId) {
-            elements.button.style.display = 'none';
             elements.panel.style.display = 'none';
             window.openLiveChat = redirectToLogin;
-            return false;
+            return true;
+        }
+
+        elements.panel.style.display = '';
+
+        if (!userMeta.chatBackendEnabled) {
+            chatUnavailable = true;
+            setStatus('Chat nao configurado no servidor.', 'error');
+            elements.messages.innerHTML = '<div class="chat-empty-state">Chat indisponivel no momento.</div>';
+            if (elements.input) elements.input.disabled = true;
+            if (elements.send) elements.send.disabled = true;
+            window.openLiveChat = openPanel;
+            return true;
         }
 
         updateTodosTabState();
@@ -1735,6 +1764,11 @@
 
     function bindEvents() {
         elements.button.addEventListener('click', () => {
+            if (!userMeta.isAuthenticated || !userMeta.userId) {
+                redirectToLogin();
+                return;
+            }
+
             if (elements.panel.classList.contains('open')) {
                 closePanel();
             } else {
@@ -1879,8 +1913,11 @@
         }
 
         bindEvents();
-        initializeChatConnection();
-        window.openLiveChat = openPanel;
+
+        if (userMeta.isAuthenticated && userMeta.userId && userMeta.chatBackendEnabled) {
+            initializeChatConnection();
+            window.openLiveChat = openPanel;
+        }
     }
 
     if (document.readyState === 'loading') {

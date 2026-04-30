@@ -66,6 +66,11 @@ except Exception:  # pragma: no cover - fallback quando dependência não está 
     firebase_firestore = None
 
 try:
+    from google.cloud.firestore_v1 import FieldFilter as FirestoreFieldFilter
+except Exception:  # pragma: no cover - compatibilidade quando Firestore não está instalado
+    FirestoreFieldFilter = None
+
+try:
     from google.oauth2 import id_token as google_id_token
     from google.auth.transport import requests as google_auth_requests
 except Exception:  # pragma: no cover - fallback quando dependência não está instalada
@@ -715,6 +720,27 @@ def _build_service_account_from_dotenv_block() -> Optional[dict]:
     return None
 
 
+def is_firebase_admin_configured() -> bool:
+    """Retorna True quando ha credenciais de servidor suficientes para o chat."""
+    if firebase_admin is None or credentials is None:
+        return False
+
+    service_account_path = (app.config.get('FIREBASE_SERVICE_ACCOUNT_PATH', '') or '').strip()
+    service_account_json = (app.config.get('FIREBASE_SERVICE_ACCOUNT_JSON', '') or '').strip()
+    service_account_b64 = os.environ.get('FIREBASE_SERVICE_ACCOUNT_B64', '').strip()
+    split_client_email = os.environ.get('FIREBASE_CLIENT_EMAIL', '').strip()
+    split_private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '').strip()
+    project_id = (app.config.get('FIREBASE_PROJECT_ID', '') or '').strip()
+
+    return bool(
+        service_account_json
+        or service_account_b64
+        or (service_account_path and os.path.exists(service_account_path))
+        or (split_client_email and split_private_key and project_id)
+        or _build_service_account_from_dotenv_block()
+    )
+
+
 def initialize_firebase_admin() -> bool:
     global _firebase_initialized
     if _firebase_initialized:
@@ -1075,34 +1101,66 @@ def get_device_type(user_agent_string):
     if not user_agent_string:
         return 'Unknown'
 
-    user_agent = user_agent_string.lower()
+    try:
+        parsed_agent = parse_ua(user_agent_string)
+        if parsed_agent.is_tablet:
+            return 'Tablet'
+        if parsed_agent.is_mobile:
+            return 'Mobile'
+        if parsed_agent.is_pc:
+            return 'Desktop'
+        if parsed_agent.is_bot:
+            return 'Bot'
+    except Exception:
+        pass
 
-    if any(device in user_agent for device in ['iphone', 'android', 'mobile']):
-        return 'Mobile'
-    elif any(device in user_agent for device in ['ipad', 'tablet']):
+    user_agent = user_agent_string.lower()
+    if any(device in user_agent for device in ['ipad', 'tablet', 'kindle', 'silk']):
         return 'Tablet'
-    else:
-        return 'Desktop'
+    if any(device in user_agent for device in ['iphone', 'android', 'mobile', 'windows phone']):
+        return 'Mobile'
+    if any(device in user_agent for device in ['bot', 'crawler', 'spider']):
+        return 'Bot'
+    return 'Desktop'
 
 def get_browser_name(user_agent_string):
     """Detecta o nome do navegador baseado no user agent"""
     if not user_agent_string:
         return 'Unknown'
 
-    user_agent = user_agent_string.lower()
+    try:
+        browser_family = parse_ua(user_agent_string).browser.family or ''
+        normalized_browser = browser_family.strip()
+        if normalized_browser:
+            browser_map = {
+                'Chrome Mobile': 'Chrome',
+                'Chrome Mobile iOS': 'Chrome',
+                'Mobile Safari': 'Safari',
+                'Firefox Mobile': 'Firefox',
+                'Firefox iOS': 'Firefox',
+                'Edge': 'Edge',
+                'Edge Mobile': 'Edge',
+                'Opera Mobile': 'Opera',
+                'Samsung Internet': 'Samsung Internet'
+            }
+            return browser_map.get(normalized_browser, normalized_browser)
+    except Exception:
+        pass
 
-    if 'chrome' in user_agent and 'edg' not in user_agent:
-        return 'Chrome'
-    elif 'firefox' in user_agent:
-        return 'Firefox'
-    elif 'safari' in user_agent and 'chrome' not in user_agent:
-        return 'Safari'
-    elif 'edg' in user_agent:
+    user_agent = user_agent_string.lower()
+    if any(token in user_agent for token in ['edg/', 'edga/', 'edgios/']):
         return 'Edge'
-    elif 'opera' in user_agent:
+    if any(token in user_agent for token in ['opr/', 'opera']):
         return 'Opera'
-    else:
-        return 'Other'
+    if 'samsungbrowser' in user_agent:
+        return 'Samsung Internet'
+    if any(token in user_agent for token in ['firefox', 'fxios']):
+        return 'Firefox'
+    if any(token in user_agent for token in ['crios', 'chrome']) and 'chromium' not in user_agent:
+        return 'Chrome'
+    if 'safari' in user_agent:
+        return 'Safari'
+    return 'Outro'
 
 # ==========================================
 # FUNÇÕES UTILITÁRIAS
@@ -1735,6 +1793,7 @@ class User(db.Model, UserMixin):
     # Preferências
     email_notifications = db.Column(db.Boolean, default=True)
     theme_preference = db.Column(db.String(20), default='light')
+    preferences = db.Column(db.Text)
 
     # Token para redefinição de senha (expira após 24 horas)
     reset_token = db.Column(db.String(100))
@@ -2580,6 +2639,7 @@ def inject_global_data():
         stats=stats,
         plan_pricing=plan_pricing,
         firebase_public_config=firebase_public_config,
+        chat_backend_available=is_firebase_admin_configured(),
         current_year=datetime.now().year,
         datetime=datetime,  # Adicionar datetime para uso em templates
         **admin_data
@@ -2761,8 +2821,47 @@ def category(category):
 @app.route('/subcategoria/<string:subcategory>')
 def subcategory(subcategory):
     page = request.args.get('page', 1, type=int)
-    posts = Post.query.filter_by(subcategory=subcategory).order_by(Post.date_posted.desc()).paginate(page=page, per_page=12)
-    return render_template('category.html', posts=posts, subcategory=subcategory, title=f'Subcategoria - {subcategory}')
+    posts = Post.query.filter_by(subcategory=subcategory, is_active=True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
+    category_name = subcategory.replace('-', ' ').title()
+    category_name = category_name.replace('Bios', 'BIOS').replace('Usb', 'USB')
+
+    subcategories = []
+    first_post = posts.items[0] if posts.items else None
+    parent_category = first_post.category_str if first_post and first_post.category_str else ''
+    if first_post and first_post.category_str:
+        sibling_rows = db.session.query(Post.subcategory).filter(
+            Post.category_str == first_post.category_str,
+            Post.subcategory.isnot(None),
+            Post.subcategory != ''
+        ).distinct().all()
+        subcategories = [row[0] for row in sibling_rows if row[0]]
+
+    if not parent_category:
+        prefix_map = {
+            'bios': 'BIOS',
+            'drivers': 'Drivers',
+            'esquemas': 'Esquemas',
+            'softwares': 'Softwares',
+            'impressoras': 'Impressoras',
+            'cursos': 'Cursos',
+            'datasheet': 'Datasheet'
+        }
+        parent_category = prefix_map.get(subcategory.split('-', 1)[0].lower(), '')
+
+    favorite_post_ids = set()
+    if current_user.is_authenticated:
+        favorite_post_ids = {f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()}
+
+    return render_template(
+        'category.html',
+        posts=posts,
+        category=category_name,
+        parent_category=parent_category,
+        subcategory=subcategory,
+        subcategories=subcategories,
+        favorite_post_ids=favorite_post_ids,
+        title=f'Subcategoria - {category_name}'
+    )
 
 @app.route('/post/<int:post_id>')
 def post(post_id):
@@ -4934,6 +5033,29 @@ def api_category_posts(category_name):
     })
 
 
+@app.route('/api/subcategory-posts/<string:subcategory_name>')
+def api_subcategory_posts(subcategory_name):
+    """API para carregar mais posts de uma subcategoria."""
+    page = request.args.get('page', 1, type=int)
+    posts_query = Post.query.filter_by(subcategory=subcategory_name, is_active=True).order_by(Post.date_posted.desc())
+    posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
+
+    favorite_post_ids = []
+    if current_user.is_authenticated:
+        favorite_post_ids = [f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()]
+
+    posts_data = _serialize_posts(posts_paginated.items, favorite_post_ids)
+
+    return jsonify({
+        'success': True,
+        'posts': posts_data,
+        'has_next': posts_paginated.has_next,
+        'next_page': posts_paginated.next_num,
+        'total': posts_paginated.total,
+        'is_authenticated': current_user.is_authenticated
+    })
+
+
 def _serialize_posts(posts_list, favorite_post_ids):
     """Serializa uma lista de posts para JSON"""
     icon_map = {'BIOS': 'fas fa-microchip', 'Esquemas': 'fas fa-project-diagram', 'Drivers': 'fas fa-cogs',
@@ -5834,6 +5956,9 @@ def chat_firebase_token():
     if firebase_auth is None:
         return jsonify({'success': False, 'message': 'Firebase Admin indisponível no servidor.'}), 503
 
+    if not is_firebase_admin_configured():
+        return jsonify({'success': True, 'token': '', 'uid': '', 'chatUnavailable': True, 'chatDisabled': True})
+
     if not initialize_firebase_admin():
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.'}), 503
 
@@ -5892,6 +6017,8 @@ def _trip_firestore_circuit() -> None:
 
 def _get_firestore_client():
     if firebase_firestore is None:
+        return None
+    if not is_firebase_admin_configured():
         return None
     if not initialize_firebase_admin():
         return None
@@ -5989,6 +6116,25 @@ def _get_chat_permissions_for_user(user) -> dict[str, Any]:
         'support_read': True,
         'support_write': True,
         'vip_area': normalize_plan_key(user.plan) == 'vip'
+    }
+
+
+def _chat_disabled_payload_for_user(user) -> dict[str, Any]:
+    support_room_id = _get_chat_support_room_id(user.id)
+    return {
+        'success': True,
+        'chatUnavailable': True,
+        'chatDisabled': True,
+        'message': 'Chat nao configurado no servidor.',
+        'todos_room_id': CHAT_PUBLIC_ROOM_ID,
+        'support_room_id': support_room_id,
+        'is_admin': _is_chat_admin(user),
+        'permissions': _get_chat_permissions_for_user(user),
+        'rooms': {
+            'todos': _serialize_chat_room(CHAT_PUBLIC_ROOM_ID, {}),
+            'support': _serialize_chat_room(support_room_id, {})
+        },
+        'tickets': []
     }
 
 
@@ -6155,7 +6301,12 @@ def _sync_chat_room_metadata_from_latest(db_firestore, room_id: str) -> None:
 def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
     tickets = []
     try:
-        docs = db_firestore.collection('chat_rooms').where('type', '==', 'support').limit(100).stream(timeout=10)
+        chat_rooms = db_firestore.collection('chat_rooms')
+        if FirestoreFieldFilter is not None:
+            query = chat_rooms.where(filter=FirestoreFieldFilter('type', '==', 'support'))
+        else:
+            query = chat_rooms.where('type', '==', 'support')
+        docs = query.limit(100).stream(timeout=10)
     except BaseException as e:
         _trip_firestore_circuit()
         app.logger.warning(f'Firestore indisponível ao listar tickets de suporte: {e}')
@@ -6249,7 +6400,7 @@ def chat_bootstrap():
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
-        return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
+        return jsonify(_chat_disabled_payload_for_user(current_user))
 
     try:
         todos_room_id, support_room_id = _ensure_chat_base_rooms_for_user(db_firestore, current_user)
@@ -6276,7 +6427,7 @@ def chat_state():
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
-        return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
+        return jsonify(_chat_disabled_payload_for_user(current_user))
 
     try:
         todos_room_id, support_room_id = _ensure_chat_base_rooms_for_user(db_firestore, current_user)
@@ -7411,6 +7562,49 @@ def admin_analytics():
     """
     Página de estatísticas com dados reais do banco de dados
     """
+    def normalize_referrer_label(value):
+        raw_value = str(value or '').strip()
+        if not raw_value or raw_value.lower() in {'direct', 'direct access', 'none', 'unknown'}:
+            return 'Direto'
+        try:
+            parsed_referrer = url_parse(raw_value)
+            if parsed_referrer.netloc:
+                return parsed_referrer.netloc.replace('www.', '')
+        except Exception:
+            pass
+        return raw_value[:60]
+
+    def normalize_count_rows(rows, label_getter, label_key):
+        normalized = []
+        for row in rows or []:
+            label = str(label_getter(row) or 'Não identificado').strip() or 'Não identificado'
+            row_mapping = getattr(row, '_mapping', None)
+            if row_mapping is not None and hasattr(row_mapping, 'get'):
+                count_value = row_mapping.get('count', 0)
+            else:
+                count_value = getattr(row, 'count', 0)
+
+            if callable(count_value):
+                count_value = 0
+
+            try:
+                count = int(cast(Any, count_value) or 0)
+            except (TypeError, ValueError):
+                count = 0
+
+            if count > 0:
+                normalized.append({label_key: label, 'count': count})
+        return normalized or [{label_key: 'Sem dados', 'count': 0}]
+
+    def counts_to_payload(counts, label_key):
+        ordered_items = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+        payload = [
+            {label_key: str(label or 'Não identificado'), 'count': int(count or 0)}
+            for label, count in ordered_items
+            if int(count or 0) > 0
+        ]
+        return payload or [{label_key: 'Sem dados', 'count': 0}]
+
     # Calcular estatísticas reais
     total_posts = Post.query.filter_by(is_active=True).count()
     total_categories = Category.query.filter_by(is_active=True).count()
@@ -7459,33 +7653,49 @@ def admin_analytics():
 
     daily_visits.reverse()  # Ordem cronológica
 
-    # Estatísticas de dispositivos (últimos 30 dias)
-    device_stats = db.session.query(
+    visitor_fingerprints = VisitorLog.query.with_entities(
+        VisitorLog.user_agent,
         VisitorLog.device_type,
-        db.func.count(VisitorLog.id).label('count')
-    ).filter(VisitorLog.visit_time >= thirty_days_ago)\
-     .group_by(VisitorLog.device_type).all()
+        VisitorLog.browser
+    ).filter(VisitorLog.visit_time >= thirty_days_ago).all()
 
-    # Estatísticas de navegadores (últimos 30 dias)
-    browser_stats = db.session.query(
-        VisitorLog.browser,
-        db.func.count(VisitorLog.id).label('count')
-    ).filter(VisitorLog.visit_time >= thirty_days_ago)\
-     .group_by(VisitorLog.browser)\
-     .order_by(db.func.count(VisitorLog.id).desc())\
-     .limit(5).all()
+    if not visitor_fingerprints:
+        visitor_fingerprints = VisitorLog.query.with_entities(
+            VisitorLog.user_agent,
+            VisitorLog.device_type,
+            VisitorLog.browser
+        ).all()
 
-    # Se não há dados de visitantes, criar lista vazia
-    if not browser_stats:
-        browser_stats = []
+    device_counts = {}
+    browser_counts = {}
+    for user_agent, stored_device, stored_browser in visitor_fingerprints:
+        normalized_device = get_device_type(user_agent) if user_agent else (stored_device or 'Não identificado')
+        normalized_browser = get_browser_name(user_agent) if user_agent else (stored_browser or 'Não identificado')
+        device_counts[normalized_device] = device_counts.get(normalized_device, 0) + 1
+        browser_counts[normalized_browser] = browser_counts.get(normalized_browser, 0) + 1
+
+    if not browser_counts:
+        user_browser_stats = db.session.query(
+            User.browser,
+            db.func.count(User.id).label('count')
+        ).filter(User.browser.isnot(None))\
+         .group_by(User.browser)\
+         .order_by(db.func.count(User.id).desc())\
+         .limit(5).all()
+        browser_payload = normalize_count_rows(user_browser_stats, lambda item: item.browser, 'browser')
+    else:
+        browser_payload = counts_to_payload(browser_counts, 'browser')
+
+    device_payload = counts_to_payload(device_counts, 'device')
 
     # Posts por categoria
     category_stats = db.session.query(
         Category.name,
-        db.func.count(Post.id).label('post_count')
+        db.func.count(Post.id).label('post_count'),
+        db.func.coalesce(db.func.sum(Post.downloads), 0).label('downloads')
     ).outerjoin(Post, (Category.id == Post.category_id) & (Post.is_active == True))\
-     .filter_by(is_active=True)\
-     .group_by(Category.name).all()
+     .filter(Category.is_active == True)\
+     .group_by(Category.id, Category.name).all()
 
     # Posts mais populares (últimos 30 dias)
     popular_posts = Post.query.filter_by(is_active=True)\
@@ -7501,10 +7711,38 @@ def admin_analytics():
      .order_by(db.func.count(VisitorLog.id).desc())\
      .limit(10).all()
 
+    if not traffic_sources:
+        traffic_sources = db.session.query(
+            VisitorLog.referrer,
+            db.func.count(VisitorLog.id).label('count')
+        ).group_by(VisitorLog.referrer)\
+         .order_by(db.func.count(VisitorLog.id).desc())\
+         .limit(10).all()
+
+    if not traffic_sources:
+        traffic_sources = db.session.query(
+            User.referrer,
+            db.func.count(User.id).label('count')
+        ).filter(User.referrer.isnot(None))\
+         .group_by(User.referrer)\
+         .order_by(db.func.count(User.id).desc())\
+         .limit(10).all()
+
     # Calcular taxa de engajamento real (comentários / posts)
     engagement_rate = 0
     if total_posts > 0:
         engagement_rate = round((total_comments / total_posts) * 100, 1)
+
+    category_payload = [
+        {
+            'name': c.name,
+            'post_count': int(c.post_count or 0),
+            'downloads': int(c.downloads or 0)
+        }
+        for c in category_stats
+    ] or [{'name': 'Sem dados', 'post_count': 0, 'downloads': 0}]
+
+    traffic_payload = normalize_count_rows(traffic_sources, lambda item: normalize_referrer_label(item.referrer), 'source')
 
     analytics_data = {
         'total_visits': total_unique_visits,  # Visitas únicas reais
@@ -7519,11 +7757,35 @@ def admin_analytics():
         'total_comments': total_comments,
         'total_subscribers': total_subscribers,
         'daily_visits': daily_visits,
-        'device_stats': [{'device': d.device_type or 'Unknown', 'count': d.count} for d in device_stats],
-        'browser_stats': [{'browser': getattr(b, 'browser', 'Unknown'), 'count': getattr(b, 'count', 0)} for b in browser_stats],
-        'category_stats': [{'name': c.name, 'post_count': c.post_count} for c in category_stats],
+        'device_stats': device_payload,
+        'browser_stats': browser_payload,
+        'category_stats': category_payload,
         'popular_posts': popular_posts,
-        'traffic_sources': [{'source': t.referrer or 'Direct', 'count': t.count} for t in traffic_sources]
+        'traffic_sources': traffic_payload
+    }
+
+    analytics_chart_data = {
+        'dailyVisits': {
+            'labels': [item['date'].replace('-', '/') for item in daily_visits],
+            'values': [int(item['visits'] or 0) for item in daily_visits]
+        },
+        'categories': {
+            'labels': [item['name'] for item in category_payload],
+            'posts': [int(item['post_count'] or 0) for item in category_payload],
+            'downloads': [int(item['downloads'] or 0) for item in category_payload]
+        },
+        'trafficSources': {
+            'labels': [item['source'] for item in traffic_payload],
+            'values': [int(item['count'] or 0) for item in traffic_payload]
+        },
+        'devices': {
+            'labels': [item['device'] for item in device_payload],
+            'values': [int(item['count'] or 0) for item in device_payload]
+        },
+        'browsers': {
+            'labels': [item['browser'] for item in browser_payload],
+            'values': [int(item['count'] or 0) for item in browser_payload]
+        }
     }
 
     # Obter estatísticas para a sidebar
@@ -7532,6 +7794,7 @@ def admin_analytics():
     return render_template('admin/analytics.html',
                          title="Estatísticas",
                          analytics=analytics_data,
+                         analytics_chart_data=analytics_chart_data,
                          **sidebar_stats)
 
 @app.route("/admin/categories")
@@ -9119,9 +9382,14 @@ def admin_profile():
     """
     # Obter estatísticas para a sidebar
     sidebar_stats = get_admin_sidebar_stats()
+    try:
+        profile_preferences = json.loads(current_user.preferences or '{}')
+    except (TypeError, ValueError, json.JSONDecodeError):
+        profile_preferences = {}
 
     return render_template('admin/profile.html',
                          title="Meu Perfil",
+                         profile_preferences=profile_preferences,
                          **sidebar_stats)
 
 @app.route('/profile')
@@ -10150,7 +10418,7 @@ def admin_update_preferences():
             'browser_notifications': 'browser_notifications' in request.form
         }
 
-        # Supondo que você tenha um campo preferences no modelo User
+        current_user.email_notifications = preferences['email_notifications']
         current_user.preferences = json.dumps(preferences)
         db.session.commit()
 
@@ -10213,6 +10481,11 @@ with app.app_context():
                     conn.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
                     conn.commit()
                     print("  ➕ Coluna 'parent_id' adicionada à tabela comments")
+                user_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(user)"))]
+                if 'preferences' not in user_cols:
+                    conn.execute(text("ALTER TABLE user ADD COLUMN preferences TEXT"))
+                    conn.commit()
+                    print("  ➕ Coluna 'preferences' adicionada à tabela user")
         except Exception:
             pass
     except Exception as e:
@@ -10246,7 +10519,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', default='127.0.0.1')
-    parser.add_argument('--port', default=5000, type=int)
+    parser.add_argument('--port', default=int(os.environ.get('PORT', '5000')), type=int)
     args = parser.parse_args()
 
     # Usar variável de ambiente para debug - segurança

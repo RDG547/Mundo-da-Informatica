@@ -191,17 +191,17 @@
 <div class="admin-card slide-in-up">
     <div class="admin-card-header">
         <h2 class="admin-card-title">Dispositivos e Navegadores</h2>
-        <div class="btn-group">
+        <div class="btn-group device-browser-toggle">
             <button class="btn-admin btn-admin-outline btn-sm active" data-target="devices">Dispositivos</button>
             <button class="btn-admin btn-admin-outline btn-sm" data-target="browsers">Navegadores</button>
         </div>
     </div>
     <div class="admin-card-body">
         <div class="row device-browser-charts">
-            <div class="col-md-6 chart-container" id="devicesChart-container" style="height: 300px;">
+            <div class="col-12 chart-container" id="devicesChart-container" style="height: 300px;">
                 <canvas id="devicesChart"></canvas>
             </div>
-            <div class="col-md-6 chart-container" id="browsersChart-container" style="height: 300px; display: none;">
+            <div class="col-12 chart-container" id="browsersChart-container" style="height: 300px; display: none;">
                 <canvas id="browsersChart"></canvas>
             </div>
         </div>
@@ -210,146 +210,157 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Dados para os gráficos -->
-<script type="application/json" id="analytics-data">
-{
-    "categoryLabels": [
-        {% if analytics.category_stats %}
-            {% for category in analytics.category_stats %}
-                "{{ category.name|e }}"{% if not loop.last %},{% endif %}
-            {% endfor %}
-        {% else %}
-            "Sem dados"
-        {% endif %}
-    ],
-    "categoryPostCounts": [
-        {% if analytics.category_stats %}
-            {% for category in analytics.category_stats %}
-                {{ category.post_count }}{% if not loop.last %},{% endif %}
-            {% endfor %}
-        {% else %}
-            0
-        {% endif %}
-    ],
-    "categoryDownloads": [
-        {% if analytics.category_stats %}
-            {% for category in analytics.category_stats %}
-                {{ category.post_count * 50 }}{% if not loop.last %},{% endif %}
-            {% endfor %}
-        {% else %}
-            0
-        {% endif %}
-    ]
-}
-</script>
+<script type="application/json" id="analytics-data">{{ analytics_chart_data | tojson }}</script>
 
 <script>
-    // Carregar dados do JSON
-    const analyticsData = JSON.parse(document.getElementById('analytics-data').textContent);
+(() => {
+    const palette = ['#3a86ff', '#8338ec', '#ff006e', '#38b000', '#ffbe0b', '#e74c3c', '#9b59b6', '#f39c12', '#2ecc71', '#1abc9c'];
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Gerenciar seletor de data
+    function getAnalyticsData() {
+        const dataNode = document.getElementById('analytics-data');
+        if (!dataNode) return {};
+        try {
+            return JSON.parse(dataNode.textContent || '{}');
+        } catch (error) {
+            console.error('Erro ao ler dados de analytics:', error);
+            return {};
+        }
+    }
+
+    function hasRealValues(values) {
+        return (values || []).some((value) => Number(value) > 0);
+    }
+
+    function seriesValues(values) {
+        const safeValues = (values || []).map((value) => Number(value) || 0);
+        return hasRealValues(safeValues) ? safeValues : [1];
+    }
+
+    function seriesLabels(labels, values) {
+        const safeLabels = labels && labels.length ? labels : ['Sem dados'];
+        return hasRealValues(values) ? safeLabels : ['Sem dados'];
+    }
+
+    function realValue(values, index) {
+        const safeValues = (values || []).map((value) => Number(value) || 0);
+        return hasRealValues(safeValues) ? safeValues[index] || 0 : 0;
+    }
+
+    function destroyChart(name) {
+        if (window[name] && typeof window[name].destroy === 'function') {
+            window[name].destroy();
+        }
+    }
+
+    function commonDoughnutOptions(values, cutout = '62%') {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => ` ${context.label}: ${realValue(values, context.dataIndex).toLocaleString('pt-BR')}`
+                    }
+                }
+            }
+        };
+    }
+
+    function createDoughnutChart(canvasId, chartName, labels, values, cutout) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || typeof Chart === 'undefined') return;
+        destroyChart(chartName);
+        window[chartName] = new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: seriesLabels(labels, values),
+                datasets: [{
+                    data: seriesValues(values),
+                    backgroundColor: palette,
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: commonDoughnutOptions(values, cutout)
+        });
+    }
+
+    function initializeAnalyticsPage() {
+        const pageData = getAnalyticsData();
+        if (!document.getElementById('visitChart') || typeof Chart === 'undefined') return;
+
         const dateRangeSelect = document.getElementById('dateRangeSelect');
         const customDateRange = document.getElementById('customDateRange');
-
-        dateRangeSelect.addEventListener('change', function() {
-            if (this.value === 'custom') {
-                customDateRange.style.display = 'block';
-            } else {
-                customDateRange.style.display = 'none';
-                fetchData(this.value);
-            }
-        });
-
-        // Formulário de data personalizada
         const dateRangeForm = document.getElementById('dateRangeForm');
-        dateRangeForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-
-            if (startDate && endDate) {
-                fetchData('custom', startDate, endDate);
-            } else {
-                showNotification('Por favor, selecione as datas inicial e final.', 'warning');
-            }
-        });
-
-        // Definir data atual como data final padrão
         const today = new Date();
-        const formattedDate = today.toISOString().split('T')[0];
-        document.getElementById('endDate').value = formattedDate;
-
-        // Definir a data inicial para 30 dias atrás
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
-        document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
 
-        // Alternar entre dispositivos e navegadores
-        const chartButtons = document.querySelectorAll('.btn-group .btn-admin');
-        chartButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Remover classe active de todos os botões
-                chartButtons.forEach(btn => btn.classList.remove('active'));
+        if (document.getElementById('endDate')) {
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+        }
+        if (document.getElementById('startDate')) {
+            document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        }
 
-                // Adicionar classe active ao botão clicado
-                this.classList.add('active');
+        if (dateRangeSelect && customDateRange && dateRangeSelect.dataset.bound !== 'true') {
+            dateRangeSelect.dataset.bound = 'true';
+            dateRangeSelect.addEventListener('change', function() {
+                customDateRange.style.display = this.value === 'custom' ? 'block' : 'none';
+            });
+        }
 
-                // Mostrar o gráfico correspondente
-                const target = this.getAttribute('data-target');
-
-                if (target === 'devices') {
-                    document.getElementById('devicesChart-container').style.display = 'block';
-                    document.getElementById('browsersChart-container').style.display = 'none';
-                } else {
-                    document.getElementById('devicesChart-container').style.display = 'none';
-                    document.getElementById('browsersChart-container').style.display = 'block';
+        if (dateRangeForm && dateRangeForm.dataset.bound !== 'true') {
+            dateRangeForm.dataset.bound = 'true';
+            dateRangeForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification('Filtro personalizado preparado para integração com dados por período.', 'info');
                 }
+            });
+        }
+
+        document.querySelectorAll('.device-browser-toggle [data-target]').forEach((button) => {
+            if (button.dataset.bound === 'true') return;
+            button.dataset.bound = 'true';
+            button.addEventListener('click', function() {
+                const target = this.dataset.target;
+                document.querySelectorAll('.device-browser-toggle [data-target]').forEach((item) => {
+                    item.classList.toggle('active', item === this);
+                });
+
+                const devicesContainer = document.getElementById('devicesChart-container');
+                const browsersContainer = document.getElementById('browsersChart-container');
+                if (devicesContainer) devicesContainer.style.display = target === 'devices' ? 'block' : 'none';
+                if (browsersContainer) browsersContainer.style.display = target === 'browsers' ? 'block' : 'none';
+
+                requestAnimationFrame(() => {
+                    if (target === 'devices') {
+                        window.devicesChart?.resize();
+                    } else {
+                        window.browsersChart?.resize();
+                    }
+                });
             });
         });
 
-        // Inicializar dados
-        fetchData(dateRangeSelect.value);
-        initCharts();
-    });
-
-    // Função para buscar dados com base no período selecionado
-    function fetchData(period, startDate, endDate) {
-        // Aqui você adicionaria a lógica para buscar dados do servidor com base no período
-        console.log(`Buscando dados para o período: ${period}`);
-
-        if (period === 'custom') {
-            console.log(`Data inicial: ${startDate}, Data final: ${endDate}`);
-        }
-
-        // Simular a atualização dos dados
-        setTimeout(() => {
-            updateCharts();
-            updateStats();
-
-            showNotification('Dados atualizados com sucesso!', 'success');
-        }, 500);
-    }
-
-    // Função para inicializar os gráficos
-    function initCharts() {
-        // Gráfico de visitas diárias
-        const visitCtx = document.getElementById('visitChart').getContext('2d');
-        window.visitChart = new Chart(visitCtx, {
+        destroyChart('visitChart');
+        window.visitChart = new Chart(document.getElementById('visitChart').getContext('2d'), {
             type: 'line',
             data: {
-                labels: [
-                    {% for visit in analytics.daily_visits %}
-                        '{{ visit.date | replace("-", "/") }}'{% if not loop.last %},{% endif %}
-                    {% endfor %}
-                ],
+                labels: pageData.dailyVisits?.labels || [],
                 datasets: [{
                     label: 'Visitas',
-                    data: [
-                        {% for visit in analytics.daily_visits %}
-                            {{ visit.visits }}{% if not loop.last %},{% endif %}
-                        {% endfor %}
-                    ],
+                    data: pageData.dailyVisits?.values || [],
                     borderColor: '#3a86ff',
                     backgroundColor: 'rgba(58, 134, 255, 0.1)',
                     tension: 0.4,
@@ -359,298 +370,76 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {
-                            label: function(context) {
-                                return ` Visitas: ${context.raw.toLocaleString('pt-BR')}`;
-                            }
-                        }
-                    }
-                },
+                plugins: { legend: { display: false } },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            display: true,
-                            drawBorder: false,
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    }
+                    y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+                    x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45 } }
                 }
             }
         });
 
-        // Gráfico de distribuição por categoria
-        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
-        window.categoryChart = new Chart(categoryCtx, {
-            type: 'doughnut',
-            data: {
-                labels: analyticsData.categoryLabels,
-                datasets: [{
-                    label: 'Posts por Categoria',
-                    data: analyticsData.categoryPostCounts,
-                    backgroundColor: [
-                        '#3a86ff',
-                        '#06ffa5',
-                        '#ffbe0b',
-                        '#fb5607',
-                        '#8338ec',
-                        '#ff006e',
-                        '#8b5cf6'
-                    ],
-                    borderWidth: 0,
-                    hoverOffset: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ` ${context.label}: ${context.raw}%`;
+        createDoughnutChart('categoryChart', 'categoryChart', pageData.categories?.labels, pageData.categories?.posts, '70%');
+
+        const downloadCanvas = document.getElementById('downloadChart');
+        if (downloadCanvas) {
+            destroyChart('downloadChart');
+            const downloadValues = pageData.categories?.downloads || [];
+            window.downloadChart = new Chart(downloadCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: seriesLabels(pageData.categories?.labels, downloadValues),
+                    datasets: [{
+                        label: 'Downloads',
+                        data: seriesValues(downloadValues),
+                        backgroundColor: palette.map((color) => `${color}bb`),
+                        borderWidth: 0,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => ` Downloads: ${realValue(downloadValues, context.dataIndex).toLocaleString('pt-BR')}`
                             }
                         }
-                    }
-                },
-                cutout: '70%'
-            }
-        });
-
-        // Gráfico de downloads por categoria
-        const downloadCtx = document.getElementById('downloadChart').getContext('2d');
-        window.downloadChart = new Chart(downloadCtx, {
-            type: 'bar',
-            data: {
-                labels: analyticsData.categoryLabels,
-                datasets: [{
-                    label: 'Downloads',
-                    data: analyticsData.categoryDownloads,
-                    backgroundColor: [
-                        'rgba(58, 134, 255, 0.7)',
-                        'rgba(131, 56, 236, 0.7)',
-                        'rgba(255, 0, 110, 0.7)',
-                        'rgba(56, 176, 0, 0.7)',
-                        'rgba(255, 190, 11, 0.7)'
-                    ],
-                    borderWidth: 0,
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            display: true,
-                            drawBorder: false,
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
                     },
-                    x: {
-                        grid: {
-                            display: false
-                        }
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+                        x: { grid: { display: false } }
                     }
                 }
-            }
-        });
+            });
+        }
 
-        // Gráfico de origem do tráfego
-        const trafficCtx = document.getElementById('trafficSourcesChart').getContext('2d');
-        window.trafficChart = new Chart(trafficCtx, {
-            type: 'pie',
-            data: {
-                labels: [
-                    {% for source in analytics.traffic_sources %}
-                        '{{ source.source }}'{% if not loop.last %},{% endif %}
-                    {% endfor %}
-                ],
-                datasets: [{
-                    data: [
-                        {% for source in analytics.traffic_sources %}
-                            {{ source.count }}{% if not loop.last %},{% endif %}
-                        {% endfor %}
-                    ],
-                    backgroundColor: [
-                        '#3a86ff',
-                        '#8338ec',
-                        '#ff006e',
-                        '#38b000',
-                        '#ffbe0b',
-                        '#e74c3c',
-                        '#9b59b6',
-                        '#f39c12',
-                        '#2ecc71',
-                        '#1abc9c'
-                    ],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ` ${context.label}: ${context.raw}%`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        createDoughnutChart('trafficSourcesChart', 'trafficChart', pageData.trafficSources?.labels, pageData.trafficSources?.values, '62%');
+        createDoughnutChart('devicesChart', 'devicesChart', pageData.devices?.labels, pageData.devices?.values, '60%');
+        createDoughnutChart('browsersChart', 'browsersChart', pageData.browsers?.labels, pageData.browsers?.values, '60%');
 
-        // Gráfico de dispositivos
-        const devicesCtx = document.getElementById('devicesChart').getContext('2d');
-        window.devicesChart = new Chart(devicesCtx, {
-            type: 'doughnut',
-            data: {
-                labels: [
-                    {% for device in analytics.device_stats %}
-                        '{{ device.device }}'{% if not loop.last %},{% endif %}
-                    {% endfor %}
-                ],
-                datasets: [{
-                    data: [
-                        {% for device in analytics.device_stats %}
-                            {{ device.count }}{% if not loop.last %},{% endif %}
-                        {% endfor %}
-                    ],
-                    backgroundColor: [
-                        '#3a86ff',
-                        '#ff006e',
-                        '#ffbe0b',
-                        '#38b000',
-                        '#8338ec'
-                    ],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ` ${context.label}: ${context.raw}%`;
-                            }
-                        }
-                    }
-                },
-                cutout: '60%'
-            }
-        });
-
-        // Gráfico de navegadores
-        const browsersCtx = document.getElementById('browsersChart').getContext('2d');
-        window.browsersChart = new Chart(browsersCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Chrome', 'Firefox', 'Safari', 'Edge', 'Outros'],
-                datasets: [{
-                    data: [60, 15, 10, 10, 5],
-                    backgroundColor: [
-                        '#3a86ff',
-                        '#ff006e',
-                        '#38b000',
-                        '#8338ec',
-                        '#ffbe0b'
-                    ],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ` ${context.label}: ${context.raw}%`;
-                            }
-                        }
-                    }
-                },
-                cutout: '60%'
-            }
-        });
+        const downloadChartBtn = document.getElementById('downloadChartBtn');
+        if (downloadChartBtn && downloadChartBtn.dataset.bound !== 'true') {
+            downloadChartBtn.dataset.bound = 'true';
+            downloadChartBtn.addEventListener('click', function() {
+                const canvas = document.getElementById('visitChart');
+                if (!canvas) return;
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'visitas-diarias.png';
+                link.click();
+            });
+        }
     }
 
-    // Dados estáticos carregados do servidor
-    // Não é necessário atualizar com dados aleatórios
-
-    // Função para formatar números
-    function formatNumber(number) {
-        return new Intl.NumberFormat('pt-BR').format(number);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeAnalyticsPage);
+    } else {
+        initializeAnalyticsPage();
     }
 
-    // Botão de download do gráfico
-    document.getElementById('downloadChartBtn').addEventListener('click', function() {
-        const canvas = document.getElementById('visitChart');
-        const url = canvas.toDataURL('image/png');
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'visitas-diarias.png';
-        link.click();
-    });
+    document.addEventListener('adminPageLoaded', initializeAnalyticsPage);
+})();
 </script>
 {% endblock %}

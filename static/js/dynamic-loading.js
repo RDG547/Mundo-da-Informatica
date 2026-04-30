@@ -83,7 +83,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 setTimeout(() => this.initializeContactForm(), 100);
             } else if (currentPath === '/about' || currentPath === '/sobre' || document.querySelector('.about-hero')) {
                 setTimeout(() => this.initializeAboutPage(), 100);
-            } else if (currentPath.startsWith('/categoria/') || document.querySelector('.category-hero')) {
+            } else if (currentPath.startsWith('/categoria/') || currentPath.startsWith('/subcategoria/') || document.querySelector('.category-hero')) {
                 setTimeout(() => this.initializeCategoryPage(), 100);
             } else if (currentPath.startsWith('/profile') || document.querySelector('.profile-hero')) {
                 // Profile page initialization is already handled in profile-page.js
@@ -109,6 +109,15 @@ if (typeof window.DynamicLoader !== 'undefined') {
             // Intercept all internal links - use capture phase to execute before other listeners
             document.addEventListener('click', (e) => {
                 const link = e.target.closest('a');
+                const fullReloadUrl = this.getFullReloadUrl(link);
+                if (fullReloadUrl) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    this.navigateWithFullPageLoader(fullReloadUrl);
+                    return false;
+                }
+
                 if (this.shouldInterceptLink(link)) {
                     e.preventDefault();
                     e.stopPropagation(); // Prevent other click handlers
@@ -126,6 +135,50 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     this.submitForm(form);
                 }
             });
+        }
+
+        getFullReloadUrl(link) {
+            if (!link || !link.href) return '';
+            if (link.hostname !== window.location.hostname) return '';
+            if (link.target === '_blank' || link.download) return '';
+            if (link.href.includes('/download/') || link.href.includes('/logout')) return '';
+
+            const url = new URL(link.href);
+            const currentIsAdmin = window.location.pathname.startsWith('/admin');
+            const targetIsAdmin = url.pathname.startsWith('/admin');
+
+            if (currentIsAdmin !== targetIsAdmin || link.dataset.fullReload === 'true') {
+                return url.href;
+            }
+
+            return '';
+        }
+
+        navigateWithFullPageLoader(url) {
+            if (this.isLoading) return;
+            this.isLoading = true;
+
+            const preloader = document.querySelector('.preloader');
+            if (preloader) {
+                preloader.dataset.hidden = 'false';
+                preloader.classList.remove('fade-out');
+                preloader.style.display = 'flex';
+                preloader.style.opacity = '1';
+                preloader.style.visibility = 'visible';
+            } else {
+                const loader = document.getElementById('dynamic-loader');
+                if (loader) {
+                    loader.style.top = '0';
+                    loader.style.left = '0';
+                    loader.style.width = '100vw';
+                    loader.style.height = '100vh';
+                    loader.style.display = 'flex';
+                }
+            }
+
+            window.setTimeout(() => {
+                window.location.href = url;
+            }, 80);
         }
 
         shouldInterceptLink(link) {
@@ -148,6 +201,10 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
             // Don't intercept logout links
             if (link.href.includes('/logout')) return false;
+
+            if (link.dataset.vipLink === 'true' && link.dataset.vipAccess !== 'vip') {
+                return false;
+            }
 
             const url = new URL(link.href);
             const currentIsAdmin = window.location.pathname.startsWith('/admin');
@@ -216,6 +273,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 }
 
                 await this.updatePage(content, url);
+                this.scrollToHashTarget(url);
 
             } catch (error) {
                 console.error('Error loading page:', error);
@@ -275,6 +333,18 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     !style.hasAttribute('data-static-base-style')
                 )
             };
+        }
+
+        scrollToHashTarget(url) {
+            const hash = new URL(url, window.location.origin).hash;
+            if (!hash) return;
+
+            requestAnimationFrame(() => {
+                const target = document.querySelector(hash);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
         }
 
         async updatePage(pageData, url) {
@@ -615,7 +685,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 if (aboutPageCSS) aboutPageCSS.media = 'all';
                 if (aboutPageCSS) activatedStyles.push(aboutPageCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 About CSS ativado');
-            } else if ((path.startsWith('/categoria/') || path === '/categorias' || path === '/posts') && categoryCSS) {
+            } else if ((path.startsWith('/categoria/') || path.startsWith('/subcategoria/') || path === '/categorias' || path === '/posts') && categoryCSS) {
                 categoryCSS.media = 'all';
                 activatedStyles.push(categoryCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Category CSS ativado');
@@ -653,7 +723,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
         // Helper para detectar páginas de post (categoria/slug)
         isPostPage(path) {
             const parts = path.split('/').filter(p => p);
-            return parts.length === 2 && !['admin', 'profile', 'categoria', 'api'].includes(parts[0]);
+            return parts.length === 2 && !['admin', 'profile', 'categoria', 'subcategoria', 'api'].includes(parts[0]);
         }
 
         async loadPageScripts(url, scripts) {
@@ -1017,7 +1087,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 '/termos-de-uso',
                 '/politica-de-privacidade'
             ]);
-            const isCategoryPath = targetPath === '/categorias' || targetPath.startsWith('/categoria/');
+            const isCategoryPath = targetPath === '/categorias' || targetPath.startsWith('/categoria/') || targetPath.startsWith('/subcategoria/');
 
             // Remove active class from all nav links
             document.querySelectorAll('.nav-menu a').forEach(link => {
@@ -1809,13 +1879,21 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
 } // Fim da verificação de carregamento
 
-// Initialize when DOM is loaded
+// Initialize as soon as the DOM is available. This keeps the first click in the
+// admin panel dynamic even when the script is loaded after DOMContentLoaded.
 if (typeof window.DynamicLoader !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function () {
+    window.ensureDynamicLoader = function () {
         if (!window.dynamicLoader) {
             window.dynamicLoader = new window.DynamicLoader();
         }
-    });
+        return window.dynamicLoader;
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', window.ensureDynamicLoader, { once: true });
+    } else {
+        window.ensureDynamicLoader();
+    }
 }
 
 // Global functions

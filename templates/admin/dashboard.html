@@ -42,30 +42,30 @@
 
 <!-- Quick Actions Bar -->
 <div class="quick-actions slide-in-up" style="animation-delay: 0.1s">
-    <div class="action-card" onclick="window.location.href='{{ url_for('admin_posts') }}'">
+    <a class="action-card" href="{{ url_for('admin_posts') }}">
         <i class="fas fa-file-alt"></i>
         <span>Gerenciar Posts</span>
-    </div>
-    <div class="action-card" onclick="window.location.href='{{ url_for('admin_categories') }}'">
+    </a>
+    <a class="action-card" href="{{ url_for('admin_categories') }}">
         <i class="fas fa-folder"></i>
         <span>Categorias</span>
-    </div>
-    <div class="action-card" onclick="window.location.href='{{ url_for('admin_users') }}'">
+    </a>
+    <a class="action-card" href="{{ url_for('admin_users') }}">
         <i class="fas fa-users"></i>
         <span>Usuários</span>
-    </div>
-    <div class="action-card" onclick="window.location.href='{{ url_for('admin_newsletter') }}'">
+    </a>
+    <a class="action-card" href="{{ url_for('admin_newsletter') }}">
         <i class="fas fa-envelope"></i>
         <span>Newsletter</span>
-    </div>
-    <div class="action-card" onclick="window.location.href='{{ url_for('admin_analytics') }}'">
+    </a>
+    <a class="action-card" href="{{ url_for('admin_analytics') }}">
         <i class="fas fa-chart-line"></i>
         <span>Analytics</span>
-    </div>
-    <div class="action-card" onclick="window.location.href='{{ url_for('admin_settings') }}'">
+    </a>
+    <a class="action-card" href="{{ url_for('admin_settings') }}">
         <i class="fas fa-cog"></i>
         <span>Configurações</span>
-    </div>
+    </a>
 </div>
 
 <!-- Enhanced Stats Grid -->

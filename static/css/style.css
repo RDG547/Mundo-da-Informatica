@@ -2451,6 +2451,14 @@ footer {
     transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 
+.preloader-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
 .preloader.fade-out {
     opacity: 0;
     visibility: hidden;
@@ -2463,6 +2471,13 @@ footer {
     border-radius: 50%;
     border-top-color: var(--primary-color);
     animation: spin 1s infinite ease-in-out;
+}
+
+.preloader-text {
+    color: var(--primary-color);
+    font-weight: 600;
+    line-height: 1.2;
+    margin: 0;
 }
 
 @keyframes spin {
@@ -2611,14 +2626,17 @@ footer {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 118px;
-    padding: 0.28rem 0.58rem;
-    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    padding: 0;
+    border-radius: 50%;
     background: rgba(37, 99, 235, 0.1);
+    border: 2px solid rgba(37, 99, 235, 0.2);
     color: #1d4ed8;
-    font-size: 0.73rem;
+    font-size: 0.84rem;
     font-weight: 800;
-    line-height: 1.2;
+    line-height: 1;
     white-space: nowrap;
 }
 
@@ -2682,7 +2700,7 @@ footer {
     }
 
     .floating-beta-countdown {
-        min-width: 0;
+        min-width: 34px;
     }
 }
 

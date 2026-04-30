@@ -68,7 +68,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}" id="about-css" data-static-base-style="true">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/about-page.css') }}" id="about-page-css" data-static-base-style="true">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/category.css') }}" id="category-css" data-static-base-style="true" {% if
-        request.endpoint !='category' and request.endpoint !='all_categories' %}media="print"
+        request.endpoint !='category' and request.endpoint !='subcategory' and request.endpoint !='all_categories' %}media="print"
         {% endif %}>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}" id="profile-css" data-static-base-style="true" {% if
         request.endpoint !='profile' %}media="print" {% endif %}>
@@ -109,10 +109,14 @@
     data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
     data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
     data-user-plan="{% if current_user.is_authenticated %}{{ current_user.plan }}{% else %}free{% endif %}"
+    data-chat-backend-enabled="{% if chat_backend_available %}true{% else %}false{% endif %}"
     data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
     <!-- Preloader -->
-    <div class="preloader">
-        <div class="loader"></div>
+    <div class="preloader" role="status" aria-live="polite" aria-label="Carregando">
+        <div class="preloader-content">
+            <div class="loader" aria-hidden="true"></div>
+            <p class="preloader-text">Carregando...</p>
+        </div>
     </div>
 
     <!-- Header & Navbar -->
@@ -266,7 +270,6 @@
                         <a href="{{ url_for('vip_area') }}"
                             class="dropdown-toggle {% if request.path == url_for('vip_area') %}active{% endif %}{% if current_user.is_authenticated and current_user.plan != 'vip' %} is-locked-feature{% endif %}"
                             data-vip-link="true"
-                            data-no-dynamic="true"
                             data-vip-access="{% if current_user.is_authenticated and current_user.plan == 'vip' %}vip{% elif current_user.is_authenticated %}locked{% else %}guest{% endif %}"
                             data-plans-url="{{ url_for('plans') }}">
                             <i class="fas fa-gem"></i> Área VIP
@@ -356,7 +359,8 @@
         <div class="floating-beta-content">
             <div class="floating-beta-content-header">
                 <strong>Estamos em construção</strong>
-                <span class="floating-beta-countdown" id="floating-beta-countdown" aria-live="polite">Recolhe em 7s</span>
+                <span class="floating-beta-countdown" id="floating-beta-countdown" aria-live="polite"
+                    aria-label="Recolhe em 7 segundos">7</span>
             </div>
             <p>Algumas áreas podem apresentar bugs. Reporte qualquer problema: estamos em constante atualização e contamos com você.</p>
             <a href="{{ url_for('contact') }}">
@@ -1381,7 +1385,8 @@
                 const updateBetaCountdown = (remainingMs) => {
                     if (!betaCountdown) return;
                     const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
-                    betaCountdown.textContent = `Recolhe em ${remainingSeconds}s`;
+                    betaCountdown.textContent = String(remainingSeconds);
+                    betaCountdown.setAttribute('aria-label', `Recolhe em ${remainingSeconds} segundos`);
                 };
 
                 const scheduleBetaCollapse = () => {

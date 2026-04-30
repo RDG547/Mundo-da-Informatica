@@ -95,19 +95,6 @@ footer h6 {
     border-radius: 0 !important;
 }
 
-/* Adicionando regras fortes para o contêiner de e-mail */
-footer a[href^="mailto:"],
-footer a[href^="mailto:"] * {
-    display: inline-block !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: normal !important;
-    word-break: break-all !important;
-    background-color: transparent !important;
-    padding: 0 !important;
-}
-
 /* Estilos adicionais para garantir que o texto esteja visível */
 .footer-column p,
 .footer-column a,

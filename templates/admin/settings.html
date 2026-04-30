@@ -18,7 +18,7 @@
             </div>
             <div class="header-actions settings-header-actions">
                 <button class="btn-admin btn-admin-outline" type="button" onclick="resetToDefaults()">
-                    <i class="fas fa-rotate-left"></i> Restaurar Padrões
+                    <i class="fas fa-undo"></i> Restaurar Padrões
                 </button>
                 <button class="btn-admin btn-admin-success" type="button" onclick="previewChanges()">
                     <i class="fas fa-eye"></i> Visualizar Site
@@ -118,66 +118,6 @@
                 </div>
             </div>
         </article>
-    </div>
-
-    <div class="settings-overview-grid slide-in-up">
-        <section class="admin-card settings-overview-card">
-            <div class="admin-card-header">
-                <div>
-                    <h2 class="admin-card-title"><i class="fas fa-layer-group"></i> Visao Operacional</h2>
-                    <p class="settings-panel-subtitle">Organize o trabalho por blocos, como no dashboard e na tela de analytics.</p>
-                </div>
-            </div>
-            <div class="admin-card-body">
-                <div class="settings-overview-items">
-                    <article class="settings-overview-item">
-                        <div class="settings-overview-icon"><i class="fas fa-palette"></i></div>
-                        <div>
-                            <strong>Aparencia</strong>
-                            <p>Cores principais, home e rodape com preview em tempo real.</p>
-                        </div>
-                    </article>
-                    <article class="settings-overview-item">
-                        <div class="settings-overview-icon"><i class="fas fa-headset"></i></div>
-                        <div>
-                            <strong>Atendimento</strong>
-                            <p>Email, telefone e cobertura exibidos no contato e no footer.</p>
-                        </div>
-                    </article>
-                    <article class="settings-overview-item">
-                        <div class="settings-overview-icon"><i class="fas fa-credit-card"></i></div>
-                        <div>
-                            <strong>Planos</strong>
-                            <p>Os valores daqui atualizam os cards e tambem o PIX; no cartao, o checkout continua lendo o valor oficial da Stripe.</p>
-                        </div>
-                    </article>
-                </div>
-            </div>
-        </section>
-
-        <section class="admin-card settings-overview-card is-accent">
-            <div class="admin-card-header">
-                <div>
-                    <h2 class="admin-card-title"><i class="fas fa-bolt"></i> Regra de Cobranca</h2>
-                    <p class="settings-panel-subtitle">Fonte oficial dos precos usados no checkout.</p>
-                </div>
-            </div>
-            <div class="admin-card-body">
-                <div class="settings-billing-stack">
-                    <div class="settings-billing-row">
-                        <span class="settings-billing-label">Premium</span>
-                        <code>{{ plan_product_ids.premium }}</code>
-                    </div>
-                    <div class="settings-billing-row">
-                        <span class="settings-billing-label">VIP</span>
-                        <code>{{ plan_product_ids.vip }}</code>
-                    </div>
-                    <p class="settings-billing-note">
-                        No cartao, o checkout usa o preco oficial vinculado a estes produtos na Stripe. No PIX Abacate Pay, o valor segue o preco definido aqui no painel.
-                    </p>
-                </div>
-            </div>
-        </section>
     </div>
 
     <div class="settings-workspace">
@@ -484,7 +424,7 @@
 
             <div class="settings-footer-actions slide-in-up">
                 <button class="btn-admin btn-admin-outline" type="button" onclick="resetToDefaults()">
-                    <i class="fas fa-rotate-left"></i> Restaurar Padrões
+                    <i class="fas fa-undo"></i> Restaurar Padrões
                 </button>
                 <button class="btn-admin btn-admin-primary" type="button" onclick="saveAllSettings()" data-settings-save>
                     <i class="fas fa-save"></i> Salvar Alterações

@@ -35,17 +35,35 @@ function transformToSearchBar() {
 }
 
 async function checkPlanForContentRequest(isAuthenticated, userPlan, contactUrl, loginUrl) {
+    const navigate = async (url) => {
+        if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
+            await window.dynamicLoader.loadPage(url);
+            const hash = new URL(url, window.location.origin).hash;
+            if (hash) {
+                const target = document.querySelector(hash);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+            return;
+        }
+        window.location.href = url;
+    };
+
     if (isAuthenticated) {
         if (userPlan === 'free') {
             // Mostrar modal de upgrade com conteúdo personalizado
             showContentRequestModal('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso a esse recurso exclusivo e solicitar materiais personalizados!');
         } else {
             // Redirecionar para página de contato com categoria pré-selecionada
-            window.location.href = contactUrl + '?category=solicitacao';
+            const contactTarget = new URL(contactUrl, window.location.origin);
+            contactTarget.searchParams.set('category', 'solicitacao');
+            contactTarget.hash = 'contact-form-section';
+            await navigate(contactTarget.toString());
         }
     } else {
         // Redirecionar para login
-        window.location.href = loginUrl + '?next=' + encodeURIComponent(contactUrl);
+        await navigate(loginUrl + '?next=' + encodeURIComponent(contactUrl));
     }
 }
 

@@ -7,20 +7,21 @@
     <div class="hero-overlay"></div>
     <div class="container">
         <div class="hero-content text-center">
+            {% set hero_icon_category = parent_category if parent_category is defined and parent_category else category %}
             <div class="hero-icon">
-                {% if category == 'BIOS' %}
+                {% if hero_icon_category == 'BIOS' %}
                 <i class="fas fa-microchip"></i>
-                {% elif category == 'Drivers' %}
+                {% elif hero_icon_category == 'Drivers' %}
                 <i class="fas fa-cogs"></i>
-                {% elif category == 'Esquemas' %}
+                {% elif hero_icon_category == 'Esquemas' %}
                 <i class="fas fa-project-diagram"></i>
-                {% elif category == 'Softwares' %}
+                {% elif hero_icon_category == 'Softwares' %}
                 <i class="fas fa-desktop"></i>
-                {% elif category == 'Impressoras' %}
+                {% elif hero_icon_category == 'Impressoras' %}
                 <i class="fas fa-print"></i>
-                {% elif category == 'Cursos' %}
+                {% elif hero_icon_category == 'Cursos' %}
                 <i class="fas fa-graduation-cap"></i>
-                {% elif category == 'Datasheet' %}
+                {% elif hero_icon_category == 'Datasheet' %}
                 <i class="fas fa-file-alt"></i>
                 {% else %}
                 <i class="fas fa-folder"></i>
@@ -237,6 +238,26 @@
                                 <span>Semicondutores</span>
                             </div>
                         </div>
+                        {% else %}
+                        <p>Encontre recursos especializados em {{ category }} organizados com o mesmo padrão das categorias principais, com materiais revisados e busca rápida para facilitar o acesso.</p>
+                        <div class="features-grid">
+                            <div class="feature-item" data-feature="verified" style="cursor: pointer;">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Verificado</span>
+                            </div>
+                            <div class="feature-item" data-feature="updated" style="cursor: pointer;">
+                                <i class="fas fa-rocket"></i>
+                                <span>Atualizado</span>
+                            </div>
+                            <div class="feature-item" data-feature="professional" style="cursor: pointer;">
+                                <i class="fas fa-users"></i>
+                                <span>Profissional</span>
+                            </div>
+                            <div class="feature-item" data-feature="support" style="cursor: pointer;">
+                                <i class="fas fa-headset"></i>
+                                <span>Suporte</span>
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -268,7 +289,7 @@
                     </div>
 
                     {% if posts and posts.items %}
-                    <div class="posts-grid" id="category-posts-grid" data-load-more-endpoint="{{ url_for('api_category_posts', category_name=category) }}" data-next-page="{{ posts.next_num if posts.has_next else '' }}" data-has-next="{{ 'true' if posts.has_next else 'false' }}">
+                    <div class="posts-grid" id="category-posts-grid" data-load-more-endpoint="{% if subcategory is defined and subcategory %}{{ url_for('api_subcategory_posts', subcategory_name=subcategory) }}{% else %}{{ url_for('api_category_posts', category_name=category) }}{% endif %}" data-next-page="{{ posts.next_num if posts.has_next else '' }}" data-has-next="{{ 'true' if posts.has_next else 'false' }}">
                         {% for post in posts.items %}
                         <div class="post-card">
                             <div class="post-image">

@@ -539,7 +539,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
             // Re-initialize post page functionality
             const currentPath = window.location.pathname;
-            if (currentPath.startsWith('/post/') || (currentPath.split('/').length === 3 && currentPath.split('/')[1] && currentPath.split('/')[2])) {
+            if (currentPath.startsWith('/post/') || (!currentPath.startsWith('/admin') && currentPath.split('/').length === 3 && currentPath.split('/')[1] && currentPath.split('/')[2])) {
                 console.log('[DYNAMIC-LOADING] 📄 Reinicializando post page');
                 this.initializePostPage();
             }

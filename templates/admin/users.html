@@ -1981,7 +1981,7 @@
     // ============================================
 
     // ID do usuário atual logado
-    const CURRENT_USER_ID = '{{ session.get("user_id") }}';
+    window.CURRENT_USER_ID = '{{ session.get("user_id") }}';
 
     // showNotification é definida globalmente em admin.js (10s padrão, duração configurável)
     // Não redefinir aqui para manter o padrão consistente do projeto
@@ -2103,8 +2103,15 @@
         const region = document.getElementById('usersListRegion');
         if (!region) return;
 
-        region.querySelectorAll('.user-row').forEach((row, index) => {
+        const rows = region.querySelectorAll('.user-row');
+        rows.forEach((row, index) => {
+            row.classList.remove('slide-in-up');
             row.style.animationDelay = `${index * 0.05}s`;
+        });
+        // Force reflow so the browser sees elements without the animation class
+        // before adding it, ensuring the animation starts correctly every time.
+        void region.offsetHeight;
+        rows.forEach((row) => {
             row.classList.add('slide-in-up');
         });
 

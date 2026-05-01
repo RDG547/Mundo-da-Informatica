@@ -668,7 +668,8 @@ function initializeProfilePage() {
     const removeImageBtn = document.getElementById('remove-image');
 
     // Trigger file upload when camera button is clicked
-    if (triggerUpload && imageInput) {
+    if (triggerUpload && imageInput && !triggerUpload.dataset.uploadListenerAttached) {
+        triggerUpload.dataset.uploadListenerAttached = 'true';
         triggerUpload.addEventListener('click', function () {
             imageInput.click();
         });

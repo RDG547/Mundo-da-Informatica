@@ -301,38 +301,155 @@
     </div>
 </div>
 
-<div class="admin-card slide-in-up" style="animation-delay: 0.6s">
+<style>
+    .activity-panel .activity-list {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .activity-panel .activity-item {
+        align-items: flex-start;
+        background: var(--admin-bg-light);
+        border: 1px solid var(--admin-border-color);
+        border-radius: 8px;
+        display: grid;
+        gap: 0.85rem;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        padding: 0.95rem;
+    }
+
+    .activity-panel .activity-icon {
+        align-items: center;
+        border-radius: 8px;
+        color: #fff;
+        display: inline-flex;
+        height: 42px;
+        justify-content: center;
+        width: 42px;
+    }
+
+    .activity-panel .activity-copy h4 {
+        color: var(--admin-text-primary);
+        font-size: 0.95rem;
+        line-height: 1.3;
+        margin: 0 0 0.25rem;
+    }
+
+    .activity-panel .activity-copy p {
+        color: var(--admin-text-light);
+        line-height: 1.45;
+        margin: 0;
+    }
+
+    .activity-panel .activity-date {
+        color: var(--admin-text-light);
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+
+    .activity-pagination {
+        align-items: center;
+        border-top: 1px solid var(--admin-border-color);
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+        padding-top: 1rem;
+    }
+
+    .activity-pagination .pagination {
+        margin: 0;
+    }
+
+    @media (max-width: 700px) {
+        .activity-panel .activity-item {
+            grid-template-columns: 42px minmax(0, 1fr);
+        }
+
+        .activity-panel .activity-date {
+            grid-column: 2;
+            white-space: normal;
+        }
+
+        .activity-pagination {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+    }
+</style>
+
+<div class="admin-card activity-panel slide-in-up" style="animation-delay: 0.6s">
     <div class="admin-card-header">
         <h2 class="admin-card-title">Atividade Recente</h2>
+        <span class="text-muted">{{ recent_activities_pagination.total }} registros</span>
     </div>
 
-    <div class="timeline">
+    <div class="activity-list">
         {% if recent_activities %}
             {% for activity in recent_activities %}
-            <div class="timeline-item">
-                <div class="timeline-icon {{ activity.bg_class }}">
+            <div class="activity-item">
+                <div class="activity-icon {{ activity.bg_class }}">
                     <i class="{{ activity.icon }}"></i>
                 </div>
-                <div class="timeline-content">
+                <div class="activity-copy">
                     <h4>{{ activity.title }}</h4>
                     <p>{{ activity.description }}</p>
-                    <span class="timeline-date">{{ activity.date.strftime('%d/%m/%Y às %H:%M') }}</span>
                 </div>
+                <span class="activity-date">{{ activity.date.strftime('%d/%m/%Y às %H:%M') }}</span>
             </div>
             {% endfor %}
         {% else %}
-            <div class="timeline-item">
-                <div class="timeline-icon bg-secondary">
+            <div class="activity-item">
+                <div class="activity-icon bg-secondary">
                     <i class="fas fa-info-circle"></i>
                 </div>
-                <div class="timeline-content">
+                <div class="activity-copy">
                     <h4>Nenhuma atividade recente</h4>
                     <p>Quando houver atividades no site, elas aparecerão aqui</p>
-                    <span class="timeline-date">Agora</span>
                 </div>
+                <span class="activity-date">Agora</span>
             </div>
         {% endif %}
     </div>
+
+    {% if recent_activities_pagination.pages > 1 %}
+    <div class="activity-pagination">
+        <div class="pagination-info">
+            Página {{ recent_activities_pagination.page }} de {{ recent_activities_pagination.pages }}
+        </div>
+        <nav aria-label="Paginação de atividades recentes">
+            <ul class="pagination">
+                <li class="page-item {% if not recent_activities_pagination.has_prev %}disabled{% endif %}">
+                    {% if recent_activities_pagination.has_prev %}
+                    <a class="page-link" href="{{ url_for('admin_dashboard', activity_page=recent_activities_pagination.prev_num) }}">&laquo;</a>
+                    {% else %}
+                    <span class="page-link">&laquo;</span>
+                    {% endif %}
+                </li>
+                {% for page_num in recent_activities_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if page_num %}
+                    <li class="page-item {% if page_num == recent_activities_pagination.page %}active{% endif %}">
+                        {% if page_num == recent_activities_pagination.page %}
+                        <span class="page-link">{{ page_num }}</span>
+                        {% else %}
+                        <a class="page-link" href="{{ url_for('admin_dashboard', activity_page=page_num) }}">{{ page_num }}</a>
+                        {% endif %}
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                <li class="page-item {% if not recent_activities_pagination.has_next %}disabled{% endif %}">
+                    {% if recent_activities_pagination.has_next %}
+                    <a class="page-link" href="{{ url_for('admin_dashboard', activity_page=recent_activities_pagination.next_num) }}">&raquo;</a>
+                    {% else %}
+                    <span class="page-link">&raquo;</span>
+                    {% endif %}
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
 </div><!-- Fecha dashboard-content -->
 

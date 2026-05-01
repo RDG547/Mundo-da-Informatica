@@ -1912,3 +1912,156 @@ input:checked + .toggle-slider:before {
     transform: scale(0.97);
     transition: transform 0.1s;
 }
+
+/* Scroll to top button (admin panel) */
+.scroll-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 46px;
+    height: 46px;
+    background: var(--admin-primary, #3a86ff);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(58,134,255,.35);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .3s ease, visibility .3s ease, transform .2s ease;
+    z-index: 900;
+}
+.scroll-top.active {
+    opacity: 1;
+    visibility: visible;
+}
+.scroll-top:hover {
+    background: var(--admin-secondary, #8338ec);
+    transform: translateY(-4px);
+}
+
+/* User info modal — avatar with photo management */
+.user-info-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    margin-bottom: 1.2rem;
+}
+.user-info-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+.user-info-avatar-img {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--admin-primary, #3a86ff);
+    display: block;
+}
+.user-info-avatar-actions {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    display: flex;
+    gap: 3px;
+}
+.avatar-action-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: var(--admin-primary, #3a86ff);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .7rem;
+    cursor: pointer;
+    transition: background .2s;
+    text-decoration: none;
+}
+.avatar-action-btn.danger {
+    background: var(--admin-danger, #e63946);
+}
+.avatar-action-btn:hover {
+    filter: brightness(1.15);
+}
+
+/* Tracking info section */
+.tracking-info-section {
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    background: var(--admin-bg, #f5f7fa);
+    border: 1px solid var(--admin-border-color, rgba(0,0,0,.1));
+}
+.tracking-info-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: .82rem;
+    font-weight: 700;
+    color: var(--admin-text-light, #6c757d);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 0.7rem;
+}
+.tracking-info-title small {
+    font-weight: 400;
+    font-size: .75rem;
+    text-transform: none;
+    margin-left: auto;
+    letter-spacing: 0;
+}
+.tracking-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.55rem;
+}
+.tracking-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.tracking-info-label {
+    font-size: .75rem;
+    color: var(--admin-text-light, #6c757d);
+}
+.tracking-info-value {
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--admin-text, #333);
+    word-break: break-all;
+}
+
+/* Floating chat button — base styles (style.css not loaded in admin) */
+.floating-chat-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(102,126,234,.4);
+    transition: bottom .3s ease, transform .2s ease, box-shadow .2s ease;
+    z-index: 901;
+    font-size: 1.2rem;
+}
+.floating-chat-btn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(102,126,234,.5);
+}
+/* Move chat up when scroll-to-top button is visible */
+.floating-chat-btn.shifted-up {
+    bottom: 90px;
+}

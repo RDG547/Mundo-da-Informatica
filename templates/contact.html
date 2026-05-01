@@ -65,7 +65,7 @@
                                         <span>Seg-Sex: 9h às 18h</span>
                                     </div>
                                 </div>
-                                <a href="https://wa.me/5521978794705" target="_blank" class="method-action">
+                                <a href="{{ whatsapp_link_from_phone(site_configs.get('contact_phone', '(21) 97879-4705')) }}" target="_blank" class="method-action">
                                     <i class="fab fa-whatsapp"></i> Enviar Mensagem
                                 </a>
                             </div>
@@ -79,7 +79,7 @@
                                 <h3>Nossa Localização</h3>
                                 <p>Atendemos todo território nacional via internet</p>
                                 <div class="method-info">
-                                    <span class="contact-detail">Internet - Brasil, BR</span>
+                                    <span class="contact-detail">{{ site_configs.get('contact_address', 'Internet - Brasil') }}</span>
                                     <div class="coverage">
                                         <i class="fas fa-map-marked-alt"></i>
                                         <span>Cobertura Nacional</span>

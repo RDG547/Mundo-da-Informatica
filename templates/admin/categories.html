@@ -63,11 +63,25 @@
                         </div>
                         <div class="sort-dropdown">
                             <select id="sortBy" class="form-select">
+                                <option value="order">Ordenar por Ordem</option>
                                 <option value="name">Ordenar por Nome</option>
                                 <option value="posts">Ordenar por Posts</option>
                                 <option value="downloads">Ordenar por Downloads</option>
                                 <option value="created">Ordenar por Data</option>
                             </select>
+                        </div>
+                        <div class="bulk-actions">
+                            <label for="bulkActionSelect" class="bulk-actions-label">
+                                <i class="fas fa-tasks"></i> Ações em Massa
+                            </label>
+                            <select id="bulkActionSelect" class="form-select">
+                                <option value="">Selecione uma ação</option>
+                                <option value="toggle-status">Ativar/Desativar selecionados</option>
+                                <option value="feature">Marcar como destaque</option>
+                                <option value="unfeature">Remover destaque</option>
+                                <option value="delete">Excluir selecionados</option>
+                            </select>
+                            <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
                         </div>
                     </div>
                 </div>
@@ -76,7 +90,7 @@
             <!-- Visualização em Grid -->
             <div class="categories-grid" id="gridView">
                 {% for category in categories %}
-                <div class="category-card{% if not category.is_active %} inactive{% endif %}" data-category-id="{{ category.id }}">
+                <div class="category-card{% if not category.is_active %} inactive{% endif %}" data-category-id="{{ category.id }}" data-category-order="{{ category.order }}">
                     <div class="card-header">
                         <div class="category-icon-large">
                             <i class="{{ category.icon }}"></i>
@@ -165,7 +179,7 @@
                     </thead>
                     <tbody id="categoriesTableBody">
                         {% for category in categories %}
-                        <tr data-category-id="{{ category.id }}" {% if not category.is_active %}class="inactive-row"{% endif %}>
+                        <tr data-category-id="{{ category.id }}" data-category-order="{{ category.order }}" {% if not category.is_active %}class="inactive-row"{% endif %}>
                             <td>
                                 <input type="checkbox" class="form-check-input category-checkbox" value="{{ category.id }}">
                             </td>
@@ -269,19 +283,6 @@
             </div>
 
             <div class="admin-card-footer">
-                <div class="bulk-actions">
-                    <label for="bulkActionSelect" class="bulk-actions-label">
-                        <i class="fas fa-tasks"></i> Ações em Massa
-                    </label>
-                    <select id="bulkActionSelect" class="form-select">
-                        <option value="">Selecione uma ação</option>
-                        <option value="toggle-status">Ativar/Desativar selecionados</option>
-                        <option value="feature">Marcar como destaque</option>
-                        <option value="unfeature">Remover destaque</option>
-                        <option value="delete">Excluir selecionados</option>
-                    </select>
-                    <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
-                </div>
 
                 <!-- Paginação -->
                 <div class="pagination-container" id="categoriesPaginationContainer" data-per-page="10">
@@ -380,7 +381,7 @@
                 <div class="analytics-section">
                     <h5>Performance das Categorias</h5>
                     <div class="performance-list">
-                        {% for category in categories[:5] %}
+                        {% for category in categories %}
                         <div class="performance-item">
                             <div class="category-info">
                                 <i class="{{ category.icon }}"></i>
@@ -507,34 +508,13 @@
                                    class="form-control modern-input"
                                    value="0" min="0" max="999"
                                    placeholder="0">
-                            <div class="form-text">Ordem numérica para exibição (0 = primeiro)</div>
+                            <div class="form-text">Define a posição na página inicial e no dropdown de categorias (0 = primeiro)</div>
                         </div>
                     </div>
 
                     <div class="col-md-4">
                         <div class="sidebar-card">
                             <h5><i class="fas fa-palette"></i> Aparência</h5>
-
-                            <div class="form-group">
-                                <label for="categoryColor" class="form-label">Cor da Categoria</label>
-                                <div class="color-picker-modern">
-                                    <input type="color" id="categoryColor" name="color" value="#4a90e2">
-                                    <div class="color-preview" id="colorPreview"></div>
-                                    <input type="text" id="categoryColorText" class="color-input" value="#4a90e2">
-                                </div>
-                                <div class="color-presets">
-                                    <div class="preset-colors">
-                                        <button type="button" class="color-preset" data-color="#4a90e2" style="background: #4a90e2"></button>
-                                        <button type="button" class="color-preset" data-color="#e74c3c" style="background: #e74c3c"></button>
-                                        <button type="button" class="color-preset" data-color="#2ecc71" style="background: #2ecc71"></button>
-                                        <button type="button" class="color-preset" data-color="#f39c12" style="background: #f39c12"></button>
-                                        <button type="button" class="color-preset" data-color="#9b59b6" style="background: #9b59b6"></button>
-                                        <button type="button" class="color-preset" data-color="#1abc9c" style="background: #1abc9c"></button>
-                                        <button type="button" class="color-preset" data-color="#34495e" style="background: #34495e"></button>
-                                        <button type="button" class="color-preset" data-color="#e67e22" style="background: #e67e22"></button>
-                                    </div>
-                                </div>
-                            </div>
 
                             <div class="form-group">
                                 <label for="categoryIcon" class="form-label">Ícone (Font Awesome)</label>
@@ -587,23 +567,6 @@
                             </div>
                         </div>
 
-                        <div class="sidebar-card">
-                            <h5><i class="fas fa-eye"></i> Preview</h5>
-                            <div class="category-preview">
-                                <div class="preview-category" id="categoryPreview">
-                                    <div class="category-icon" id="previewIcon">
-                                        <i class="fas fa-folder"></i>
-                                    </div>
-                                    <div class="category-info">
-                                        <div class="category-name" id="previewName">Nome da Categoria</div>
-                                        <div class="category-description" id="previewDesc">Descrição da categoria</div>
-                                        <div class="category-stats">
-                                            <span class="post-count">0 posts</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </form>
@@ -687,7 +650,7 @@
                                 <input type="number" id="editCategoryOrder" name="order"
                                        class="form-control modern-input"
                                        placeholder="0" min="0" value="0">
-                                <div class="form-text">Ordem numérica para exibição (0 = primeiro)</div>
+                                <div class="form-text">Define a posição na página inicial e no dropdown de categorias (0 = primeiro)</div>
                             </div>
                         </div>
                     </div>
@@ -695,27 +658,6 @@
                     <div class="col-md-4">
                         <div class="sidebar-card">
                             <h5><i class="fas fa-palette"></i> Aparência</h5>
-
-                            <div class="form-group">
-                                <label for="editCategoryColor" class="form-label">Cor da Categoria</label>
-                                <div class="color-picker-modern">
-                                    <input type="color" id="editCategoryColor" name="color" value="#4a90e2">
-                                    <div class="color-preview" id="editColorPreview"></div>
-                                    <input type="text" id="editCategoryColorText" class="color-input" value="#4a90e2">
-                                </div>
-                                <div class="color-presets">
-                                    <div class="preset-colors">
-                                        <button type="button" class="color-preset" data-color="#4a90e2" style="background: #4a90e2"></button>
-                                        <button type="button" class="color-preset" data-color="#e74c3c" style="background: #e74c3c"></button>
-                                        <button type="button" class="color-preset" data-color="#2ecc71" style="background: #2ecc71"></button>
-                                        <button type="button" class="color-preset" data-color="#f39c12" style="background: #f39c12"></button>
-                                        <button type="button" class="color-preset" data-color="#9b59b6" style="background: #9b59b6"></button>
-                                        <button type="button" class="color-preset" data-color="#1abc9c" style="background: #1abc9c"></button>
-                                        <button type="button" class="color-preset" data-color="#34495e" style="background: #34495e"></button>
-                                        <button type="button" class="color-preset" data-color="#e67e22" style="background: #e67e22"></button>
-                                    </div>
-                                </div>
-                            </div>
 
                             <div class="form-group">
                                 <label for="editCategoryIcon" class="form-label">Ícone (Font Awesome)</label>
@@ -768,23 +710,6 @@
                             </div>
                         </div>
 
-                        <div class="sidebar-card">
-                            <h5><i class="fas fa-eye"></i> Preview</h5>
-                            <div class="category-preview">
-                                <div class="preview-category" id="editCategoryPreview">
-                                    <div class="category-icon" id="editPreviewIcon">
-                                        <i class="fas fa-folder"></i>
-                                    </div>
-                                    <div class="category-info">
-                                        <div class="category-name" id="editPreviewName">Nome da Categoria</div>
-                                        <div class="category-description" id="editPreviewDesc">Descrição da categoria</div>
-                                        <div class="category-stats">
-                                            <span class="post-count">0 posts</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </form>
@@ -1705,6 +1630,11 @@
                     let aValue, bValue;
 
                     switch (sortValue) {
+                        case 'order':
+                            aValue = parseInt(a.dataset.categoryOrder || '0');
+                            bValue = parseInt(b.dataset.categoryOrder || '0');
+                            return aValue - bValue;
+
                         case 'name':
                             aValue = a.querySelector('.category-title')?.textContent || '';
                             bValue = b.querySelector('.category-title')?.textContent || '';
@@ -1742,6 +1672,11 @@
                     let aValue, bValue;
 
                     switch (sortValue) {
+                        case 'order':
+                            aValue = parseInt(a.dataset.categoryOrder || '0');
+                            bValue = parseInt(b.dataset.categoryOrder || '0');
+                            return aValue - bValue;
+
                         case 'name':
                             aValue = a.querySelector('.category-name')?.textContent || '';
                             bValue = b.querySelector('.category-name')?.textContent || '';
@@ -1835,6 +1770,7 @@
 
         // Sincronizar inputs de cor texto/picker
         function syncColorInputs(colorInput, textInput) {
+            if (!colorInput || !textInput) return;
             colorInput.addEventListener('input', () => {
                 textInput.value = colorInput.value;
             });
@@ -2067,8 +2003,10 @@
 
                         // Preencher cor
                         const color = category.color || '#4a90e2';
-                        document.getElementById('editCategoryColor').value = color;
-                        document.getElementById('editCategoryColorText').value = color;
+                        const _ecColor = document.getElementById('editCategoryColor');
+                        const _ecColorText = document.getElementById('editCategoryColorText');
+                        if (_ecColor) _ecColor.value = color;
+                        if (_ecColorText) _ecColorText.value = color;
 
                         // Preencher ícone
                         const icon = category.icon || 'fas fa-folder';
@@ -2306,7 +2244,7 @@
                 slug: document.getElementById('editCategorySlug').value,
                 description: document.getElementById('editCategoryDescription').value,
                 icon: document.getElementById('editCategoryIcon').value,
-                color: document.getElementById('editCategoryColor').value,
+                color: (document.getElementById('editCategoryColor') || {value: '#4a90e2'}).value,
                 order: parseInt(document.getElementById('editCategoryOrder').value) || 0,
                 is_active: document.getElementById('editCategoryActive').checked,
                 featured: document.getElementById('editCategoryFeatured').checked,

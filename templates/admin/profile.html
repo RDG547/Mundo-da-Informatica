@@ -17,61 +17,7 @@
                 <h1><i class="fas fa-id-card"></i> Meu Perfil</h1>
                 <p class="header-subtitle">Atualize seus dados, imagem, segurança e preferências do painel.</p>
             </div>
-            <div class="header-actions profile-header-actions">
-                <button type="button" class="btn-admin btn-admin-outline" id="trigger-upload-top">
-                    <i class="fas fa-camera"></i> Trocar Foto
-                </button>
-                <a href="{{ url_for('home') }}" class="btn-admin btn-admin-primary" target="_blank" rel="noopener noreferrer">
-                    <i class="fas fa-external-link-alt"></i> Ver Site
-                </a>
-            </div>
         </div>
-    </div>
-
-    <div class="stats-grid enhanced profile-stats-grid slide-in-up">
-        <article class="stat-card profile-stat-card" style="animation-delay: 0.1s">
-            <div class="stat-header">
-                <div class="stat-icon"><i class="fas fa-user-tag"></i></div>
-                <div class="stat-trend neutral"><i class="fas fa-shield-alt"></i><span>{{ current_user.role }}</span></div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number">{{ profile_display_name }}</h3>
-                <p class="stat-label">Identidade pública no painel</p>
-            </div>
-        </article>
-
-        <article class="stat-card profile-stat-card" style="animation-delay: 0.2s">
-            <div class="stat-header">
-                <div class="stat-icon"><i class="fas fa-crown"></i></div>
-                <div class="stat-trend positive"><i class="fas fa-gem"></i><span>{{ current_user.plan|upper }}</span></div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number">{{ current_user.email }}</h3>
-                <p class="stat-label">Email da conta</p>
-            </div>
-        </article>
-
-        <article class="stat-card profile-stat-card" style="animation-delay: 0.3s">
-            <div class="stat-header">
-                <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
-                <div class="stat-trend neutral"><i class="fas fa-layer-group"></i><span>Painel</span></div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number">{{ post_count }}</h3>
-                <p class="stat-label">Posts ativos registrados</p>
-            </div>
-        </article>
-
-        <article class="stat-card profile-stat-card" style="animation-delay: 0.4s">
-            <div class="stat-header">
-                <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                <div class="stat-trend neutral"><i class="fas fa-calendar"></i><span>Desde</span></div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number">{{ current_user.date_joined.strftime('%d/%m/%Y') if current_user.date_joined else 'Sem data' }}</h3>
-                <p class="stat-label">Entrada na plataforma</p>
-            </div>
-        </article>
     </div>
 
     <div class="profile-workspace">
@@ -95,14 +41,14 @@
                         </div>
                         <div class="profile-image-hover">
                             <div class="profile-image-actions">
-                                <button type="button" class="btn-profile-action" id="trigger-upload" title="Trocar foto">
-                                    <i class="fas fa-camera"></i>
-                                </button>
-                                <button type="button" class="btn-profile-action" id="view-image" title="Visualizar foto">
+                                <button type="button" class="btn-profile-action" id="view-image" title="Visualizar foto" onclick="document.getElementById('imagePreviewModal').classList.add('show'); document.body.classList.add('modal-open');">
                                     <i class="fas fa-search-plus"></i>
                                 </button>
+                                <button type="button" class="btn-profile-action" id="edit-image" title="Editar foto" onclick="document.getElementById('profile-image-input').click();">
+                                    <i class="fas fa-pencil-alt"></i>
+                                </button>
                                 {% if current_user.profile_image %}
-                                <button type="button" class="btn-profile-action danger" id="remove-image" title="Remover foto">
+                                <button type="button" class="btn-profile-action danger" id="remove-image" title="Remover foto" onclick="document.getElementById('removeImageModal').classList.add('show'); document.body.classList.add('modal-open');">
                                     <i class="fas fa-trash"></i>
                                 </button>
                                 {% endif %}
@@ -132,6 +78,29 @@
 
                     <h2>{{ profile_display_name }}</h2>
                     <p class="profile-role">{{ current_user.role }}</p>
+                </div>
+
+                <div class="profile-identity-list" aria-label="Resumo da conta">
+                    <div class="profile-identity-row">
+                        <span><i class="fas fa-user-tag"></i> Identidade</span>
+                        <strong>{{ current_user.role }} · {{ profile_display_name }}</strong>
+                    </div>
+                    <div class="profile-identity-row">
+                        <span><i class="fas fa-envelope"></i> Email</span>
+                        <strong>{{ current_user.email }}</strong>
+                    </div>
+                    <div class="profile-identity-row">
+                        <span><i class="fas fa-gem"></i> Plano</span>
+                        <strong>{{ current_user.plan|upper }}</strong>
+                    </div>
+                    <div class="profile-identity-row">
+                        <span><i class="fas fa-layer-group"></i> Posts ativos</span>
+                        <strong>{{ post_count }}</strong>
+                    </div>
+                    <div class="profile-identity-row">
+                        <span><i class="fas fa-calendar-plus"></i> Desde</span>
+                        <strong>{{ current_user.date_joined.strftime('%d/%m/%Y') if current_user.date_joined else 'Sem data' }}</strong>
+                    </div>
                 </div>
 
                 <div class="profile-side-metrics">

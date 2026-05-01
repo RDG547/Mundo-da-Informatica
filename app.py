@@ -377,14 +377,62 @@ def get_admin_posts_overview() -> dict[str, int]:
     }
 
 
-def get_category_subcategories_map() -> dict[str, list[str]]:
+def get_default_category_subcategories() -> dict[str, list[str]]:
+    return {
+        'BIOS': ['bios-notebook', 'bios-desktop', 'bios-all-in-one'],
+        'Esquemas': ['esquemas-placa-mae', 'esquemas-fonte', 'esquemas-monitor'],
+        'Drivers': ['drivers-video', 'drivers-audio', 'drivers-rede', 'drivers-chipset'],
+        'Softwares': ['softwares-diagnostico', 'softwares-recuperacao', 'softwares-otimizacao'],
+        'Impressoras': ['impressoras-hp', 'impressoras-canon', 'impressoras-epson', 'impressoras-samsung'],
+        'Cursos': ['cursos-hardware', 'cursos-software', 'cursos-redes'],
+        'Datasheet': ['datasheet-ics', 'datasheet-transistores', 'datasheet-semicondutores']
+    }
+
+def format_subcategory_label(subcategory_slug: str) -> str:
+    labels = {
+        'bios-notebook': 'BIOS Notebook',
+        'bios-desktop': 'BIOS Desktop',
+        'bios-all-in-one': 'BIOS All-in-One',
+        'esquemas-placa-mae': 'Esquemas Placa-Mãe',
+        'esquemas-fonte': 'Esquemas Fonte',
+        'esquemas-monitor': 'Esquemas Monitor',
+        'drivers-video': 'Drivers Vídeo',
+        'drivers-audio': 'Drivers Áudio',
+        'drivers-rede': 'Drivers Rede',
+        'drivers-chipset': 'Drivers Chipset',
+        'softwares-diagnostico': 'Diagnóstico',
+        'softwares-recuperacao': 'Recuperação',
+        'softwares-otimizacao': 'Otimização',
+        'impressoras-hp': 'HP',
+        'impressoras-canon': 'Canon',
+        'impressoras-epson': 'Epson',
+        'impressoras-samsung': 'Samsung',
+        'cursos-hardware': 'Hardware',
+        'cursos-software': 'Software',
+        'cursos-redes': 'Redes',
+        'datasheet-ics': 'Circuitos Integrados',
+        'datasheet-transistores': 'Transistores',
+        'datasheet-semicondutores': 'Semicondutores'
+    }
+    return labels.get(subcategory_slug, subcategory_slug.replace('-', ' ').title())
+
+def get_category_subcategories_map(include_defaults: bool = False) -> dict[str, list[str]]:
+    subcategories_map: dict[str, list[str]] = {}
+
+    if include_defaults:
+        default_subcategories = get_default_category_subcategories()
+        categories = Category.query.filter_by(is_active=True).all()
+        for category in categories:
+            defaults = default_subcategories.get(category.name, [])
+            if defaults:
+                subcategories_map[str(category.id)] = list(defaults)
+
     rows = db.session.query(Post.category_id, Post.subcategory).filter(
         Post.category_id.isnot(None),
         Post.subcategory.isnot(None),
         Post.subcategory != ''
     ).distinct().order_by(Post.subcategory.asc()).all()
 
-    subcategories_map: dict[str, list[str]] = {}
     for category_id, subcategory in rows:
         key = str(category_id)
         subcategories_map.setdefault(key, [])
@@ -527,7 +575,7 @@ def send_contact_support_email(
         'outros': 'Outros',
     }
     normalized_category = category_labels.get(category, category or 'Nao informado')
-    support_email = app.config.get('SUPPORT_EMAIL') or DEFAULT_SUPPORT_EMAIL
+    support_email: str = str(SiteConfig.get_value('contact_email', None) or app.config.get('SUPPORT_EMAIL') or DEFAULT_SUPPORT_EMAIL)
 
     email_body = "\n".join([
         "Nova mensagem enviada pelo formulario de contato do site.",
@@ -973,9 +1021,11 @@ class Category(db.Model):
     name = db.Column(db.String(50), nullable=False, unique=True)
     description = db.Column(db.Text, nullable=True)
     icon = db.Column(db.String(50), nullable=True)  # Classe de ícone FontAwesome
+    color = db.Column(db.String(20), default='#4a90e2')
     slug = db.Column(db.String(50), nullable=False, unique=True)
     is_active = db.Column(db.Boolean, default=True)
     featured = db.Column(db.Boolean, default=False)  # Campo para categorias em destaque
+    show_in_menu = db.Column(db.Boolean, default=True)
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Data de criação
     posts = db.relationship('Post', backref='category_rel', lazy=True,
@@ -1425,13 +1475,126 @@ def get_default_category_data():
 
 def apply_default_category_data(category):
     """
-    Aplica ícone e descrição padrão para uma categoria se ela estiver no mapeamento.
+    Preenche ícone e descrição padrão sem sobrescrever personalizações do admin.
     """
     default_data = get_default_category_data()
     if category.name in default_data:
-        category.icon = default_data[category.name]['icon']
-        category.description = default_data[category.name]['description']
+        if not category.icon:
+            category.icon = default_data[category.name]['icon']
+        if not category.description:
+            category.description = default_data[category.name]['description']
     return category
+
+def coerce_bool(value, default=False):
+    """Converte valores de formulário/JSON para boolean sem tratar 'false' como True."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'true', '1', 'on', 'yes', 'sim'}:
+            return True
+        if normalized in {'false', '0', 'off', 'no', 'nao', 'não', ''}:
+            return False
+    return default
+
+def coerce_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+def category_public_url_value(category):
+    return category.slug or generate_slug(category.name)
+
+def get_category_query_filter(category):
+    category_record = Category.query.filter(
+        db.or_(
+            Category.slug == category,
+            Category.name == category
+        )
+    ).first()
+
+    if category_record:
+        category_filter = db.or_(
+            Post.category_id == category_record.id,
+            Post.category_str == category_record.name
+        )
+        return category_record, category_filter, category_record.name
+
+    category_filter = Post.category_str == category
+    return None, category_filter, category
+
+def build_category_admin_payload(category):
+    apply_default_category_data(category)
+    post_filter = db.or_(Post.category_id == category.id, Post.category_str == category.name)
+    post_count = Post.query.filter(post_filter, Post.is_active == True).count()
+    featured_posts = Post.query.filter(post_filter, Post.is_active == True, Post.featured == True).count()
+    total_downloads = db.session.query(db.func.sum(Post.downloads)).filter(post_filter, Post.is_active == True).scalar() or 0
+    last_post = Post.query.filter(post_filter, Post.is_active == True).order_by(Post.date_posted.desc()).first()
+
+    return {
+        'id': category.id,
+        'name': category.name,
+        'slug': category.slug,
+        'description': category.description or '',
+        'icon': category.icon or 'fas fa-folder',
+        'color': category.color or '#4a90e2',
+        'post_count': post_count,
+        'featured_posts': featured_posts,
+        'total_downloads': int(total_downloads or 0),
+        'is_active': bool(category.is_active),
+        'is_featured': bool(category.featured),
+        'featured': bool(category.featured),
+        'show_in_menu': bool(category.show_in_menu),
+        'order': category.order or 0,
+        'created_at': category.created_at if hasattr(category, 'created_at') else None,
+        'last_post_date': last_post.date_posted if last_post else None,
+        'last_post_title': last_post.title if last_post else None
+    }
+
+class ListPagination:
+    def __init__(self, items, page=1, per_page=10):
+        self.page = max(1, int(page or 1))
+        self.per_page = max(1, int(per_page or 10))
+        self.total = len(items)
+        self.pages = max(1, math.ceil(self.total / self.per_page))
+        self.page = min(self.page, self.pages)
+        start = (self.page - 1) * self.per_page
+        end = start + self.per_page
+        self.items = items[start:end]
+
+    @property
+    def has_prev(self):
+        return self.page > 1
+
+    @property
+    def has_next(self):
+        return self.page < self.pages
+
+    @property
+    def prev_num(self):
+        return self.page - 1 if self.has_prev else None
+
+    @property
+    def next_num(self):
+        return self.page + 1 if self.has_next else None
+
+    def iter_pages(self, left_edge=1, left_current=1, right_current=2, right_edge=1):
+        last = 0
+        for num in range(1, self.pages + 1):
+            if (
+                num <= left_edge
+                or (num > self.page - left_current - 1 and num < self.page + right_current)
+                or num > self.pages - right_edge
+            ):
+                if last + 1 != num:
+                    yield None
+                yield num
+                last = num
 
 def create_database_backup():
     """Cria backup do banco de dados"""
@@ -2152,8 +2315,17 @@ class SiteConfig(db.Model):
             defaults = {
                 'site_name': 'Mundo da Informática',
                 'site_description': 'Portal de tecnologia e informática',
+                'footer_text': 'Mundo da Informática - Todos os direitos reservados',
+                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
+                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+                'enable_dark_mode': True,
+                'primary_color': '#3a86ff',
+                'secondary_color': '#8338ec',
+                'google_analytics': '',
+                'maintenance_mode': False,
                 'contact_email': DEFAULT_SUPPORT_EMAIL,
                 'contact_phone': '(21) 97879-4705',
+                'contact_address': 'Internet - Brasil',
                 'social_facebook': '#',
                 'social_twitter': '#',
                 'social_instagram': '#',
@@ -2199,8 +2371,17 @@ class SiteConfig(db.Model):
             return {
                 'site_name': 'Mundo da Informática',
                 'site_description': 'Portal de tecnologia e informática',
+                'footer_text': 'Mundo da Informática - Todos os direitos reservados',
+                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
+                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+                'enable_dark_mode': True,
+                'primary_color': '#3a86ff',
+                'secondary_color': '#8338ec',
+                'google_analytics': '',
+                'maintenance_mode': False,
                 'contact_email': DEFAULT_SUPPORT_EMAIL,
                 'contact_phone': '(21) 97879-4705',
+                'contact_address': 'Internet - Brasil',
                 'social_facebook': '#',
                 'social_twitter': '#',
                 'social_instagram': '#',
@@ -2244,6 +2425,96 @@ class SiteConfig(db.Model):
 
         db.session.commit()
         return config
+
+
+def normalize_hex_color(value, default='#3a86ff'):
+    color = (value or '').strip()
+    if re.fullmatch(r'#[0-9a-fA-F]{6}', color):
+        return color
+    return default
+
+
+def hex_to_rgb_string(value, default='58, 134, 255'):
+    color = normalize_hex_color(value, '')
+    if not color:
+        return default
+    try:
+        return ', '.join(str(int(color[index:index + 2], 16)) for index in (1, 3, 5))
+    except (TypeError, ValueError):
+        return default
+
+
+def whatsapp_link_from_phone(phone_value):
+    digits = re.sub(r'\D+', '', phone_value or '')
+    if len(digits) in (10, 11) and not digits.startswith('55'):
+        digits = f'55{digits}'
+    return f'https://wa.me/{digits}' if digits else '#'
+
+
+def get_user_plan_limits(user):
+    if user.plan == 'premium':
+        daily_limit = 5
+        weekly_limit = 15
+    elif user.plan == 'vip':
+        daily_limit = 999
+        weekly_limit = 999
+    else:
+        daily_limit = 1
+        weekly_limit = 7
+
+    return {
+        'daily_limit': user.custom_daily_limit if user.custom_daily_limit is not None else daily_limit,
+        'weekly_limit': user.custom_weekly_limit if user.custom_weekly_limit is not None else weekly_limit,
+    }
+
+
+def serialize_user_for_admin(user):
+    """Payload unico para modais e atualizacoes dinamicas do admin."""
+    limits = get_user_plan_limits(user)
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=today_start.weekday())
+
+    return {
+        'id': user.id,
+        'username': user.username,
+        'name': user.name or '',
+        'first_name': user.first_name or '',
+        'last_name': user.last_name or '',
+        'display_name': user.get_full_name(),
+        'email': user.email,
+        'role': user.role,
+        'plan': user.plan,
+        'is_active': bool(user.is_active),
+        'is_verified': bool(user.is_verified),
+        'email_notifications': bool(user.email_notifications),
+        'bio': user.bio or '',
+        'location': user.location or '',
+        'phone': user.phone or '',
+        'website': user.website or '',
+        'facebook': user.facebook or '',
+        'twitter': user.twitter or '',
+        'instagram': user.instagram or '',
+        'linkedin': user.linkedin or '',
+        'github': user.github or '',
+        'ip_address': user.ip_address or '',
+        'browser': user.browser or '',
+        'operating_system': user.operating_system or '',
+        'referrer': user.referrer or '',
+        'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+        'date_joined_label': user.date_joined.strftime('%d/%m/%Y %H:%M') if user.date_joined else 'N/A',
+        'last_login': user.last_login.isoformat() if user.last_login else None,
+        'last_login_label': user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else 'N/A',
+        'profile_image_url': get_image_url_for_response(user.profile_image, folder='profiles', default='default_profile.jpg'),
+        'daily_limit': limits['daily_limit'],
+        'weekly_limit': limits['weekly_limit'],
+        'daily_downloads': user.daily_downloads or 0,
+        'weekly_downloads': user.weekly_downloads or 0,
+        'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else (today_start + timedelta(days=1)).isoformat(),
+        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else (week_start + timedelta(days=7)).isoformat(),
+        'can_download': bool(user.can_download),
+        'custom_daily_limit': user.custom_daily_limit,
+        'custom_weekly_limit': user.custom_weekly_limit,
+    }
 
 
 PLAN_METADATA = {
@@ -2588,8 +2859,12 @@ def inject_global_data():
     def get_image_url(image_path, folder='profiles', default='default.jpg'):
         return get_image_url_for_response(image_path, folder=folder, default=default)
 
-    # Categorias
-    categories = Category.query.filter_by(is_active=True).order_by(Category.order).all()
+    # Categorias públicas, sempre vindas do banco para refletir o painel admin.
+    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all()
+    for category_item in categories:
+        apply_default_category_data(category_item)
+    menu_categories = [category_item for category_item in categories if category_item.show_in_menu]
+    home_categories = [category_item for category_item in categories if category_item.featured] or categories
 
     # Posts em destaque
     featured_posts = Post.query.filter_by(featured=True, is_active=True).order_by(Post.date_posted.desc()).limit(4).all()
@@ -2597,6 +2872,8 @@ def inject_global_data():
     # Configurações do site
     config = SiteConfig.get_config()
     plan_pricing = get_plan_pricing_config(config)
+    primary_color = normalize_hex_color(config.get('primary_color'), '#3a86ff')
+    secondary_color = normalize_hex_color(config.get('secondary_color'), '#8338ec')
 
     # Estatísticas para o frontend
     stats = {
@@ -2631,11 +2908,22 @@ def inject_global_data():
 
     return dict(
         categories=categories,
+        menu_categories=menu_categories,
+        home_categories=home_categories,
+        menu_subcategories_map=get_category_subcategories_map(include_defaults=True),
+        category_public_url_value=category_public_url_value,
+        format_subcategory_label=format_subcategory_label,
         featured_posts=featured_posts,
         post_url=post_url,
         get_image_url=get_image_url,  # Adicionar helper de imagens
+        hex_to_rgb=hex_to_rgb_string,
+        whatsapp_link_from_phone=whatsapp_link_from_phone,
         config=config,
         site_configs=config,  # Adicionar alias para compatibilidade
+        site_primary_color=primary_color,
+        site_secondary_color=secondary_color,
+        site_primary_rgb=hex_to_rgb_string(primary_color),
+        site_secondary_rgb=hex_to_rgb_string(secondary_color, '131, 56, 236'),
         stats=stats,
         plan_pricing=plan_pricing,
         firebase_public_config=firebase_public_config,
@@ -2781,21 +3069,21 @@ def setup():
 def all_categories():
     """Página exclusiva de todas as categorias"""
     # Buscar todas as categorias do banco de dados
-    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc()).all()
-
-    # Aplicar ícones e descrições padrão
+    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all()
     default_data = get_default_category_data()
 
     if categories:
         for cat in categories:
-            if cat.name in default_data:
-                # Sempre usar ícone e descrição padrão
-                cat.icon = default_data[cat.name]['icon']
-                cat.description = default_data[cat.name]['description']
+            apply_default_category_data(cat)
     else:
         # Se não houver categorias no banco, criar objetos dict com dados padrão
         categories = [
-            {'name': name, 'icon': data['icon'], 'description': data['description']}
+            {
+                'name': name,
+                'slug': generate_slug(name),
+                'icon': data['icon'],
+                'description': data['description']
+            }
             for name, data in default_data.items()
         ]
 
@@ -2804,11 +3092,15 @@ def all_categories():
 @app.route('/categoria/<string:category>')
 def category(category):
     page = request.args.get('page', 1, type=int)
-    # Alterar category para category_str na consulta
-    posts = Post.query.filter_by(category_str=category, is_active=True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
+    category_record, category_filter, category_name = get_category_query_filter(category)
+    posts = Post.query.filter(category_filter, Post.is_active == True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
 
-    # Obter subcategorias disponíveis - alterar category para category_str
-    subcategories = db.session.query(Post.subcategory).filter(Post.category_str == category, Post.subcategory != None).distinct().all()
+    subcategory_query = db.session.query(Post.subcategory).filter(
+        category_filter,
+        Post.subcategory.isnot(None),
+        Post.subcategory != ''
+    ).distinct()
+    subcategories = subcategory_query.all()
     subcategories = [subcategory[0] for subcategory in subcategories if subcategory[0]]
 
     # Obter IDs dos posts favoritados do usuário logado
@@ -2816,7 +3108,15 @@ def category(category):
     if current_user.is_authenticated:
         favorite_post_ids = {f.post_id for f in Favorite.query.filter_by(user_id=current_user.id).all()}
 
-    return render_template('category.html', posts=posts, category=category, subcategories=subcategories, favorite_post_ids=favorite_post_ids, title=f'Categoria - {category}')
+    return render_template(
+        'category.html',
+        posts=posts,
+        category=category_name,
+        category_record=category_record,
+        subcategories=subcategories,
+        favorite_post_ids=favorite_post_ids,
+        title=f'Categoria - {category_name}'
+    )
 
 @app.route('/subcategoria/<string:subcategory>')
 def subcategory(subcategory):
@@ -6982,8 +7282,8 @@ def admin_dashboard():
 
     # Buscar atividades recentes do banco de dados
     recent_activities = []
-    # 1. Posts mais recentes (últimos 5)
-    latest_posts = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc()).limit(5).all()
+    # 1. Posts mais recentes
+    latest_posts = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc()).limit(12).all()
     for post in latest_posts:
         author_name = "Admin"  # Default
         if post.author_id:
@@ -7000,8 +7300,8 @@ def admin_dashboard():
             'date': post.date_posted
         })
 
-    # 2. Usuários recém-cadastrados (últimos 3)
-    latest_users = User.query.filter_by(is_active=True).order_by(User.date_joined.desc()).limit(3).all()
+    # 2. Usuários recém-cadastrados
+    latest_users = User.query.filter_by(is_active=True).order_by(User.date_joined.desc()).limit(12).all()
     for user in latest_users:
         recent_activities.append({
             'type': 'user_registered',
@@ -7012,8 +7312,8 @@ def admin_dashboard():
             'date': user.date_joined
         })
 
-    # 3. Posts atualizados recentemente (últimos 3 com date_updated)
-    updated_posts = Post.query.filter(Post.date_updated.isnot(None), Post.is_active==True).order_by(Post.date_updated.desc()).limit(3).all()
+    # 3. Posts atualizados recentemente
+    updated_posts = Post.query.filter(Post.date_updated.isnot(None), Post.is_active==True).order_by(Post.date_updated.desc()).limit(12).all()
     for post in updated_posts:
         author_name = "Admin"
         if post.author_id:
@@ -7030,8 +7330,8 @@ def admin_dashboard():
             'date': post.date_updated
         })
 
-    # 4. Comentários recentes (últimos 3)
-    latest_comments = Comment.query.order_by(Comment.date_posted.desc()).limit(3).all()
+    # 4. Comentários recentes
+    latest_comments = Comment.query.order_by(Comment.date_posted.desc()).limit(12).all()
     for comment in latest_comments:
         user_name = "Usuário"
         if comment.user_id:
@@ -7054,9 +7354,39 @@ def admin_dashboard():
             'date': comment.date_posted
         })
 
-    # Ordenar atividades por data (mais recente primeiro) e limitar a 10
+    # 5. Ações administrativas registradas
+    admin_activity_icon_map = {
+        'criar_categoria': ('fas fa-folder-plus', 'bg-primary', 'Categoria criada'),
+        'atualizar_categoria': ('fas fa-folder-open', 'bg-success', 'Categoria atualizada'),
+        'excluir_categoria': ('fas fa-trash', 'bg-danger', 'Categoria excluída'),
+        'toggle_destaque_categoria': ('fas fa-star', 'bg-warning', 'Destaque alterado'),
+        'toggle_status_categoria': ('fas fa-toggle-on', 'bg-info', 'Status alterado'),
+        'bulk_delete': ('fas fa-layer-group', 'bg-danger', 'Ação em massa'),
+        'bulk_feature': ('fas fa-star', 'bg-warning', 'Ação em massa'),
+        'bulk_unfeature': ('fas fa-star-half-alt', 'bg-secondary', 'Ação em massa'),
+        'bulk_toggle_status': ('fas fa-toggle-on', 'bg-info', 'Ação em massa')
+    }
+    latest_admin_activities = AdminActivity.query.order_by(AdminActivity.created_at.desc()).limit(18).all()
+    for admin_activity in latest_admin_activities:
+        icon, bg_class, title = admin_activity_icon_map.get(
+            admin_activity.action,
+            ('fas fa-clipboard-list', 'bg-secondary', 'Ação administrativa')
+        )
+        actor_name = admin_activity.user.get_full_name() if admin_activity.user else 'Admin'
+        recent_activities.append({
+            'type': 'admin_activity',
+            'icon': icon,
+            'bg_class': bg_class,
+            'title': title,
+            'description': admin_activity.description or f'Ação registrada por {actor_name}',
+            'date': admin_activity.created_at
+        })
+
+    # Ordenar atividades por data (mais recente primeiro) e paginar a cada 6 itens.
     recent_activities.sort(key=lambda x: x['date'], reverse=True)
-    recent_activities = recent_activities[:10]
+    activity_page = request.args.get('activity_page', 1, type=int)
+    recent_activities_pagination = ListPagination(recent_activities, page=activity_page, per_page=6)
+    recent_activities = recent_activities_pagination.items
 
     # Dados para a sidebar
     context = {
@@ -7064,6 +7394,7 @@ def admin_dashboard():
         "stats": stats,
         "recent_posts": recent_posts,
         "recent_activities": recent_activities,
+        "recent_activities_pagination": recent_activities_pagination,
         "categories": categories,
         "category_subcategories_map": get_category_subcategories_map(),
         "post_count": stats["posts"],
@@ -7574,28 +7905,6 @@ def admin_analytics():
             pass
         return raw_value[:60]
 
-    def normalize_count_rows(rows, label_getter, label_key):
-        normalized = []
-        for row in rows or []:
-            label = str(label_getter(row) or 'Não identificado').strip() or 'Não identificado'
-            row_mapping = getattr(row, '_mapping', None)
-            if row_mapping is not None and hasattr(row_mapping, 'get'):
-                count_value = row_mapping.get('count', 0)
-            else:
-                count_value = getattr(row, 'count', 0)
-
-            if callable(count_value):
-                count_value = 0
-
-            try:
-                count = int(cast(Any, count_value) or 0)
-            except (TypeError, ValueError):
-                count = 0
-
-            if count > 0:
-                normalized.append({label_key: label, 'count': count})
-        return normalized or [{label_key: 'Sem dados', 'count': 0}]
-
     def counts_to_payload(counts, label_key):
         ordered_items = sorted(counts.items(), key=lambda item: item[1], reverse=True)
         payload = [
@@ -7605,6 +7914,29 @@ def admin_analytics():
         ]
         return payload or [{label_key: 'Sem dados', 'count': 0}]
 
+    def parse_date_param(value):
+        try:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            return None
+
+    today = datetime.utcnow().date()
+    allowed_periods = {7, 30, 90, 365}
+    requested_days = request.args.get('days', 30, type=int)
+    period_days = requested_days if requested_days in allowed_periods else 30
+    start_date = parse_date_param(request.args.get('start'))
+    end_date = parse_date_param(request.args.get('end'))
+
+    if not start_date or not end_date or start_date > end_date:
+        end_date = today
+        start_date = today - timedelta(days=period_days - 1)
+    else:
+        period_days = max(1, (end_date - start_date).days + 1)
+
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(end_date, datetime.max.time())
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+
     # Calcular estatísticas reais
     total_posts = Post.query.filter_by(is_active=True).count()
     total_categories = Category.query.filter_by(is_active=True).count()
@@ -7612,52 +7944,72 @@ def admin_analytics():
     total_comments = Comment.query.count()
     total_subscribers = Subscriber.query.filter_by(is_active=True).count()
 
-    # Calcular total de visualizações e downloads reais dos posts
-    total_views = db.session.query(db.func.sum(Post.views)).scalar() or 0
-    total_downloads = db.session.query(db.func.sum(Post.downloads)).scalar() or 0
-
-    # Últimos 30 dias de dados
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-
-    # Novos usuários nos últimos 30 dias
-    new_users = User.query.filter(User.date_joined >= thirty_days_ago).count()
-    new_users_week = User.query.filter(User.date_joined >= seven_days_ago).count()
-
-    # Novos posts nos últimos 30 dias
-    new_posts = Post.query.filter(Post.date_posted >= thirty_days_ago).filter_by(is_active=True).count()
-
-    # Calcular visitas totais únicas (baseado em IPs únicos nos VisitorLogs)
-    total_unique_visits = db.session.query(
-        db.func.count(db.func.distinct(VisitorLog.ip_address))
+    period_views = db.session.query(db.func.sum(PostStats.views)).filter(
+        PostStats.date >= start_date,
+        PostStats.date <= end_date
+    ).scalar() or 0
+    period_downloads = db.session.query(db.func.sum(PostStats.downloads)).filter(
+        PostStats.date >= start_date,
+        PostStats.date <= end_date
     ).scalar() or 0
 
-    # Se não houver dados de visitantes, usar visualizações de posts como fallback
+    total_views = period_views or db.session.query(db.func.sum(Post.views)).filter(Post.is_active == True).scalar() or 0
+    total_downloads = period_downloads or db.session.query(db.func.sum(Post.downloads)).filter(Post.is_active == True).scalar() or 0
+
+    # Novos usuários no período selecionado
+    new_users = User.query.filter(User.date_joined >= start_dt, User.date_joined <= end_dt).count()
+    new_users_week = User.query.filter(User.date_joined >= seven_days_ago).count()
+
+    # Novos posts no período selecionado
+    new_posts = Post.query.filter(
+        Post.date_posted >= start_dt,
+        Post.date_posted <= end_dt,
+        Post.is_active == True
+    ).count()
+
+    total_unique_visits = db.session.query(db.func.count(db.func.distinct(VisitorLog.ip_address))).filter(
+        VisitorLog.visit_time >= start_dt,
+        VisitorLog.visit_time <= end_dt
+    ).scalar() or 0
     if total_unique_visits == 0:
-        total_unique_visits = total_views
+        total_unique_visits = int(total_views or 0)
 
-    # Logs de visitantes dos últimos 7 dias
+    visitor_daily_rows = db.session.query(
+        db.func.date(VisitorLog.visit_time).label('day'),
+        db.func.count(db.func.distinct(VisitorLog.ip_address)).label('visits')
+    ).filter(
+        VisitorLog.visit_time >= start_dt,
+        VisitorLog.visit_time <= end_dt
+    ).group_by(db.func.date(VisitorLog.visit_time)).all()
+
+    stats_daily_rows = db.session.query(
+        PostStats.date.label('day'),
+        db.func.sum(PostStats.views).label('views')
+    ).filter(
+        PostStats.date >= start_date,
+        PostStats.date <= end_date
+    ).group_by(PostStats.date).all()
+
+    visitor_daily_lookup = {str(row.day): int(row.visits or 0) for row in visitor_daily_rows}
+    stats_daily_lookup = {str(row.day): int(row.views or 0) for row in stats_daily_rows}
+    use_stats_fallback = not any(visitor_daily_lookup.values()) and any(stats_daily_lookup.values())
     daily_visits = []
-    for i in range(7):
-        date = datetime.utcnow().date() - timedelta(days=i)
-        # Contar visitantes únicos por IP para cada data
-        unique_ips = db.session.query(VisitorLog.ip_address).filter(
-            db.func.date(VisitorLog.visit_time) == date
-        ).distinct().count()
-
-        # Se não há dados de visitantes, usar 0
+    for offset in range(period_days):
+        date = start_date + timedelta(days=offset)
+        date_key = date.isoformat()
         daily_visits.append({
-            'date': date.strftime('%Y-%m-%d'),
-            'visits': unique_ips
+            'date': date_key,
+            'visits': stats_daily_lookup.get(date_key, 0) if use_stats_fallback else visitor_daily_lookup.get(date_key, 0)
         })
-
-    daily_visits.reverse()  # Ordem cronológica
 
     visitor_fingerprints = VisitorLog.query.with_entities(
         VisitorLog.user_agent,
         VisitorLog.device_type,
         VisitorLog.browser
-    ).filter(VisitorLog.visit_time >= thirty_days_ago).all()
+    ).filter(
+        VisitorLog.visit_time >= start_dt,
+        VisitorLog.visit_time <= end_dt
+    ).all()
 
     if not visitor_fingerprints:
         visitor_fingerprints = VisitorLog.query.with_entities(
@@ -7682,75 +8034,74 @@ def admin_analytics():
          .group_by(User.browser)\
          .order_by(db.func.count(User.id).desc())\
          .limit(5).all()
-        browser_payload = normalize_count_rows(user_browser_stats, lambda item: item.browser, 'browser')
-    else:
-        browser_payload = counts_to_payload(browser_counts, 'browser')
+        browser_counts = {
+            row.browser or 'Não identificado': int(row.count or 0)
+            for row in user_browser_stats
+        }
 
+    browser_payload = counts_to_payload(browser_counts, 'browser')
     device_payload = counts_to_payload(device_counts, 'device')
 
-    # Posts por categoria
-    category_stats = db.session.query(
-        Category.name,
-        db.func.count(Post.id).label('post_count'),
-        db.func.coalesce(db.func.sum(Post.downloads), 0).label('downloads')
-    ).outerjoin(Post, (Category.id == Post.category_id) & (Post.is_active == True))\
-     .filter(Category.is_active == True)\
-     .group_by(Category.id, Category.name).all()
+    category_payload = []
+    for category in Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all():
+        apply_default_category_data(category)
+        category_filter = db.or_(Post.category_id == category.id, Post.category_str == category.name)
+        category_payload.append({
+            'name': category.name,
+            'post_count': int(Post.query.filter(category_filter, Post.is_active == True).count() or 0),
+            'downloads': int(db.session.query(db.func.sum(Post.downloads)).filter(category_filter, Post.is_active == True).scalar() or 0)
+        })
 
-    # Posts mais populares (últimos 30 dias)
-    popular_posts = Post.query.filter_by(is_active=True)\
-                             .order_by(Post.views.desc())\
-                             .limit(5).all()
+    if not category_payload:
+        category_payload = [{'name': 'Sem dados', 'post_count': 0, 'downloads': 0}]
 
-    # Origem de tráfego baseada em referrers
-    traffic_sources = db.session.query(
+    popular_page = request.args.get('popular_page', 1, type=int)
+    popular_posts_pagination = Post.query.filter_by(is_active=True)\
+        .order_by(Post.views.desc(), Post.downloads.desc(), Post.date_posted.desc())\
+        .paginate(page=popular_page, per_page=6, error_out=False)
+
+    traffic_rows = db.session.query(
         VisitorLog.referrer,
         db.func.count(VisitorLog.id).label('count')
-    ).filter(VisitorLog.visit_time >= thirty_days_ago)\
-     .group_by(VisitorLog.referrer)\
+    ).filter(
+        VisitorLog.visit_time >= start_dt,
+        VisitorLog.visit_time <= end_dt
+    ).group_by(VisitorLog.referrer)\
      .order_by(db.func.count(VisitorLog.id).desc())\
      .limit(10).all()
 
-    if not traffic_sources:
-        traffic_sources = db.session.query(
-            VisitorLog.referrer,
-            db.func.count(VisitorLog.id).label('count')
-        ).group_by(VisitorLog.referrer)\
-         .order_by(db.func.count(VisitorLog.id).desc())\
-         .limit(10).all()
+    traffic_counts = {}
+    for row in traffic_rows:
+        label = normalize_referrer_label(row.referrer)
+        traffic_counts[label] = traffic_counts.get(label, 0) + int(row.count or 0)
 
-    if not traffic_sources:
-        traffic_sources = db.session.query(
+    if not traffic_counts:
+        user_referrer_rows = db.session.query(
             User.referrer,
             db.func.count(User.id).label('count')
         ).filter(User.referrer.isnot(None))\
          .group_by(User.referrer)\
          .order_by(db.func.count(User.id).desc())\
          .limit(10).all()
+        for row in user_referrer_rows:
+            label = normalize_referrer_label(row.referrer)
+            traffic_counts[label] = traffic_counts.get(label, 0) + int(row.count or 0)
+
+    if not traffic_counts and total_unique_visits:
+        traffic_counts['Direto'] = int(total_unique_visits)
+
+    traffic_payload = counts_to_payload(traffic_counts, 'source')
 
     # Calcular taxa de engajamento real (comentários / posts)
-    engagement_rate = 0
-    if total_posts > 0:
-        engagement_rate = round((total_comments / total_posts) * 100, 1)
-
-    category_payload = [
-        {
-            'name': c.name,
-            'post_count': int(c.post_count or 0),
-            'downloads': int(c.downloads or 0)
-        }
-        for c in category_stats
-    ] or [{'name': 'Sem dados', 'post_count': 0, 'downloads': 0}]
-
-    traffic_payload = normalize_count_rows(traffic_sources, lambda item: normalize_referrer_label(item.referrer), 'source')
+    engagement_rate = round((total_comments / total_posts) * 100, 1) if total_posts > 0 else 0
 
     analytics_data = {
-        'total_visits': total_unique_visits,  # Visitas únicas reais
-        'total_downloads': total_downloads,  # Downloads reais dos posts
-        'new_users': new_users,  # Novos usuários últimos 30 dias
-        'new_users_week': new_users_week,  # Novos usuários últimos 7 dias
+        'total_visits': int(total_unique_visits or 0),
+        'total_downloads': int(total_downloads or 0),
+        'new_users': new_users,
+        'new_users_week': new_users_week,
         'new_posts': new_posts,
-        'engagement_rate': f'{engagement_rate}%',  # Taxa real baseada em comentários
+        'engagement_rate': f'{engagement_rate}%',
         'total_posts': total_posts,
         'total_categories': total_categories,
         'total_users': total_users,
@@ -7760,13 +8111,16 @@ def admin_analytics():
         'device_stats': device_payload,
         'browser_stats': browser_payload,
         'category_stats': category_payload,
-        'popular_posts': popular_posts,
-        'traffic_sources': traffic_payload
+        'popular_posts': popular_posts_pagination.items,
+        'traffic_sources': traffic_payload,
+        'period_days': period_days,
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat()
     }
 
     analytics_chart_data = {
         'dailyVisits': {
-            'labels': [item['date'].replace('-', '/') for item in daily_visits],
+            'labels': [item['date'][5:].replace('-', '/') for item in daily_visits],
             'values': [int(item['visits'] or 0) for item in daily_visits]
         },
         'categories': {
@@ -7795,6 +8149,7 @@ def admin_analytics():
                          title="Estatísticas",
                          analytics=analytics_data,
                          analytics_chart_data=analytics_chart_data,
+                         popular_posts_pagination=popular_posts_pagination,
                          **sidebar_stats)
 
 @app.route("/admin/categories")
@@ -7805,11 +8160,7 @@ def admin_categories():
     Página para gerenciar categorias com dados reais e estatísticas detalhadas
     """
     # Obter todas as categorias ordenadas
-    categories = Category.query.order_by(Category.order, Category.name).all()
-
-    # Aplicar ícones e descrições padrão
-    for category in categories:
-        apply_default_category_data(category)
+    categories = Category.query.order_by(Category.order.asc(), Category.name.asc()).all()
 
     # Calcular estatísticas detalhadas para cada categoria
     category_stats = []
@@ -7817,41 +8168,12 @@ def admin_categories():
     featured_count = 0
 
     for category in categories:
-        # Posts ativos nesta categoria
-        post_count = Post.query.filter_by(category_id=category.id, is_active=True).count()
-
-        # Posts em destaque nesta categoria
-        featured_posts = Post.query.filter_by(category_id=category.id, is_active=True, featured=True).count()
-
-        # Total de downloads desta categoria
-        total_downloads = db.session.query(db.func.sum(Post.downloads)).filter_by(category_id=category.id, is_active=True).scalar() or 0
-
-        # Último post publicado nesta categoria
-        last_post = Post.query.filter_by(category_id=category.id, is_active=True).order_by(Post.date_posted.desc()).first()
-
-        # Verificar se categoria é destacada (assumindo campo featured)
-        is_featured = getattr(category, 'featured', False)
-        if is_featured:
+        category_payload = build_category_admin_payload(category)
+        if category_payload['is_featured']:
             featured_count += 1
 
-        category_stats.append({
-            'id': category.id,
-            'name': category.name,
-            'slug': category.slug,
-            'description': category.description or '',
-            'icon': category.icon or 'fas fa-folder',
-            'post_count': post_count,
-            'featured_posts': featured_posts,
-            'total_downloads': total_downloads,
-            'is_active': category.is_active,
-            'is_featured': is_featured,
-            'order': category.order,
-            'created_at': category.created_at if hasattr(category, 'created_at') else None,
-            'last_post_date': last_post.date_posted if last_post else None,
-            'last_post_title': last_post.title if last_post else None
-        })
-
-        total_posts += post_count
+        category_stats.append(category_payload)
+        total_posts += category_payload['post_count']
 
     # Calcular estatísticas gerais
     active_categories = len([cat for cat in category_stats if cat['is_active']])
@@ -7908,13 +8230,15 @@ def admin_create_category():
         if request.is_json and not isinstance(data, dict):
             return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
-        name = data.get('name', '').strip()
-        slug = data.get('slug', '').strip()
-        description = data.get('description', '').strip()
-        icon = data.get('icon', 'fas fa-folder').strip()
-        order = int(data.get('order', 0))
-        is_active = bool(data.get('is_active', True))
-        featured = bool(data.get('featured', False))
+        name = sanitize_input((data.get('name') or '').strip())
+        slug = generate_slug((data.get('slug') or '').strip())
+        description = sanitize_input((data.get('description') or '').strip())
+        icon = sanitize_input((data.get('icon') or 'fas fa-folder').strip()) or 'fas fa-folder'
+        color = sanitize_input((data.get('color') or '#4a90e2').strip()) or '#4a90e2'
+        order = coerce_int(data.get('order'), 0)
+        is_active = coerce_bool(data.get('is_active'), True)
+        featured = coerce_bool(data.get('featured'), False)
+        show_in_menu = coerce_bool(data.get('show_in_menu'), True)
 
         # Validações
         if not name:
@@ -7922,8 +8246,7 @@ def admin_create_category():
 
         # Gerar slug automaticamente se não fornecido
         if not slug:
-            slug = re.sub(r'[^\w\s-]', '', name.lower())
-            slug = re.sub(r'[-\s]+', '-', slug)
+            slug = generate_slug(name)
 
         # Verificar se slug já existe (ignorando a categoria atual se estiver editando)
         existing_category = Category.query.filter_by(slug=slug).first()
@@ -7942,8 +8265,10 @@ def admin_create_category():
             slug=slug,
             description=description,
             icon=icon,
+            color=color,
             order=order,
-            is_active=is_active
+            is_active=is_active,
+            show_in_menu=show_in_menu
         )
 
         # Adicionar campo featured se existe no modelo
@@ -7967,16 +8292,7 @@ def admin_create_category():
         return jsonify({
             'success': True,
             'message': 'Categoria criada com sucesso!',
-            'category': {
-                'id': new_category.id,
-                'name': new_category.name,
-                'slug': new_category.slug,
-                'description': new_category.description,
-                'icon': new_category.icon,
-                'order': new_category.order,
-                'is_active': new_category.is_active,
-                'featured': getattr(new_category, 'featured', False)
-            }
+            'category': build_category_admin_payload(new_category)
         })
 
     except Exception as e:
@@ -8001,11 +8317,11 @@ def admin_get_category(category_id):
                 'slug': category.slug,
                 'description': category.description or '',
                 'icon': category.icon or 'fas fa-folder',
-                'color': getattr(category, 'color', '#4a90e2'),
+                'color': category.color or '#4a90e2',
                 'order': category.order or 0,
                 'is_active': category.is_active,
-                'is_featured': getattr(category, 'featured', False) or getattr(category, 'is_featured', False),
-                'show_in_menu': getattr(category, 'show_in_menu', True),
+                'is_featured': bool(category.featured),
+                'show_in_menu': bool(category.show_in_menu),
             }
         })
     except Exception as e:
@@ -8024,17 +8340,23 @@ def admin_update_category(category_id):
         if request.is_json and not isinstance(data, dict):
             return jsonify({'success': False, 'message': 'JSON inválido'}), 400
 
-        name = data.get('name', '').strip()
-        slug = data.get('slug', '').strip()
-        description = data.get('description', '').strip()
-        icon = data.get('icon', 'fas fa-folder').strip()
-        order = int(data.get('order', 0))
-        is_active = bool(data.get('is_active', True))
-        featured = bool(data.get('featured', False))
+        old_name = category.name
+        name = sanitize_input((data.get('name', category.name) or category.name).strip())
+        slug = generate_slug((data.get('slug', category.slug) or '').strip())
+        description = sanitize_input((data.get('description', category.description or '') or '').strip())
+        icon = sanitize_input((data.get('icon', category.icon or 'fas fa-folder') or 'fas fa-folder').strip()) or 'fas fa-folder'
+        color = sanitize_input((data.get('color', category.color or '#4a90e2') or '#4a90e2').strip()) or '#4a90e2'
+        order = coerce_int(data.get('order'), category.order or 0)
+        is_active = coerce_bool(data.get('is_active'), bool(category.is_active))
+        featured = coerce_bool(data.get('featured'), bool(category.featured))
+        show_in_menu = coerce_bool(data.get('show_in_menu'), bool(category.show_in_menu))
 
         # Validações
         if not name:
             return jsonify({'success': False, 'message': 'Nome da categoria é obrigatório.'}), 400
+
+        if not slug:
+            slug = generate_slug(name)
 
         # Verificar se slug já existe em outra categoria
         if slug != category.slug:
@@ -8043,13 +8365,14 @@ def admin_update_category(category_id):
                 return jsonify({'success': False, 'message': 'URL amigável (slug) já existe.'}), 400
 
         # Atualizar campos
-        old_name = category.name
         category.name = name
         category.slug = slug
         category.description = description
         category.icon = icon
+        category.color = color
         category.order = order
         category.is_active = is_active
+        category.show_in_menu = show_in_menu
 
         # Atualizar campo featured se existe
         if hasattr(category, 'featured'):
@@ -8057,6 +8380,13 @@ def admin_update_category(category_id):
 
         # Aplicar ícone e descrição padrão se a categoria corresponder a um padrão
         apply_default_category_data(category)
+
+        Post.query.filter(
+            db.or_(
+                Post.category_id == category.id,
+                Post.category_str == old_name
+            )
+        ).update({'category_str': category.name}, synchronize_session=False)
 
         db.session.commit()
 
@@ -8071,16 +8401,7 @@ def admin_update_category(category_id):
         return jsonify({
             'success': True,
             'message': 'Categoria atualizada com sucesso!',
-            'category': {
-                'id': category.id,
-                'name': category.name,
-                'slug': category.slug,
-                'description': category.description,
-                'icon': category.icon,
-                'order': category.order,
-                'is_active': category.is_active,
-                'featured': getattr(category, 'featured', False)
-            }
+            'category': build_category_admin_payload(category)
         })
 
     except Exception as e:
@@ -8099,13 +8420,17 @@ def admin_delete_category(category_id):
         category_name = category.name
 
         # Verificar se há posts nesta categoria
-        post_count = Post.query.filter_by(category_id=category_id).count()
+        post_filter = db.or_(Post.category_id == category_id, Post.category_str == category_name)
+        post_count = Post.query.filter(post_filter).count()
 
         if post_count > 0:
             # Opção 1: Mover posts para categoria "Sem Categoria" ou primeira categoria disponível
-            default_category = Category.query.filter(Category.id != category_id).first()
+            default_category = Category.query.filter(Category.id != category_id).order_by(Category.order.asc(), Category.name.asc()).first()
             if default_category:
-                Post.query.filter_by(category_id=category_id).update({'category_id': default_category.id})
+                Post.query.filter(post_filter).update({
+                    'category_id': default_category.id,
+                    'category_str': default_category.name
+                }, synchronize_session=False)
                 message = f'Categoria excluída. {post_count} posts foram movidos para "{default_category.name}".'
             else:
                 return jsonify({
@@ -8305,10 +8630,29 @@ def admin_categories_bulk_action():
 
         elif action == 'delete':
             # Excluir categorias
+            fallback_category = Category.query.filter(~Category.id.in_(category_ids)).order_by(Category.order.asc(), Category.name.asc()).first()
+            categories_with_posts = []
+
             for category in categories:
+                post_filter = db.or_(Post.category_id == category.id, Post.category_str == category.name)
+                post_count = Post.query.filter(post_filter).count()
+                if post_count > 0:
+                    categories_with_posts.append(category.name)
+                    if not fallback_category:
+                        return jsonify({
+                            'success': False,
+                            'message': 'Não é possível excluir todas as categorias enquanto houver posts associados.'
+                        }), 400
+                    Post.query.filter(post_filter).update({
+                        'category_id': fallback_category.id,
+                        'category_str': fallback_category.name
+                    }, synchronize_session=False)
                 db.session.delete(category)
 
             db.session.commit()
+            moved_suffix = ''
+            if categories_with_posts and fallback_category:
+                moved_suffix = f' Posts associados foram movidos para "{fallback_category.name}".'
             log_admin_activity(
                 current_user.id,
                 'bulk_delete',
@@ -8316,7 +8660,7 @@ def admin_categories_bulk_action():
             )
             return jsonify({
                 'success': True,
-                'message': f'{len(categories)} categorias excluídas',
+                'message': f'{len(categories)} categorias excluídas.{moved_suffix}',
                 'count': len(categories)
             })
 
@@ -8629,49 +8973,7 @@ def admin_users():
 def admin_user_data(user_id):
     """Retorna dados do usuário em JSON para edição"""
     user = User.query.get_or_404(user_id)
-
-    # Calcular limites baseados no plano
-    if user.plan == 'free':
-        daily_limit = 1
-        weekly_limit = 7
-    elif user.plan == 'premium':
-        daily_limit = 5
-        weekly_limit = 15
-    elif user.plan == 'vip':
-        daily_limit = 999
-        weekly_limit = 999
-    else:
-        daily_limit = 1
-        weekly_limit = 7
-
-    # Calcular uso atual
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    # Ajuste para início da semana (segunda-feira)
-    week_start = today_start - timedelta(days=today_start.weekday())
-
-    # Simulação de dados de uso (idealmente viriam de uma tabela de logs de download)
-    # Como não temos uma tabela específica de user_downloads no modelo visível,
-    # vamos retornar os limites e zerar os contadores por enquanto ou usar campos do usuário se existirem.
-    # Assumindo que existem campos ou retornando 0 para implementação futura.
-
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'name': user.name or '',
-        'email': user.email,
-        'role': user.role,
-        'plan': user.plan,
-        'is_active': user.is_active,
-        'daily_limit': user.custom_daily_limit if user.custom_daily_limit is not None else daily_limit,
-        'weekly_limit': user.custom_weekly_limit if user.custom_weekly_limit is not None else weekly_limit,
-        'daily_downloads': user.daily_downloads or 0,
-        'weekly_downloads': user.weekly_downloads or 0,
-        'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else (today_start + timedelta(days=1)).isoformat(),
-        'week_reset_date': user.week_reset_date.isoformat() if user.week_reset_date else (week_start + timedelta(days=7)).isoformat(),
-        'can_download': user.can_download if hasattr(user, 'can_download') else True,
-        'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
-        'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
-    })
+    return jsonify(serialize_user_for_admin(user))
 
 @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
 @login_required
@@ -8706,19 +9008,45 @@ def admin_update_user(user_id):
     """Atualiza dados do usuário"""
     try:
         user = User.query.get_or_404(user_id)
+        incoming_json = request.get_json(silent=True) if request.is_json else None
+        source = incoming_json if isinstance(incoming_json, dict) else request.form
+
+        def field_value(name, current=None):
+            value = source.get(name, current)
+            if isinstance(value, str):
+                return value.strip()
+            return value
 
         # Obter dados do formulário (permitir atualização parcial)
-        username = request.form.get('username', user.username).strip()
-        name = request.form.get('name', user.name or '').strip()
-        email = request.form.get('email', user.email).strip()
-        role = request.form.get('role', user.role)
-        plan = request.form.get('plan', user.plan)
-        is_active = request.form.get('is_active') == 'true' if 'is_active' in request.form else user.is_active
+        username = field_value('username', user.username)
+        name = field_value('name', user.name or '')
+        email = field_value('email', user.email)
+        role = field_value('role', user.role)
+        plan = field_value('plan', user.plan)
+        is_active = coerce_bool(source.get('is_active'), user.is_active) if 'is_active' in source else user.is_active
+        is_verified = coerce_bool(source.get('is_verified'), user.is_verified) if 'is_verified' in source else user.is_verified
+        email_notifications = coerce_bool(source.get('email_notifications'), user.email_notifications) if 'email_notifications' in source else user.email_notifications
+
+        first_name = field_value('first_name', user.first_name or '')
+        last_name = field_value('last_name', user.last_name or '')
+        bio = field_value('bio', user.bio or '')
+        location = field_value('location', user.location or '')
+        phone = field_value('phone', user.phone or '')
+        website = field_value('website', user.website or '')
+        facebook = field_value('facebook', user.facebook or '')
+        twitter = field_value('twitter', user.twitter or '')
+        instagram = field_value('instagram', user.instagram or '')
+        linkedin = field_value('linkedin', user.linkedin or '')
+        github = field_value('github', user.github or '')
+        ip_address = field_value('ip_address', user.ip_address or '')
+        browser = field_value('browser', user.browser or '')
+        operating_system = field_value('operating_system', user.operating_system or '')
+        referrer = field_value('referrer', user.referrer or '')
 
         # Novos campos de permissões de download
-        can_download = request.form.get('can_download') == 'on' or request.form.get('can_download') == 'true' if 'can_download' in request.form else (user.can_download if hasattr(user, 'can_download') else True)
-        custom_daily_limit = request.form.get('custom_daily_limit', '').strip()
-        custom_weekly_limit = request.form.get('custom_weekly_limit', '').strip()
+        can_download = coerce_bool(source.get('can_download'), user.can_download) if 'can_download' in source else user.can_download
+        custom_daily_limit = field_value('custom_daily_limit', user.custom_daily_limit if user.custom_daily_limit is not None else '')
+        custom_weekly_limit = field_value('custom_weekly_limit', user.custom_weekly_limit if user.custom_weekly_limit is not None else '')
 
         # Validações
         # Validações de segurança
@@ -8730,6 +9058,12 @@ def admin_update_user(user_id):
 
         if not email:
             return jsonify({'success': False, 'message': 'Email é obrigatório'})
+
+        if role not in ['user', 'editor', 'admin']:
+            return jsonify({'success': False, 'message': 'Função inválida'})
+
+        if plan not in ['free', 'premium', 'vip']:
+            return jsonify({'success': False, 'message': 'Plano inválido'})
 
         # Verificar se username já existe (exceto para o próprio usuário)
         existing_user = User.query.filter(User.username == username, User.id != user_id).first()
@@ -8749,6 +9083,8 @@ def admin_update_user(user_id):
             'role': user.role,
             'plan': user.plan,
             'is_active': user.is_active,
+            'is_verified': user.is_verified,
+            'email_notifications': user.email_notifications,
             'can_download': user.can_download if hasattr(user, 'can_download') else True,
             'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
             'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
@@ -8760,6 +9096,21 @@ def admin_update_user(user_id):
         user.role = role
         user.plan = plan
         user.is_active = is_active
+        user.is_verified = is_verified
+        user.email_notifications = email_notifications
+        user.first_name = first_name or None
+        user.last_name = last_name or None
+        user.bio = bio or None
+        user.location = location or None
+        user.phone = phone or None
+        user.website = website or None
+        user.facebook = facebook or None
+        user.twitter = twitter or None
+        user.instagram = instagram or None
+        user.linkedin = linkedin or None
+        user.github = github or None
+        # ip_address, browser, operating_system e referrer são gerenciados
+        # automaticamente pelo sistema de login e não devem ser editados manualmente
 
         # Atualizar permissões de download
         user.can_download = can_download
@@ -8783,6 +9134,8 @@ def admin_update_user(user_id):
                     'role': role,
                     'plan': plan,
                     'is_active': is_active,
+                    'is_verified': is_verified,
+                    'email_notifications': email_notifications,
                     'can_download': can_download,
                     'custom_daily_limit': user.custom_daily_limit,
                     'custom_weekly_limit': user.custom_weekly_limit
@@ -8790,7 +9143,11 @@ def admin_update_user(user_id):
             }
         )
 
-        return jsonify({'success': True, 'message': 'Usuário atualizado com sucesso'})
+        return jsonify({
+            'success': True,
+            'message': 'Usuário atualizado com sucesso',
+            'user': serialize_user_for_admin(user)
+        })
 
     except Exception as e:
         db.session.rollback()
@@ -8992,7 +9349,7 @@ def admin_update_permissions(user_id):
         new_role = data.get('role', 'user')
 
         # Validar role
-        if new_role not in ['user', 'admin']:
+        if new_role not in ['user', 'editor', 'admin']:
             return jsonify({'success': False, 'message': 'Função inválida'})
 
         # Prevenir que o admin remova seu próprio acesso admin
@@ -9966,6 +10323,57 @@ def admin_remove_profile_image():
     flash('Imagem de perfil removida com sucesso!', 'success')
     return redirect(url_for('admin_profile'))
 
+
+@app.route('/admin/users/<int:user_id>/update-photo', methods=['POST'])
+@login_required
+@admin_required
+def admin_update_user_photo(user_id):
+    """Admin altera a foto de perfil de outro usuário"""
+    user = User.query.get_or_404(user_id)
+    if 'profile_image' not in request.files:
+        return jsonify({'success': False, 'message': 'Nenhum arquivo enviado'}), 400
+    file = request.files['profile_image']
+    if not file.filename or not allowed_file(file.filename):
+        return jsonify({'success': False, 'message': 'Formato inválido. Use JPG, PNG ou GIF'}), 400
+
+    upload_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+    os.makedirs(upload_path, exist_ok=True)
+    filename = secure_filename(file.filename)
+    base, ext = os.path.splitext(filename)
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f"{base}_{timestamp}{ext}"
+    filepath = os.path.join(upload_path, filename)
+    try:
+        if user.profile_image:
+            delete_old_image(user.profile_image)
+        img = Image.open(file.stream)
+        img = img.convert('RGB')
+        img.thumbnail((300, 300))
+        img.save(filepath, optimize=True, quality=85)
+        user.profile_image = filename
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Foto atualizada com sucesso',
+            'photo_url': get_image_url_for_response(filename, folder='profiles', default='default_profile.jpg')
+        })
+    except Exception as e:
+        app.logger.error(f'Erro ao processar imagem do usuário {user_id}: {e}')
+        return jsonify({'success': False, 'message': 'Erro ao processar a imagem'}), 500
+
+
+@app.route('/admin/users/<int:user_id>/remove-photo', methods=['POST'])
+@login_required
+@admin_required
+def admin_remove_user_photo(user_id):
+    """Admin remove a foto de perfil de outro usuário"""
+    user = User.query.get_or_404(user_id)
+    if user.profile_image:
+        delete_old_image(user.profile_image)
+    user.profile_image = ''
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Foto removida com sucesso'})
+
 # Adicione estas rotas se ainda não existirem
 
 @app.route('/admin/update-profile', methods=['POST'])
@@ -10466,6 +10874,20 @@ def ensure_default_categories():
 with app.app_context():
     try:
         db.create_all()
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                category_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(category)"))]
+                if 'color' not in category_cols:
+                    conn.execute(text("ALTER TABLE category ADD COLUMN color VARCHAR(20) DEFAULT '#4a90e2'"))
+                    conn.commit()
+                    print("  ➕ Coluna 'color' adicionada à tabela category")
+                if 'show_in_menu' not in category_cols:
+                    conn.execute(text("ALTER TABLE category ADD COLUMN show_in_menu BOOLEAN DEFAULT 1"))
+                    conn.commit()
+                    print("  ➕ Coluna 'show_in_menu' adicionada à tabela category")
+        except Exception:
+            pass
         ensure_default_categories()
         # Garantir que colunas novas existam em tabelas existentes
         try:
@@ -10486,6 +10908,15 @@ with app.app_context():
                     conn.execute(text("ALTER TABLE user ADD COLUMN preferences TEXT"))
                     conn.commit()
                     print("  ➕ Coluna 'preferences' adicionada à tabela user")
+                category_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(category)"))]
+                if 'color' not in category_cols:
+                    conn.execute(text("ALTER TABLE category ADD COLUMN color VARCHAR(20) DEFAULT '#4a90e2'"))
+                    conn.commit()
+                    print("  ➕ Coluna 'color' adicionada à tabela category")
+                if 'show_in_menu' not in category_cols:
+                    conn.execute(text("ALTER TABLE category ADD COLUMN show_in_menu BOOLEAN DEFAULT 1"))
+                    conn.commit()
+                    print("  ➕ Coluna 'show_in_menu' adicionada à tabela category")
         except Exception:
             pass
     except Exception as e:

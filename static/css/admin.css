@@ -474,14 +474,14 @@ body[data-theme="dark"] {
     --admin-border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Definição de fonte universal */
-body,
-button,
-input,
-select,
-textarea,
+/* Definição de fonte universal — scoped ao admin para não vazar em outras páginas (profile) */
 .admin-container,
-.admin-container * {
+.admin-container *,
+body[data-is-admin="true"],
+body[data-is-admin="true"] button,
+body[data-is-admin="true"] input,
+body[data-is-admin="true"] select,
+body[data-is-admin="true"] textarea {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     box-sizing: border-box;
 }
@@ -1649,6 +1649,7 @@ body.modal-open {
 }
 
 .modal.show {
+    display: flex;
     opacity: 1;
 }
 

@@ -36,6 +36,7 @@
             total_downloads: Number(raw.total_downloads || 0),
             is_active: Boolean(raw.is_active),
             is_featured: Boolean(raw.featured ?? raw.is_featured),
+            show_in_menu: raw.show_in_menu !== false,
             color: raw.color || '#4a90e2'
         };
     }
@@ -167,7 +168,7 @@
 
     function buildRow(category) {
         return `
-            <tr data-category-id="${category.id}" ${category.is_active ? '' : 'class="inactive-row"'}>
+            <tr data-category-id="${category.id}" data-category-order="${category.order}" ${category.is_active ? '' : 'class="inactive-row"'}>
                 <td><input type="checkbox" class="form-check-input category-checkbox" value="${category.id}"></td>
                 <td>
                     <div class="category-name">
@@ -203,7 +204,7 @@
 
     function buildCard(category) {
         return `
-            <div class="category-card${category.is_active ? '' : ' inactive'}" data-category-id="${category.id}">
+            <div class="category-card${category.is_active ? '' : ' inactive'}" data-category-id="${category.id}" data-category-order="${category.order}">
                 <div class="card-header">
                     <div class="category-icon-large"><i class="${escapeHtml(category.icon)}"></i></div>
                     <div class="category-actions-quick">
@@ -247,6 +248,7 @@
             const featuredInput = row.querySelector('.featured-toggle');
             const deleteBtn = row.querySelector('.btn-delete');
             const descSmall = row.querySelector('.category-name small');
+            if (has('order')) row.dataset.categoryOrder = String(category.order || 0);
             if (has('name') && title) title.textContent = category.name;
             if (has('slug') && slug) slug.textContent = category.slug;
             if (has('icon') && rowIcon) rowIcon.className = category.icon;
@@ -287,6 +289,7 @@
             const viewBtn = card.querySelector('.btn-card.btn-secondary');
             const editBtn = card.querySelector('.btn-card.btn-primary');
             const deleteBtn = card.querySelector('.btn-card.btn-danger');
+            if (has('order')) card.dataset.categoryOrder = String(category.order || 0);
             if (has('name') && name) name.textContent = category.name;
             if (has('description') && desc) {
                 desc.textContent = category.description ? `${category.description.substring(0, 80)}${category.description.length > 80 ? '...' : ''}` : 'Sem descrição';
@@ -364,10 +367,13 @@
             document.getElementById('editCategoryDescription').value = category.description;
             document.getElementById('editCategoryOrder').value = String(category.order || 0);
             document.getElementById('editCategoryIcon').value = category.icon;
-            document.getElementById('editCategoryColor').value = category.color || '#4a90e2';
-            document.getElementById('editCategoryColorText').value = category.color || '#4a90e2';
+            const _colorEl = document.getElementById('editCategoryColor');
+            const _colorTextEl = document.getElementById('editCategoryColorText');
+            if (_colorEl) _colorEl.value = category.color || '#4a90e2';
+            if (_colorTextEl) _colorTextEl.value = category.color || '#4a90e2';
             document.getElementById('editCategoryActive').checked = category.is_active;
             document.getElementById('editCategoryFeatured').checked = category.is_featured;
+            document.getElementById('editCategoryShowInMenu').checked = category.show_in_menu;
 
             const iconPreview = document.getElementById('editIconPreview');
             if (iconPreview) iconPreview.innerHTML = `<i class="${category.icon}"></i>`;

@@ -498,6 +498,44 @@
     max-width: 240px;
 }
 
+.profile-identity-list {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0 1rem 1rem;
+}
+
+.profile-identity-row {
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.82rem 0.9rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: #ffffff;
+    min-width: 0;
+}
+
+.profile-identity-row span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--admin-text-light);
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.profile-identity-row span i {
+    color: var(--admin-primary);
+}
+
+.profile-identity-row strong {
+    color: var(--admin-text);
+    font-size: 0.92rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
 .upload-feedback {
     margin: 0.9rem auto 0;
     max-width: 260px;

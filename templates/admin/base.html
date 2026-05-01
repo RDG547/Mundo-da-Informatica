@@ -61,6 +61,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin-profile.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-forms.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}">
 
     <!-- Adicionar tema atual -->
     <script>
@@ -72,7 +73,14 @@
     {% block head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body
+    data-is-admin="true"
+    data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
+    data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
+    data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
+    data-user-plan="{% if current_user.is_authenticated %}{{ current_user.plan }}{% else %}free{% endif %}"
+    data-chat-backend-enabled="{% if chat_backend_available %}true{% else %}false{% endif %}"
+    data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
 
     <div class="admin-container">
         <!-- Sidebar -->
@@ -109,6 +117,84 @@
     <script src="{{ url_for('static', filename='js/profile-images.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}" data-static-base-script="true"></script>
     {% block scripts %}{% endblock %}
+
+    <!-- Scroll to Top -->
+    <div class="scroll-top" id="admin-scroll-top"><i class="fas fa-arrow-up"></i></div>
+
+    <!-- Floating Chat Button -->
+    <button class="floating-chat-btn" id="floating-chat-btn" title="Chat ao Vivo">
+        <i class="fas fa-comments"></i>
+        <span class="floating-chat-unread" id="floating-chat-unread" hidden>0</span>
+    </button>
+
+    <!-- Floating Chat Panel -->
+    <div class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
+        <header class="chat-panel-header">
+            <div>
+                <h4>Chat ao Vivo</h4>
+                <p id="chat-connection-status">Conectando...</p>
+            </div>
+            <button type="button" class="chat-close-btn" id="chat-close-btn" title="Fechar chat">
+                <i class="fas fa-times"></i>
+            </button>
+        </header>
+        <div class="chat-room-tabs" id="chat-room-tabs">
+            <button type="button" class="chat-room-tab active" data-chat-room="todos">
+                Todos
+                <span class="chat-tab-unread" data-chat-badge="todos" hidden>0</span>
+            </button>
+            <button type="button" class="chat-room-tab" data-chat-room="suporte">
+                Suporte
+                <span class="chat-tab-unread" data-chat-badge="suporte" hidden>0</span>
+            </button>
+            <button type="button" class="chat-room-tab" data-chat-room="chamados">
+                Chamados
+                <span class="chat-tab-unread" data-chat-badge="chamados" hidden>0</span>
+            </button>
+        </div>
+        <div class="chat-ticket-list" id="chat-ticket-list" hidden></div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-empty-state">Carregando mensagens da sala...</div>
+        </div>
+        <form class="chat-input-wrapper" id="chat-message-form" autocomplete="off">
+            <div class="chat-composer-state" id="chat-composer-state" hidden></div>
+            <div class="chat-input-row">
+                <input type="text" id="chat-message-input" maxlength="500" placeholder="Digite sua mensagem..." required>
+                <button type="submit" id="chat-send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Firebase & Chat -->
+    <script id="firebase-config" type="application/json" data-static-base-script="true">{{ firebase_public_config | tojson | safe }}</script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" data-static-base-script="true"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" data-static-base-script="true"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>
+
+    <!-- Scroll to Top JS -->
+    <script>
+    (function() {
+        const scrollBtn = document.getElementById('admin-scroll-top');
+        if (!scrollBtn) return;
+        function updateScrollBtn() {
+            const shouldShift = window.scrollY > 300;
+            scrollBtn.classList.toggle('active', shouldShift);
+            // Move chat button up when scroll-to-top is visible (same as public site)
+            const chatBtn = document.getElementById('floating-chat-btn');
+            const chatPanel = document.getElementById('floating-chat-panel');
+            if (chatBtn) chatBtn.classList.toggle('shifted-up', shouldShift);
+            if (chatPanel) chatPanel.classList.toggle('shifted-up', shouldShift);
+        }
+        window.addEventListener('scroll', updateScrollBtn, { passive: true });
+        updateScrollBtn();
+        scrollBtn.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    })();
+    </script>
 
     <script>
         // Inicializar notificações flash (apenas as que existem no carregamento da página)

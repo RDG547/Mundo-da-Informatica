@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% set home_hero_title = site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') %}
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
-        <h1 class="hero-title-3d hero-split-text" aria-label="Bem-vindo ao Mundo da Informática"><span class="hero-line" data-text="Bem-vindo ao">Bem-vindo ao</span><span class="hero-line" data-text="Mundo da">Mundo da</span><span class="hero-line" data-text="Informática">Informática</span></h1>
+        <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}">{{ home_hero_title }}</h1>
         <p class="hero-subtitle-split">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
@@ -56,6 +57,23 @@
         return chars;
     }
 
+    function getHeroTitleLines(titleEl) {
+        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Bem-vindo ao Mundo da Informática').trim();
+        var explicitLines = rawTitle.split('|').map(function (line) { return line.trim(); }).filter(Boolean);
+        if (explicitLines.length > 1) return explicitLines;
+
+        var words = rawTitle.split(/\s+/).filter(Boolean);
+        if (words.length <= 3) return [rawTitle];
+
+        var firstBreak = Math.ceil(words.length / 3);
+        var secondBreak = Math.ceil((words.length * 2) / 3);
+        return [
+            words.slice(0, firstBreak).join(' '),
+            words.slice(firstBreak, secondBreak).join(' '),
+            words.slice(secondBreak).join(' ')
+        ].filter(Boolean);
+    }
+
     function initHeroSplitText() {
         var titleEl = document.querySelector('.hero-split-text');
         var subtitleEl = document.querySelector('.hero-subtitle-split');
@@ -70,8 +88,7 @@
 
         if (typeof gsap === 'undefined') return;
 
-        // Title: explicit 3 lines
-        var titleChars = splitIntoChars(titleEl, ['Bem-vindo ao', 'Mundo da', 'Informática']);
+        var titleChars = splitIntoChars(titleEl, getHeroTitleLines(titleEl));
         var titleLines = Array.prototype.slice.call(titleEl.querySelectorAll('.hero-line, .hero-line-3d'));
 
         gsap.fromTo(titleLines, {

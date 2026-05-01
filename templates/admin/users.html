@@ -85,10 +85,23 @@
                         <option value="date">Ordenar por Data</option>
                     </select>
                 </div>
+                <div class="bulk-actions">
+                    <select id="bulkActionSelect" class="form-select">
+                        <option value="">Ações em massa</option>
+                        <option value="activate">Ativar selecionados</option>
+                        <option value="deactivate">Desativar selecionados</option>
+                        <option value="promote_editor">Promover a Editor</option>
+                        <option value="demote_user">Rebaixar a Usuário</option>
+                        <option value="send_welcome">Enviar Boas-vindas</option>
+                        <option value="delete">Excluir selecionados</option>
+                    </select>
+                    <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+                </div>
             </div>
         </div>
     </div>
 
+    <div id="usersListRegion" data-current-page="{{ pagination.page if pagination else 1 }}">
     <div class="table-responsive">
         <table class="admin-table enhanced">
             <thead>
@@ -367,7 +380,7 @@
                 {% else %}
                 <!-- Estado vazio -->
                 <tr class="empty-state">
-                    <td colspan="8" style="text-align: center; padding: 3rem;">
+                    <td colspan="9" style="text-align: center; padding: 3rem;">
                         <div class="empty-state-content">
                             <i class="fas fa-users fa-3x text-muted mb-3"></i>
                             <h4 class="text-muted">Nenhum usuário encontrado</h4>
@@ -398,20 +411,6 @@
 
     <!-- Enhanced Footer -->
     <div class="admin-card-footer">
-        <div class="bulk-actions">
-            <select id="bulkActionSelect" class="form-select">
-                <option value="">Ações em massa</option>
-                <option value="activate">Ativar selecionados</option>
-                <option value="deactivate">Desativar selecionados</option>
-                <option value="promote_editor">Promover a Editor</option>
-                <option value="demote_user">Rebaixar a Usuário</option>
-                <option value="send_welcome">Enviar Boas-vindas</option>
-                <option value="delete">Excluir selecionados</option>
-            </select>
-            <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
-        </div>
-
-        <!-- Enhanced Pagination -->
         <div class="pagination-container">
             <div class="pagination-info">
                 {% if pagination %}
@@ -479,6 +478,7 @@
                 </ul>
             </nav>
         </div>
+    </div>
     </div>
 </div>
 
@@ -982,19 +982,125 @@
         </div>
         <div class="modal-body">
             <div class="user-info-modal-header">
-                <div class="admin-action-icon is-info">
-                    <i class="fas fa-user"></i>
+                <div class="user-info-avatar-wrap">
+                    <img id="infoUserPhoto" src="" alt="Foto do usuário" class="user-info-avatar-img">
+                    <div class="user-info-avatar-actions">
+                        <label for="adminPhotoInput" class="avatar-action-btn" title="Alterar foto">
+                            <i class="fas fa-camera"></i>
+                        </label>
+                        <button type="button" id="adminPhotoRemoveBtn" class="avatar-action-btn danger" title="Remover foto">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <input type="file" id="adminPhotoInput" accept="image/jpeg,image/png,image/gif" hidden>
+                    </div>
                 </div>
                 <div>
                     <h4 id="userInfoName">Usuário</h4>
                     <p id="userInfoEmail">email@exemplo.com</p>
                 </div>
             </div>
-            <div class="user-info-grid" id="userInfoGrid"></div>
+            <form id="userInfoForm" class="user-info-edit-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" id="infoUserId" name="user_id">
+                <div class="user-info-edit-grid">
+                    <div class="form-group">
+                        <label for="infoUsername"><i class="fas fa-at"></i> Usuário</label>
+                        <input type="text" id="infoUsername" name="username" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="infoName"><i class="fas fa-signature"></i> Nome</label>
+                        <input type="text" id="infoName" name="name" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="infoEmail"><i class="fas fa-envelope"></i> Email</label>
+                        <input type="email" id="infoEmail" name="email" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="infoRole"><i class="fas fa-user-shield"></i> Papel</label>
+                        <select id="infoRole" name="role" class="form-select">
+                            <option value="user">Usuário</option>
+                            <option value="editor">Editor</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="infoPlan"><i class="fas fa-gem"></i> Plano</label>
+                        <select id="infoPlan" name="plan" class="form-select">
+                            <option value="free">Grátis</option>
+                            <option value="premium">Premium</option>
+                            <option value="vip">VIP</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="infoStatus"><i class="fas fa-toggle-on"></i> Status</label>
+                        <select id="infoStatus" name="is_active" class="form-select">
+                            <option value="true">Ativo</option>
+                            <option value="false">Inativo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="infoVerified"><i class="fas fa-check-circle"></i> Verificação</label>
+                        <select id="infoVerified" name="is_verified" class="form-select">
+                            <option value="true">Email verificado</option>
+                            <option value="false">Email não verificado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="infoPhone"><i class="fas fa-phone"></i> Telefone</label>
+                        <input type="text" id="infoPhone" name="phone" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="infoLocation"><i class="fas fa-map-marker-alt"></i> Localização</label>
+                        <input type="text" id="infoLocation" name="location" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="infoWebsite"><i class="fas fa-globe"></i> Website</label>
+                        <input type="url" id="infoWebsite" name="website" class="form-control">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="infoBio"><i class="fas fa-quote-left"></i> Biografia</label>
+                        <textarea id="infoBio" name="bio" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="user-info-readonly-grid">
+                    <div><span>Cadastro</span><strong id="infoJoined">N/A</strong></div>
+                    <div><span>Último acesso</span><strong id="infoLastLogin">N/A</strong></div>
+                </div>
+            </form>
+
+            <!-- Seção de Rastreamento -->
+            <div class="tracking-info-section">
+                <div class="tracking-info-title">
+                    <i class="fas fa-satellite-dish"></i>
+                    <span>Dados de Rastreamento</span>
+                    <small>Atualizados automaticamente a cada login</small>
+                </div>
+                <div class="tracking-info-grid">
+                    <div class="tracking-info-item">
+                        <span class="tracking-info-label"><i class="fas fa-network-wired"></i> IP</span>
+                        <span class="tracking-info-value" id="infoIp">—</span>
+                    </div>
+                    <div class="tracking-info-item">
+                        <span class="tracking-info-label"><i class="fas fa-globe-americas"></i> Navegador</span>
+                        <span class="tracking-info-value" id="infoBrowser">—</span>
+                    </div>
+                    <div class="tracking-info-item">
+                        <span class="tracking-info-label"><i class="fas fa-desktop"></i> Sistema</span>
+                        <span class="tracking-info-value" id="infoOs">—</span>
+                    </div>
+                    <div class="tracking-info-item">
+                        <span class="tracking-info-label"><i class="fas fa-external-link-alt"></i> Origem</span>
+                        <span class="tracking-info-value" id="infoReferrer">—</span>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn-admin btn-admin-primary" data-dismiss="modal">
-                <i class="fas fa-check"></i> Entendi
+            <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-admin btn-admin-primary" id="saveUserInfo">
+                <i class="fas fa-save"></i> Salvar Informações
             </button>
         </div>
     </div>
@@ -1059,6 +1165,15 @@
     .inactive-row {
         opacity: 0.6;
         background: rgba(220, 53, 69, 0.02);
+    }
+
+    #usersListRegion {
+        transition: opacity 0.2s ease;
+    }
+
+    #usersListRegion.is-loading {
+        opacity: 0.56;
+        pointer-events: none;
     }
 
     .user-cell {
@@ -1522,8 +1637,19 @@
         overflow: hidden;
     }
 
+    .admin-action-modal.user-info-modal {
+        max-width: min(1040px, 96vw);
+        width: min(1040px, 96vw);
+        max-height: 92vh;
+    }
+
     .admin-action-modal .modal-body {
         text-align: center;
+    }
+
+    .admin-action-modal.user-info-modal .modal-body {
+        text-align: left;
+        padding: 1.25rem 1.5rem;
     }
 
     .admin-action-modal .modal-footer {
@@ -1577,10 +1703,10 @@
     .user-info-modal-header {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 1rem;
         text-align: left;
-        margin-bottom: 1.35rem;
+        margin-bottom: 1rem;
     }
 
     .user-info-modal-header .admin-action-icon {
@@ -1637,6 +1763,77 @@
         overflow-wrap: anywhere;
     }
 
+    .user-info-edit-form {
+        display: grid;
+        gap: 0.9rem;
+    }
+
+    .user-info-edit-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    .user-info-edit-grid .form-group {
+        margin-bottom: 0;
+        min-width: 0;
+    }
+
+    .user-info-edit-grid .full-width {
+        grid-column: 1 / -1;
+    }
+
+    .user-info-edit-grid label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.42rem;
+        margin-bottom: 0.34rem;
+        color: var(--admin-text);
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .user-info-edit-grid label i {
+        color: var(--admin-primary);
+        width: 16px;
+        text-align: center;
+    }
+
+    .user-info-edit-grid .form-control,
+    .user-info-edit-grid .form-select {
+        min-height: 42px;
+        font-size: 0.9rem;
+    }
+
+    .user-info-readonly-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .user-info-readonly-grid div {
+        padding: 0.78rem 0.9rem;
+        border-radius: 12px;
+        background: rgba(58, 134, 255, 0.08);
+        border: 1px solid rgba(58, 134, 255, 0.12);
+    }
+
+    .user-info-readonly-grid span {
+        display: block;
+        color: var(--admin-text-light);
+        font-size: 0.74rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .user-info-readonly-grid strong {
+        display: block;
+        margin-top: 0.2rem;
+        color: var(--admin-text);
+        font-size: 0.9rem;
+    }
+
     #editUserModal .form-label,
     #editUserModal label {
         display: inline-flex;
@@ -1659,6 +1856,11 @@
         }
 
         .user-info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .user-info-edit-grid,
+        .user-info-readonly-grid {
             grid-template-columns: 1fr;
         }
 
@@ -1821,6 +2023,150 @@
 
     let pendingDeleteUser = null;
 
+    function openDeleteUserModalFromButton(button) {
+        const userId = button?.getAttribute('data-user-id');
+        const userName = button?.getAttribute('data-user-name') || button?.closest('tr')?.querySelector('.username')?.textContent?.trim() || 'usuário';
+        if (!userId) return;
+
+        pendingDeleteUser = { userId, userName };
+        const message = document.getElementById('deleteUserMessage');
+        if (message) {
+            message.textContent = `Tem certeza que deseja excluir o usuário "${userName}"? Esta ação não pode ser desfeita.`;
+        }
+        openAdminModal('deleteModal');
+    }
+
+    async function refreshUsersListFromUrl(url, options = {}) {
+        const region = document.getElementById('usersListRegion');
+        if (!region) {
+            window.location.href = url;
+            return;
+        }
+
+        region.classList.add('is-loading');
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const html = await response.text();
+            const parsed = new DOMParser().parseFromString(html, 'text/html');
+            const nextRegion = parsed.getElementById('usersListRegion');
+            if (!response.ok || !nextRegion) {
+                throw new Error('Não foi possível atualizar a lista.');
+            }
+
+            region.replaceWith(nextRegion);
+            if (options.pushState !== false) {
+                window.history.pushState({}, '', url);
+            }
+            initializeUsersListRegion();
+            if (!options.silent) {
+                showNotification('Lista de usuários atualizada.', 'success');
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar lista de usuários:', error);
+            showNotification(error.message || 'Erro ao atualizar lista de usuários.', 'error');
+        } finally {
+            document.getElementById('usersListRegion')?.classList.remove('is-loading');
+        }
+    }
+
+    window.loadUsersPage = function (url, options = {}) {
+        return refreshUsersListFromUrl(url, options);
+    };
+
+    window.refreshCurrentUsersList = function (options = {}) {
+        return refreshUsersListFromUrl(window.location.href, { silent: true, pushState: false, ...options });
+    };
+
+    function updateBulkActionsVisibilityDynamic() {
+        const region = document.getElementById('usersListRegion');
+        const checkedBoxes = region ? region.querySelectorAll('.user-checkbox:checked') : [];
+        const bulkActions = region?.querySelector('.bulk-actions');
+        const applyButton = region?.querySelector('#applyBulkAction');
+
+        const enabled = checkedBoxes.length > 0;
+        if (bulkActions) {
+            bulkActions.style.opacity = enabled ? '1' : '0.5';
+            bulkActions.style.pointerEvents = enabled ? 'auto' : 'none';
+        }
+        if (applyButton) {
+            applyButton.disabled = !enabled;
+            applyButton.classList.toggle('disabled', !enabled);
+        }
+    }
+
+    function initializeUsersListRegion() {
+        const region = document.getElementById('usersListRegion');
+        if (!region) return;
+
+        region.querySelectorAll('.user-row').forEach((row, index) => {
+            row.style.animationDelay = `${index * 0.05}s`;
+            row.classList.add('slide-in-up');
+        });
+
+        updateBulkActionsVisibilityDynamic();
+    }
+
+    document.addEventListener('click', function (event) {
+        const paginationLink = event.target.closest('#usersListRegion .pagination a.page-link');
+        if (paginationLink) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            refreshUsersListFromUrl(paginationLink.href);
+            return;
+        }
+
+        const editButton = event.target.closest('#usersListRegion .btn-edit');
+        if (editButton) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const userId = editButton.getAttribute('data-user-id');
+            if (userId) window.editUser?.(userId);
+            return;
+        }
+
+        const deleteButton = event.target.closest('#usersListRegion .btn-delete');
+        if (deleteButton) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openDeleteUserModalFromButton(deleteButton);
+            return;
+        }
+
+        const moreButton = event.target.closest('#usersListRegion .btn-more');
+        if (moreButton) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closeActionDropdownPortal();
+            if (!moreButton.dataset.dropdownButtonId) {
+                moreButton.dataset.dropdownButtonId = `more-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            }
+            openActionDropdownPortal(moreButton);
+        }
+    }, true);
+
+    document.addEventListener('change', function (event) {
+        const selectAll = event.target.closest('#usersListRegion #selectAllUsers');
+        if (selectAll) {
+            const region = document.getElementById('usersListRegion');
+            region?.querySelectorAll('.user-checkbox').forEach((checkbox) => {
+                if (checkbox.closest('tr')?.style.display !== 'none') {
+                    checkbox.checked = selectAll.checked;
+                }
+            });
+            updateBulkActionsVisibilityDynamic();
+            return;
+        }
+
+        if (event.target.closest('#usersListRegion .user-checkbox')) {
+            updateBulkActionsVisibilityDynamic();
+        }
+    });
+
     function submitDeleteUser(userId) {
         const form = document.createElement('form');
         form.method = 'POST';
@@ -1978,40 +2324,147 @@
         }, 0);
     }
 
-    window.openUserInfoModal = function (button) {
-        const data = button.dataset || {};
-        const items = [
-            ['fas fa-id-card', 'Usuário', data.username],
-            ['fas fa-signature', 'Nome', data.name],
-            ['fas fa-envelope', 'Email', data.email],
-            ['fas fa-user-shield', 'Papel', data.role],
-            ['fas fa-gem', 'Plano', data.plan],
-            ['fas fa-toggle-on', 'Status', data.status],
-            ['fas fa-calendar-plus', 'Cadastro', data.joined],
-            ['fas fa-clock', 'Último acesso', data.lastLogin],
-            ['fas fa-network-wired', 'IP', data.ip || 'Sem dados'],
-            ['fas fa-globe', 'Navegador', data.browser || 'Sem dados'],
-            ['fas fa-desktop', 'Sistema', data.os || 'Sem dados'],
-            ['fas fa-external-link-alt', 'Origem', data.referrer || 'Sem dados']
-        ];
+    function setFieldValue(id, value) {
+        const field = document.getElementById(id);
+        if (field) field.value = value ?? '';
+    }
 
+    function setTrackingText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value || '—';
+    }
+
+    function populateUserInfoForm(user) {
         const title = document.getElementById('userInfoName');
         const email = document.getElementById('userInfoEmail');
-        const grid = document.getElementById('userInfoGrid');
 
-        if (title) title.textContent = data.name || data.username || 'Usuário';
-        if (email) email.textContent = data.email || 'Email não informado';
-        if (grid) {
-            grid.innerHTML = items.map(([icon, label, value]) => `
-                <div class="user-info-item">
-                    <strong><i class="${icon}"></i> ${escapeHtml(label)}</strong>
-                    <span>${escapeHtml(value || 'Sem dados')}</span>
-                </div>
-            `).join('');
+        if (title) title.textContent = user.display_name || user.name || user.username || 'Usuário';
+        if (email) email.textContent = user.email || 'Email não informado';
+
+        const photo = document.getElementById('infoUserPhoto');
+        if (photo) photo.src = user.profile_image_url || '/static/images/profiles/default_profile.jpg';
+
+        setFieldValue('infoUserId', user.id);
+        setFieldValue('infoUsername', user.username);
+        setFieldValue('infoName', user.name || user.display_name || '');
+        setFieldValue('infoEmail', user.email);
+        setFieldValue('infoRole', user.role || 'user');
+        setFieldValue('infoPlan', user.plan || 'free');
+        setFieldValue('infoStatus', user.is_active ? 'true' : 'false');
+        setFieldValue('infoVerified', user.is_verified ? 'true' : 'false');
+        setFieldValue('infoPhone', user.phone || '');
+        setFieldValue('infoLocation', user.location || '');
+        setFieldValue('infoWebsite', user.website || '');
+        setFieldValue('infoBio', user.bio || '');
+
+        setTrackingText('infoIp', user.ip_address || '');
+        setTrackingText('infoBrowser', user.browser || '');
+        setTrackingText('infoOs', user.operating_system || '');
+        setTrackingText('infoReferrer', user.referrer || '');
+
+        const joined = document.getElementById('infoJoined');
+        const lastLogin = document.getElementById('infoLastLogin');
+        if (joined) joined.textContent = user.date_joined_label || 'N/A';
+        if (lastLogin) lastLogin.textContent = user.last_login_label || 'N/A';
+    }
+
+    window.openUserInfoModal = async function (button) {
+        const userId = button?.dataset?.userId;
+        if (!userId) {
+            showNotification('Usuário não encontrado.', 'error');
+            return;
         }
 
         openAdminModal('userInfoModal');
+        populateUserInfoForm({
+            id: userId,
+            username: button.dataset.username || '',
+            name: button.dataset.name || '',
+            display_name: button.dataset.name || button.dataset.username || '',
+            email: button.dataset.email || '',
+            role: button.dataset.role || 'user',
+            plan: button.dataset.plan || 'free',
+            is_active: button.dataset.status !== 'Inativo',
+            is_verified: false,
+            ip_address: button.dataset.ip || '',
+            browser: button.dataset.browser || '',
+            operating_system: button.dataset.os || '',
+            referrer: button.dataset.referrer || '',
+            date_joined_label: button.dataset.joined || 'N/A',
+            last_login_label: button.dataset.lastLogin || 'N/A'
+        });
+
+        try {
+            const response = await fetch(`/admin/users/${userId}/data`);
+            if (!response.ok) throw new Error('Erro ao carregar informações do usuário.');
+            const user = await response.json();
+            populateUserInfoForm(user);
+        } catch (error) {
+            console.error('Erro ao carregar informações do usuário:', error);
+            showNotification(error.message || 'Erro ao carregar informações do usuário.', 'error');
+        }
     };
+
+    // Photo management in user info modal
+    (function initAdminUserPhoto() {
+        const photoInput = document.getElementById('adminPhotoInput');
+        const removeBtn = document.getElementById('adminPhotoRemoveBtn');
+
+        function getCurrentUserId() {
+            return document.getElementById('infoUserId')?.value || null;
+        }
+
+        if (photoInput) {
+            photoInput.addEventListener('change', async function () {
+                const userId = getCurrentUserId();
+                if (!this.files || !this.files[0] || !userId) return;
+                const formData = new FormData();
+                formData.append('profile_image', this.files[0]);
+                const csrf = window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
+                if (csrf) formData.append('csrf_token', csrf);
+                try {
+                    const resp = await fetch(`/admin/users/${userId}/update-photo`, { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.success) {
+                        const photoEl = document.getElementById('infoUserPhoto');
+                        if (photoEl) photoEl.src = data.photo_url;
+                        showNotification('Foto atualizada com sucesso!', 'success');
+                    } else {
+                        showNotification(data.message || 'Erro ao atualizar foto.', 'error');
+                    }
+                } catch (e) {
+                    showNotification('Erro ao enviar foto.', 'error');
+                }
+                this.value = '';
+            });
+        }
+
+        if (removeBtn) {
+            removeBtn.addEventListener('click', async function () {
+                const userId = getCurrentUserId();
+                if (!userId) return;
+                if (!confirm('Remover a foto deste usuário?')) return;
+                const csrf = window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
+                try {
+                    const resp = await fetch(`/admin/users/${userId}/remove-photo`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                        body: JSON.stringify({})
+                    });
+                    const data = await resp.json();
+                    if (data.success) {
+                        const photoEl = document.getElementById('infoUserPhoto');
+                        if (photoEl) photoEl.src = '/static/images/profiles/default_profile.jpg';
+                        showNotification('Foto removida com sucesso!', 'success');
+                    } else {
+                        showNotification(data.message || 'Erro ao remover foto.', 'error');
+                    }
+                } catch (e) {
+                    showNotification('Erro ao remover foto.', 'error');
+                }
+            });
+        }
+    })();
 
     // Toggle dropdown de cargo - Portal approach
     window.toggleRoleDropdown = function (badgeElement, event) {
@@ -2122,6 +2575,7 @@
                 // Atualizar badge na tabela
                 const row = document.querySelector(`[data-id="${userId}"]`);
                 if (row) {
+                    row.setAttribute('data-role', newRole);
                     const roleCell = row.querySelector('.role-cell');
                     const roleBadge = roleCell.querySelector('.role-badge');
                     const permissionsInfo = roleCell.querySelector('.permissions-info small');
@@ -2427,6 +2881,46 @@
             }
         });
 
+        document.getElementById('saveUserInfo')?.addEventListener('click', async function () {
+            const form = document.getElementById('userInfoForm');
+            const userId = document.getElementById('infoUserId')?.value;
+            if (!form || !userId) {
+                showNotification('Usuário não encontrado para salvar.', 'error');
+                return;
+            }
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            this.disabled = true;
+            const originalHtml = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+
+            try {
+                const response = await fetch(`/admin/users/${userId}/update`, {
+                    method: 'POST',
+                    body: new FormData(form)
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Erro ao salvar informações.');
+                }
+
+                showNotification(data.message || 'Informações salvas com sucesso!', 'success');
+                closeAdminModal('userInfoModal');
+                await window.refreshCurrentUsersList?.();
+            } catch (error) {
+                console.error('Erro ao salvar informações:', error);
+                showNotification(error.message || 'Erro ao salvar informações.', 'error');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = originalHtml;
+            }
+        });
+
         // Função para editar usuário
         window.editUser = function (userId) {
             console.log('Editando usuário (Enhanced):', userId);
@@ -2674,8 +3168,7 @@
                     if (data.success) {
                         showNotification('Usuário atualizado com sucesso!', 'success');
                         closeEditUserModal();
-                        // Recarregar a página para mostrar as mudanças
-                        setTimeout(() => location.reload(), 1000);
+                        window.refreshCurrentUsersList?.();
                     } else {
                         showNotification(data.message || 'Erro ao atualizar usuário', 'error');
                     }
@@ -3018,6 +3511,7 @@
 
 
         // Initialize
+        initializeUsersListRegion();
         updateBulkActionsVisibility();
 
         // Inicializar estado desabilitado das ações em massa

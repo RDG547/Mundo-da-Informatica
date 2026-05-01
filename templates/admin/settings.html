@@ -20,9 +20,6 @@
                 <button class="btn-admin btn-admin-outline" type="button" onclick="resetToDefaults()">
                     <i class="fas fa-undo"></i> Restaurar Padrões
                 </button>
-                <button class="btn-admin btn-admin-success" type="button" onclick="previewChanges()">
-                    <i class="fas fa-eye"></i> Visualizar Site
-                </button>
                 <button class="btn-admin btn-admin-primary" type="button" onclick="saveAllSettings()" data-settings-save>
                     <i class="fas fa-save"></i> Salvar Alterações
                 </button>
@@ -189,9 +186,15 @@
                                 data-key="footer_text" data-type="string" data-default-value="Mundo da Informática - Todos os direitos reservados">
                         </div>
                         <div class="settings-field full-width">
-                            <label for="site_description">Descrição do Site</label>
+                            <label for="site_description">Descrição do Site (meta)</label>
                             <textarea id="site_description" class="form-control" rows="3"
                                 data-key="site_description" data-type="string" data-default-value="Seu portal de recursos para técnicos de informática">{{ site_configs.get('site_description', 'Seu portal de recursos para técnicos de informática') }}</textarea>
+                        </div>
+                        <div class="settings-field full-width">
+                            <label for="footer_description">Texto de Descrição do Rodapé</label>
+                            <textarea id="footer_description" class="form-control" rows="3"
+                                data-key="footer_description" data-type="string" data-default-value="Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.">{{ site_configs.get('footer_description', 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.') }}</textarea>
+                            <small class="form-text text-muted">Texto exibido na coluna de marca do rodapé do site.</small>
                         </div>
                         <div class="settings-field">
                             <label for="home_hero_title">Título Principal da Home</label>
@@ -202,8 +205,8 @@
                         <div class="settings-field">
                             <label for="home_hero_subtitle">Subtítulo da Home</label>
                             <input type="text" id="home_hero_subtitle" class="form-control"
-                                value="{{ site_configs.get('home_hero_subtitle', 'Recursos essenciais para técnicos') }}"
-                                data-key="home_hero_subtitle" data-type="string" data-default-value="Recursos essenciais para técnicos">
+                                value="{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}"
+                                data-key="home_hero_subtitle" data-type="string" data-default-value="Seu portal completo de recursos para técnicos e entusiastas de informática">
                         </div>
                     </div>
                 </div>
@@ -443,7 +446,7 @@
         site_description: 'Seu portal de recursos para técnicos de informática',
         footer_text: 'Mundo da Informática - Todos os direitos reservados',
         home_hero_title: 'Bem-vindo ao Mundo da Informática',
-        home_hero_subtitle: 'Recursos essenciais para técnicos',
+        home_hero_subtitle: 'Seu portal completo de recursos para técnicos e entusiastas de informática',
         enable_dark_mode: true,
         primary_color: '#3a86ff',
         secondary_color: '#8338ec',

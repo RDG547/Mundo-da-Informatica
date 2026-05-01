@@ -1,8 +1,11 @@
 {% set footer_whatsapp_number = site_configs.get('contact_phone', '(21) 97879-4705') %}
-{% set footer_whatsapp_link = 'https://wa.me/5521978794705' %}
+{% set footer_whatsapp_link = whatsapp_link_from_phone(footer_whatsapp_number) %}
 {% set footer_youtube_link = site_configs.get('social_links', {}).get('youtube') or 'https://www.youtube.com/@_RDTech' %}
 {% set footer_email = site_configs.get('contact_email', 'suporte@mundodainformatica.com') %}
 {% set footer_instagram_link = site_configs.get('social_links', {}).get('instagram', '') %}
+{% set footer_site_name = site_configs.get('site_name', 'Mundo da Informática') %}
+{% set footer_description = site_configs.get('footer_description') or site_configs.get('site_description') or 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.' %}
+{% set footer_text = site_configs.get('footer_text', 'Mundo da Informática - Todos os direitos reservados') %}
 
 <footer class="modern-footer">
     <div class="footer-content">
@@ -11,10 +14,10 @@
                 <section class="footer-brand">
                     <div class="footer-logo">
                         <i class="fas fa-microchip"></i>
-                        <span class="logo-text">Mundo da Informática</span>
+                        <span class="logo-text">{{ footer_site_name }}</span>
                     </div>
                     <p class="footer-description">
-                        Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.
+                        {{ footer_description }}
                     </p>
 
                     <div class="footer-contact-actions" aria-label="Contatos e redes sociais">
@@ -76,11 +79,11 @@
                 <section class="footer-column">
                     <h4 class="footer-title">Links Rápidos</h4>
                     <ul class="footer-links">
-                        <li><a href="{{ url_for('home') }}"><i class="fas fa-chevron-right"></i> Início</a></li>
-                        <li><a href="{{ url_for('all_categories') }}"><i class="fas fa-chevron-right"></i> Categorias</a></li>
-                        <li><a href="{{ url_for('plans') }}"><i class="fas fa-chevron-right"></i> Planos</a></li>
+                        <li><a href="{{ url_for('home') }}"><i class="fas fa-home"></i> Início</a></li>
+                        <li><a href="{{ url_for('all_categories') }}"><i class="fas fa-folder"></i> Categorias</a></li>
+                        <li><a href="{{ url_for('plans') }}"><i class="fas fa-crown"></i> Planos</a></li>
                         {% if current_user.is_authenticated and current_user.plan == 'vip' %}
-                        <li><a href="{{ url_for('vip_area') }}"><i class="fas fa-chevron-right"></i> Área VIP</a></li>
+                        <li><a href="{{ url_for('vip_area') }}"><i class="fas fa-gem"></i> Área VIP</a></li>
                         {% endif %}
                     </ul>
                 </section>
@@ -88,25 +91,27 @@
                 <section class="footer-column">
                     <h4 class="footer-title">Categorias</h4>
                     <ul class="footer-links">
-                        <li><a href="{{ url_for('category', category='BIOS') }}"><i class="fas fa-chevron-right"></i> BIOS</a></li>
-                        <li><a href="{{ url_for('category', category='Drivers') }}"><i class="fas fa-chevron-right"></i> Drivers</a></li>
-                        <li><a href="{{ url_for('category', category='Esquemas') }}"><i class="fas fa-chevron-right"></i> Esquemas</a></li>
-                        <li><a href="{{ url_for('category', category='Softwares') }}"><i class="fas fa-chevron-right"></i> Softwares</a></li>
-                        <li><a href="{{ url_for('category', category='Impressoras') }}"><i class="fas fa-chevron-right"></i> Impressoras</a></li>
-                        <li><a href="{{ url_for('category', category='Cursos') }}"><i class="fas fa-chevron-right"></i> Cursos</a></li>
+                        {% for footer_category in menu_categories[:6] %}
+                        <li><a href="{{ url_for('category', category=category_public_url_value(footer_category)) }}"><i class="{{ footer_category.icon or 'fas fa-folder' }}"></i> {{ footer_category.name }}</a></li>
+                        {% else %}
+                        <li><a href="{{ url_for('all_categories') }}"><i class="fas fa-folder-open"></i> Todas as categorias</a></li>
+                        {% endfor %}
                     </ul>
                 </section>
 
                 <section class="footer-column">
                     <h4 class="footer-title">Ajuda & Suporte</h4>
                     <ul class="footer-links">
-                        <li><a href="{{ url_for('about') }}"><i class="fas fa-chevron-right"></i> Sobre Nós</a></li>
-                        <li><a href="{{ url_for('faq') }}"><i class="fas fa-chevron-right"></i> Perguntas Frequentes</a></li>
-                        <li><a href="{{ url_for('contact') }}"><i class="fas fa-chevron-right"></i> Contato</a></li>
-                        <li><a href="{{ url_for('terms_of_service') }}"><i class="fas fa-chevron-right"></i> Termos de Uso</a></li>
-                        <li><a href="{{ url_for('privacy_policy') }}"><i class="fas fa-chevron-right"></i> Política de Privacidade</a></li>
+                        <li><a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> Sobre Nós</a></li>
+                        <li><a href="{{ url_for('faq') }}"><i class="fas fa-question-circle"></i> Perguntas Frequentes</a></li>
+                        <li><a href="{{ url_for('contact') }}"><i class="fas fa-envelope"></i> Contato</a></li>
+                        <li><a href="{{ url_for('terms_of_service') }}"><i class="fas fa-file-contract"></i> Termos de Uso</a></li>
+                        <li><a href="{{ url_for('privacy_policy') }}"><i class="fas fa-shield-alt"></i> Política de Privacidade</a></li>
                     </ul>
                 </section>
+            </div>
+            <div class="footer-bottom">
+                <p>{{ footer_text }}</p>
             </div>
         </div>
     </div>
@@ -136,6 +141,18 @@
     grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
     gap: 2rem;
     align-items: start;
+}
+
+.footer-bottom {
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #aebdd1;
+    font-size: 0.88rem;
+}
+
+.footer-bottom p {
+    margin: 0;
 }
 
 .footer-brand,
@@ -305,7 +322,10 @@
 }
 
 .footer-links a i {
-    font-size: 0.72rem;
+    width: 1rem;
+    font-size: 0.82rem;
+    flex-shrink: 0;
+    text-align: center;
     color: #66d9a6;
 }
 

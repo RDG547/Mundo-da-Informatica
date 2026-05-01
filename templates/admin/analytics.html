@@ -1,16 +1,37 @@
 {% extends "admin/base.html" %}
 
 {% block content %}
+<style>
+    .analytics-pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding-top: 1rem;
+    }
+
+    .analytics-pagination .pagination {
+        margin: 0;
+    }
+
+    @media (max-width: 640px) {
+        .analytics-pagination {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
 <div class="admin-header slide-in-up">
     <h1>Estatísticas do Site</h1>
     <div class="d-flex gap-2">
         <div class="date-range-selector">
             <select id="dateRangeSelect" class="form-select">
-                <option value="7">Últimos 7 dias</option>
-                <option value="30" selected>Últimos 30 dias</option>
-                <option value="90">Últimos 3 meses</option>
-                <option value="365">Último ano</option>
-                <option value="custom">Período personalizado</option>
+                <option value="7" {% if analytics.period_days == 7 and not request.args.get('start') %}selected{% endif %}>Últimos 7 dias</option>
+                <option value="30" {% if analytics.period_days == 30 and not request.args.get('start') %}selected{% endif %}>Últimos 30 dias</option>
+                <option value="90" {% if analytics.period_days == 90 and not request.args.get('start') %}selected{% endif %}>Últimos 3 meses</option>
+                <option value="365" {% if analytics.period_days == 365 and not request.args.get('start') %}selected{% endif %}>Último ano</option>
+                <option value="custom" {% if request.args.get('start') and request.args.get('end') %}selected{% endif %}>Período personalizado</option>
             </select>
         </div>
         <button class="btn-admin btn-admin-primary" onclick="window.print()">
@@ -20,7 +41,7 @@
 </div>
 
 <!-- Período personalizado (inicialmente oculto) -->
-<div id="customDateRange" class="admin-card slide-in-up" style="display: none;">
+<div id="customDateRange" class="admin-card slide-in-up" style="display: {% if request.args.get('start') and request.args.get('end') %}block{% else %}none{% endif %};">
     <div class="admin-card-header">
         <h2 class="admin-card-title">Selecionar Período</h2>
     </div>
@@ -28,11 +49,11 @@
         <form id="dateRangeForm" class="d-flex gap-2">
             <div class="form-group">
                 <label for="startDate">Data inicial</label>
-                <input type="date" id="startDate" class="form-control">
+                <input type="date" id="startDate" class="form-control" value="{{ analytics.start_date }}">
             </div>
             <div class="form-group">
                 <label for="endDate">Data final</label>
-                <input type="date" id="endDate" class="form-control">
+                <input type="date" id="endDate" class="form-control" value="{{ analytics.end_date }}">
             </div>
             <div class="form-group d-flex align-end">
                 <button type="submit" class="btn-admin btn-admin-primary">Aplicar</button>
@@ -185,6 +206,45 @@
                 </tbody>
             </table>
         </div>
+        {% if popular_posts_pagination and popular_posts_pagination.pages > 1 %}
+        <div class="analytics-pagination">
+            <div class="pagination-info">
+                Página {{ popular_posts_pagination.page }} de {{ popular_posts_pagination.pages }}
+            </div>
+            <nav aria-label="Paginação de posts populares">
+                <ul class="pagination">
+                    {% set period_query = 'start=' ~ request.args.get('start') ~ '&end=' ~ request.args.get('end') if request.args.get('start') and request.args.get('end') else 'days=' ~ request.args.get('days', analytics.period_days) %}
+                    <li class="page-item {% if not popular_posts_pagination.has_prev %}disabled{% endif %}">
+                        {% if popular_posts_pagination.has_prev %}
+                        <a class="page-link" href="{{ url_for('admin_analytics') }}?{{ period_query }}&popular_page={{ popular_posts_pagination.prev_num }}">&laquo;</a>
+                        {% else %}
+                        <span class="page-link">&laquo;</span>
+                        {% endif %}
+                    </li>
+                    {% for page_num in popular_posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                        <li class="page-item {% if page_num == popular_posts_pagination.page %}active{% endif %}">
+                            {% if page_num == popular_posts_pagination.page %}
+                            <span class="page-link">{{ page_num }}</span>
+                            {% else %}
+                            <a class="page-link" href="{{ url_for('admin_analytics') }}?{{ period_query }}&popular_page={{ page_num }}">{{ page_num }}</a>
+                            {% endif %}
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li class="page-item {% if not popular_posts_pagination.has_next %}disabled{% endif %}">
+                        {% if popular_posts_pagination.has_next %}
+                        <a class="page-link" href="{{ url_for('admin_analytics') }}?{{ period_query }}&popular_page={{ popular_posts_pagination.next_num }}">&raquo;</a>
+                        {% else %}
+                        <span class="page-link">&raquo;</span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -305,10 +365,10 @@
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
 
-        if (document.getElementById('endDate')) {
+        if (document.getElementById('endDate') && !document.getElementById('endDate').value) {
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
         }
-        if (document.getElementById('startDate')) {
+        if (document.getElementById('startDate') && !document.getElementById('startDate').value) {
             document.getElementById('startDate').value = thirtyDaysAgo.toISOString().split('T')[0];
         }
 
@@ -316,6 +376,14 @@
             dateRangeSelect.dataset.bound = 'true';
             dateRangeSelect.addEventListener('change', function() {
                 customDateRange.style.display = this.value === 'custom' ? 'block' : 'none';
+                if (this.value !== 'custom') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('days', this.value);
+                    url.searchParams.delete('start');
+                    url.searchParams.delete('end');
+                    url.searchParams.delete('popular_page');
+                    window.location.href = url.toString();
+                }
             });
         }
 
@@ -323,9 +391,15 @@
             dateRangeForm.dataset.bound = 'true';
             dateRangeForm.addEventListener('submit', function(event) {
                 event.preventDefault();
-                if (typeof window.showNotification === 'function') {
-                    window.showNotification('Filtro personalizado preparado para integração com dados por período.', 'info');
-                }
+                const startDate = document.getElementById('startDate')?.value;
+                const endDate = document.getElementById('endDate')?.value;
+                if (!startDate || !endDate) return;
+                const url = new URL(window.location.href);
+                url.searchParams.set('start', startDate);
+                url.searchParams.set('end', endDate);
+                url.searchParams.delete('days');
+                url.searchParams.delete('popular_page');
+                window.location.href = url.toString();
             });
         }
 

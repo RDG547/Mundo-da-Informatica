@@ -93,7 +93,7 @@
                             <div class="category-showcase-content">
                                 <h3>{{ category.name }}</h3>
                                 <p>{{ category.description if category.description else 'Explore conteúdos nesta categoria' }}</p>
-                                <a href="{{ url_for('category', category=category.name) }}" class="explore-btn">
+                                <a href="{{ url_for('category', category=category.slug if category.slug else category.name) }}" class="explore-btn">
                                     Explorar <i class="fas fa-arrow-right"></i>
                                 </a>
                             </div>

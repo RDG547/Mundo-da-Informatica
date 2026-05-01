@@ -21,8 +21,8 @@
     <link rel="icon" type="image/png" sizes="1024x1024" href="{{ url_for('static', filename='images/favicon.svg') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/favicon.svg') }}">
     <meta name="msapplication-TileImage" content="{{ url_for('static', filename='images/favicon.svg') }}">
-    <meta name="msapplication-TileColor" content="#667eea">
-    <meta name="theme-color" content="#667eea">
+    <meta name="msapplication-TileColor" content="{{ site_primary_color }}">
+    <meta name="theme-color" content="{{ site_primary_color }}">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -80,14 +80,20 @@
 
     {% block extra_css %}{% endblock %}
 
+    <!-- Tema público configurável -->
+    <style data-static-base-style="true">
+        :root {
+            --primary-color: {{ site_primary_color }};
+            --secondary-color: {{ site_secondary_color }};
+            --primary-rgb: {{ site_primary_rgb }};
+            --secondary-rgb: {{ site_secondary_rgb }};
+        }
+    </style>
+
     <!-- CSS Customizado das Configurações -->
     {% if site_configs.get('custom_css') %}
     <style data-static-base-style="true">
-        {
-                {
-                site_configs.custom_css | safe
-            }
-        }
+        {{ site_configs.get('custom_css') | safe }}
     </style>
     {% endif %}
 
@@ -110,6 +116,7 @@
     data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
     data-user-plan="{% if current_user.is_authenticated %}{{ current_user.plan }}{% else %}free{% endif %}"
     data-chat-backend-enabled="{% if chat_backend_available %}true{% else %}false{% endif %}"
+    data-dark-mode-enabled="{% if site_configs.get('enable_dark_mode', True) %}true{% else %}false{% endif %}"
     data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
     <!-- Preloader -->
     <div class="preloader" role="status" aria-live="polite" aria-label="Carregando">
@@ -125,7 +132,7 @@
             <div class="container">
                 <div class="logo">
                     <a href="{{ url_for('home') }}">
-                        <i class="fas fa-microchip"></i> <span>Mundo</span> da Informática
+                        <i class="fas fa-microchip"></i> <span>{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
                     </a>
                 </div>
 
@@ -144,97 +151,30 @@
                             <i class="fas fa-folder"></i> Categorias <i class="fas fa-chevron-down dropdown-arrow"></i>
                         </a>
                         <div class="dropdown-menu">
+                            {% for nav_category in menu_categories %}
+                            {% set nav_category_key = nav_category.id|string %}
+                            {% set nav_subcategories = menu_subcategories_map.get(nav_category_key, []) %}
                             <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='BIOS') }}" class="dropdown-item-main">
-                                    <i class="fas fa-microchip"></i> BIOS <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
+                                <a href="{{ url_for('category', category=category_public_url_value(nav_category)) }}" class="dropdown-item-main">
+                                    <i class="{{ nav_category.icon or 'fas fa-folder' }}"></i>
+                                    <span class="dropdown-item-label">{{ nav_category.name }}</span>
+                                    {% if nav_subcategories %}
+                                    <i class="fas fa-chevron-right submenu-arrow"></i>
+                                    {% endif %}
                                 </a>
+                                {% if nav_subcategories %}
                                 <div class="submenu-content">
-                                    <a href="{{ url_for('subcategory', subcategory='bios-notebook') }}">BIOS
-                                        Notebook</a>
-                                    <a href="{{ url_for('subcategory', subcategory='bios-desktop') }}">BIOS Desktop</a>
-                                    <a href="{{ url_for('subcategory', subcategory='bios-all-in-one') }}">BIOS
-                                        All-in-One</a>
+                                    {% for subcategory_name in nav_subcategories %}
+                                    <a href="{{ url_for('subcategory', subcategory=subcategory_name) }}">{{ format_subcategory_label(subcategory_name) }}</a>
+                                    {% endfor %}
                                 </div>
+                                {% endif %}
                             </div>
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='Esquemas') }}" class="dropdown-item-main">
-                                    <i class="fas fa-project-diagram"></i> Esquemas <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
-                                </a>
-                                <div class="submenu-content">
-                                    <a href="{{ url_for('subcategory', subcategory='esquemas-placa-mae') }}">Esquemas
-                                        Placa-Mãe</a>
-                                    <a href="{{ url_for('subcategory', subcategory='esquemas-fonte') }}">Esquemas
-                                        Fonte</a>
-                                    <a href="{{ url_for('subcategory', subcategory='esquemas-monitor') }}">Esquemas
-                                        Monitor</a>
-                                </div>
-                            </div>
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='Drivers') }}" class="dropdown-item-main">
-                                    <i class="fas fa-cogs"></i> Drivers <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
-                                </a>
-                                <div class="submenu-content">
-                                    <a href="{{ url_for('subcategory', subcategory='drivers-video') }}">Drivers
-                                        Vídeo</a>
-                                    <a href="{{ url_for('subcategory', subcategory='drivers-audio') }}">Drivers
-                                        Áudio</a>
-                                    <a href="{{ url_for('subcategory', subcategory='drivers-rede') }}">Drivers Rede</a>
-                                    <a href="{{ url_for('subcategory', subcategory='drivers-chipset') }}">Drivers
-                                        Chipset</a>
-                                </div>
-                            </div>
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='Softwares') }}" class="dropdown-item-main">
-                                    <i class="fas fa-laptop-code"></i> Softwares <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
-                                </a>
-                                <div class="submenu-content">
-                                    <a
-                                        href="{{ url_for('subcategory', subcategory='softwares-diagnostico') }}">Diagnóstico</a>
-                                    <a
-                                        href="{{ url_for('subcategory', subcategory='softwares-recuperacao') }}">Recuperação</a>
-                                    <a
-                                        href="{{ url_for('subcategory', subcategory='softwares-otimizacao') }}">Otimização</a>
-                                </div>
-                            </div>
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='Impressoras') }}" class="dropdown-item-main">
-                                    <i class="fas fa-print"></i> Impressoras <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
-                                </a>
-                                <div class="submenu-content">
-                                    <a href="{{ url_for('subcategory', subcategory='impressoras-hp') }}">HP</a>
-                                    <a href="{{ url_for('subcategory', subcategory='impressoras-canon') }}">Canon</a>
-                                    <a href="{{ url_for('subcategory', subcategory='impressoras-epson') }}">Epson</a>
-                                    <a
-                                        href="{{ url_for('subcategory', subcategory='impressoras-samsung') }}">Samsung</a>
-                                </div>
-                            </div>
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='Cursos') }}" class="dropdown-item-main">
-                                    <i class="fas fa-graduation-cap"></i> Cursos <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
-                                </a>
-                                <div class="submenu-content">
-                                    <a href="{{ url_for('subcategory', subcategory='cursos-hardware') }}">Hardware</a>
-                                    <a href="{{ url_for('subcategory', subcategory='cursos-software') }}">Software</a>
-                                    <a href="{{ url_for('subcategory', subcategory='cursos-redes') }}">Redes</a>
-                                </div>
-                            </div>
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category='Datasheet') }}" class="dropdown-item-main">
-                                    <i class="fas fa-file-alt"></i> Datasheet <i
-                                        class="fas fa-chevron-right submenu-arrow"></i>
-                                </a>
-                                <div class="submenu-content">
-                                    <a href="{{ url_for('subcategory', subcategory='datasheet-ics') }}">Circuitos Integrados</a>
-                                    <a href="{{ url_for('subcategory', subcategory='datasheet-transistores') }}">Transistores</a>
-                                    <a href="{{ url_for('subcategory', subcategory='datasheet-semicondutores') }}">Semicondutores</a>
-                                </div>
-                            </div>
+                            {% else %}
+                            <a href="{{ url_for('all_categories') }}">
+                                <i class="fas fa-folder-open"></i> Categorias
+                            </a>
+                            {% endfor %}
                             <div class="dropdown-divider"></div>
                             <a href="{{ url_for('all_categories') }}" class="dropdown-item-featured">
                                 <i class="fas fa-th"></i> Ver Mais
@@ -349,6 +289,7 @@
         <span class="floating-chat-unread" id="floating-chat-unread" hidden>0</span>
     </button>
 
+    {% if request.endpoint != 'profile' %}
     <!-- Floating Construction Notice -->
     <aside class="floating-beta-notice is-open" id="floating-beta-notice" aria-label="Aviso de construção">
         <button type="button" class="floating-beta-toggle" id="floating-beta-toggle" aria-expanded="true"
@@ -369,6 +310,7 @@
             </a>
         </div>
     </aside>
+    {% endif %}
 
     <!-- Floating Chat Panel -->
     <div class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
@@ -627,7 +569,13 @@
         }
 
         .dropdown-item-main {
-            justify-content: space-between !important;
+            justify-content: flex-start !important;
+        }
+
+        .dropdown-item-label {
+            flex: 1 1 auto;
+            min-width: 0;
+            text-align: left;
         }
 
         .submenu-arrow {

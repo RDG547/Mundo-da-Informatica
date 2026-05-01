@@ -713,6 +713,10 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 if (postDetailCSS) postDetailCSS.media = 'all';
                 if (postDetailCSS) activatedStyles.push(postDetailCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Post Detail CSS ativado');
+            } else if (path.startsWith('/admin')) {
+                if (adminCSS) adminCSS.media = 'all';
+                if (adminCSS) activatedStyles.push(adminCSS);
+                console.log('[DYNAMIC-LOADING] 🎨 Admin CSS ativado');
             }
 
             if (aboutCSS && !activatedStyles.includes(aboutCSS)) {

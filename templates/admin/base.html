@@ -66,8 +66,10 @@
     <!-- Adicionar tema atual -->
     <script>
         // Carregar tema salvo
-        const savedTheme = localStorage.getItem('admin_theme') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        (function() {
+            const savedTheme = localStorage.getItem('admin_theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
     </script>
 
     {% block head %}{% endblock %}

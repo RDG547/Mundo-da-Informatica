@@ -2741,7 +2741,7 @@
     // CÓDIGO QUE RODA APÓS DOM CARREGAR
     // ============================================
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function initUsersPage() {
         console.log('DOM carregado, inicializando JavaScript de usuários...'); // Debug
 
         // Teste simples para verificar se os elementos existem
@@ -3520,7 +3520,12 @@
             applyButton.disabled = true;
             applyButton.classList.add('disabled');
         }
-    });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUsersPage);
+    } else {
+        initUsersPage();
+    }
 
     // Funções de controle de downloads
     let currentEditingUserId = null;

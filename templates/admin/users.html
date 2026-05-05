@@ -11,21 +11,19 @@
         <div class="header-actions">
             <div class="quick-stats">
                 <div class="stat-item admins">
-                    <span class="stat-number">{{ users | selectattr('role', 'equalto', 'admin') | list | length
-                        }}</span>
+                    <span class="stat-number">{{ user_totals.admins }}</span>
                     <span class="stat-label">Admins</span>
                 </div>
                 <div class="stat-item editors">
-                    <span class="stat-number">{{ users | selectattr('role', 'equalto', 'editor') | list | length
-                        }}</span>
+                    <span class="stat-number">{{ user_totals.editors }}</span>
                     <span class="stat-label">Editores</span>
                 </div>
                 <div class="stat-item users">
-                    <span class="stat-number">{{ users | selectattr('role', 'equalto', 'user') | list | length }}</span>
+                    <span class="stat-number">{{ user_totals.users }}</span>
                     <span class="stat-label">Usuários</span>
                 </div>
                 <div class="stat-item active">
-                    <span class="stat-number">{{ users | selectattr('is_active') | list | length }}</span>
+                    <span class="stat-number">{{ user_totals.active }}</span>
                     <span class="stat-label">Ativos</span>
                 </div>
             </div>
@@ -50,14 +48,14 @@
         <div class="header-left">
             <h2 class="admin-card-title">
                 <i class="fas fa-list"></i> Usuários Cadastrados
-                <span class="count-badge">{{ users | length }}</span>
+                <span class="count-badge">{{ user_totals.total }}</span>
             </h2>
         </div>
         <div class="header-right">
             <div class="filter-controls">
                 <div class="search-bar-advanced">
                     <div class="search-input-container">
-                        <input type="text" placeholder="Pesquisar usuários..." id="searchUsers" class="search-input">
+                        <input type="text" placeholder="Pesquisar usuários..." id="searchUsers" class="search-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
                         <button class="search-btn"><i class="fas fa-search"></i></button>
                         <button class="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
                     </div>
@@ -101,7 +99,7 @@
         </div>
     </div>
 
-    <div id="usersListRegion" data-current-page="{{ pagination.page if pagination else 1 }}">
+    <div id="usersListRegion" data-current-page="{{ pagination.page if pagination else 1 }}" data-total-users="{{ user_totals.total }}" data-current-page-users="{{ users | length }}">
     <div class="table-responsive">
         <table class="admin-table enhanced">
             <thead>
@@ -2022,6 +2020,76 @@
     }
 
     let pendingDeleteUser = null;
+    let usersStatsState = null;
+
+    function readUsersStatValue(selector) {
+        const value = Number(document.querySelector(selector)?.textContent?.trim() || '0');
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function computeUsersPageStats(region = document.getElementById('usersListRegion')) {
+        const rows = Array.from(region?.querySelectorAll('.user-row') || []);
+        return {
+            total: rows.length,
+            admins: rows.filter((row) => row.getAttribute('data-role') === 'admin').length,
+            editors: rows.filter((row) => row.getAttribute('data-role') === 'editor').length,
+            users: rows.filter((row) => row.getAttribute('data-role') === 'user').length,
+            active: rows.filter((row) => row.getAttribute('data-status') === 'active').length,
+        };
+    }
+
+    function ensureUsersStatsState() {
+        if (!usersStatsState) {
+            usersStatsState = {
+                total: readUsersStatValue('.count-badge'),
+                admins: readUsersStatValue('.stat-item.admins .stat-number'),
+                editors: readUsersStatValue('.stat-item.editors .stat-number'),
+                users: readUsersStatValue('.stat-item.users .stat-number'),
+                active: readUsersStatValue('.stat-item.active .stat-number'),
+                pageSnapshot: computeUsersPageStats(),
+            };
+        }
+
+        return usersStatsState;
+    }
+
+    function renderUsersStats() {
+        const stats = ensureUsersStatsState();
+        const countBadge = document.querySelector('.count-badge');
+        const adminCount = document.querySelector('.stat-item.admins .stat-number');
+        const editorCount = document.querySelector('.stat-item.editors .stat-number');
+        const userCount = document.querySelector('.stat-item.users .stat-number');
+        const activeCount = document.querySelector('.stat-item.active .stat-number');
+
+        if (countBadge) countBadge.textContent = stats.total;
+        if (adminCount) adminCount.textContent = stats.admins;
+        if (editorCount) editorCount.textContent = stats.editors;
+        if (userCount) userCount.textContent = stats.users;
+        if (activeCount) activeCount.textContent = stats.active;
+    }
+
+    function resetUsersStatsSnapshot(region = document.getElementById('usersListRegion')) {
+        const stats = ensureUsersStatsState();
+        const totalUsers = Number(region?.dataset.totalUsers || stats.total);
+
+        stats.total = Number.isFinite(totalUsers) ? totalUsers : stats.total;
+        stats.pageSnapshot = computeUsersPageStats(region);
+        renderUsersStats();
+    }
+
+    function syncUsersStatsFromCurrentPage(region = document.getElementById('usersListRegion')) {
+        const stats = ensureUsersStatsState();
+        const nextSnapshot = computeUsersPageStats(region);
+
+        stats.total += nextSnapshot.total - stats.pageSnapshot.total;
+        stats.admins += nextSnapshot.admins - stats.pageSnapshot.admins;
+        stats.editors += nextSnapshot.editors - stats.pageSnapshot.editors;
+        stats.users += nextSnapshot.users - stats.pageSnapshot.users;
+        stats.active += nextSnapshot.active - stats.pageSnapshot.active;
+        stats.pageSnapshot = nextSnapshot;
+
+        renderUsersStats();
+    }
 
     function openDeleteUserModalFromButton(button) {
         const userId = button?.getAttribute('data-user-id');
@@ -2115,6 +2183,7 @@
             row.classList.add('slide-in-up');
         });
 
+        resetUsersStatsSnapshot(region);
         updateBulkActionsVisibilityDynamic();
     }
 
@@ -3309,33 +3378,37 @@
 
         function updateResultsCount() {
             const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
-            const countElement = document.querySelector('.count-badge');
-            if (countElement) {
-                countElement.textContent = visibleRows.length;
-            }
+            const stats = ensureUsersStatsState();
+            const currentPageUsers = Number(document.getElementById('usersListRegion')?.dataset.currentPageUsers || stats.pageSnapshot.total);
+            const totalUsers = stats.total;
 
             // Update pagination info text
             const paginationInfo = document.querySelector('.pagination-info');
             if (paginationInfo) {
-                const totalUsers = tableRows.length;
-                if (visibleRows.length === totalUsers) {
-                    paginationInfo.innerHTML = `Mostrando ${visibleRows.length} de ${totalUsers} usuários`;
+                if (visibleRows.length === currentPageUsers) {
+                    paginationInfo.innerHTML = `Mostrando ${currentPageUsers} de ${totalUsers} usuários`;
                 } else {
-                    paginationInfo.innerHTML = `Mostrando ${visibleRows.length} de ${totalUsers} usuários (filtrado)`;
+                    paginationInfo.innerHTML = `Mostrando ${visibleRows.length} de ${currentPageUsers} usuários nesta página (${totalUsers} no total)`;
                 }
             }
         }
 
         function updateStats() {
-            const activeCount = document.querySelectorAll('[data-status="active"]').length;
-            const adminCount = document.querySelectorAll('[data-role="admin"]').length;
-            const editorCount = document.querySelectorAll('[data-role="editor"]').length;
-            const userCount = document.querySelectorAll('[data-role="user"]').length;
+            syncUsersStatsFromCurrentPage();
+        }
 
-            document.querySelector('.stat-item.active .stat-number').textContent = activeCount;
-            document.querySelector('.stat-item.admins .stat-number').textContent = adminCount;
-            document.querySelector('.stat-item.editors .stat-number').textContent = editorCount;
-            document.querySelector('.stat-item.users .stat-number').textContent = userCount;
+        function clearInitialUsersFilters() {
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            if (roleFilter) {
+                roleFilter.value = '';
+            }
+            if (statusFilter) {
+                statusFilter.value = '';
+            }
+
+            filterUsers();
         }
 
         // Event listeners
@@ -3520,6 +3593,8 @@
         // Initialize
         initializeUsersListRegion();
         updateBulkActionsVisibility();
+        requestAnimationFrame(clearInitialUsersFilters);
+        window.addEventListener('pageshow', clearInitialUsersFilters, { once: true });
 
         // Inicializar estado desabilitado das ações em massa
         const applyButton = document.getElementById('applyBulkAction');

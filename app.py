@@ -8906,10 +8906,20 @@ def admin_users():
         except Exception:
             db.session.rollback()
 
+    user_totals = {
+        'total': len(users),
+        'admins': sum(1 for user in users if user.role == 'admin'),
+        'editors': sum(1 for user in users if user.role == 'editor'),
+        'users': sum(1 for user in users if user.role == 'user'),
+        'active': sum(1 for user in users if user.is_active),
+    }
+
     # Paginação
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    total = len(users)
+    total = user_totals['total']
+    total_pages = max(1, math.ceil(total / per_page))
+    page = min(max(page, 1), total_pages)
 
     # Calcular itens da página atual
     start = (page - 1) * per_page
@@ -8965,6 +8975,7 @@ def admin_users():
                          title="Usuários",
                          users=page_users,
                          pagination=pagination,
+                         user_totals=user_totals,
                          **sidebar_stats)
 
 @app.route("/admin/users/<int:user_id>/data")

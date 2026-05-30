@@ -36,20 +36,21 @@ def test_admin_users_uses_global_totals_and_clamps_requested_page(monkeypatch):
 
     captured = {}
 
-    monkeypatch.setattr(app_module.User, 'query', FakeUserQuery(users), raising=False)
-    monkeypatch.setattr(app_module, 'get_admin_sidebar_stats', lambda: {})
+    with app_module.app.app_context():
+        monkeypatch.setattr(app_module.User, 'query', FakeUserQuery(users), raising=False)
+        monkeypatch.setattr(app_module, 'get_admin_sidebar_stats', lambda: {})
 
-    def fake_render(template_name, **context):
-        captured['template_name'] = template_name
-        captured['context'] = context
-        return context
+        def fake_render(template_name, **context):
+            captured['template_name'] = template_name
+            captured['context'] = context
+            return context
 
-    monkeypatch.setattr(app_module, 'render_template', fake_render)
+        monkeypatch.setattr(app_module, 'render_template', fake_render)
 
-    view = inspect.unwrap(app_module.admin_users)
+        view = inspect.unwrap(app_module.admin_users)
 
-    with app_module.app.test_request_context('/admin/users?page=99'):
-        response_context = view()
+        with app_module.app.test_request_context('/admin/users?page=99'):
+            response_context = view()
 
     context = captured['context']
     pagination = context['pagination']

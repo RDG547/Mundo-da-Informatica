@@ -287,41 +287,14 @@ function initializeHomeSearch() {
     }
 
     function dedupeSuggestions(suggestions, query) {
-        const normalizedQuery = String(query || '').trim().toLowerCase();
         const seen = new Set();
-        const baseItems = (suggestions || []).filter((item) => {
+        return (suggestions || []).filter((item) => {
             const key = `${item?.type || ''}::${item?.url || ''}::${String(item?.title || '').trim().toLowerCase()}`;
             if (seen.has(key)) {
                 return false;
             }
             seen.add(key);
             return true;
-        });
-
-        const categoryAnchors = baseItems.filter((item) => {
-            const normalizedTitle = String(item?.title || '').trim().toLowerCase();
-            return item?.type === 'category' && normalizedQuery && normalizedTitle.startsWith(normalizedQuery);
-        });
-
-        if (!categoryAnchors.length) {
-            return baseItems;
-        }
-
-        const matchedCategoryNames = new Set(
-            categoryAnchors.map((item) => String(item?.title || '').trim().toLowerCase()).filter(Boolean)
-        );
-
-        return baseItems.filter((item) => {
-            if (item?.type !== 'post') {
-                return true;
-            }
-            const postTitle = String(item?.title || '').trim().toLowerCase();
-            const postCategory = String(item?.category || item?.description || '').trim().toLowerCase();
-            return !Array.from(matchedCategoryNames).some((categoryName) => (
-                postTitle.startsWith(categoryName) ||
-                postCategory === categoryName ||
-                postCategory.endsWith(` ${categoryName}`)
-            ));
         });
     }
 

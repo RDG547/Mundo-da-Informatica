@@ -48,39 +48,40 @@
         <div class="header-left">
             <h2 class="admin-card-title">
                 <i class="fas fa-list"></i> Usuários Cadastrados
-                <span class="count-badge">{{ user_totals.total }}</span>
+                <span class="count-badge">{{ pagination.total if current_filters and (current_filters.q or current_filters.role or current_filters.status) else user_totals.total }}</span>
             </h2>
         </div>
         <div class="header-right">
-            <div class="filter-controls">
+            <form class="filter-controls admin-list-filters" method="get" action="{{ url_for('admin_users') }}" data-admin-filter-form>
                 <div class="search-bar-advanced">
                     <div class="search-input-container">
-                        <input type="text" placeholder="Pesquisar usuários..." id="searchUsers" class="search-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-                        <button class="search-btn"><i class="fas fa-search"></i></button>
-                        <button class="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
+                        <i class="fas fa-search search-field-icon" aria-hidden="true"></i>
+                        <input type="text" name="q" value="{{ current_filters.q if current_filters else '' }}" placeholder="Pesquisar usuários..." id="searchUsers" class="search-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+                        <button type="submit" class="search-btn" aria-label="Buscar usuários"><i class="fas fa-arrow-right"></i></button>
+                        <button type="button" class="search-clear" onclick="clearSearch()" aria-label="Limpar busca"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterRole" class="form-select">
+                    <select id="filterRole" name="role" class="form-select">
                         <option value="">Todos os Papéis</option>
-                        <option value="admin">Administradores</option>
-                        <option value="editor">Editores</option>
-                        <option value="user">Usuários</option>
+                        <option value="admin" {% if current_filters and current_filters.role == 'admin' %}selected{% endif %}>Administradores</option>
+                        <option value="editor" {% if current_filters and current_filters.role == 'editor' %}selected{% endif %}>Editores</option>
+                        <option value="user" {% if current_filters and current_filters.role == 'user' %}selected{% endif %}>Usuários</option>
                     </select>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterStatus" class="form-select">
+                    <select id="filterStatus" name="status" class="form-select">
                         <option value="">Todos os Status</option>
-                        <option value="active">Ativos</option>
-                        <option value="inactive">Inativos</option>
+                        <option value="active" {% if current_filters and current_filters.status == 'active' %}selected{% endif %}>Ativos</option>
+                        <option value="inactive" {% if current_filters and current_filters.status == 'inactive' %}selected{% endif %}>Inativos</option>
                     </select>
                 </div>
                 <div class="sort-dropdown">
-                    <select id="sortBy" class="form-select">
-                        <option value="name">Ordenar por Nome</option>
-                        <option value="email">Ordenar por Email</option>
-                        <option value="role">Ordenar por Papel</option>
-                        <option value="date">Ordenar por Data</option>
+                    <select id="sortBy" name="sort" class="form-select">
+                        <option value="name" {% if not current_filters or current_filters.sort == 'name' %}selected{% endif %}>Ordenar por Nome</option>
+                        <option value="email" {% if current_filters and current_filters.sort == 'email' %}selected{% endif %}>Ordenar por Email</option>
+                        <option value="role" {% if current_filters and current_filters.sort == 'role' %}selected{% endif %}>Ordenar por Papel</option>
+                        <option value="date" {% if current_filters and current_filters.sort == 'date' %}selected{% endif %}>Ordenar por Data</option>
                     </select>
                 </div>
                 <div class="bulk-actions">
@@ -93,13 +94,13 @@
                         <option value="send_welcome">Enviar Boas-vindas</option>
                         <option value="delete">Excluir selecionados</option>
                     </select>
-                    <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+                    <button type="button" id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 
-    <div id="usersListRegion" data-current-page="{{ pagination.page if pagination else 1 }}" data-total-users="{{ user_totals.total }}" data-current-page-users="{{ users | length }}">
+    <div id="usersListRegion" data-current-page="{{ pagination.page if pagination else 1 }}" data-total-users="{{ user_totals.total }}" data-filtered-users="{{ pagination.total if pagination else users|length }}" data-current-page-users="{{ users | length }}">
     <div class="table-responsive">
         <table class="admin-table enhanced">
             <thead>
@@ -412,7 +413,7 @@
         <div class="pagination-container">
             <div class="pagination-info">
                 {% if pagination %}
-                Mostrando {{ users | length }} de {{ pagination.total }} usuários
+                Mostrando {{ users | length }} de {{ pagination.total }} usuários{% if current_filters and (current_filters.q or current_filters.role or current_filters.status) %} filtrados ({{ user_totals.total }} no total){% endif %}
                 {% else %}
                 {{ users | length }} usuários encontrados
                 {% endif %}
@@ -421,7 +422,7 @@
                 <ul class="pagination">
                     {% if pagination and pagination.has_prev %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_users', page=pagination.prev_num) }}"
+                        <a class="page-link" href="{{ url_for('admin_users', page=pagination.prev_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}"
                             aria-label="Anterior">
                             <i class="fas fa-chevron-left"></i>
                         </a>
@@ -444,7 +445,7 @@
                     </li>
                     {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_users', page=page_num) }}">{{ page_num }}</a>
+                        <a class="page-link" href="{{ url_for('admin_users', page=page_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}">{{ page_num }}</a>
                     </li>
                     {% endif %}
                     {% else %}
@@ -461,7 +462,7 @@
 
                     {% if pagination and pagination.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_users', page=pagination.next_num) }}"
+                        <a class="page-link" href="{{ url_for('admin_users', page=pagination.next_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}"
                             aria-label="Próximo">
                             <i class="fas fa-chevron-right"></i>
                         </a>
@@ -2019,8 +2020,8 @@
         }, 220);
     }
 
-    let pendingDeleteUser = null;
-    let usersStatsState = null;
+    window.pendingDeleteUser = null;
+    window.usersStatsState = null;
 
     function readUsersStatValue(selector) {
         const value = Number(document.querySelector(selector)?.textContent?.trim() || '0');
@@ -2836,6 +2837,11 @@
             document.getElementById('filterRole').value = '';
             document.getElementById('filterStatus').value = '';
             filterUsers();
+            if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
+                window.dynamicLoader.loadPage('/admin/users');
+            } else {
+                window.location.href = '/admin/users';
+            }
         };
 
         window.exportUsers = function () {
@@ -3347,20 +3353,62 @@
         const statusFilter = document.getElementById('filterStatus');
         const sortBy = document.getElementById('sortBy');
         const tableRows = document.querySelectorAll('.user-row');
+        const filtersForm = document.querySelector('[data-admin-filter-form]');
+        let filtersSubmitTimer = null;
+
+        function normalizeAdminSearchText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '');
+        }
+
+        function buildAdminFilterUrl() {
+            if (!filtersForm) return '/admin/users';
+            const formData = new FormData(filtersForm);
+            formData.delete('page');
+            const params = new URLSearchParams();
+            formData.forEach((value, key) => {
+                const normalizedValue = String(value || '').trim();
+                if (normalizedValue) params.set(key, normalizedValue);
+            });
+            const query = params.toString();
+            return `${filtersForm.action}${query ? `?${query}` : ''}`;
+        }
+
+        function loadAdminFilterUrl(url) {
+            if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
+                window.dynamicLoader.loadPage(url);
+            } else {
+                window.location.href = url;
+            }
+        }
+
+        function submitAdminFilters(delay = 0) {
+            if (!filtersForm) return;
+            clearTimeout(filtersSubmitTimer);
+            filtersSubmitTimer = setTimeout(() => {
+                loadAdminFilterUrl(buildAdminFilterUrl());
+            }, delay);
+        }
 
         function filterUsers() {
-            const searchTerm = searchInput.value.toLowerCase();
+            const searchTerm = normalizeAdminSearchText(searchInput.value);
             const selectedRole = roleFilter.value;
             const selectedStatus = statusFilter.value;
 
             tableRows.forEach(row => {
-                const username = row.querySelector('.username')?.textContent.toLowerCase() || '';
-                const fullName = row.querySelector('.full-name')?.textContent.toLowerCase() || '';
-                const email = row.querySelector('.email-address')?.textContent.toLowerCase() || '';
+                const username = normalizeAdminSearchText(row.querySelector('.username')?.textContent || '');
+                const fullName = normalizeAdminSearchText(row.querySelector('.full-name')?.textContent || '');
+                const email = normalizeAdminSearchText(row.querySelector('.email-address')?.textContent || '');
+                const rowText = normalizeAdminSearchText(row.textContent || '');
 
-                const matchesSearch = username.includes(searchTerm) ||
+                const matchesSearch = !searchTerm ||
+                    username.includes(searchTerm) ||
                     fullName.includes(searchTerm) ||
-                    email.includes(searchTerm);
+                    email.includes(searchTerm) ||
+                    rowText.includes(searchTerm);
 
                 const matchesRole = !selectedRole || row.getAttribute('data-role') === selectedRole;
                 const matchesStatus = !selectedStatus || row.getAttribute('data-status') === selectedStatus;
@@ -3412,12 +3460,26 @@
         }
 
         // Event listeners
-        searchInput?.addEventListener('input', filterUsers);
-        roleFilter?.addEventListener('change', filterUsers);
-        statusFilter?.addEventListener('change', filterUsers);
+        filtersForm?.addEventListener('submit', function (event) {
+            event.preventDefault();
+            loadAdminFilterUrl(buildAdminFilterUrl());
+        });
+        searchInput?.addEventListener('input', function () {
+            filterUsers();
+            submitAdminFilters(500);
+        });
+        roleFilter?.addEventListener('change', function () {
+            filterUsers();
+            submitAdminFilters(0);
+        });
+        statusFilter?.addEventListener('change', function () {
+            filterUsers();
+            submitAdminFilters(0);
+        });
 
         // Sorting functionality
         sortBy?.addEventListener('change', function () {
+            submitAdminFilters(0);
             const sortType = this.value;
             const tbody = document.querySelector('.admin-table tbody');
             const rows = Array.from(tbody.querySelectorAll('.user-row'));
@@ -3610,7 +3672,7 @@
     }
 
     // Funções de controle de downloads
-    let currentEditingUserId = null;
+    window.currentEditingUserId = null;
 
     window.adjustDownloads = async function (period, action, value = 1) {
         if (!currentEditingUserId) {

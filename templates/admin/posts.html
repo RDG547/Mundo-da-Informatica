@@ -43,43 +43,44 @@
         <div class="header-left">
             <h2 class="admin-card-title">
                 <i class="fas fa-list"></i> Posts Publicados
-                <span class="count-badge" data-posts-total-badge>{{ posts_overview.total_posts }}</span>
+                <span class="count-badge" data-posts-total-badge>{{ posts.total if current_filters and (current_filters.q or current_filters.category or current_filters.status) else posts_overview.total_posts }}</span>
             </h2>
         </div>
         <div class="header-right">
-            <div class="filter-controls">
+            <form class="filter-controls admin-list-filters" method="get" action="{{ url_for('admin_posts') }}" data-admin-filter-form>
                 <div class="search-bar-advanced">
                     <div class="search-input-container">
-                        <input type="text" placeholder="Pesquisar posts..." id="searchPosts" class="search-input">
-                        <button class="search-btn" aria-label="Buscar posts"><i class="fas fa-search"></i></button>
-                        <button class="search-clear" onclick="clearSearch()" aria-label="Limpar busca"><i class="fas fa-times"></i></button>
+                        <i class="fas fa-search search-field-icon" aria-hidden="true"></i>
+                        <input type="text" name="q" value="{{ current_filters.q if current_filters else '' }}" placeholder="Pesquisar posts..." id="searchPosts" class="search-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                        <button type="submit" class="search-btn" aria-label="Buscar posts"><i class="fas fa-arrow-right"></i></button>
+                        <button type="button" class="search-clear" onclick="clearSearch()" aria-label="Limpar busca"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterCategory" class="form-select" aria-label="Filtrar por categoria">
+                    <select id="filterCategory" name="category" class="form-select" aria-label="Filtrar por categoria">
                         <option value="">Todas as categorias</option>
                         {% for category in categories %}
-                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        <option value="{{ category.id }}" {% if current_filters and current_filters.category == category.id|string %}selected{% endif %}>{{ category.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterStatus" class="form-select" aria-label="Filtrar por status">
+                    <select id="filterStatus" name="status" class="form-select" aria-label="Filtrar por status">
                         <option value="">Todos os Status</option>
-                        <option value="active">Ativos</option>
-                        <option value="featured">Em Destaque</option>
-                        <option value="inactive">Inativos</option>
+                        <option value="active" {% if current_filters and current_filters.status == 'active' %}selected{% endif %}>Ativos</option>
+                        <option value="featured" {% if current_filters and current_filters.status == 'featured' %}selected{% endif %}>Em Destaque</option>
+                        <option value="inactive" {% if current_filters and current_filters.status == 'inactive' %}selected{% endif %}>Inativos</option>
                     </select>
                 </div>
                 <div class="sort-dropdown">
-                    <select id="sortBy" class="form-select" aria-label="Ordenar por">
-                        <option value="date">Ordenar por Data</option>
-                        <option value="title">Ordenar por Título</option>
-                        <option value="views">Ordenar por Visualizações</option>
-                        <option value="downloads">Ordenar por Downloads</option>
+                    <select id="sortBy" name="sort" class="form-select" aria-label="Ordenar por">
+                        <option value="date" {% if not current_filters or current_filters.sort == 'date' %}selected{% endif %}>Ordenar por Data</option>
+                        <option value="title" {% if current_filters and current_filters.sort == 'title' %}selected{% endif %}>Ordenar por Título</option>
+                        <option value="views" {% if current_filters and current_filters.sort == 'views' %}selected{% endif %}>Ordenar por Visualizações</option>
+                        <option value="downloads" {% if current_filters and current_filters.sort == 'downloads' %}selected{% endif %}>Ordenar por Downloads</option>
                     </select>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 
@@ -258,7 +259,7 @@
                 <ul class="pagination">
                     {% if posts.has_prev %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.prev_num) }}"
+                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.prev_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}"
                             aria-label="Anterior">
                             <i class="fas fa-chevron-left"></i>
                         </a>
@@ -279,7 +280,7 @@
                     </li>
                     {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_posts', page=page_num) }}">{{ page_num }}</a>
+                        <a class="page-link" href="{{ url_for('admin_posts', page=page_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}">{{ page_num }}</a>
                     </li>
                     {% endif %}
                     {% else %}
@@ -291,7 +292,7 @@
 
                     {% if posts.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.next_num) }}"
+                        <a class="page-link" href="{{ url_for('admin_posts', page=posts.next_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}"
                             aria-label="Próximo">
                             <i class="fas fa-chevron-right"></i>
                         </a>
@@ -592,8 +593,8 @@
     // ========================================
 
     // Variável global para controlar o step atual
-    let currentEditStep = 1;
-    const EDIT_TOTAL_STEPS = 3;
+    window.currentEditStep = 1;
+    window.EDIT_TOTAL_STEPS = 3;
 
     async function parseJsonResponse(response) {
         const rawText = await response.text();
@@ -608,7 +609,7 @@
 
     window.goToEditStep = function (targetStep) {
         const normalizedStep = Number(targetStep);
-        if (!Number.isInteger(normalizedStep) || normalizedStep < 1 || normalizedStep > EDIT_TOTAL_STEPS) {
+        if (!Number.isInteger(normalizedStep) || normalizedStep < 1 || normalizedStep > window.EDIT_TOTAL_STEPS) {
             return;
         }
 
@@ -625,24 +626,24 @@
             contentEl.classList.toggle('active', Number(contentEl.getAttribute('data-step')) === normalizedStep);
         });
 
-        currentEditStep = normalizedStep;
+        window.currentEditStep = normalizedStep;
     };
 
     // Função para avançar para o próximo step
     window.nextEditStep = function () {
-        console.log('nextEditStep chamado, currentEditStep:', currentEditStep);
+        console.log('nextEditStep chamado, currentEditStep:', window.currentEditStep);
 
-        if (currentEditStep < EDIT_TOTAL_STEPS) {
-            window.goToEditStep(currentEditStep + 1);
-            console.log('Avançou para step:', currentEditStep);
+        if (window.currentEditStep < window.EDIT_TOTAL_STEPS) {
+            window.goToEditStep(window.currentEditStep + 1);
+            console.log('Avançou para step:', window.currentEditStep);
         }
     };
 
     // Função para voltar ao step anterior
     window.prevEditStep = function () {
-        if (currentEditStep > 1) {
-            window.goToEditStep(currentEditStep - 1);
-            console.log('Voltou para step:', currentEditStep);
+        if (window.currentEditStep > 1) {
+            window.goToEditStep(window.currentEditStep - 1);
+            console.log('Voltou para step:', window.currentEditStep);
         }
     };
 
@@ -704,7 +705,13 @@
     // FIM DAS FUNÇÕES GLOBAIS
     // ========================================
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function initAdminPostsPageInline() {
+        const postsTableBodyForInit = document.getElementById('postsTableBody');
+        if (!postsTableBodyForInit || postsTableBodyForInit.dataset.inlineInitialized === 'true') {
+            return;
+        }
+        postsTableBodyForInit.dataset.inlineInitialized = 'true';
+
         console.log('DOM carregado, inicializando JavaScript...'); // Debug
 
         // ==========================================
@@ -741,19 +748,59 @@
         const categoryFilter = document.getElementById('filterCategory');
         const statusFilter = document.getElementById('filterStatus');
         const sortBy = document.getElementById('sortBy');
+        const filtersForm = document.querySelector('[data-admin-filter-form]');
         const getTableRows = () => Array.from(document.querySelectorAll('.admin-table tbody tr[data-post-id]'));
+        let filtersSubmitTimer = null;
+
+        function normalizeAdminSearchText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '');
+        }
+
+        function buildAdminFilterUrl() {
+            if (!filtersForm) return '/admin/posts';
+            const formData = new FormData(filtersForm);
+            formData.delete('page');
+            const params = new URLSearchParams();
+            formData.forEach((value, key) => {
+                const normalizedValue = String(value || '').trim();
+                if (normalizedValue) params.set(key, normalizedValue);
+            });
+            const query = params.toString();
+            return `${filtersForm.action}${query ? `?${query}` : ''}`;
+        }
+
+        function loadAdminFilterUrl(url) {
+            if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
+                window.dynamicLoader.loadPage(url);
+            } else {
+                window.location.href = url;
+            }
+        }
+
+        function submitAdminFilters(delay = 0) {
+            if (!filtersForm) return;
+            clearTimeout(filtersSubmitTimer);
+            filtersSubmitTimer = setTimeout(() => {
+                loadAdminFilterUrl(buildAdminFilterUrl());
+            }, delay);
+        }
 
         function filterAndSearchPosts() {
-            const searchTerm = searchInput.value.toLowerCase();
+            const searchTerm = normalizeAdminSearchText(searchInput.value);
             const selectedCategory = categoryFilter.value;
             const selectedStatus = statusFilter.value;
             const tableRows = getTableRows();
 
             tableRows.forEach(row => {
-                const titleCell = row.querySelector('.post-title')?.textContent.toLowerCase() || '';
-                const excerptCell = row.querySelector('.post-excerpt')?.textContent.toLowerCase() || '';
+                const titleCell = normalizeAdminSearchText(row.querySelector('.post-title')?.textContent || '');
+                const excerptCell = normalizeAdminSearchText(row.querySelector('.post-excerpt')?.textContent || '');
+                const rowText = normalizeAdminSearchText(row.textContent || '');
 
-                const matchesSearch = titleCell.includes(searchTerm) || excerptCell.includes(searchTerm);
+                const matchesSearch = !searchTerm || titleCell.includes(searchTerm) || excerptCell.includes(searchTerm) || rowText.includes(searchTerm);
                 const matchesCategory = !selectedCategory || (row.dataset.categoryId || '') === selectedCategory;
 
                 let matchesStatus = true;
@@ -792,9 +839,22 @@
         }
 
         // Event listeners for filters
-        searchInput?.addEventListener('input', filterAndSearchPosts);
-        categoryFilter?.addEventListener('change', filterAndSearchPosts);
-        statusFilter?.addEventListener('change', filterAndSearchPosts);
+        filtersForm?.addEventListener('submit', function (event) {
+            event.preventDefault();
+            loadAdminFilterUrl(buildAdminFilterUrl());
+        });
+        searchInput?.addEventListener('input', function () {
+            filterAndSearchPosts();
+            submitAdminFilters(500);
+        });
+        categoryFilter?.addEventListener('change', function () {
+            filterAndSearchPosts();
+            submitAdminFilters(0);
+        });
+        statusFilter?.addEventListener('change', function () {
+            filterAndSearchPosts();
+            submitAdminFilters(0);
+        });
 
         // Clear search function
         window.clearSearch = function () {
@@ -802,6 +862,7 @@
             categoryFilter.value = '';
             statusFilter.value = '';
             filterAndSearchPosts();
+            loadAdminFilterUrl('/admin/posts');
         };
 
         window.refreshPostsListFilters = filterAndSearchPosts;
@@ -813,6 +874,7 @@
 
         // Sorting functionality
         sortBy?.addEventListener('change', function () {
+            submitAdminFilters(0);
             const sortType = this.value;
             const tbody = document.querySelector('.admin-table tbody');
             const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-state)'));
@@ -1351,7 +1413,14 @@
         // showNotification global é definida em admin.js
 
         updateBulkActionsVisibility();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAdminPostsPageInline);
+    } else {
+        initAdminPostsPageInline();
+    }
+    document.addEventListener('adminPageLoaded', initAdminPostsPageInline);
 </script>
 
 <style>
@@ -1907,9 +1976,9 @@
     }
 
     // Atualizar formulário de edição para usar FormData (suporte a upload)
-    const editPostForm = document.getElementById('editPostForm');
-    if (editPostForm) {
-        editPostForm.addEventListener('submit', function (e) {
+    var editPostFormElement = document.getElementById('editPostForm');
+    if (editPostFormElement) {
+        editPostFormElement.addEventListener('submit', function (e) {
             e.preventDefault();
             window.savePost(e);
         });
@@ -2003,8 +2072,14 @@
         if (urlInput) urlInput.value = '';
     };
 
-    // CONSOLIDADO: Todos os eventos do modal de edição em um único DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', function () {
+    // CONSOLIDADO: Todos os eventos do modal de edição
+    function initEditPostModalEvents() {
+        const editModal = document.getElementById('editPostModal');
+        if (!editModal || editModal.dataset.editEventsInitialized === 'true') {
+            return;
+        }
+        editModal.dataset.editEventsInitialized = 'true';
+
         console.log('Inicializando eventos do modal de edição...');
 
         // Editor de conteúdo
@@ -2118,10 +2193,23 @@
         } else {
             console.error('✗ ERRO: Elementos não encontrados!');
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEditPostModalEvents);
+    } else {
+        initEditPostModalEvents();
+    }
+    document.addEventListener('adminPageLoaded', initEditPostModalEvents);
 
     // Adicionar listeners para atualizar preview SEO
-    document.addEventListener('DOMContentLoaded', function () {
+    function initEditSeoPreviewEvents() {
+        const editModal = document.getElementById('editPostModal');
+        if (!editModal || editModal.dataset.seoEventsInitialized === 'true') {
+            return;
+        }
+        editModal.dataset.seoEventsInitialized = 'true';
+
         const editTitle = document.getElementById('editPostTitle');
         const editContent = document.getElementById('editPostContentEditor');
 
@@ -2132,7 +2220,14 @@
         if (editContent) {
             editContent.addEventListener('input', updateEditSeoPreview);
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEditSeoPreviewEvents);
+    } else {
+        initEditSeoPreviewEvents();
+    }
+    document.addEventListener('adminPageLoaded', initEditSeoPreviewEvents);
 
 </script>
 

@@ -22,6 +22,7 @@ import uuid
 import secrets
 import hmac
 import hashlib
+import unicodedata
 import urllib.request
 import urllib.error
 import stripe
@@ -453,6 +454,48 @@ def get_plain_text_excerpt(content: str | None, limit: int = 220) -> str:
         return f"{normalized[:limit].rstrip()}..."
 
     return normalized
+
+
+def get_search_parts(value: Any) -> tuple[str, str]:
+    text = unicodedata.normalize('NFKD', str(value or ''))
+    text = ''.join(char for char in text if not unicodedata.combining(char)).casefold()
+    spaced = re.sub(r'[^a-z0-9]+', ' ', text).strip()
+    compact = re.sub(r'[^a-z0-9]+', '', text)
+    return spaced, compact
+
+
+def get_search_match_score(query: str, *values: Any) -> int | None:
+    query_spaced, query_compact = get_search_parts(query)
+    if not query_spaced and not query_compact:
+        return 0
+
+    value_parts = [get_search_parts(value) for value in values if value is not None]
+    if not value_parts:
+        return None
+
+    spaced_values = [spaced for spaced, _compact in value_parts if spaced]
+    compact_values = [compact for _spaced, compact in value_parts if compact]
+    spaced_blob = ' '.join(spaced_values)
+    compact_blob = ' '.join(compact_values)
+
+    if query_spaced and any(query_spaced == spaced for spaced in spaced_values):
+        return 0
+    if query_compact and any(query_compact == compact for compact in compact_values):
+        return 0
+    if query_spaced and any(spaced.startswith(query_spaced) for spaced in spaced_values):
+        return 1
+    if query_compact and any(compact.startswith(query_compact) for compact in compact_values):
+        return 1
+    if query_spaced and query_spaced in spaced_blob:
+        return 2
+    if query_compact and query_compact in compact_blob:
+        return 2
+
+    tokens = [token for token in query_spaced.split() if token]
+    if tokens and all(token in spaced_blob or token in compact_blob for token in tokens):
+        return 3
+
+    return None
 
 
 def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
@@ -3866,66 +3909,39 @@ def search():
     # Buscar categorias que correspondem à pesquisa (apenas se filter != 'posts')
     categories = []
     if filter_type in ['all', 'categories']:
-        # Busca mais restritiva - apenas se começar com a query ou for muito similar
-        categories = Category.query.filter(
-            db.or_(
-                Category.name.ilike(f'{query}%'),  # Começa com
-                Category.name.ilike(f'%{query}%')   # Contém (menos prioritário)
-            )
-        ).all()
+        scored_categories = []
+        for cat in Category.query.filter_by(is_active=True).all():
+            score = get_search_match_score(query, cat.name, cat.description, cat.slug)
+            if score is not None:
+                scored_categories.append((score, cat.name.casefold(), cat))
 
-        # Ordenar: exatas primeiro, depois que começam, depois que contêm
-        def category_score(cat):
-            name_lower = cat.name.lower()
-            query_lower = query.lower()
-            if name_lower == query_lower:
-                return 0  # Exata
-            elif name_lower.startswith(query_lower):
-                return 1  # Começa com
-            else:
-                return 2  # Contém
-
-        categories.sort(key=category_score)
+        categories = [cat for _score, _name, cat in sorted(scored_categories, key=lambda item: (item[0], item[1]))]
 
     # Buscar posts (apenas se filter != 'categories')
     posts = []
     if filter_type in ['all', 'posts']:
-        # Realizar pesquisa - Priorizar posts que começam com a query
-        search_filter_starts = Post.query.filter_by(is_active=True)
-        search_filter_contains = Post.query.filter_by(is_active=True)
-
-        # Se há categoria específica, filtrar por ela
+        posts_query = Post.query.filter_by(is_active=True)
         if category:
-            search_filter_starts = search_filter_starts.filter(Post.category_str == category)
-            search_filter_contains = search_filter_contains.filter(Post.category_str == category)
+            posts_query = posts_query.filter(Post.category_str == category)
 
-        # Buscar posts que COMEÇAM com a query
-        results_starts = search_filter_starts.filter(
-            db.or_(
-                Post.title.ilike(f'{query}%'),
-                Post.seo_title.ilike(f'{query}%')
+        scored_posts = []
+        for post in posts_query.all():
+            score = get_search_match_score(
+                query,
+                post.title,
+                post.content,
+                post.seo_title,
+                post.seo_description,
+                post.tags,
+                post.category_str,
+                post.subcategory,
+                post.slug,
             )
-        ).order_by(Post.date_posted.desc()).all()
+            if score is not None:
+                sort_date = post.date_posted or datetime.min
+                scored_posts.append((score, -sort_date.toordinal(), post.title.casefold(), post))
 
-        # Buscar posts que CONTÊM a query (mas não começam)
-        results_contains = search_filter_contains.filter(
-            db.or_(
-                Post.title.ilike(f'%{query}%'),
-                Post.content.ilike(f'%{query}%'),
-                Post.seo_title.ilike(f'%{query}%'),
-                Post.seo_description.ilike(f'%{query}%'),
-                db.and_(Post.tags.isnot(None), Post.tags.ilike(f'%{query}%'))
-            )
-        ).filter(
-            # Excluir os que já começam com a query no título ou SEO title
-            ~db.or_(
-                Post.title.ilike(f'{query}%'),
-                Post.seo_title.ilike(f'{query}%')
-            )
-        ).order_by(Post.date_posted.desc()).all()
-
-        # Combinar resultados (começam primeiro, depois contém)
-        posts = results_starts + results_contains
+        posts = [post for _score, _date, _title, post in sorted(scored_posts, key=lambda item: (item[0], item[1], item[2]))]
 
         debug_log(f"SEARCH Query: '{query}', Posts found: {len(posts)}")  # DEBUG
 
@@ -5435,8 +5451,7 @@ def api_post(post_id):
 def search_suggestions():
     query = request.args.get('q', '').strip()
     category = request.args.get('category', '').strip()
-    normalized_query = query.lower()
-    matched_category_names = set()
+    max_suggestions = 10
 
     debug_log(f" Search query: '{query}', category: '{category}'")  # DEBUG
 
@@ -5448,28 +5463,16 @@ def search_suggestions():
 
     # Se não há categoria específica, buscar categorias também
     if not category:
-        # Buscar categorias que COMEÇAM com a query (prioridade)
-        categories_starts = Category.query.filter(
-            Category.name.ilike(f'{query}%')
-        ).filter_by(is_active=True).limit(2).all()
+        scored_categories = []
+        for cat in Category.query.filter_by(is_active=True).all():
+            score = get_search_match_score(query, cat.name, cat.description, cat.slug)
+            if score is not None:
+                scored_categories.append((score, cat.name.casefold(), cat))
 
-        debug_log(f" Categories starting with '{query}': {len(categories_starts)}")  # DEBUG
-
-        # Buscar categorias que CONTÉM a query (caso não encontre suficientes)
-        if len(categories_starts) < 2:
-            categories_contains = Category.query.filter(
-                Category.name.ilike(f'%{query}%'),
-                ~Category.name.ilike(f'{query}%')  # Excluir as que já começam
-            ).filter_by(is_active=True).limit(2 - len(categories_starts)).all()
-            categories = categories_starts + categories_contains
-        else:
-            categories = categories_starts
-
-        matched_category_names = {
-            str(cat.name).strip().lower()
-            for cat in categories
-            if str(cat.name or '').strip().lower().startswith(normalized_query)
-        }
+        categories = [
+            cat
+            for _score, _name, cat in sorted(scored_categories, key=lambda item: (item[0], item[1]))[:2]
+        ]
 
         for cat in categories:
             suggestions.append({
@@ -5480,46 +5483,32 @@ def search_suggestions():
                 'icon': cat.icon or 'fas fa-folder'
             })
 
-    # Buscar posts que COMEÇAM com a query (prioridade)
-    posts_starts = Post.query.filter(
-        Post.title.ilike(f'{query}%')
-    ).filter_by(is_active=True)
-
-    # Se há categoria específica, filtrar por ela
+    posts_query = Post.query.filter_by(is_active=True)
     if category:
-        posts_starts = posts_starts.filter(Post.category_str == category)
+        posts_query = posts_query.filter(Post.category_str == category)
 
-    posts_starts_list = posts_starts.limit(5).all()
+    scored_posts = []
+    for post in posts_query.all():
+        score = get_search_match_score(
+            query,
+            post.title,
+            post.content,
+            post.seo_title,
+            post.seo_description,
+            post.tags,
+            post.category_str,
+            post.subcategory,
+            post.slug,
+        )
+        if score is not None:
+            sort_date = post.date_posted or datetime.min
+            scored_posts.append((score, -sort_date.toordinal(), post.title.casefold(), post))
 
-    debug_log(f" Posts starting with '{query}': {len(posts_starts_list)}")  # DEBUG
-
-    # Buscar posts que CONTÉM a query (caso não encontre suficientes)
-    posts_contains_list = []
-    if len(posts_starts_list) < 5:
-        posts_contains = Post.query.filter(
-            db.or_(
-                Post.title.ilike(f'%{query}%'),
-                Post.content.ilike(f'%{query}%'),
-                Post.seo_title.ilike(f'%{query}%'),
-                Post.seo_description.ilike(f'%{query}%'),
-                db.and_(Post.tags.isnot(None), Post.tags.ilike(f'%{query}%'))
-            )
-        ).filter_by(is_active=True)
-
-        # Excluir posts que já começam com a query (já foram incluídos)
-        if posts_starts_list:
-            posts_contains = posts_contains.filter(
-                ~Post.id.in_([p.id for p in posts_starts_list])
-            )
-
-        if category:
-            posts_contains = posts_contains.filter(Post.category_str == category)
-
-        posts_contains_list = posts_contains.limit(5 - len(posts_starts_list)).all()
-
-        debug_log(f" Posts containing '{query}': {len(posts_contains_list)}")  # DEBUG
-
-    posts = posts_starts_list + posts_contains_list
+    remaining_slots = max(max_suggestions - len(suggestions), 0)
+    posts = [
+        post
+        for _score, _date, _title, post in sorted(scored_posts, key=lambda item: (item[0], item[1], item[2]))[:remaining_slots]
+    ]
 
     # Verificar total de posts ativos no banco
     total_active_posts = Post.query.filter_by(is_active=True).count()
@@ -5528,9 +5517,6 @@ def search_suggestions():
 
     for post in posts:
         category_name = post.category_str or (post.category_rel.name if post.category_rel else 'Sem categoria')
-
-        if not category and matched_category_names and category_name.strip().lower() in matched_category_names:
-            continue
 
         # Determinar o ícone baseado na categoria
         category_icon = 'fas fa-file-alt'
@@ -5570,7 +5556,7 @@ def search_suggestions():
         seen_suggestions.add(key)
         unique_suggestions.append(item)
 
-    return jsonify(unique_suggestions[:8])  # Limitar a 8 sugestões
+    return jsonify(unique_suggestions[:max_suggestions])
 
 @app.route('/admin/posts/<int:post_id>/toggle-active', methods=['POST'])
 @login_required
@@ -5859,16 +5845,7 @@ def admin_update_post(post_id):
         return jsonify({
             'success': True,
             'message': 'Post atualizado com sucesso!',
-            'post': {
-                'id': post.id,
-                'title': post.title,
-                'category_name': post.category_rel.name if post.category_rel else 'Sem Categoria',
-                'views': post.views,
-                'downloads': post.downloads,
-                'is_active': post.is_active,
-                'featured': post.featured,
-                'date': post.date_posted.strftime('%d/%m/%Y')
-            },
+            'post': serialize_post_for_admin(post),
             'stats': get_admin_posts_overview()
         })
 
@@ -7635,6 +7612,7 @@ def admin_create_post():
             context["pagination"] = pagination
             context["posts_overview"] = get_admin_posts_overview()
             context["category_subcategories_map"] = get_category_subcategories_map()
+            context["current_filters"] = {'q': '', 'category': '', 'status': '', 'sort': 'date'}
             context["system_status"] = "online"
             context["app_version"] = "1.6.2"
             return render_template('admin/posts.html', **context)
@@ -7863,7 +7841,98 @@ def admin_posts():
     """
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    pagination = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    search_query = request.args.get('q', '').strip()
+    category_filter = request.args.get('category', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    sort_by = request.args.get('sort', 'date').strip() or 'date'
+
+    posts_list = Post.query.all()
+
+    if search_query:
+        posts_list = [
+            post for post in posts_list
+            if get_search_match_score(
+                search_query,
+                post.title,
+                post.content,
+                post.seo_title,
+                post.seo_description,
+                post.tags,
+                post.category_str,
+                post.subcategory,
+                post.slug,
+            ) is not None
+        ]
+
+    if category_filter:
+        try:
+            category_id = int(category_filter)
+            posts_list = [post for post in posts_list if post.category_id == category_id]
+        except ValueError:
+            posts_list = []
+
+    if status_filter == 'active':
+        posts_list = [post for post in posts_list if post.is_active and not post.featured]
+    elif status_filter == 'featured':
+        posts_list = [post for post in posts_list if post.featured]
+    elif status_filter == 'inactive':
+        posts_list = [post for post in posts_list if not post.is_active]
+
+    if sort_by == 'title':
+        posts_list.sort(key=lambda post: (post.title or '').casefold())
+    elif sort_by == 'views':
+        posts_list.sort(key=lambda post: post.views or 0, reverse=True)
+    elif sort_by == 'downloads':
+        posts_list.sort(key=lambda post: post.downloads or 0, reverse=True)
+    else:
+        sort_by = 'date'
+        posts_list.sort(key=lambda post: post.date_posted or datetime.min, reverse=True)
+
+    total_posts = len(posts_list)
+    total_pages = max(1, math.ceil(total_posts / per_page))
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * per_page
+    end = start + per_page
+
+    class SimplePagination:
+        def __init__(self, page, per_page, total, items):
+            self.page = page
+            self.per_page = per_page
+            self.total = total
+            self.items = items
+
+        @property
+        def pages(self):
+            return max(1, math.ceil(self.total / self.per_page))
+
+        @property
+        def has_prev(self):
+            return self.page > 1
+
+        @property
+        def has_next(self):
+            return self.page < self.pages
+
+        @property
+        def prev_num(self):
+            return self.page - 1 if self.has_prev else None
+
+        @property
+        def next_num(self):
+            return self.page + 1 if self.has_next else None
+
+        def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
+            last = 0
+            for num in range(1, self.pages + 1):
+                if num <= left_edge or \
+                   (num > self.page - left_current - 1 and num < self.page + right_current) or \
+                   num > self.pages - right_edge:
+                    if last + 1 != num:
+                        yield None
+                    yield num
+                    last = num
+
+    pagination = SimplePagination(page, per_page, total_posts, posts_list[start:end])
 
     # Obter estatísticas para a sidebar
     sidebar_stats = get_admin_sidebar_stats()
@@ -7878,6 +7947,12 @@ def admin_posts():
         "posts_overview": get_admin_posts_overview(),
         "categories": categories,
         "category_subcategories_map": get_category_subcategories_map(),
+        "current_filters": {
+            'q': search_query,
+            'category': category_filter,
+            'status': status_filter,
+            'sort': sort_by,
+        },
         "system_status": "online",
         "app_version": "1.6.2",
         **sidebar_stats
@@ -8874,6 +8949,11 @@ def admin_users():
     """
     Página para gerenciar usuários
     """
+    search_query = request.args.get('q', '').strip()
+    role_filter = request.args.get('role', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    sort_by = request.args.get('sort', '').strip()
+
     # Buscar todos os usuários reais do banco de dados
     users = User.query.order_by(User.date_joined.desc()).all()
     identities_fixed = False
@@ -8914,17 +8994,53 @@ def admin_users():
         'active': sum(1 for user in users if user.is_active),
     }
 
+    filtered_users = list(users)
+
+    if search_query:
+        filtered_users = [
+            user for user in filtered_users
+            if get_search_match_score(
+                search_query,
+                user.username,
+                user.name,
+                user.first_name,
+                user.last_name,
+                user.email,
+                user.role,
+                user.plan,
+                user.location,
+                user.phone,
+            ) is not None
+        ]
+
+    if role_filter:
+        filtered_users = [user for user in filtered_users if user.role == role_filter]
+
+    if status_filter == 'active':
+        filtered_users = [user for user in filtered_users if user.is_active]
+    elif status_filter == 'inactive':
+        filtered_users = [user for user in filtered_users if not user.is_active]
+
+    if sort_by == 'email':
+        filtered_users.sort(key=lambda user: (user.email or '').casefold())
+    elif sort_by == 'role':
+        filtered_users.sort(key=lambda user: (user.role or '').casefold())
+    elif sort_by == 'date':
+        filtered_users.sort(key=lambda user: user.date_joined or datetime.min, reverse=True)
+    elif sort_by == 'name':
+        filtered_users.sort(key=lambda user: (user.name or user.username or '').casefold())
+
     # Paginação
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    total = user_totals['total']
+    total = len(filtered_users)
     total_pages = max(1, math.ceil(total / per_page))
     page = min(max(page, 1), total_pages)
 
     # Calcular itens da página atual
     start = (page - 1) * per_page
     end = start + per_page
-    page_users = users[start:end]
+    page_users = filtered_users[start:end]
 
     # Criar objeto de paginação
     class SimplePagination:
@@ -8976,6 +9092,12 @@ def admin_users():
                          users=page_users,
                          pagination=pagination,
                          user_totals=user_totals,
+                         current_filters={
+                             'q': search_query,
+                             'role': role_filter,
+                             'status': status_filter,
+                             'sort': sort_by,
+                         },
                          **sidebar_stats)
 
 @app.route("/admin/users/<int:user_id>/data")

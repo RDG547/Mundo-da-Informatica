@@ -629,6 +629,7 @@ section {
     display: flex;
     align-items: center;
     position: relative;
+    z-index: 20;
     overflow: visible;
     animation: gradientAnimation 15s ease infinite;
 }
@@ -916,7 +917,7 @@ section {
     transform: translateY(-30px);
     animation: fadeDown 0.8s forwards 0.4s;
     position: relative;
-    z-index: 15;
+    z-index: 20000;
 }
 
 .search-bar input {
@@ -963,9 +964,9 @@ section {
     background: white;
     border-radius: var(--radius-lg);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-    max-height: 400px;
+    max-height: min(430px, calc(100vh - 140px));
     overflow-y: auto;
-    z-index: 12000;
+    z-index: 21000;
     animation: slideDown 0.3s ease;
 }
 
@@ -985,7 +986,8 @@ section {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem 1.5rem;
+    min-height: 78px;
+    padding: 0.9rem 1.25rem;
     cursor: pointer;
     transition: all 0.2s ease;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);

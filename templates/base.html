@@ -729,8 +729,8 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            z-index: 12000;
-            max-height: 400px;
+            z-index: 21000;
+            max-height: min(430px, calc(100vh - 140px));
             overflow-y: auto;
             display: none;
             margin-top: 5px;
@@ -744,8 +744,8 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            z-index: 12000;
-            max-height: 400px;
+            z-index: 21000;
+            max-height: min(430px, calc(100vh - 140px));
             overflow-y: auto;
             margin-top: 5px;
         }
@@ -753,6 +753,7 @@
         .suggestion-item {
             display: flex;
             align-items: center;
+            min-height: 78px;
             padding: 12px 16px;
             cursor: pointer;
             transition: background-color 0.2s ease;

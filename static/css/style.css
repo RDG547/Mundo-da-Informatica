@@ -634,6 +634,10 @@ section {
     animation: gradientAnimation 15s ease infinite;
 }
 
+.hero.search-open {
+    z-index: 30000;
+}
+
 @keyframes gradientAnimation {
     0% {
         background-position: 0% 50%;
@@ -918,6 +922,10 @@ section {
     animation: fadeDown 0.8s forwards 0.4s;
     position: relative;
     z-index: 20000;
+}
+
+.hero.search-open .search-bar {
+    z-index: 30001;
 }
 
 .search-bar input {

@@ -161,8 +161,8 @@ function initializeParticles() {
             existingCanvas.remove();
         }
 
-        // Add particles container
-        heroSection.style.overflow = 'hidden';
+        // Keep overflow visible so home search suggestions can extend over the next section.
+        heroSection.style.overflow = 'visible';
 
         // Initialize particles animation
         new window.ParticlesAnimation('hero-particles', {

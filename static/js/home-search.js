@@ -93,6 +93,7 @@ function initializeHomeSearch() {
     const searchForm = document.getElementById('home-search-form');
     const searchInput = document.getElementById('home-search-input');
     const suggestionsDropdown = document.getElementById('home-search-suggestions');
+    const heroSection = searchInput?.closest('.hero');
 
     if (!searchInput || !suggestionsDropdown) {
         console.warn('Search elements not found');
@@ -248,6 +249,7 @@ function initializeHomeSearch() {
 
         suggestionsDropdown.innerHTML = html;
         suggestionsDropdown.style.display = 'block';
+        heroSection?.classList.add('search-open');
         selectedIndex = -1;
 
         // Add click handlers
@@ -283,6 +285,7 @@ function initializeHomeSearch() {
     function hideSuggestions() {
         suggestionsDropdown.style.display = 'none';
         suggestionsDropdown.innerHTML = '';
+        heroSection?.classList.remove('search-open');
         selectedIndex = -1;
     }
 

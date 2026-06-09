@@ -309,6 +309,12 @@
             if (data.status === 'cancelled') {
                 setStatus('Pagamento cancelado', 'O checkout PIX foi cancelado. Se desejar, você pode iniciar novamente.', 'error', 'fa-xmark-circle');
                 cleanupState({ cancelPending: false });
+                return;
+            }
+
+            if (data.stop_polling || data.status === 'failed' || data.status === 'refunded') {
+                setStatus('Pagamento não confirmado', 'Esta cobrança PIX foi encerrada. Inicie um novo checkout para tentar novamente.', 'error', 'fa-triangle-exclamation');
+                cleanupState({ cancelPending: false });
             }
         } catch (error) {
             console.error('[PIX MODAL] Erro ao verificar pagamento:', error);

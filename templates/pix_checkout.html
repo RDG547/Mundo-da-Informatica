@@ -431,7 +431,18 @@
             // Se a transação foi cancelada, parar polling
             if (data.stop_polling || data.status === 'cancelled') {
                 clearInterval(checkInterval);
-                console.log('Polling interrompido - transação cancelada');
+                console.log('Polling interrompido - transação encerrada');
+                if (data.status === 'failed' || data.status === 'refunded') {
+                    const statusDiv = document.getElementById('paymentStatus');
+                    statusDiv.className = 'payment-status status-pending';
+                    statusDiv.innerHTML = `
+                        <div class="status-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <strong>Pagamento não confirmado</strong>
+                        <p>Esta cobrança PIX foi encerrada. Inicie um novo checkout para tentar novamente.</p>
+                    `;
+                }
                 return;
             }
 

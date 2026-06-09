@@ -1,4 +1,5 @@
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash, send_file
+from flask.typing import ResponseReturnValue
 from flask_sqlalchemy import SQLAlchemy
 from flask_assets import Environment
 from webassets.bundle import Bundle
@@ -104,6 +105,145 @@ def debug_log(message):
     if DEBUG_MODE:
         print(f"[DEBUG] {message}")
 
+class AbacatePayAPIError(Exception):
+    """Erro normalizado para respostas da API AbacatePay."""
+
+    def __init__(self, message, status_code=None, payload=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.payload = payload or {}
+
+
+def get_abacatepay_api_url(path):
+    base_url = (app.config.get('ABACATEPAY_API_URL') or '').rstrip('/')
+    return f"{base_url}/{path.lstrip('/')}"
+
+
+def get_abacatepay_headers():
+    api_key = (app.config.get('ABACATEPAY_API_KEY') or '').strip()
+    if not api_key:
+        raise AbacatePayAPIError('Chave da AbacatePay não configurada.')
+    return {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+
+
+def get_abacatepay_error_message(payload, fallback):
+    if isinstance(payload, dict):
+        error = payload.get('error')
+        if isinstance(error, dict):
+            return error.get('message') or error.get('code') or json.dumps(error, ensure_ascii=False)
+        if error:
+            return str(error)
+    return fallback
+
+
+def abacatepay_request(method, path, **kwargs):
+    import requests
+
+    response = requests.request(
+        method,
+        get_abacatepay_api_url(path),
+        headers=get_abacatepay_headers(),
+        timeout=kwargs.pop('timeout', 15),
+        **kwargs,
+    )
+
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+
+    success = payload.get('success') if isinstance(payload, dict) else None
+    error = payload.get('error') if isinstance(payload, dict) else None
+    if response.status_code >= 400 or success is False or error:
+        message = get_abacatepay_error_message(payload, 'Erro ao consultar a AbacatePay.')
+        raise AbacatePayAPIError(message, status_code=response.status_code, payload=payload)
+
+    if not isinstance(payload, dict):
+        raise AbacatePayAPIError('Resposta inválida da AbacatePay.', status_code=response.status_code)
+
+    return payload.get('data') or {}
+
+
+def build_abacatepay_customer(user):
+    customer = {
+        'name': (getattr(user, 'name', None) or getattr(user, 'username', '') or 'Cliente').strip(),
+        'email': (getattr(user, 'email', '') or '').strip(),
+    }
+    phone = re.sub(r'\D+', '', getattr(user, 'phone', '') or '')
+    if phone:
+        customer['cellphone'] = phone
+    return {key: value for key, value in customer.items() if value}
+
+
+def verify_abacatepay_signature(raw_body, signature_from_header):
+    public_key = (app.config.get('ABACATEPAY_PUBLIC_KEY') or '').strip()
+    if not public_key or not signature_from_header:
+        return False
+    expected = hmac.new(
+        public_key.encode('utf-8'),
+        raw_body,
+        hashlib.sha256,
+    ).digest()
+    expected_b64 = base64.b64encode(expected).decode('utf-8')
+    return hmac.compare_digest(expected_b64, signature_from_header)
+
+
+def verify_abacatepay_webhook_request(raw_body: bytes) -> Optional[ResponseReturnValue]:
+    webhook_secret = (app.config.get('ABACATEPAY_WEBHOOK_SECRET') or '').strip()
+    if webhook_secret:
+        received_secret = (request.args.get('webhookSecret') or '').strip()
+        if not hmac.compare_digest(received_secret, webhook_secret):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+    signature = request.headers.get('X-Webhook-Signature', '')
+    if signature and not verify_abacatepay_signature(raw_body, signature):
+        return jsonify({'error': 'Invalid signature'}), 400
+
+    if webhook_secret and not signature and is_production_environment():
+        return jsonify({'error': 'Missing signature'}), 400
+
+    return None
+
+
+def get_abacatepay_remote_id(transaction):
+    return transaction.abacatepay_charge_id or (
+        transaction.abacatepay_billing_id
+        if transaction.abacatepay_billing_id and transaction.abacatepay_billing_id.startswith(('pix_char_', 'char_', 'bole_'))
+        else None
+    )
+
+
+def sync_abacatepay_transaction_status(transaction, charge_data):
+    status = str((charge_data or {}).get('status') or '').upper()
+    if status in {'PAID', 'COMPLETE', 'COMPLETED'}:
+        handle_abacatepay_payment_success(transaction, charge_data)
+    elif status in {'REFUNDED'}:
+        handle_abacatepay_payment_refunded(transaction, charge_data)
+    elif status in {'EXPIRED', 'FAILED', 'LOST'}:
+        handle_abacatepay_payment_failed(transaction, charge_data)
+    elif status == 'CANCELLED' and transaction.status != 'completed':
+        transaction.status = 'cancelled'
+        db.session.commit()
+
+
+def find_abacatepay_transaction(charge_id=None, external_id=None):
+    if charge_id:
+        transaction = Transaction.query.filter_by(abacatepay_charge_id=charge_id).first()
+        if transaction:
+            return transaction
+        transaction = Transaction.query.filter_by(abacatepay_billing_id=charge_id).first()
+        if transaction:
+            return transaction
+
+    if external_id:
+        return Transaction.query.filter_by(abacatepay_billing_id=external_id).first()
+
+    return None
+
 # Configuração da aplicação Flask
 app = Flask(__name__)
 
@@ -139,7 +279,12 @@ app.config['FIREBASE_SERVICE_ACCOUNT_JSON'] = os.environ.get('FIREBASE_SERVICE_A
 
 # Configuração do Abacate Pay
 app.config['ABACATEPAY_API_KEY'] = os.environ.get('ABACATEPAY_API_KEY')
-app.config['ABACATEPAY_API_URL'] = 'https://api.abacatepay.com/v1'
+app.config['ABACATEPAY_API_URL'] = 'https://api.abacatepay.com/v2'
+app.config['ABACATEPAY_WEBHOOK_SECRET'] = os.environ.get('ABACATEPAY_WEBHOOK_SECRET', '')
+app.config['ABACATEPAY_PUBLIC_KEY'] = os.environ.get(
+    'ABACATEPAY_PUBLIC_KEY',
+    't9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9'
+)
 
 # Configuração do Cloudinary
 cloudinary.config(
@@ -2158,6 +2303,7 @@ class Transaction(db.Model):
 
     # Dados do Abacate Pay
     abacatepay_billing_id = db.Column(db.String(255), unique=True, nullable=True)  # ID da cobrança
+    abacatepay_charge_id = db.Column(db.String(255), unique=True, nullable=True)  # ID real do Checkout Transparente na AbacatePay
     abacatepay_payment_url = db.Column(db.Text, nullable=True)  # URL de pagamento
     abacatepay_qr_code = db.Column(db.Text, nullable=True)  # QR Code PIX em base64
     abacatepay_pix_code = db.Column(db.Text, nullable=True)  # Código PIX copia-e-cola
@@ -4439,8 +4585,6 @@ def process_pix_async(billing_id):
     Processa a criação do QR Code PIX em background
     """
     try:
-        import requests
-
         transaction = Transaction.query.filter_by(
             abacatepay_billing_id=billing_id,
             user_id=current_user.id
@@ -4449,10 +4593,11 @@ def process_pix_async(billing_id):
         if not transaction:
             return jsonify({'error': 'Transação não encontrada'}), 404
 
-        # Se já foi processado, retornar sucesso
-        if transaction.status in ['pending', 'completed']:
+        # Se já foi processado, retornar os dados salvos sem criar uma nova cobrança.
+        if transaction.status in ['pending', 'completed'] and (transaction.abacatepay_qr_code or transaction.abacatepay_pix_code):
             return jsonify({
                 'status': 'success',
+                'charge_id': transaction.abacatepay_charge_id,
                 'qr_code': transaction.abacatepay_qr_code,
                 'pix_code': transaction.abacatepay_pix_code
             })
@@ -4464,87 +4609,70 @@ def process_pix_async(billing_id):
         plan_type = transaction.plan_type
         amount = transaction.amount
 
-        # Configuração API Abacate Pay
-        api_key = app.config['ABACATEPAY_API_KEY']
-        api_url = app.config['ABACATEPAY_API_URL']
-
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-
-        # Payload para criar PIX QR Code
-        payload = {
+        description = 'Doacao para o Mundo da Informatica' if plan_type == 'donation' else f'Plano {plan_type.upper()}'
+        payload_data = {
             'amount': amount,
             'expiresIn': 3600,
-            'description': 'Doacao para o Mundo da Informatica' if plan_type == 'donation' else f'Plano {plan_type.upper()}',
-            'customer': {
-                'name': current_user.username,
-                'cellphone': '+5511999999999',
-                'email': current_user.email,
-                'taxId': '11144477735'
-            },
+            'description': description,
+            'externalId': billing_id,
             'metadata': {
                 'externalId': billing_id,
+                'transaction_id': str(transaction.id),
                 'user_id': str(current_user.id),
                 'plan': plan_type
             }
         }
 
+        payload = {
+            'method': 'PIX',
+            'data': payload_data
+        }
+
         debug_log(f'Processando PIX async para billing_id: {billing_id}')
 
         try:
-            response = requests.post(
-                f'{api_url}/pixQrCode/create',
-                headers=headers,
-                json=payload,
-                timeout=10
-            )
+            pix_data = abacatepay_request('POST', '/transparents/create', json=payload)
+            pix_charge_id = pix_data.get('id')
+            pix_code = pix_data.get('brCode')
+            qr_code_base64 = pix_data.get('brCodeBase64')
 
-            if response.status_code == 200:
-                result = response.json()
-                pix_data = result.get('data', {})
-                pix_charge_id = pix_data.get('id')
-                pix_code = pix_data.get('brCode')
-                qr_code_base64 = pix_data.get('brCodeBase64')
+            if not pix_charge_id or not (pix_code or qr_code_base64):
+                raise AbacatePayAPIError('Resposta da AbacatePay sem dados do PIX.')
 
-                # Atualizar transação com os dados do QR Code
-                # IMPORTANTE: Manter o billing_id original para não quebrar o polling
-                transaction.abacatepay_qr_code = qr_code_base64
-                transaction.abacatepay_pix_code = pix_code
-                transaction.status = 'pending'
-                db.session.commit()
+            transaction.abacatepay_charge_id = pix_charge_id
+            transaction.abacatepay_qr_code = qr_code_base64
+            transaction.abacatepay_pix_code = pix_code
+            transaction.status = 'pending'
+            db.session.commit()
 
-                debug_log(f'PIX QR Code criado com sucesso: {pix_charge_id}')
+            debug_log(f'PIX QR Code criado com sucesso: {pix_charge_id}')
 
-                return jsonify({
-                    'status': 'success',
-                    'qr_code': qr_code_base64,
-                    'pix_code': pix_code
-                })
-            else:
-                debug_log(f'Erro API Abacate Pay: {response.status_code}')
-                transaction.status = 'failed'
-                db.session.commit()
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Erro ao processar pagamento'
-                }), 400
+            return jsonify({
+                'status': 'success',
+                'charge_id': pix_charge_id,
+                'qr_code': qr_code_base64,
+                'pix_code': pix_code
+            })
 
-        except Exception as e:
+        except AbacatePayAPIError as e:
             debug_log(f'Erro ao processar PIX async: {str(e)}')
             transaction.status = 'failed'
             db.session.commit()
             return jsonify({
                 'status': 'error',
                 'message': str(e)
+            }), 400
+        except Exception as e:
+            debug_log(f'Erro ao processar PIX async: {str(e)}')
+            transaction.status = 'failed'
+            db.session.commit()
+            return jsonify({
+                'status': 'error',
+                'message': 'Erro ao processar pagamento PIX.'
             }), 500
 
     except Exception as e:
         debug_log(f'Erro geral no process_pix_async: {str(e)}')
-        import traceback
-        debug_log(traceback.format_exc())
-        return jsonify({'error': 'Erro interno do servidor'}), 500
         import traceback
         debug_log(traceback.format_exc())
         return jsonify({'error': 'Erro interno do servidor'}), 500
@@ -4667,10 +4795,21 @@ def check_pix_payment(billing_id):
                 'stop_polling': True
             })
 
+        remote_id = get_abacatepay_remote_id(transaction)
+        remote_status = None
+        if remote_id and transaction.status in ['processing', 'pending']:
+            try:
+                charge_data = abacatepay_request('GET', '/transparents/check', params={'id': remote_id})
+                remote_status = charge_data.get('status')
+                sync_abacatepay_transaction_status(transaction, charge_data)
+            except AbacatePayAPIError as e:
+                debug_log(f'Erro ao consultar status AbacatePay: {str(e)}')
+
         return jsonify({
             'status': transaction.status,
+            'remote_status': remote_status,
             'paid': transaction.status == 'completed',
-            'stop_polling': False
+            'stop_polling': transaction.status in ['failed', 'refunded', 'cancelled']
         })
 
     except Exception as e:
@@ -4775,11 +4914,17 @@ def abacatepay_webhook():
     Configure este endpoint no Dashboard do Abacate Pay.
 
     Eventos importantes:
-    - billing.paid: Cobrança paga com sucesso
-    - billing.failed: Falha no pagamento
-    - billing.refunded: Pagamento estornado
+    - transparent.completed: Cobrança PIX paga com sucesso (V2)
+    - transparent.refunded: Pagamento estornado (V2)
+    - transparent.disputed/transparent.lost: Pagamento contestado/perdido (V2)
+    - billing.paid/billing.failed/billing.refunded: compatibilidade com payloads antigos
     """
     try:
+        raw_body = request.get_data(cache=True)
+        webhook_error = verify_abacatepay_webhook_request(raw_body)
+        if webhook_error is not None:
+            return webhook_error
+
         payload = request.get_json(silent=True) or {}
         if not isinstance(payload, dict):
             return jsonify({'error': 'JSON inválido'}), 400
@@ -4791,29 +4936,46 @@ def abacatepay_webhook():
         if not payload:
             return jsonify({'error': 'Payload inválido'}), 400
 
-        # Extrair dados do evento
-        event_type = payload.get('event')  # Ex: 'billing.paid'
-        billing_data = payload.get('data', {})
-        billing_id = billing_data.get('id')
+        event_type = str(payload.get('event') or '')
+        event_data = payload.get('data') or {}
+        if not isinstance(event_data, dict):
+            return jsonify({'error': 'Payload inválido'}), 400
 
-        if not billing_id:
-            debug_log('ERRO: billing_id não encontrado no webhook')
+        transparent_data = event_data.get('transparent')
+        if not isinstance(transparent_data, dict):
+            transparent_data = event_data
+
+        metadata = transparent_data.get('metadata') if isinstance(transparent_data.get('metadata'), dict) else {}
+        billing_data = transparent_data
+        charge_id = transparent_data.get('id') or event_data.get('id')
+        external_id = (
+            transparent_data.get('externalId')
+            or event_data.get('externalId')
+            or metadata.get('externalId')
+        )
+
+        if not charge_id and not external_id:
+            debug_log('ERRO: identificador da cobrança não encontrado no webhook')
             return jsonify({'error': 'Missing billing_id'}), 400
 
-        # Buscar transação
-        transaction = Transaction.query.filter_by(abacatepay_billing_id=billing_id).first()
+        transaction = find_abacatepay_transaction(charge_id=charge_id, external_id=external_id)
 
         if not transaction:
-            debug_log(f'ERRO: Transação não encontrada para billing_id: {billing_id}')
+            debug_log(f'ERRO: Transação não encontrada para charge_id={charge_id} external_id={external_id}')
             return jsonify({'error': 'Transaction not found'}), 404
 
-        # Processar evento
-        if event_type == 'billing.paid':
+        if charge_id and not transaction.abacatepay_charge_id:
+            transaction.abacatepay_charge_id = charge_id
+
+        normalized_event = event_type.lower()
+        if normalized_event in {'transparent.completed', 'billing.paid'}:
             handle_abacatepay_payment_success(transaction, billing_data)
-        elif event_type == 'billing.failed':
+        elif normalized_event in {'transparent.lost', 'transparent.disputed', 'billing.failed'}:
             handle_abacatepay_payment_failed(transaction, billing_data)
-        elif event_type == 'billing.refunded':
+        elif normalized_event in {'transparent.refunded', 'billing.refunded'}:
             handle_abacatepay_payment_refunded(transaction, billing_data)
+        else:
+            sync_abacatepay_transaction_status(transaction, billing_data)
 
         return jsonify({'status': 'success'}), 200
 
@@ -11041,6 +11203,11 @@ with app.app_context():
                     conn.execute(text("ALTER TABLE user ADD COLUMN preferences TEXT"))
                     conn.commit()
                     print("  ➕ Coluna 'preferences' adicionada à tabela user")
+                transaction_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(transactions)"))]
+                if transaction_cols and 'abacatepay_charge_id' not in transaction_cols:
+                    conn.execute(text("ALTER TABLE transactions ADD COLUMN abacatepay_charge_id VARCHAR(255)"))
+                    conn.commit()
+                    print("  ➕ Coluna 'abacatepay_charge_id' adicionada à tabela transactions")
                 category_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(category)"))]
                 if 'color' not in category_cols:
                     conn.execute(text("ALTER TABLE category ADD COLUMN color VARCHAR(20) DEFAULT '#4a90e2'"))

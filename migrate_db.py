@@ -89,6 +89,7 @@ def migrate():
                     stripe_subscription_id VARCHAR(255) NULL,
                     stripe_payment_intent_id VARCHAR(255) NULL,
                     abacatepay_billing_id VARCHAR(255) NULL,
+                    abacatepay_charge_id VARCHAR(255) NULL,
                     abacatepay_payment_url TEXT NULL,
                     abacatepay_qr_code TEXT NULL,
                     abacatepay_pix_code TEXT NULL,
@@ -108,6 +109,12 @@ def migrate():
             print("Checking if transactions table needs to be recreated...")
             cursor.execute("PRAGMA table_info(transactions)")
             trans_columns = {col[1]: col for col in cursor.fetchall()}
+
+            if 'abacatepay_charge_id' not in trans_columns:
+                print("Adding abacatepay_charge_id column to transactions...")
+                cursor.execute("ALTER TABLE transactions ADD COLUMN abacatepay_charge_id VARCHAR(255) NULL")
+                migrations_applied = True
+                print("✓ abacatepay_charge_id column added to transactions")
 
             # Verificar se stripe_session_id está como NOT NULL (notnull=1)
             if 'stripe_session_id' in trans_columns and trans_columns['stripe_session_id'][3] == 1:
@@ -129,6 +136,7 @@ def migrate():
                         stripe_subscription_id VARCHAR(255) NULL,
                         stripe_payment_intent_id VARCHAR(255) NULL,
                         abacatepay_billing_id VARCHAR(255) NULL,
+                        abacatepay_charge_id VARCHAR(255) NULL,
                         abacatepay_payment_url TEXT NULL,
                         abacatepay_qr_code TEXT NULL,
                         abacatepay_pix_code TEXT NULL,
@@ -144,8 +152,11 @@ def migrate():
 
                 # Restaurar dados se houver
                 if existing_data:
+                    old_column_count = len(existing_data[0])
+                    if old_column_count == 17:
+                        existing_data = [row[:8] + (None,) + row[8:] for row in existing_data]
                     cursor.executemany(
-                        "INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         existing_data
                     )
 

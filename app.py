@@ -523,6 +523,77 @@ def get_admin_posts_overview() -> dict[str, int]:
     }
 
 
+DEFAULT_DOWNLOAD_FILE_TYPES = [
+    {'label': 'BIOS'},
+    {'label': 'EC'},
+    {'label': 'ME'},
+    {'label': 'Outros'},
+]
+
+CATEGORY_ICON_FALLBACKS = {
+    'bios': 'fas fa-microchip',
+    'esquemas': 'fas fa-project-diagram',
+    'drivers': 'fas fa-cogs',
+    'softwares': 'fas fa-laptop-code',
+    'impressoras': 'fas fa-print',
+    'cursos': 'fas fa-graduation-cap',
+    'datasheet': 'fas fa-file-alt',
+}
+
+
+def normalize_download_file_type_label(value: Any) -> str:
+    label = str(value or '').strip()
+    label = re.sub(r'\s+', ' ', label)
+    return label[:30]
+
+
+def normalize_download_file_types(raw_types: Any) -> list[dict[str, str]]:
+    if not isinstance(raw_types, list):
+        return []
+
+    normalized_types: list[dict[str, str]] = []
+    used_labels: set[str] = set()
+
+    for item in raw_types:
+        raw_label = item.get('label') if isinstance(item, dict) else item
+        label = normalize_download_file_type_label(raw_label)
+        label_key = label.casefold()
+
+        if not label or label_key in used_labels:
+            continue
+
+        normalized_types.append({'label': label})
+        used_labels.add(label_key)
+
+        if len(normalized_types) >= 12:
+            break
+
+    return normalized_types
+
+
+def get_download_file_types() -> list[dict[str, str]]:
+    configured_types = SiteConfig.get_value('download_file_types', None)
+    normalized_types = normalize_download_file_types(configured_types)
+    return normalized_types or [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES]
+
+
+def get_download_file_type_labels() -> list[str]:
+    return [item['label'] for item in get_download_file_types()]
+
+
+def get_category_icon(category_or_name: Any) -> str:
+    if hasattr(category_or_name, 'icon') and getattr(category_or_name, 'icon', None):
+        return getattr(category_or_name, 'icon')
+
+    if hasattr(category_or_name, 'name'):
+        category_name = getattr(category_or_name, 'name', '')
+    else:
+        category_name = str(category_or_name or '')
+
+    slug = generate_slug(category_name)
+    return CATEGORY_ICON_FALLBACKS.get(slug, 'fas fa-folder')
+
+
 def get_default_category_subcategories() -> dict[str, list[str]]:
     return {
         'BIOS': ['bios-notebook', 'bios-desktop', 'bios-all-in-one'],
@@ -800,7 +871,7 @@ def serialize_post_for_admin(post):
         'excerpt': get_plain_text_excerpt(post.content, limit=120),
         'category_id': post.category_id,
         'category_name': category.name if category else (post.category_str or 'Sem categoria'),
-        'category_icon': (category.icon if category else 'fas fa-folder') or 'fas fa-folder',
+        'category_icon': get_category_icon(category or post.category_str),
         'category_color': (getattr(category, 'color', None) if category else None) or '#3a86ff',
         'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg'),
         'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
@@ -2072,7 +2143,7 @@ def utility_processor():
     def get_image_url(image_path, folder='profiles', default='default.jpg'):
         return get_image_url_for_response(image_path, folder=folder, default=default)
 
-    return dict(get_image_url=get_image_url)
+    return dict(get_image_url=get_image_url, get_category_icon=get_category_icon)
 
 @app.context_processor
 def inject_admin_data():
@@ -2085,6 +2156,7 @@ def inject_admin_data():
                 'unread_comments': Comment.query.count(),
                 'total_users': User.query.filter_by(is_active=True).count(),
                 'total_subscribers': Subscriber.query.filter_by(is_active=True).count(),
+                'download_file_types': get_download_file_types(),
                 'app_version': '1.6.2'
             }
         except Exception as e:
@@ -2095,6 +2167,7 @@ def inject_admin_data():
                 'unread_comments': 0,
                 'total_users': 0,
                 'total_subscribers': 0,
+                'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
                 'app_version': '1.6.2'
             }
     return {}
@@ -2528,6 +2601,7 @@ class SiteConfig(db.Model):
                     'twitter': '',
                     'youtube': 'https://www.youtube.com/@_RDTech'
                 },
+                'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
                 'plan_price_premium': 29.90,
                 'plan_price_vip': 49.90
             }
@@ -2584,6 +2658,7 @@ class SiteConfig(db.Model):
                     'twitter': '',
                     'youtube': 'https://www.youtube.com/@_RDTech'
                 },
+                'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
                 'plan_price_premium': 29.90,
                 'plan_price_vip': 49.90
             }
@@ -6133,6 +6208,13 @@ def initialize_db():
                     'twitter': '',
                     'youtube': 'https://www.youtube.com/@_RDTech'
                 }), value_type='json'),
+                SiteConfig(
+                    key='download_file_types',
+                    value=json.dumps([dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES]),
+                    value_type='json',
+                    description='Tipos disponíveis no dropdown de links de download',
+                    is_public=False
+                ),
                 SiteConfig(key='plan_price_premium', value='29.90', value_type='float'),
                 SiteConfig(key='plan_price_vip', value='49.90', value_type='float')
             ]
@@ -8121,6 +8203,90 @@ def admin_posts():
     }
 
     return render_template('admin/posts.html', **context)
+
+
+@app.route('/admin/download-types', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_download_types():
+    """Lista e salva os tipos globais usados nos links de download dos posts."""
+    if request.method == 'GET':
+        return jsonify({'success': True, 'types': get_download_file_types()})
+
+    payload = request.get_json(silent=True) or {}
+    next_types = normalize_download_file_types(payload.get('types'))
+
+    if not next_types:
+        return jsonify({
+            'success': False,
+            'message': 'Informe pelo menos um tipo de arquivo.'
+        }), 400
+
+    previous_labels = get_download_file_type_labels()
+    next_labels = [item['label'] for item in next_types]
+
+    try:
+        SiteConfig.set_value(
+            'download_file_types',
+            next_types,
+            value_type='json',
+            description='Tipos disponíveis no dropdown de links de download',
+            is_public=False
+        )
+
+        renamed_labels: dict[str, str] = {}
+        if len(previous_labels) == len(next_labels):
+            renamed_labels = {
+                old_label: new_label
+                for old_label, new_label in zip(previous_labels, next_labels)
+                if old_label != new_label
+            }
+
+        updated_posts_count = 0
+        if renamed_labels:
+            posts_with_metadata = Post.query.filter(cast(Any, Post.custom_metadata).isnot(None)).all()
+            for post in posts_with_metadata:
+                metadata = post.get_metadata()
+                download_files = metadata.get('download_files') if isinstance(metadata, dict) else None
+                if not isinstance(download_files, list):
+                    continue
+
+                changed = False
+                for download_file in download_files:
+                    if not isinstance(download_file, dict):
+                        continue
+                    current_type = download_file.get('type')
+                    if current_type in renamed_labels:
+                        download_file['type'] = renamed_labels[current_type]
+                        changed = True
+
+                if changed:
+                    metadata['download_files'] = download_files
+                    post.custom_metadata = json.dumps(metadata)
+                    updated_posts_count += 1
+
+            if updated_posts_count:
+                db.session.commit()
+
+        log_admin_activity(
+            current_user.id,
+            'update_download_types',
+            'Atualizou os tipos de arquivo de download',
+            metadata={'types': next_labels, 'updated_posts': updated_posts_count}
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Tipos de download salvos com sucesso.',
+            'types': next_types
+        })
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao salvar tipos de download: {str(exc)}'
+        }), 500
+
 
 # Adicionar as demais rotas administrativas
 @app.route("/admin/analytics")

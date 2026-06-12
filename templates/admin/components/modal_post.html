@@ -239,6 +239,165 @@
         padding-right: 2.25rem !important;
     }
 
+    .icon-select-native {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .icon-select {
+        position: relative;
+        width: 100%;
+    }
+
+    .icon-select-trigger {
+        align-items: center;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        color: #2d3748;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        min-height: 46px;
+        padding: 0.75rem 1rem;
+        width: 100%;
+    }
+
+    .icon-select-current {
+        align-items: center;
+        display: inline-flex;
+        gap: 0.65rem;
+        min-width: 0;
+    }
+
+    .icon-select-current i,
+    .icon-select-option i {
+        color: var(--admin-primary, #3a86ff);
+        width: 18px;
+        text-align: center;
+    }
+
+    .icon-select-arrow {
+        color: #718096;
+        font-size: 0.8rem;
+        transition: transform 0.2s ease;
+    }
+
+    .icon-select.open .icon-select-arrow {
+        transform: rotate(180deg);
+    }
+
+    .icon-select-menu {
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+        display: none;
+        left: 0;
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 0.35rem;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 10020;
+    }
+
+    .icon-select.open .icon-select-menu {
+        display: block;
+    }
+
+    .icon-select-option {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 6px;
+        color: #2d3748;
+        cursor: pointer;
+        display: flex;
+        gap: 0.65rem;
+        padding: 0.65rem 0.75rem;
+        text-align: left;
+        width: 100%;
+    }
+
+    .icon-select-option:hover,
+    .icon-select-option.active {
+        background: rgba(58, 134, 255, 0.1);
+        color: var(--admin-primary, #3a86ff);
+    }
+
+    .download-types-toolbar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .download-types-manage-btn {
+        align-items: center;
+        background: rgba(58, 134, 255, 0.08);
+        border: 1px solid rgba(58, 134, 255, 0.28);
+        border-radius: 6px;
+        color: var(--admin-primary, #3a86ff);
+        cursor: pointer;
+        display: inline-flex;
+        gap: 0.45rem;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .download-types-manager {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        display: none;
+        margin-top: 0.75rem;
+        padding: 0.9rem;
+    }
+
+    .download-types-manager.active {
+        display: block;
+    }
+
+    .download-type-row {
+        align-items: center;
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .download-type-row input {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .download-type-remove {
+        align-items: center;
+        background: rgba(220, 53, 69, 0.1);
+        border: 1px solid rgba(220, 53, 69, 0.35);
+        border-radius: 6px;
+        color: #dc3545;
+        cursor: pointer;
+        display: inline-flex;
+        height: 36px;
+        justify-content: center;
+        width: 36px;
+    }
+
+    .download-types-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-end;
+        margin-top: 0.75rem;
+    }
+
 </style>
 <div class="modal" id="addPostModal">
     <div class="modal-content modal-xl">
@@ -356,16 +515,38 @@
                                     <span class="required">*</span>
                                 </label>
                                 <select id="postCategory" name="category"
-                                        class="form-select modern-select{% if form_errors and form_errors.category %} is-invalid{% endif %}"
+                                        class="form-select modern-select icon-select-native{% if form_errors and form_errors.category %} is-invalid{% endif %}"
                                         required>
-                                    <option value="">Selecione uma categoria</option>
+                                    <option value="" data-icon="fas fa-folder-open">Selecione uma categoria</option>
                                     {% for category in categories %}
                                     <option value="{{ category.id }}"
+                                            data-icon="{{ get_category_icon(category) }}"
                                             {% if form_data and form_data.category == category.id|string %}selected{% endif %}>
                                         {{ category.name }}
                                     </option>
                                     {% endfor %}
                                 </select>
+                                <div class="icon-select" data-icon-select data-source-select="postCategory">
+                                    <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="icon-select-current">
+                                            <i class="fas fa-folder-open"></i>
+                                            <span>Selecione uma categoria</span>
+                                        </span>
+                                        <i class="fas fa-chevron-down icon-select-arrow"></i>
+                                    </button>
+                                    <div class="icon-select-menu" role="listbox">
+                                        <button type="button" class="icon-select-option" data-value="" data-icon="fas fa-folder-open" role="option">
+                                            <i class="fas fa-folder-open"></i>
+                                            <span>Selecione uma categoria</span>
+                                        </button>
+                                        {% for category in categories %}
+                                        <button type="button" class="icon-select-option" data-value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}" role="option">
+                                            <i class="{{ get_category_icon(category) }}"></i>
+                                            <span>{{ category.name }}</span>
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                                 {% if form_errors and form_errors.category %}
                                     <div class="invalid-feedback">{{ form_errors.category }}</div>
                                 {% endif %}
@@ -388,10 +569,9 @@
                                     <div class="download-entry" data-index="0">
                                         <div class="download-entry-row">
                                             <select name="download_type_0" class="form-select download-type-select">
-                                                <option value="BIOS">BIOS</option>
-                                                <option value="EC">EC</option>
-                                                <option value="ME">ME</option>
-                                                <option value="Outro">Outro</option>
+                                                {% for file_type in download_file_types %}
+                                                <option value="{{ file_type.label }}">{{ file_type.label }}</option>
+                                                {% endfor %}
                                             </select>
                                             <div class="input-group download-url-group">
                                                 <input type="url" name="download_url_0"
@@ -413,9 +593,29 @@
                                         </div>
                                     </div>
                                 </div>
-                                <button type="button" id="addDownloadEntry" class="btn btn-sm" style="margin-top: 4px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;">
-                                    <i class="fas fa-plus"></i> Adicionar outro download (ex: EC)
-                                </button>
+                                <div class="download-types-toolbar">
+                                    <button type="button" id="addDownloadEntry" class="btn btn-sm" style="background: rgba(var(--primary-rgb), 0.1); color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;">
+                                        <i class="fas fa-plus"></i> Adicionar outro download
+                                    </button>
+                                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                                    <button type="button" id="manageDownloadTypesBtn" class="download-types-manage-btn">
+                                        <i class="fas fa-sliders-h"></i> Gerenciar tipos
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                                <div id="downloadTypesManager" class="download-types-manager" aria-live="polite">
+                                    <div id="downloadTypesList"></div>
+                                    <div class="download-types-actions">
+                                        <button type="button" id="addDownloadTypeBtn" class="btn-admin btn-admin-outline">
+                                            <i class="fas fa-plus"></i> Adicionar tipo
+                                        </button>
+                                        <button type="button" id="saveDownloadTypesBtn" class="btn-admin btn-admin-primary">
+                                            <i class="fas fa-save"></i> Salvar tipos
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endif %}
                                 <input type="hidden" id="downloadFilesData" name="download_files" value="">
                                 <input type="hidden" id="postDownloadLink" name="download_link" value="">
                                 {% if form_errors and form_errors.download_link %}
@@ -598,3 +798,4 @@
         </div>
     </div>
 </div>
+<script id="download-file-types-data" type="application/json">{{ download_file_types | tojson | safe }}</script>

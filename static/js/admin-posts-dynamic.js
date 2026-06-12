@@ -225,6 +225,14 @@
         return `
             <tr data-post-id="${post.id}" data-category-id="${escapeHtml(post.category_id || '')}" class="${post.is_active ? '' : 'inactive-row'}">
                 <td><input type="checkbox" class="form-check-input post-checkbox" value="${post.id}"></td>
+                <td class="actions">
+                    <div class="action-buttons">
+                        <a href="${escapeHtml(post.post_url || '#')}" class="btn-action btn-view" title="Visualizar" target="_blank"><i class="fas fa-eye"></i></a>
+                        <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="${post.id}"><i class="fas fa-edit"></i></a>
+                        <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="${post.id}"><i class="fas fa-copy"></i></a>
+                        <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="${post.id}" data-post-title="${escapeHtml(post.title)}"><i class="fas fa-trash"></i></a>
+                    </div>
+                </td>
                 <td>
                     <div class="post-title-cell">
                         <div class="post-thumb">
@@ -264,14 +272,6 @@
                     </div>
                 </td>
                 <td><div class="status-cell">${statusHtml}</div></td>
-                <td class="actions">
-                    <div class="action-buttons">
-                        <a href="${escapeHtml(post.post_url || '#')}" class="btn-action btn-view" title="Visualizar" target="_blank"><i class="fas fa-eye"></i></a>
-                        <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="${post.id}"><i class="fas fa-edit"></i></a>
-                        <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="${post.id}"><i class="fas fa-copy"></i></a>
-                        <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="${post.id}" data-post-title="${escapeHtml(post.title)}"><i class="fas fa-trash"></i></a>
-                    </div>
-                </td>
             </tr>
         `;
     }
@@ -463,6 +463,12 @@
                 addPostForm.reset();
                 const editor = document.getElementById('postContentEditor');
                 if (editor) editor.innerHTML = '';
+                if (typeof window.refreshIconSelects === 'function') {
+                    window.refreshIconSelects();
+                }
+                if (typeof window.refreshDownloadTypeSelects === 'function') {
+                    window.refreshDownloadTypeSelects();
+                }
 
                 if (typeof window.closeModal === 'function') {
                     window.closeModal('addPostModal');

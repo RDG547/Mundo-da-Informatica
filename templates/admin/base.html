@@ -75,7 +75,7 @@
     {% block head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
-<body
+<body class="admin-page"
     data-is-admin="true"
     data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
     data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
@@ -113,11 +113,11 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/csrf.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/admin.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/modern-forms.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/profile-images.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}" data-static-base-script="true"></script>
     {% block scripts %}{% endblock %}
 
     <!-- Scroll to Top -->

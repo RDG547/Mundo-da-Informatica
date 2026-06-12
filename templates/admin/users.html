@@ -423,6 +423,7 @@
                     {% if pagination and pagination.has_prev %}
                     <li class="page-item">
                         <a class="page-link" href="{{ url_for('admin_users', page=pagination.prev_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}"
+                            data-no-dynamic="true"
                             aria-label="Anterior">
                             <i class="fas fa-chevron-left"></i>
                         </a>
@@ -445,7 +446,7 @@
                     </li>
                     {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_users', page=page_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}">{{ page_num }}</a>
+                        <a class="page-link" href="{{ url_for('admin_users', page=page_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}" data-no-dynamic="true">{{ page_num }}</a>
                     </li>
                     {% endif %}
                     {% else %}
@@ -463,6 +464,7 @@
                     {% if pagination and pagination.has_next %}
                     <li class="page-item">
                         <a class="page-link" href="{{ url_for('admin_users', page=pagination.next_num, q=current_filters.q, role=current_filters.role, status=current_filters.status, sort=current_filters.sort) }}"
+                            data-no-dynamic="true"
                             aria-label="Próximo">
                             <i class="fas fa-chevron-right"></i>
                         </a>
@@ -2022,6 +2024,7 @@
 
     window.pendingDeleteUser = null;
     window.usersStatsState = null;
+    let activeUsersListController = null;
 
     function readUsersStatValue(selector) {
         const value = Number(document.querySelector(selector)?.textContent?.trim() || '0');
@@ -2071,9 +2074,9 @@
 
     function resetUsersStatsSnapshot(region = document.getElementById('usersListRegion')) {
         const stats = ensureUsersStatsState();
-        const totalUsers = Number(region?.dataset.totalUsers || stats.total);
+        const filteredUsers = Number(region?.dataset.filteredUsers || region?.dataset.currentPageUsers || stats.total);
 
-        stats.total = Number.isFinite(totalUsers) ? totalUsers : stats.total;
+        stats.total = Number.isFinite(filteredUsers) ? filteredUsers : stats.total;
         stats.pageSnapshot = computeUsersPageStats(region);
         renderUsersStats();
     }
@@ -2105,6 +2108,48 @@
         openAdminModal('deleteModal');
     }
 
+    function markUsersPaginationLinks() {
+        document.querySelectorAll('#usersListRegion .pagination a.page-link').forEach((link) => {
+            link.dataset.noDynamic = 'true';
+        });
+    }
+
+    function syncUsersUrl(url, pushState = false) {
+        const nextUrl = new URL(url, window.location.origin);
+        const nextPath = `${nextUrl.pathname}${nextUrl.search}`;
+
+        if (pushState) {
+            window.history.pushState({ url: nextUrl.href }, '', nextPath);
+        } else {
+            window.history.replaceState({ url: nextUrl.href }, '', nextPath);
+        }
+
+        if (window.dynamicLoader) {
+            window.dynamicLoader.currentUrl = nextUrl.href;
+        }
+    }
+
+    function updateUsersHeaderFromDocument(doc) {
+        const selectors = [
+            '.count-badge',
+            '.stat-item.admins .stat-number',
+            '.stat-item.editors .stat-number',
+            '.stat-item.users .stat-number',
+            '.stat-item.active .stat-number',
+        ];
+
+        selectors.forEach((selector) => {
+            const nextElement = doc.querySelector(selector);
+            const currentElement = document.querySelector(selector);
+            if (nextElement && currentElement) {
+                currentElement.textContent = nextElement.textContent;
+            }
+        });
+
+        usersStatsState = null;
+        window.usersStatsState = null;
+    }
+
     async function refreshUsersListFromUrl(url, options = {}) {
         const region = document.getElementById('usersListRegion');
         if (!region) {
@@ -2112,13 +2157,20 @@
             return;
         }
 
+        if (activeUsersListController) {
+            activeUsersListController.abort();
+        }
+
+        const requestController = new AbortController();
+        activeUsersListController = requestController;
         region.classList.add('is-loading');
 
         try {
             const response = await fetch(url, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'
-                }
+                },
+                signal: requestController.signal
             });
             const html = await response.text();
             const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -2127,19 +2179,25 @@
                 throw new Error('Não foi possível atualizar a lista.');
             }
 
+            updateUsersHeaderFromDocument(parsed);
             region.replaceWith(nextRegion);
-            if (options.pushState !== false) {
-                window.history.pushState({}, '', url);
+            if (options.updateUrl !== false) {
+                syncUsersUrl(url, options.pushState === true);
             }
             initializeUsersListRegion();
             if (!options.silent) {
                 showNotification('Lista de usuários atualizada.', 'success');
             }
         } catch (error) {
-            console.error('Erro ao atualizar lista de usuários:', error);
-            showNotification(error.message || 'Erro ao atualizar lista de usuários.', 'error');
+            if (error.name !== 'AbortError') {
+                console.error('Erro ao atualizar lista de usuários:', error);
+                showNotification(error.message || 'Erro ao atualizar lista de usuários.', 'error');
+            }
         } finally {
-            document.getElementById('usersListRegion')?.classList.remove('is-loading');
+            if (activeUsersListController === requestController) {
+                document.getElementById('usersListRegion')?.classList.remove('is-loading');
+                activeUsersListController = null;
+            }
         }
     }
 
@@ -2184,6 +2242,7 @@
             row.classList.add('slide-in-up');
         });
 
+        markUsersPaginationLinks();
         resetUsersStatsSnapshot(region);
         updateBulkActionsVisibilityDynamic();
     }
@@ -2193,7 +2252,7 @@
         if (paginationLink) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            refreshUsersListFromUrl(paginationLink.href);
+            refreshUsersListFromUrl(paginationLink.href, { pushState: true, silent: true });
             return;
         }
 
@@ -2837,11 +2896,7 @@
             document.getElementById('filterRole').value = '';
             document.getElementById('filterStatus').value = '';
             filterUsers();
-            if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
-                window.dynamicLoader.loadPage('/admin/users');
-            } else {
-                window.location.href = '/admin/users';
-            }
+            refreshUsersListFromUrl('/admin/users', { pushState: false, silent: true });
         };
 
         window.exportUsers = function () {
@@ -3352,7 +3407,7 @@
         const roleFilter = document.getElementById('filterRole');
         const statusFilter = document.getElementById('filterStatus');
         const sortBy = document.getElementById('sortBy');
-        const tableRows = document.querySelectorAll('.user-row');
+        const getTableRows = () => Array.from(document.querySelectorAll('#usersListRegion .user-row'));
         const filtersForm = document.querySelector('[data-admin-filter-form]');
         let filtersSubmitTimer = null;
 
@@ -3377,12 +3432,8 @@
             return `${filtersForm.action}${query ? `?${query}` : ''}`;
         }
 
-        function loadAdminFilterUrl(url) {
-            if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
-                window.dynamicLoader.loadPage(url);
-            } else {
-                window.location.href = url;
-            }
+        function loadAdminFilterUrl(url, options = {}) {
+            return refreshUsersListFromUrl(url, { pushState: false, silent: true, ...options });
         }
 
         function submitAdminFilters(delay = 0) {
@@ -3394,9 +3445,10 @@
         }
 
         function filterUsers() {
-            const searchTerm = normalizeAdminSearchText(searchInput.value);
-            const selectedRole = roleFilter.value;
-            const selectedStatus = statusFilter.value;
+            const searchTerm = normalizeAdminSearchText(searchInput?.value || '');
+            const selectedRole = roleFilter?.value || '';
+            const selectedStatus = statusFilter?.value || '';
+            const tableRows = getTableRows();
 
             tableRows.forEach(row => {
                 const username = normalizeAdminSearchText(row.querySelector('.username')?.textContent || '');
@@ -3425,7 +3477,8 @@
         }
 
         function updateResultsCount() {
-            const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
+            const tableRows = getTableRows();
+            const visibleRows = tableRows.filter(row => row.style.display !== 'none');
             const stats = ensureUsersStatsState();
             const currentPageUsers = Number(document.getElementById('usersListRegion')?.dataset.currentPageUsers || stats.pageSnapshot.total);
             const totalUsers = stats.total;
@@ -3445,24 +3498,10 @@
             syncUsersStatsFromCurrentPage();
         }
 
-        function clearInitialUsersFilters() {
-            if (searchInput) {
-                searchInput.value = '';
-            }
-            if (roleFilter) {
-                roleFilter.value = '';
-            }
-            if (statusFilter) {
-                statusFilter.value = '';
-            }
-
-            filterUsers();
-        }
-
         // Event listeners
         filtersForm?.addEventListener('submit', function (event) {
             event.preventDefault();
-            loadAdminFilterUrl(buildAdminFilterUrl());
+            loadAdminFilterUrl(buildAdminFilterUrl(), { pushState: false });
         });
         searchInput?.addEventListener('input', function () {
             filterUsers();
@@ -3611,7 +3650,7 @@
         });
 
         // Animation delays for table rows
-        tableRows.forEach((row, index) => {
+        getTableRows().forEach((row, index) => {
             row.style.animationDelay = `${index * 0.05}s`;
             row.classList.add('slide-in-up');
         });
@@ -3655,8 +3694,6 @@
         // Initialize
         initializeUsersListRegion();
         updateBulkActionsVisibility();
-        requestAnimationFrame(clearInitialUsersFilters);
-        window.addEventListener('pageshow', clearInitialUsersFilters, { once: true });
 
         // Inicializar estado desabilitado das ações em massa
         const applyButton = document.getElementById('applyBulkAction');

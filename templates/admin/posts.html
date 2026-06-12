@@ -91,6 +91,7 @@
                     <th style="width: 40px">
                         <input type="checkbox" id="selectAllPosts" class="form-check-input" aria-label="Selecionar todos os posts">
                     </th>
+                    <th class="actions-column">Ações</th>
                     <th data-sort="title">
                         <i class="fas fa-heading"></i> Título
                         <i class="fas fa-sort sort-icon"></i>
@@ -111,7 +112,6 @@
                         <i class="fas fa-sort sort-icon"></i>
                     </th>
                     <th>Status</th>
-                    <th>Ações</th>
                 </tr>
             </thead>
             <tbody id="postsTableBody" data-per-page="{{ posts.per_page }}">
@@ -119,6 +119,24 @@
                 <tr data-post-id="{{ post.id }}" data-category-id="{{ post.category_id or '' }}" class="{% if not post.is_active %}inactive-row{% endif %}">
                     <td>
                         <input type="checkbox" class="form-check-input post-checkbox" value="{{ post.id }}">
+                    </td>
+                    <td class="actions">
+                        <div class="action-buttons">
+                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn-action btn-view"
+                                title="Visualizar" target="_blank">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="{{ post.id }}">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="{{ post.id }}">
+                                <i class="fas fa-copy"></i>
+                            </a>
+                            <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="{{ post.id }}"
+                                data-post-title="{{ post.title }}">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
                     </td>
                     <td>
                         <div class="post-title-cell">
@@ -198,24 +216,6 @@
                             {% endif %}
                         </div>
                     </td>
-                    <td class="actions">
-                        <div class="action-buttons">
-                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn-action btn-view"
-                                title="Visualizar" target="_blank">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="{{ post.id }}">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="{{ post.id }}">
-                                <i class="fas fa-copy"></i>
-                            </a>
-                            <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="{{ post.id }}"
-                                data-post-title="{{ post.title }}">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </div>
-                    </td>
                 </tr>
                 {% else %}
                 <!-- Estado vazio -->
@@ -260,7 +260,7 @@
                     {% if posts.has_prev %}
                     <li class="page-item">
                         <a class="page-link" href="{{ url_for('admin_posts', page=posts.prev_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}"
-                            aria-label="Anterior">
+                            aria-label="Anterior" data-admin-posts-partial="true">
                             <i class="fas fa-chevron-left"></i>
                         </a>
                     </li>
@@ -280,7 +280,7 @@
                     </li>
                     {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('admin_posts', page=page_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}">{{ page_num }}</a>
+                        <a class="page-link" href="{{ url_for('admin_posts', page=page_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}" data-admin-posts-partial="true">{{ page_num }}</a>
                     </li>
                     {% endif %}
                     {% else %}
@@ -293,7 +293,7 @@
                     {% if posts.has_next %}
                     <li class="page-item">
                         <a class="page-link" href="{{ url_for('admin_posts', page=posts.next_num, q=current_filters.q, category=current_filters.category, status=current_filters.status, sort=current_filters.sort) }}"
-                            aria-label="Próximo">
+                            aria-label="Próximo" data-admin-posts-partial="true">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     </li>
@@ -488,13 +488,34 @@
                                     <i class="fas fa-folder"></i> Categoria
                                     <span class="required">*</span>
                                 </label>
-                                <select id="editPostCategory" name="category_id" class="form-control modern-select"
+                                <select id="editPostCategory" name="category_id" class="form-control modern-select icon-select-native"
                                     required>
-                                    <option value="">Selecione uma categoria</option>
+                                    <option value="" data-icon="fas fa-folder-open">Selecione uma categoria</option>
                                     {% for category in categories %}
-                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    <option value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}">{{ category.name }}</option>
                                     {% endfor %}
                                 </select>
+                                <div class="icon-select" data-icon-select data-source-select="editPostCategory">
+                                    <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="icon-select-current">
+                                            <i class="fas fa-folder-open"></i>
+                                            <span>Selecione uma categoria</span>
+                                        </span>
+                                        <i class="fas fa-chevron-down icon-select-arrow"></i>
+                                    </button>
+                                    <div class="icon-select-menu" role="listbox">
+                                        <button type="button" class="icon-select-option" data-value="" data-icon="fas fa-folder-open" role="option">
+                                            <i class="fas fa-folder-open"></i>
+                                            <span>Selecione uma categoria</span>
+                                        </button>
+                                        {% for category in categories %}
+                                        <button type="button" class="icon-select-option" data-value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}" role="option">
+                                            <i class="{{ get_category_icon(category) }}"></i>
+                                            <span>{{ category.name }}</span>
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </div>
 
                         </div>
@@ -773,19 +794,109 @@
             return `${filtersForm.action}${query ? `?${query}` : ''}`;
         }
 
-        function loadAdminFilterUrl(url) {
-            if (window.dynamicLoader && typeof window.dynamicLoader.loadPage === 'function') {
-                window.dynamicLoader.loadPage(url);
+        let activePostsFilterController = null;
+
+        function markPostsPaginationLinks() {
+            document.querySelectorAll('#postsPaginationContainer a.page-link').forEach((link) => {
+                link.dataset.adminPostsPartial = 'true';
+            });
+        }
+
+        function setPostsListLoading(isLoading) {
+            const table = document.querySelector('.admin-table.enhanced');
+            const pagination = document.getElementById('postsPaginationContainer');
+            if (table) table.classList.toggle('is-partial-loading', isLoading);
+            if (pagination) pagination.classList.toggle('is-partial-loading', isLoading);
+        }
+
+        function syncPostsUrl(url, pushState) {
+            const nextUrl = new URL(url, window.location.origin);
+            const nextPath = `${nextUrl.pathname}${nextUrl.search}`;
+            if (pushState) {
+                window.history.pushState({ url: nextUrl.href }, '', nextPath);
             } else {
-                window.location.href = url;
+                window.history.replaceState({ url: nextUrl.href }, '', nextPath);
+            }
+            if (window.dynamicLoader) {
+                window.dynamicLoader.currentUrl = nextUrl.href;
             }
         }
+
+        function updatePostsPartialFromDocument(doc) {
+            const nextTbody = doc.getElementById('postsTableBody');
+            const currentTbody = document.getElementById('postsTableBody');
+            if (nextTbody && currentTbody) {
+                currentTbody.innerHTML = nextTbody.innerHTML;
+                Array.from(nextTbody.attributes).forEach((attr) => {
+                    currentTbody.setAttribute(attr.name, attr.value);
+                });
+                currentTbody.dataset.inlineInitialized = 'true';
+            }
+
+            const nextPagination = doc.getElementById('postsPaginationContainer');
+            const currentPagination = document.getElementById('postsPaginationContainer');
+            if (nextPagination && currentPagination) {
+                currentPagination.outerHTML = nextPagination.outerHTML;
+            }
+
+            const nextBadge = doc.querySelector('[data-posts-total-badge]');
+            const currentBadge = document.querySelector('[data-posts-total-badge]');
+            if (nextBadge && currentBadge) {
+                currentBadge.textContent = nextBadge.textContent;
+            }
+
+            markPostsPaginationLinks();
+            bindPostsSelectionHandlers();
+        }
+
+        async function loadAdminFilterUrl(url, options = {}) {
+            const { pushState = false } = options;
+            if (!filtersForm) return;
+
+            if (activePostsFilterController) {
+                activePostsFilterController.abort();
+            }
+
+            const requestController = new AbortController();
+            activePostsFilterController = requestController;
+            setPostsListLoading(true);
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: requestController.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                updatePostsPartialFromDocument(doc);
+                syncPostsUrl(url, pushState);
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    console.error('Erro ao atualizar lista de posts:', error);
+                    if (typeof showNotification === 'function') {
+                        showNotification('Não foi possível atualizar a lista de posts.', 'error');
+                    }
+                }
+            } finally {
+                if (activePostsFilterController === requestController) {
+                    setPostsListLoading(false);
+                    activePostsFilterController = null;
+                }
+            }
+        }
+
+        window.loadAdminPostsPartialUrl = loadAdminFilterUrl;
 
         function submitAdminFilters(delay = 0) {
             if (!filtersForm) return;
             clearTimeout(filtersSubmitTimer);
             filtersSubmitTimer = setTimeout(() => {
-                loadAdminFilterUrl(buildAdminFilterUrl());
+                loadAdminFilterUrl(buildAdminFilterUrl(), { pushState: false });
             }, delay);
         }
 
@@ -841,7 +952,7 @@
         // Event listeners for filters
         filtersForm?.addEventListener('submit', function (event) {
             event.preventDefault();
-            loadAdminFilterUrl(buildAdminFilterUrl());
+            loadAdminFilterUrl(buildAdminFilterUrl(), { pushState: false });
         });
         searchInput?.addEventListener('input', function () {
             filterAndSearchPosts();
@@ -862,7 +973,7 @@
             categoryFilter.value = '';
             statusFilter.value = '';
             filterAndSearchPosts();
-            loadAdminFilterUrl('/admin/posts');
+            loadAdminFilterUrl('/admin/posts', { pushState: false });
         };
 
         window.refreshPostsListFilters = filterAndSearchPosts;
@@ -907,20 +1018,44 @@
             rows.forEach(row => tbody.appendChild(row));
         });
 
+        markPostsPaginationLinks();
+
+        if (!window.__adminPostsPartialPaginationBound) {
+            window.__adminPostsPartialPaginationBound = true;
+            document.addEventListener('click', function (event) {
+                const paginationLink = event.target.closest('#postsPaginationContainer a.page-link');
+                if (!paginationLink) return;
+
+                event.preventDefault();
+                if (typeof window.loadAdminPostsPartialUrl === 'function') {
+                    window.loadAdminPostsPartialUrl(paginationLink.href, { pushState: true });
+                }
+            });
+        }
+
         // Select All functionality
         const selectAllCheckbox = document.getElementById('selectAllPosts');
-        const postCheckboxes = document.querySelectorAll('.post-checkbox');
 
-        selectAllCheckbox?.addEventListener('change', function () {
-            postCheckboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
+        function bindPostsSelectionHandlers() {
+            const currentSelectAll = document.getElementById('selectAllPosts');
+            const currentPostCheckboxes = document.querySelectorAll('.post-checkbox');
+
+            if (currentSelectAll && currentSelectAll.dataset.selectionBound !== 'true') {
+                currentSelectAll.dataset.selectionBound = 'true';
+                currentSelectAll.addEventListener('change', function () {
+                    document.querySelectorAll('.post-checkbox').forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                    updateBulkActionsVisibility();
+                });
+            }
+
+            currentPostCheckboxes.forEach(checkbox => {
+                if (checkbox.dataset.selectionBound === 'true') return;
+                checkbox.dataset.selectionBound = 'true';
+                checkbox.addEventListener('change', updateBulkActionsVisibility);
             });
-            updateBulkActionsVisibility();
-        });
-
-        postCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateBulkActionsVisibility);
-        });
+        }
 
         function updateBulkActionsVisibility() {
             const checkedBoxes = document.querySelectorAll('.post-checkbox:checked');
@@ -934,6 +1069,8 @@
                 bulkActions.style.pointerEvents = 'none';
             }
         }
+
+        bindPostsSelectionHandlers();
 
         // Bulk actions
         document.getElementById('applyBulkAction')?.addEventListener('click', function () {
@@ -1125,6 +1262,7 @@
             }
 
             document.getElementById('editPostCategory').value = post.category_id || '';
+            window.refreshIconSelects?.();
 
             // Populate multi-download entries (also handles download_link)
             populateEditDownloadEntries(post);
@@ -1208,10 +1346,7 @@
             }
             entry.innerHTML = '<div class="download-entry-row">' +
                 '<select name="edit_download_type_' + idx + '" class="form-select download-type-select">' +
-                '<option value="BIOS"' + (type === 'BIOS' ? ' selected' : '') + '>BIOS</option>' +
-                '<option value="EC"' + (type === 'EC' ? ' selected' : '') + '>EC</option>' +
-                '<option value="ME"' + (type === 'ME' ? ' selected' : '') + '>ME</option>' +
-                '<option value="Outro"' + (type === 'Outro' ? ' selected' : '') + '>Outro</option>' +
+                (window.renderDownloadTypeOptions ? window.renderDownloadTypeOptions(type || '') : '<option value="' + (type || 'BIOS') + '" selected>' + (type || 'BIOS') + '</option>') +
                 '</select>' +
                 '<div class="input-group download-url-group">' +
                 '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip" value="' + (url || '') + '">' +
@@ -1841,6 +1976,20 @@
         padding: 1rem 1.5rem;
         border-top: 1px solid var(--admin-border-color);
         background: rgba(248, 249, 250, 0.5);
+    }
+
+    .admin-table.enhanced.is-partial-loading,
+    #postsPaginationContainer.is-partial-loading {
+        opacity: 0.55;
+        pointer-events: none;
+        transition: opacity 0.18s ease;
+    }
+
+    .actions-column,
+    .admin-table .actions {
+        width: 136px;
+        min-width: 136px;
+        text-align: center;
     }
 
     .bulk-actions {

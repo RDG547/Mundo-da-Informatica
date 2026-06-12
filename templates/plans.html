@@ -338,15 +338,19 @@
 
 <!-- Downgrade Modal -->
 <div id="downgradeModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content downgrade-modal-content">
         <span class="close-modal" onclick="closeDowngradeModal()">&times;</span>
         <h2>Confirmar Alteração de Plano</h2>
         <p id="downgradeMessage">Tem certeza que deseja alterar seu plano?</p>
         <p class="warning-text" id="downgradeWarning">Você perderá acesso imediato aos benefícios exclusivos do seu
             plano atual.</p>
         <div class="modal-actions">
-            <button class="btn-cancel" onclick="closeDowngradeModal()">Cancelar</button>
-            <button class="btn-confirm" onclick="confirmDowngrade()">Confirmar</button>
+            <button class="btn-cancel" onclick="closeDowngradeModal()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button class="btn-confirm" onclick="confirmDowngrade()">
+                <i class="fas fa-check"></i> Confirmar
+            </button>
         </div>
     </div>
 </div>
@@ -539,9 +543,24 @@
         border-left: 4px solid #dc3545;
     }
 
+    #downgradeModal .downgrade-modal-content {
+        text-align: center;
+    }
+
+    #downgradeModal .downgrade-modal-content h2,
+    #downgradeModal .downgrade-modal-content p {
+        text-align: center;
+    }
+
+    #downgradeModal .warning-text {
+        border-left: 0;
+        border-top: 4px solid #dc3545;
+        line-height: 1.6;
+    }
+
     .modal-actions {
         display: flex;
-        justify-content: flex-end;
+        justify-content: center;
         gap: 1rem;
     }
 
@@ -559,6 +578,10 @@
     }
 
     .btn-cancel {
+        align-items: center;
+        display: inline-flex;
+        gap: 0.5rem;
+        justify-content: center;
         padding: 0.8rem 1.5rem;
         border: 1px solid #ddd;
         background: white;
@@ -575,6 +598,10 @@
     }
 
     .btn-confirm {
+        align-items: center;
+        display: inline-flex;
+        gap: 0.5rem;
+        justify-content: center;
         padding: 0.8rem 1.5rem;
         border: none;
         background: #dc3545;

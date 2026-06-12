@@ -206,6 +206,10 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 return false;
             }
 
+            if (link.dataset.adminPostsPartial === 'true') {
+                return false;
+            }
+
             const url = new URL(link.href);
             const currentIsAdmin = window.location.pathname.startsWith('/admin');
             const targetIsAdmin = url.pathname.startsWith('/admin');

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, jsonify, flash, send_file
+from flask import Flask, Response, render_template, redirect, url_for, request, jsonify, flash, send_file
 from flask.typing import ResponseReturnValue
 from flask_sqlalchemy import SQLAlchemy
 from flask_assets import Environment
@@ -29,6 +29,7 @@ import urllib.error
 import stripe
 from stripe import error as stripe_error
 from typing import Any, Mapping, Optional, Tuple, cast
+from xml.sax.saxutils import escape as xml_escape
 
 # Para compatibilidade, criar alias
 SignatureVerificationError = stripe_error.SignatureVerificationError  # type: ignore[attr-defined]
@@ -261,6 +262,13 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True  # Não acessível via JavaScript
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Proteção CSRF
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Sessão expira em 24h
 app.config['SUPPORT_EMAIL'] = DEFAULT_SUPPORT_EMAIL
+app.config['SITE_URL'] = (
+    os.environ.get('SITE_URL')
+    or os.environ.get('BASE_URL')
+    or os.environ.get('PUBLIC_URL')
+    or os.environ.get('RENDER_EXTERNAL_URL')
+    or ''
+)
 
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -3276,6 +3284,291 @@ def format_date_pt(date_value, format_string='%d de %B de %Y'):
         formatted = formatted.replace(eng, pt)
 
     return formatted
+
+
+SEO_SITE_URL_ENV_KEYS = ('SITE_URL', 'BASE_URL', 'PUBLIC_URL', 'RENDER_EXTERNAL_URL')
+
+SEO_PUBLIC_STATIC_PAGES = (
+    ('/', 'daily', '1.0'),
+    ('/categorias', 'daily', '0.9'),
+    ('/posts', 'daily', '0.9'),
+    ('/sobre', 'monthly', '0.6'),
+    ('/faq', 'monthly', '0.6'),
+    ('/contato', 'monthly', '0.5'),
+    ('/planos', 'monthly', '0.5'),
+    ('/termos-de-uso', 'yearly', '0.3'),
+    ('/politica-de-privacidade', 'yearly', '0.3'),
+)
+
+SEO_ROBOTS_DISALLOW_PATHS = (
+    '/admin',
+    '/api/',
+    '/debug/',
+    '/setup',
+    '/login',
+    '/register',
+    '/logout',
+    '/profile',
+    '/reset-password',
+    '/area-vip',
+    '/download/',
+    '/favorite/',
+    '/unfavorite/',
+    '/newsletter',
+    '/clear-download-history',
+    '/update-profile-image',
+    '/remove-profile-image',
+    '/update-password',
+    '/downgrade_plan',
+    '/create-checkout-session',
+    '/create-donation-checkout-session',
+    '/checkout-success',
+    '/checkout-cancel',
+    '/donation-success',
+    '/create-pix-checkout',
+    '/create-donation-pix-checkout',
+    '/process-pix-async/',
+    '/pix-checkout',
+    '/pix-checkout-error',
+    '/pix-checkout-success',
+    '/cancel-pix-transaction/',
+    '/check-pix-payment/',
+    '/stripe-webhook',
+    '/abacatepay-webhook',
+    '/pesquisa',
+    '/test-password-toggle',
+    '/*/comments',
+)
+
+
+def _normalize_public_base_url(raw_url: str | None) -> str | None:
+    raw_url = (raw_url or '').strip()
+    if not raw_url:
+        return None
+
+    if raw_url.startswith('//'):
+        raw_url = f'https:{raw_url}'
+    elif not re.match(r'^https?://', raw_url, flags=re.IGNORECASE):
+        raw_url = f'https://{raw_url}'
+
+    parsed = url_parse(raw_url)
+    if not parsed.netloc:
+        return None
+
+    scheme = parsed.scheme.lower()
+    if scheme not in {'http', 'https'}:
+        scheme = 'https'
+
+    base_path = parsed.path.rstrip('/')
+    return f'{scheme}://{parsed.netloc}{base_path}'.rstrip('/')
+
+
+def _get_public_base_url() -> str:
+    for env_key in SEO_SITE_URL_ENV_KEYS:
+        configured_url = _normalize_public_base_url(os.environ.get(env_key))
+        if configured_url:
+            return configured_url
+
+    configured_url = _normalize_public_base_url(app.config.get('SITE_URL'))
+    if configured_url:
+        return configured_url
+
+    forwarded_host = request.headers.get('X-Forwarded-Host', '').split(',', 1)[0].strip()
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').split(',', 1)[0].strip()
+    host = forwarded_host or request.host or url_parse(request.url_root).netloc
+    scheme = forwarded_proto or request.scheme or 'https'
+
+    if is_production_environment() and scheme == 'http':
+        scheme = 'https'
+
+    return _normalize_public_base_url(f'{scheme}://{host}') or request.url_root.rstrip('/')
+
+
+def _absolute_public_url(path: str) -> str:
+    if re.match(r'^https?://', path, flags=re.IGNORECASE):
+        return path
+
+    if not path.startswith('/'):
+        path = f'/{path}'
+
+    return f'{_get_public_base_url()}{path}'
+
+
+def _coerce_sitemap_datetime(value):
+    if not value:
+        return None
+
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(pytz.UTC).replace(tzinfo=None)
+        return value
+
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(pytz.UTC).replace(tzinfo=None)
+            return parsed
+        except ValueError:
+            return None
+
+    return None
+
+
+def _format_sitemap_lastmod(value) -> str | None:
+    value = _coerce_sitemap_datetime(value)
+    if not value:
+        return None
+    return value.date().isoformat()
+
+
+def _latest_active_post_date(*filters):
+    posted_query = db.session.query(db.func.max(Post.date_posted)).filter(Post.is_active == True)
+    updated_query = db.session.query(db.func.max(Post.date_updated)).filter(Post.is_active == True)
+
+    for filter_condition in filters:
+        posted_query = posted_query.filter(filter_condition)
+        updated_query = updated_query.filter(filter_condition)
+
+    dates = [
+        _coerce_sitemap_datetime(posted_query.scalar()),
+        _coerce_sitemap_datetime(updated_query.scalar()),
+    ]
+    dates = [date_value for date_value in dates if date_value]
+    return max(dates) if dates else None
+
+
+def _post_sitemap_lastmod(post):
+    dates = [
+        _coerce_sitemap_datetime(post.date_posted),
+        _coerce_sitemap_datetime(post.date_updated),
+    ]
+    dates = [date_value for date_value in dates if date_value]
+    return max(dates) if dates else None
+
+
+def _post_public_path(post):
+    category_name = post.category_str or (post.category_rel.name if post.category_rel else '')
+    if post.slug and category_name:
+        return url_for('post_by_slug', category=generate_slug(category_name), slug=post.slug)
+    return url_for('post', post_id=post.id)
+
+
+def _add_sitemap_entry(entries, seen_urls, path, lastmod=None, changefreq=None, priority=None):
+    loc = _absolute_public_url(path)
+    if loc in seen_urls:
+        return
+
+    seen_urls.add(loc)
+    entry = {'loc': loc}
+
+    formatted_lastmod = _format_sitemap_lastmod(lastmod)
+    if formatted_lastmod:
+        entry['lastmod'] = formatted_lastmod
+    if changefreq:
+        entry['changefreq'] = str(changefreq)
+    if priority:
+        entry['priority'] = str(priority)
+
+    entries.append(entry)
+
+
+def _build_sitemap_entries() -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    latest_content_date = _latest_active_post_date()
+
+    for path, changefreq, priority in SEO_PUBLIC_STATIC_PAGES:
+        lastmod = latest_content_date if path in {'/', '/categorias', '/posts'} else None
+        _add_sitemap_entry(entries, seen_urls, path, lastmod=lastmod, changefreq=changefreq, priority=priority)
+
+    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all()
+    for category_item in categories:
+        category_filter = db.or_(Post.category_id == category_item.id, Post.category_str == category_item.name)
+        _add_sitemap_entry(
+            entries,
+            seen_urls,
+            url_for('category', category=category_public_url_value(category_item)),
+            lastmod=_latest_active_post_date(category_filter),
+            changefreq='weekly',
+            priority='0.8',
+        )
+
+    subcategories = db.session.query(Post.subcategory).filter(
+        Post.is_active == True,
+        Post.subcategory.isnot(None),
+        Post.subcategory != ''
+    ).distinct().order_by(Post.subcategory.asc()).all()
+    for (subcategory_slug,) in subcategories:
+        _add_sitemap_entry(
+            entries,
+            seen_urls,
+            url_for('subcategory', subcategory=subcategory_slug),
+            lastmod=_latest_active_post_date(Post.subcategory == subcategory_slug),
+            changefreq='weekly',
+            priority='0.7',
+        )
+
+    active_posts = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc()).all()
+    for post_item in active_posts:
+        _add_sitemap_entry(
+            entries,
+            seen_urls,
+            _post_public_path(post_item),
+            lastmod=_post_sitemap_lastmod(post_item),
+            changefreq='weekly',
+            priority='0.7',
+        )
+
+    return entries
+
+
+def _render_sitemap_xml(entries: list[dict[str, str]]) -> str:
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+
+    for entry in entries:
+        lines.append('  <url>')
+        lines.append(f'    <loc>{xml_escape(entry["loc"])}</loc>')
+        if entry.get('lastmod'):
+            lines.append(f'    <lastmod>{xml_escape(entry["lastmod"])}</lastmod>')
+        if entry.get('changefreq'):
+            lines.append(f'    <changefreq>{xml_escape(entry["changefreq"])}</changefreq>')
+        if entry.get('priority'):
+            lines.append(f'    <priority>{xml_escape(entry["priority"])}</priority>')
+        lines.append('  </url>')
+
+    lines.append('</urlset>')
+    return '\n'.join(lines) + '\n'
+
+
+@app.route('/robots.txt')
+@limiter.exempt
+def robots_txt():
+    lines = [
+        'User-agent: *',
+        'Allow: /',
+        'Allow: /static/',
+    ]
+
+    for path in SEO_ROBOTS_DISALLOW_PATHS:
+        lines.append(f'Disallow: {path}')
+
+    lines.extend(['', f'Sitemap: {_absolute_public_url(url_for("sitemap_xml"))}'])
+    response = Response('\n'.join(lines) + '\n', content_type='text/plain; charset=utf-8')
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
+
+@app.route('/sitemap.xml')
+@limiter.exempt
+def sitemap_xml():
+    response = Response(_render_sitemap_xml(_build_sitemap_entries()), content_type='application/xml; charset=utf-8')
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
 
 # Rotas principais
 @app.route('/')

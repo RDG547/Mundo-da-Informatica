@@ -274,6 +274,10 @@ app.config['SITE_URL'] = (
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
 
+# Configuração do Meta Pixel (Facebook) - Conversions API
+app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '1324405009312324')
+app.config['META_ACCESS_TOKEN'] = os.environ.get('META_ACCESS_TOKEN')
+
 # Configuração Firebase (Google Sign-In)
 app.config['FIREBASE_API_KEY'] = os.environ.get('FIREBASE_API_KEY', '')
 app.config['FIREBASE_AUTH_DOMAIN'] = os.environ.get('FIREBASE_AUTH_DOMAIN', '')
@@ -5352,6 +5356,66 @@ def abacatepay_webhook():
         app.logger.exception('Erro ao processar webhook Abacate Pay')
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
+def send_meta_conversion_event(event_name, user, plan_type, amount_cents, event_id=None):
+    """Envia evento para a Conversions API do Meta (Facebook) sem quebrar o fluxo de pagamento"""
+    access_token = (app.config.get('META_ACCESS_TOKEN') or '').strip()
+    if not access_token:
+        app.logger.warning('META_ACCESS_TOKEN não configurado; evento %s não enviado ao Meta Pixel', event_name)
+        return
+
+    pixel_id = (app.config.get('META_PIXEL_ID') or '').strip()
+    if not pixel_id:
+        app.logger.warning('META_PIXEL_ID não configurado; evento %s não enviado ao Meta Pixel', event_name)
+        return
+
+    try:
+        import requests
+
+        event_time = int(datetime.utcnow().timestamp())
+        if not event_id:
+            event_id = f'{event_name}-{user.id if user else "anon"}-{event_time}'
+
+        # Dados do usuário hasheados (SHA256) conforme exigido pela Conversions API
+        user_data = {}
+        if user:
+            email = (getattr(user, 'email', '') or '').strip().lower()
+            if email:
+                user_data['em'] = hashlib.sha256(email.encode('utf-8')).hexdigest()
+            user_data['external_id'] = hashlib.sha256(str(user.id).encode('utf-8')).hexdigest()
+
+        payload = {
+            'data': [{
+                'event_name': event_name,
+                'event_time': event_time,
+                'action_source': 'website',
+                'event_id': event_id,
+                'user_data': user_data,
+                'custom_data': {
+                    'value': (amount_cents or 0) / 100,
+                    'currency': 'BRL',
+                    'content_name': plan_type,
+                },
+            }]
+        }
+
+        response = requests.post(
+            f'https://graph.facebook.com/v21.0/{pixel_id}/events',
+            params={'access_token': access_token},
+            json=payload,
+            timeout=5,
+        )
+        if response.status_code != 200:
+            app.logger.error(
+                'Meta Conversions API retornou %s para evento %s: %s',
+                response.status_code, event_name, response.text[:200]
+            )
+        else:
+            debug_log(f'Evento {event_name} enviado ao Meta Pixel (event_id={event_id})')
+    except Exception as e:
+        # Nunca propagar: falha no rastreamento não pode quebrar o webhook de pagamento
+        app.logger.error(f'Erro ao enviar evento {event_name} ao Meta Pixel: {str(e)}')
+
+
 def handle_abacatepay_payment_success(transaction, billing_data):
     """Processa pagamento PIX bem-sucedido"""
     debug_log(f'Pagamento PIX confirmado: {transaction.abacatepay_billing_id}')
@@ -5382,6 +5446,17 @@ def handle_abacatepay_payment_success(transaction, billing_data):
             debug_log(f'Doação PIX confirmada para usuário {user.id}')
         else:
             debug_log(f'Plano {transaction.plan_type} ativado para usuário {user.id} via PIX')
+
+            # Disparar eventos do Meta Pixel (Conversions API) para planos pagos
+            if transaction.plan_type in ('premium', 'vip'):
+                send_meta_conversion_event(
+                    'Subscribe', user, transaction.plan_type, transaction.amount,
+                    event_id=f'sub-{transaction.id}'
+                )
+                send_meta_conversion_event(
+                    'Purchase', user, transaction.plan_type, transaction.amount,
+                    event_id=f'pur-{transaction.id}'
+                )
 
     except Exception as e:
         debug_log(f'Erro ao processar pagamento PIX: {str(e)}')
@@ -5496,6 +5571,18 @@ def handle_checkout_completed(session):
 
         db.session.commit()
         debug_log(f'✅ Plano {plan_type.upper()} ativado para usuário {user.username} via webhook')
+
+        # Disparar eventos do Meta Pixel (Conversions API) para planos pagos
+        if plan_type in ('premium', 'vip'):
+            completed_transaction = transaction if not existing_transaction else existing_transaction
+            send_meta_conversion_event(
+                'Subscribe', user, completed_transaction.plan_type, completed_transaction.amount,
+                event_id=f'sub-{completed_transaction.id}'
+            )
+            send_meta_conversion_event(
+                'Purchase', user, completed_transaction.plan_type, completed_transaction.amount,
+                event_id=f'pur-{completed_transaction.id}'
+            )
 
     except Exception as e:
         db.session.rollback()

@@ -187,6 +187,17 @@ window.initializePlansPage = function () {
         // Salvar o plano antes de fechar o modal
         const planToCheckout = selectedPlan;
 
+        // Meta Pixel: início do checkout (valor lido do card do plano, formato "29,90")
+        if (typeof fbq === 'function') {
+            const amountElement = document.querySelector(`.plan-card.${planToCheckout} .plan-price .amount`);
+            const amountValue = amountElement
+                ? parseFloat(amountElement.textContent.trim().replace(/\./g, '').replace(',', '.'))
+                : NaN;
+            if (!isNaN(amountValue)) {
+                fbq('track', 'InitiateCheckout', {value: amountValue, currency: 'BRL', content_name: planToCheckout});
+            }
+        }
+
         window.closePaymentMethodModal();
 
         if (method === 'credit_card') {

@@ -363,6 +363,13 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script src="{{ url_for('static', filename='js/plans.js') }}"></script>
 
+<script>
+    // Meta Pixel: visualização da página de planos
+    if (typeof fbq === 'function') {
+        fbq('track', 'ViewContent', {content_type: 'product', content_ids: ['premium', 'vip'], currency: 'BRL'});
+    }
+</script>
+
 <style>
     /* Payment Method Modal Styles */
     .payment-methods-grid {

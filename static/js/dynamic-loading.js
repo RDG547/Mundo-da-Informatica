@@ -436,16 +436,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     footer.style.display = '';
                 }
             }
-
-            // Show/hide beta notice based on route (mirrors server-side logic)
-            const betaNotice = document.getElementById('floating-beta-notice');
-            if (betaNotice) {
-                if (path.startsWith('/profile')) {
-                    betaNotice.style.setProperty('display', 'none', 'important');
-                } else {
-                    betaNotice.style.removeProperty('display');
-                }
-            }
         }
 
         reinitializeComponents() {

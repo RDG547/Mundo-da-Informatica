@@ -61,7 +61,7 @@
                 </div>
             </div>
             <div class="stat-info">
-                <h3 class="stat-number">R$ {{ site_configs.get('plan_price_premium', 29.90) }}</h3>
+                <h3 class="stat-number" data-plan-price-full="premium">R$ {{ site_configs.get('plan_price_premium', 29.90) }}</h3>
                 <p class="stat-label">Card do Plano Premium</p>
                 <div class="stat-details">
                     <span class="detail-item">
@@ -78,12 +78,12 @@
                     <i class="fas fa-crown"></i>
                 </div>
                 <div class="stat-trend positive">
-                    <i class="fas fa-gem"></i>
+                    <i class="fas fa-crown"></i>
                     <span>VIP</span>
                 </div>
             </div>
             <div class="stat-info">
-                <h3 class="stat-number">R$ {{ site_configs.get('plan_price_vip', 49.90) }}</h3>
+                <h3 class="stat-number" data-plan-price-full="vip">R$ {{ site_configs.get('plan_price_vip', 49.90) }}</h3>
                 <p class="stat-label">Card do Plano VIP</p>
                 <div class="stat-details">
                     <span class="detail-item">
@@ -334,7 +334,7 @@
                         </article>
 
                         <article class="settings-plan-card vip">
-                            <div class="settings-plan-icon"><i class="fas fa-gem"></i></div>
+                            <div class="settings-plan-icon"><i class="fas fa-crown"></i></div>
                             <div class="settings-field">
                                 <label for="plan_price_vip">Preço do Plano VIP</label>
                                 <div class="settings-money-input">
@@ -661,6 +661,11 @@
                 }
 
                 showSettingsNotification(data.message || 'Configurações salvas com sucesso!', 'success');
+
+                // Atualiza imediatamente os preços exibidos nesta página (cards e estatísticas)
+                if (typeof window.refreshPlanPrices === 'function') {
+                    window.refreshPlanPrices();
+                }
             } catch (error) {
                 console.error('Erro ao salvar configurações:', error);
                 showSettingsNotification(error.message || 'Erro ao salvar configurações.', 'error');

@@ -5,6 +5,7 @@
 
     let modalElements = null;
     let modalState = null;
+    let successCountdownTimer = null;
 
     function getCsrfToken() {
         if (window.csrfUtils && typeof window.csrfUtils.getCsrfToken === 'function') {
@@ -259,11 +260,44 @@
             modalState.poller = null;
         }
 
+        if (successCountdownTimer) {
+            clearInterval(successCountdownTimer);
+            successCountdownTimer = null;
+        }
+
         if (cancelPending && modalState.billingId && !modalState.completed) {
             cancelTransaction(modalState.billingId);
         }
 
         modalState = null;
+    }
+
+    function startSuccessCountdown(seconds) {
+        const countdownEl = document.getElementById('sitePixCountdown');
+        let remaining = seconds;
+
+        const render = () => {
+            if (!countdownEl) {
+                return;
+            }
+            countdownEl.textContent = String(remaining);
+            // Reinicia a animação a cada tick
+            countdownEl.classList.remove('is-ticking');
+            void countdownEl.offsetWidth;
+            countdownEl.classList.add('is-ticking');
+        };
+
+        render();
+        successCountdownTimer = window.setInterval(() => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                window.clearInterval(successCountdownTimer);
+                successCountdownTimer = null;
+                window.location.href = '/';
+                return;
+            }
+            render();
+        }, 1000);
     }
 
     function closePixCheckoutModal({ cancelPending = true } = {}) {
@@ -296,13 +330,15 @@
 
             if (data.paid) {
                 modalState.completed = true;
-                setStatus('Pagamento confirmado', modalState.successMessage || 'Pagamento confirmado com sucesso.', 'success', 'fa-check-circle');
-                if (modalState.successRedirectUrl) {
-                    window.setTimeout(() => {
-                        window.location.href = modalState.successRedirectUrl;
-                    }, 1600);
-                }
+                const successMessage = modalState.successMessage || 'Pagamento confirmado com sucesso.';
+                setStatus(
+                    'Pagamento confirmado',
+                    `${successMessage} Sua assinatura já está ativa. Redirecionando para a página inicial em <span class="site-pix-countdown" id="sitePixCountdown">3</span>...`,
+                    'success',
+                    'fa-check-circle'
+                );
                 cleanupState({ cancelPending: false });
+                startSuccessCountdown(3);
                 return;
             }
 

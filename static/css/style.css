@@ -2561,159 +2561,6 @@ footer {
     bottom: 90px;
 }
 
-/* Floating construction notice */
-.floating-beta-notice {
-    position: fixed;
-    left: 24px;
-    bottom: 24px;
-    z-index: 99;
-    width: min(320px, calc(100vw - 48px));
-    max-width: calc(100vw - 48px);
-    border: 1px solid rgba(58, 134, 255, 0.24);
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
-    backdrop-filter: blur(12px);
-    overflow: hidden;
-    transform-origin: left bottom;
-    transition: width 0.26s ease, border-radius 0.24s ease, transform 0.24s ease, box-shadow 0.24s ease;
-}
-
-.floating-beta-toggle {
-    width: 100%;
-    min-height: 54px;
-    border: none;
-    background: linear-gradient(135deg, #2563eb, #22c55e);
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.6rem;
-    padding: 0.76rem 0.95rem;
-    cursor: pointer;
-    font-weight: 800;
-    font-size: 0.86rem;
-    letter-spacing: 0;
-    transition: padding 0.22s ease, gap 0.22s ease, justify-content 0.22s ease;
-}
-
-.floating-beta-toggle i {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.18);
-    flex: 0 0 28px;
-}
-
-.floating-beta-content {
-    padding: 0.95rem;
-    color: #334155;
-    display: grid;
-    gap: 0.6rem;
-    max-height: 240px;
-    opacity: 1;
-    overflow: hidden;
-    transition: max-height 0.26s ease, opacity 0.18s ease, padding 0.18s ease;
-}
-
-.floating-beta-content-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.floating-beta-content strong {
-    color: #0f172a;
-    font-size: 0.96rem;
-}
-
-.floating-beta-countdown {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    padding: 0;
-    border-radius: 50%;
-    background: rgba(37, 99, 235, 0.1);
-    border: 2px solid rgba(37, 99, 235, 0.2);
-    color: #1d4ed8;
-    font-size: 0.84rem;
-    font-weight: 800;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-.floating-beta-content p {
-    margin: 0;
-    color: #475569;
-    font-size: 0.84rem;
-    line-height: 1.5;
-}
-
-.floating-beta-content a {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-    border-radius: 999px;
-    background: rgba(58, 134, 255, 0.1);
-    color: var(--primary-color);
-    padding: 0.62rem 0.85rem;
-    text-decoration: none;
-    font-size: 0.78rem;
-    font-weight: 800;
-    transition: background 0.18s ease, transform 0.18s ease;
-}
-
-.floating-beta-content a:hover {
-    background: rgba(58, 134, 255, 0.16);
-    transform: translateY(-1px);
-}
-
-.floating-beta-notice:not(.is-open) {
-    width: 108px;
-    border-radius: 999px;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
-}
-
-.floating-beta-notice:not(.is-open) .floating-beta-toggle {
-    justify-content: center;
-    gap: 0.45rem;
-    padding: 0.7rem 0.9rem;
-}
-
-.floating-beta-notice:not(.is-open) .floating-beta-content {
-    max-height: 0;
-    opacity: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    pointer-events: none;
-}
-
-@media (max-width: 576px) {
-    .floating-beta-notice {
-        left: 12px;
-        bottom: 16px;
-        max-width: calc(100vw - 24px);
-    }
-
-    .floating-beta-content-header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .floating-beta-countdown {
-        min-width: 34px;
-    }
-}
-
 /* Tema Escuro */
 .dark-mode {
     position: fixed;
@@ -4436,4 +4283,29 @@ a.download-card-category:hover {
     .site-pix-qr {
         min-height: 220px;
     }
+}
+
+/* Contagem regressiva de sucesso do checkout PIX */
+.site-pix-countdown {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6em;
+    padding: 0 0.35em;
+    margin: 0 0.15em;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.18);
+    color: #047857;
+    font-weight: 800;
+    line-height: 1.4;
+}
+
+.site-pix-countdown.is-ticking {
+    animation: sitePixCountdownPop 1s ease;
+}
+
+@keyframes sitePixCountdownPop {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.4); }
+    100% { transform: scale(1); }
 }

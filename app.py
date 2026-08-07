@@ -4498,6 +4498,23 @@ def plans():
     return render_template('plans.html', title='Planos e Preços', stripe_public_key=app.config['STRIPE_PUBLIC_KEY'], checkout_plan=checkout_plan)
 
 
+@app.route('/api/plan-prices')
+def api_plan_prices():
+    """Retorna os preços atuais dos planos para atualização dinâmica no frontend"""
+    pricing = get_plan_pricing_config()
+    return jsonify({
+        'success': True,
+        'plans': {
+            plan_key: {
+                'amount_cents': plan_data['amount_cents'],
+                'display_amount': plan_data['display_amount'],
+                'display_full': f"R$ {plan_data['display_amount']}"
+            }
+            for plan_key, plan_data in pricing.items()
+        }
+    })
+
+
 @app.route('/api/user/permissions')
 @login_required
 def get_user_permissions():

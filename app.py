@@ -275,7 +275,7 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
 
 # Configuração do Meta Pixel (Facebook) - Conversions API
-app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '1324405009312324')
+app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '3117485985088560')
 app.config['META_ACCESS_TOKEN'] = os.environ.get('META_ACCESS_TOKEN')
 
 # Configuração Firebase (Google Sign-In)
@@ -5380,14 +5380,15 @@ def send_meta_conversion_event(event_name, user, plan_type, amount_cents, event_
         if user:
             email = (getattr(user, 'email', '') or '').strip().lower()
             if email:
-                user_data['em'] = hashlib.sha256(email.encode('utf-8')).hexdigest()
-            user_data['external_id'] = hashlib.sha256(str(user.id).encode('utf-8')).hexdigest()
+                user_data['em'] = [hashlib.sha256(email.encode('utf-8')).hexdigest()]
+            user_data['external_id'] = [hashlib.sha256(str(user.id).encode('utf-8')).hexdigest()]
 
         payload = {
             'data': [{
                 'event_name': event_name,
                 'event_time': event_time,
                 'action_source': 'website',
+                'event_source_url': f"{app.config.get('SITE_URL', '').rstrip('/')}/planos",
                 'event_id': event_id,
                 'user_data': user_data,
                 'custom_data': {

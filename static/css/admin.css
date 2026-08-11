@@ -1253,6 +1253,47 @@ body.modal-open {
     color: var(--admin-success);
 }
 
+/* Cores estáveis das ações de posts, inclusive no primeiro carregamento dinâmico. */
+.posts-management-table .btn-action {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.posts-management-table .btn-action.btn-view {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+}
+
+.posts-management-table .btn-action.btn-view:hover {
+    background: #0369a1 !important;
+}
+
+.posts-management-table .btn-action.btn-edit {
+    background: #d97706 !important;
+    color: #ffffff !important;
+}
+
+.posts-management-table .btn-action.btn-edit:hover {
+    background: #b45309 !important;
+}
+
+.posts-management-table .btn-action.btn-duplicate {
+    background: #7c3aed !important;
+    color: #ffffff !important;
+}
+
+.posts-management-table .btn-action.btn-duplicate:hover {
+    background: #6d28d9 !important;
+}
+
+.posts-management-table .btn-action.btn-delete {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+}
+
+.posts-management-table .btn-action.btn-delete:hover {
+    background: #b91c1c !important;
+}
+
 /* Status badges */
 .status-badge {
     display: inline-flex;

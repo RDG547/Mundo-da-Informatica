@@ -74,6 +74,11 @@ except Exception:  # pragma: no cover - compatibilidade quando Firestore não es
     FirestoreFieldFilter = None
 
 try:
+    from google.api_core import exceptions as google_api_exceptions
+except Exception:  # pragma: no cover - compatibilidade quando google-api-core não está instalado
+    google_api_exceptions = None
+
+try:
     from google.oauth2 import id_token as google_id_token
     from google.auth.transport import requests as google_auth_requests
 except Exception:  # pragma: no cover - fallback quando dependência não está instalada
@@ -6991,7 +6996,11 @@ def chat_firebase_token():
         return jsonify({'success': True, 'token': '', 'uid': '', 'chatUnavailable': True, 'chatDisabled': True})
 
     if not initialize_firebase_admin():
-        return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.'}), 503
+        return jsonify({
+            'success': False,
+            'message': 'Chat temporariamente indisponível.',
+            'chatUnavailable': True
+        }), 503, {'Retry-After': '30'}
 
     try:
         firebase_uid = f"site_user_{current_user.id}"
@@ -7011,7 +7020,7 @@ def chat_firebase_token():
 # Circuit breaker para Firestore – evita crash loop quando quota é atingida.
 # Usa arquivo em /tmp para que o estado persista entre restarts de workers
 # do gunicorn (variáveis in-memory se perdem quando o master mata o worker).
-# Quando uma chamada falha (429/timeout/rede), o circuito abre por 5 min
+# Quando uma chamada transitória falha (429/timeout/rede), o circuito abre por 30s
 # e _get_firestore_client() retorna None → rotas de chat respondem 503
 # imediatamente sem tentar gRPC → worker não bloqueia → site funciona.
 # ---------------------------------------------------------------------------
@@ -7019,7 +7028,7 @@ import os as _cb_os
 import time as _cb_time
 
 _FIRESTORE_CIRCUIT_FILE = '/tmp/_firestore_circuit_open'
-_FIRESTORE_CIRCUIT_COOLDOWN = 300  # 5 minutos
+_FIRESTORE_CIRCUIT_COOLDOWN = 30
 
 
 def _is_firestore_circuit_open() -> bool:
@@ -7034,7 +7043,36 @@ def _is_firestore_circuit_open() -> bool:
     return False
 
 
-def _trip_firestore_circuit() -> None:
+def _is_transient_firestore_error(error: BaseException) -> bool:
+    """Distingue falhas recuperáveis de erros de regra/configuração."""
+    if google_api_exceptions is not None:
+        transient_types = tuple(
+            error_type
+            for error_type in (
+                getattr(google_api_exceptions, 'DeadlineExceeded', None),
+                getattr(google_api_exceptions, 'ResourceExhausted', None),
+                getattr(google_api_exceptions, 'ServiceUnavailable', None),
+                getattr(google_api_exceptions, 'TooManyRequests', None),
+                getattr(google_api_exceptions, 'InternalServerError', None)
+            )
+            if isinstance(error_type, type)
+        )
+        if transient_types and isinstance(error, transient_types):
+            return True
+
+    normalized_message = str(error or '').casefold()
+    return any(marker in normalized_message for marker in (
+        '429', '503', 'deadline exceeded', 'quota', 'resource exhausted',
+        'service unavailable', 'temporarily unavailable', 'timeout',
+        'timed out', 'connection reset', 'connection aborted'
+    ))
+
+
+def _trip_firestore_circuit(error: BaseException | None = None) -> None:
+    if error is not None and not _is_transient_firestore_error(error):
+        app.logger.warning('[CHAT] Falha não transitória não abriu o circuito: %s', error)
+        return
+
     try:
         with open(_FIRESTORE_CIRCUIT_FILE, 'w') as f:
             f.write(str(_cb_time.time()))
@@ -7042,7 +7080,7 @@ def _trip_firestore_circuit() -> None:
         pass
     app.logger.warning(
         f'[CHAT] Circuit breaker ABERTO (arquivo) por {_FIRESTORE_CIRCUIT_COOLDOWN}s '
-        f'– Firestore desabilitado até cooldown.'
+        f'– nova tentativa automática após o cooldown.'
     )
 
 
@@ -7059,7 +7097,7 @@ def _get_firestore_client():
         return firebase_firestore.client()
     except Exception as e:
         app.logger.error(f'Erro ao obter cliente Firestore: {e}')
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         return None
 
 
@@ -7167,6 +7205,20 @@ def _chat_disabled_payload_for_user(user) -> dict[str, Any]:
         },
         'tickets': []
     }
+
+
+def _chat_backend_unavailable_response(user):
+    """Separa chat não configurado de uma interrupção temporária recuperável."""
+    if not is_firebase_admin_configured():
+        return jsonify(_chat_disabled_payload_for_user(user))
+
+    return jsonify({
+        'success': False,
+        'chatUnavailable': True,
+        'chatDisabled': False,
+        'message': 'Chat temporariamente indisponível. Tentando reconectar...',
+        'permissions': _get_chat_permissions_for_user(user)
+    }), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 
 
 def _validate_chat_room_access(user, room_id: str, *, write: bool = False) -> tuple[bool, str, int]:
@@ -7325,7 +7377,7 @@ def _sync_chat_room_metadata_from_latest(db_firestore, room_id: str) -> None:
             'lastSenderPlan': normalize_plan_key(latest_data.get('senderPlan'))
         }, merge=True, timeout=5)
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.warning(f'Firestore indisponível ao sincronizar metadados da sala {room_id}: {e}')
 
 
@@ -7337,9 +7389,9 @@ def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
             query = chat_rooms.where(filter=FirestoreFieldFilter('type', '==', 'support'))
         else:
             query = chat_rooms.where('type', '==', 'support')
-        docs = query.limit(100).stream(timeout=10)
+        docs = list(query.limit(100).stream(timeout=10))
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.warning(f'Firestore indisponível ao listar tickets de suporte: {e}')
         return tickets
 
@@ -7412,7 +7464,7 @@ def _ensure_chat_base_rooms_for_user(db_firestore, user) -> tuple[str, str]:
 
         _chat_rooms_ensured_cache[cache_key] = now
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.warning(f'Firestore indisponível ao garantir salas de chat (quota/rede): {e}')
         # Mesmo com erro, retorna os IDs — as salas provavelmente já existem
 
@@ -7431,7 +7483,7 @@ def chat_bootstrap():
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
-        return jsonify(_chat_disabled_payload_for_user(current_user))
+        return _chat_backend_unavailable_response(current_user)
 
     try:
         todos_room_id, support_room_id = _ensure_chat_base_rooms_for_user(db_firestore, current_user)
@@ -7444,7 +7496,7 @@ def chat_bootstrap():
             'permissions': _get_chat_permissions_for_user(current_user)
         })
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.error(f'Erro no bootstrap das salas de chat: {e}')
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 
@@ -7458,7 +7510,7 @@ def chat_state():
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
-        return jsonify(_chat_disabled_payload_for_user(current_user))
+        return _chat_backend_unavailable_response(current_user)
 
     try:
         todos_room_id, support_room_id = _ensure_chat_base_rooms_for_user(db_firestore, current_user)
@@ -7486,7 +7538,7 @@ def chat_state():
 
         return jsonify(payload)
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.error(f'Erro ao carregar estado do chat: {e}')
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 
@@ -7556,7 +7608,7 @@ def chat_room_messages(room_id):
             'message': _serialize_chat_message(created_doc) if created_doc.exists else {**payload, 'id': new_message_ref.id}
         })
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.error(f'Erro ao processar mensagens da sala {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 
@@ -7628,7 +7680,7 @@ def chat_room_message_actions(room_id, message_id):
         _sync_chat_room_metadata_from_latest(db_firestore, room_id)
         return jsonify({'success': True, 'message': 'Mensagem excluída com sucesso.'})
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.error(f'Erro ao processar ação da mensagem {message_id} na sala {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 
@@ -7647,7 +7699,7 @@ def chat_admin_tickets():
     try:
         return jsonify({'success': True, 'tickets': _get_chat_support_tickets(db_firestore)})
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.error(f'Erro ao listar chamados do chat: {e}')
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 
@@ -7670,7 +7722,7 @@ def chat_admin_delete_ticket(room_id):
         _delete_chat_room_recursive(db_firestore, room_id)
         return jsonify({'success': True, 'message': 'Chamado excluído com sucesso.', 'room_id': room_id})
     except BaseException as e:
-        _trip_firestore_circuit()
+        _trip_firestore_circuit(e)
         app.logger.error(f'Erro ao excluir chamado do chat {room_id}: {e}')
         return jsonify({'success': False, 'message': 'Chat temporariamente indisponível.', 'chatUnavailable': True}), 503, {'Retry-After': str(_FIRESTORE_CIRCUIT_COOLDOWN)}
 

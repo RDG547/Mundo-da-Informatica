@@ -194,7 +194,7 @@
                 <td class="actions">
                     <div class="action-buttons">
                         <a href="#" class="btn-action btn-edit" title="Editar" data-category-id="${category.id}"><i class="fas fa-edit"></i></a>
-                        <a href="#" class="btn-action btn-delete" title="Excluir" data-category-id="${category.id}" data-category-name="${escapeHtml(category.name)}" data-post-count="${category.post_count}"><i class="fas fa-trash"></i></a>
+                        <a href="#" class="btn-action btn-delete" title="Excluir" data-category-id="${category.id}" data-category-name="${escapeHtml(category.name)}" data-post-count="${category.post_count}"><i class="fas fa-trash"></i><span>Excluir</span></a>
                         <a href="/categoria/${encodeURIComponent(category.slug)}" class="btn-action btn-view" title="Ver Categoria" target="_blank"><i class="fas fa-external-link-alt"></i></a>
                     </div>
                 </td>
@@ -227,7 +227,7 @@
                 <div class="card-footer">
                     <button class="btn-card btn-primary" onclick="editCategory(${category.id})"><i class="fas fa-edit"></i> Editar</button>
                     <button class="btn-card btn-secondary" onclick="viewCategory('${escapeHtml(category.slug)}')"><i class="fas fa-eye"></i> Ver</button>
-                    <button class="btn-card btn-danger" onclick="deleteCategory(${category.id}, '${escapeHtml(category.name)}')"><i class="fas fa-trash"></i></button>
+                    <button class="btn-card btn-danger" onclick="deleteCategory(${category.id}, '${escapeHtml(category.name)}')"><i class="fas fa-trash"></i> Excluir</button>
                 </div>
             </div>
         `;

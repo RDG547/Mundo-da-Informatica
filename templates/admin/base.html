@@ -62,6 +62,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-forms.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-responsive.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/project-dropdowns.css') }}" data-static-base-style="true">
 
     <!-- Adicionar tema atual -->
     <script>
@@ -116,6 +117,7 @@
     <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/admin.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/modern-forms.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/project-dropdowns.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/profile-images.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/plan-prices.js') }}" data-static-base-script="true"></script>
@@ -143,14 +145,17 @@
         </header>
         <div class="chat-room-tabs" id="chat-room-tabs">
             <button type="button" class="chat-room-tab active" data-chat-room="todos">
+                <i class="fas fa-users" aria-hidden="true"></i>
                 Todos
                 <span class="chat-tab-unread" data-chat-badge="todos" hidden>0</span>
             </button>
             <button type="button" class="chat-room-tab" data-chat-room="suporte">
+                <i class="fas fa-headset" aria-hidden="true"></i>
                 Suporte
                 <span class="chat-tab-unread" data-chat-badge="suporte" hidden>0</span>
             </button>
             <button type="button" class="chat-room-tab" data-chat-room="chamados">
+                <i class="fas fa-ticket-alt" aria-hidden="true"></i>
                 Chamados
                 <span class="chat-tab-unread" data-chat-badge="chamados" hidden>0</span>
             </button>

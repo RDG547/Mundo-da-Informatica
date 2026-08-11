@@ -77,6 +77,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}" data-static-base-style="true">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/click-effects.css') }}" data-static-base-style="true">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}" data-static-base-style="true">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/project-dropdowns.css') }}" data-static-base-style="true">
 
     <!-- Page-specific CSS - Always loaded but conditionally activated -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}" id="faq-css" data-static-base-style="true" {% if request.endpoint
@@ -321,15 +322,18 @@
 
         <div class="chat-room-tabs" id="chat-room-tabs">
             <button type="button" class="chat-room-tab active" data-chat-room="todos">
+                <i class="fas fa-users" aria-hidden="true"></i>
                 Todos
                 <span class="chat-tab-unread" data-chat-badge="todos" hidden>0</span>
             </button>
             <button type="button" class="chat-room-tab" data-chat-room="suporte">
+                <i class="fas fa-headset" aria-hidden="true"></i>
                 Suporte
                 <span class="chat-tab-unread" data-chat-badge="suporte" hidden>0</span>
             </button>
             {% if current_user.is_authenticated and current_user.role == 'admin' %}
             <button type="button" class="chat-room-tab" data-chat-room="chamados">
+                <i class="fas fa-ticket-alt" aria-hidden="true"></i>
                 Chamados
                 <span class="chat-tab-unread" data-chat-badge="chamados" hidden>0</span>
             </button>
@@ -378,6 +382,7 @@
     <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/plan-prices.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/project-dropdowns.js') }}" data-static-base-script="true"></script>
     {% block extra_js %}{% endblock %}
 
     <style data-static-base-style="true">

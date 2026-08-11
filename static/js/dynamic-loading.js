@@ -1239,7 +1239,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 align-items: center;
                 z-index: 900;
                 backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
                 pointer-events: auto;
+                overflow: hidden;
             }
 
             .loader-spinner {
@@ -1288,6 +1290,28 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         attachLoaderToMain(loader) {
+            const isAdminPage = document.body.classList.contains('admin-page')
+                || window.location.pathname.startsWith('/admin');
+            const adminContent = document.querySelector('.admin-content');
+
+            if (isAdminPage && adminContent) {
+                const adminRect = adminContent.getBoundingClientRect();
+                const left = Math.max(adminRect.left, 0);
+
+                if (loader.parentNode !== document.body) {
+                    document.body.appendChild(loader);
+                }
+
+                // O painel mantém a sidebar disponível e cobre uniformemente toda a
+                // viewport de conteúdo. A altura do documento ou a posição do scroll
+                // não podem mais fazer o blur começar no meio da tela.
+                loader.style.top = '0';
+                loader.style.left = `${left}px`;
+                loader.style.width = `${Math.max(window.innerWidth - left, 0)}px`;
+                loader.style.height = '100dvh';
+                return;
+            }
+
             const mainContainer = document.querySelector('.main-content-container') ||
                 document.querySelector('main') ||
                 document.querySelector('[data-dynamic-loading-root="true"]');
@@ -1303,22 +1327,18 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 return;
             }
 
-            const rect = mainContainer.getBoundingClientRect();
             const header = document.querySelector('header');
             const headerRect = header?.getBoundingClientRect();
-            const top = Math.max(rect.top, headerRect ? headerRect.bottom : 0, 0);
-            const left = Math.max(rect.left, 0);
-            const width = Math.max(rect.width, 320);
-            const height = Math.max(Math.min(rect.bottom, window.innerHeight) - top, 240);
+            const top = Math.max(headerRect ? headerRect.bottom : 0, 0);
 
             if (loader.parentNode !== document.body) {
                 document.body.appendChild(loader);
             }
 
             loader.style.top = `${top}px`;
-            loader.style.left = `${left}px`;
-            loader.style.width = `${width}px`;
-            loader.style.height = `${height}px`;
+            loader.style.left = '0';
+            loader.style.width = '100vw';
+            loader.style.height = `${Math.max(window.innerHeight - top, 0)}px`;
         }
 
         dispatchEvent(eventName, data = {}) {

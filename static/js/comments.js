@@ -23,11 +23,7 @@
             count: document.querySelector('.comments-count'),
             name: document.getElementById('commentName'),
             email: document.getElementById('commentEmail'),
-            text: document.getElementById('commentText'),
-            parentId: document.getElementById('commentParentId'),
-            replyState: document.getElementById('commentReplyState'),
-            replyAuthor: document.getElementById('commentReplyAuthor'),
-            replyPreview: document.getElementById('commentReplyPreview')
+            text: document.getElementById('commentText')
         };
     }
 
@@ -151,6 +147,7 @@
                         <p class="comment-text">${parseMultilineText(comment.content)}</p>
                     </div>
                 </div>
+                <div class="comment-inline-reply-slot" data-comment-reply-slot="${comment.id}"></div>
                 ${replies.length ? `<div class="comment-replies">${replies.map((reply) => renderCommentItem(reply, depth + 1)).join('')}</div>` : ''}
             </div>
         `;
@@ -216,6 +213,14 @@
         const { list, count } = getElements();
         if (!list) return;
 
+        const activeReplyId = state.replyId;
+        const activeReplyForm = list.querySelector('[data-comment-inline-reply]');
+        const activeReplyDraft = activeReplyForm ? {
+            content: activeReplyForm.querySelector('[name="content"]')?.value || '',
+            name: activeReplyForm.querySelector('[name="name"]')?.value || '',
+            email: activeReplyForm.querySelector('[name="email"]')?.value || ''
+        } : null;
+
         state.editId = null;
         state.comments = Array.isArray(comments) ? comments.slice() : [];
         state.snapshot = JSON.stringify(state.comments);
@@ -235,7 +240,10 @@
             count.textContent = `(${countComments(state.comments)})`;
         }
 
-        if (state.replyId && !findCommentById(state.comments, state.replyId)) {
+        const activeReplyComment = activeReplyId && findCommentById(state.comments, activeReplyId);
+        if (activeReplyComment) {
+            updateReplyState(activeReplyComment, false, activeReplyDraft);
+        } else if (activeReplyId) {
             clearReplyState();
         }
 
@@ -284,36 +292,62 @@
         }
     }
 
-    function updateReplyState(comment) {
-        const { parentId, replyState, replyAuthor, replyPreview, text } = getElements();
-        if (!comment || !replyState || !parentId) return;
+    function buildReplyForm(comment, draft = {}) {
+        const guestFields = isAuthenticated() ? '' : `
+            <div class="comment-inline-reply-fields">
+                <input type="text" class="form-control" name="name" value="${escapeHtml(draft.name || '')}" placeholder="Seu nome" autocomplete="name" required>
+                <input type="email" class="form-control" name="email" value="${escapeHtml(draft.email || '')}" placeholder="Seu email" autocomplete="email" required>
+            </div>
+        `;
+        const preview = String(comment.content || '').trim().slice(0, 140);
+
+        return `
+            <form class="comment-inline-reply" data-comment-inline-reply data-parent-id="${comment.id}">
+                <div class="comment-reply-state">
+                    <div class="comment-reply-summary">
+                        <i class="fas fa-reply"></i>
+                        <div class="comment-reply-copy">
+                            <strong>Respondendo a ${escapeHtml(comment.author || 'Usuario')}</strong>
+                            <p>${escapeHtml(preview)}</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-cancel-reply" data-comment-cancel-reply>
+                        <i class="fas fa-times"></i>
+                        Cancelar
+                    </button>
+                </div>
+                ${guestFields}
+                <textarea class="form-control" name="content" rows="3" maxlength="1000" placeholder="Escreva sua resposta..." required>${escapeHtml(draft.content || '')}</textarea>
+                <div class="comment-inline-reply-actions">
+                    <button type="submit" class="btn-submit-reply">
+                        <i class="fas fa-paper-plane"></i>
+                        Enviar resposta
+                    </button>
+                </div>
+            </form>
+        `;
+    }
+
+    function updateReplyState(comment, shouldFocus = true, draft = null) {
+        if (!comment) return;
+
+        document.querySelectorAll('[data-comment-inline-reply]').forEach((form) => form.remove());
+        const slot = document.querySelector(`[data-comment-reply-slot="${comment.id}"]`);
+        if (!slot) return;
 
         state.replyId = Number(comment.id);
-        parentId.value = String(comment.id);
-        replyState.hidden = false;
+        slot.innerHTML = buildReplyForm(comment, draft || {});
 
-        if (replyAuthor) {
-            replyAuthor.textContent = comment.author || 'Usuario';
-        }
-
-        if (replyPreview) {
-            replyPreview.textContent = (comment.content || '').trim().slice(0, 140);
-        }
-
-        if (text) {
-            text.focus();
-            text.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (shouldFocus) {
+            const text = slot.querySelector('textarea[name="content"]');
+            text?.focus();
+            slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
 
     function clearReplyState() {
-        const { parentId, replyState, replyAuthor, replyPreview } = getElements();
-
         state.replyId = null;
-        if (parentId) parentId.value = '';
-        if (replyState) replyState.hidden = true;
-        if (replyAuthor) replyAuthor.textContent = '';
-        if (replyPreview) replyPreview.textContent = '';
+        document.querySelectorAll('[data-comment-inline-reply]').forEach((form) => form.remove());
     }
 
     function applyPendingReplyIntent() {
@@ -370,8 +404,18 @@
         }
     }
 
-    async function submitComment() {
-        const { form, name, email, text } = getElements();
+    async function submitComment(form = getElements().form, parentCommentId = null) {
+        const mainElements = getElements();
+        const isReply = Boolean(parentCommentId);
+        const text = isReply
+            ? form?.querySelector('[name="content"]')
+            : mainElements.text;
+        const name = isReply
+            ? form?.querySelector('[name="name"]')
+            : mainElements.name;
+        const email = isReply
+            ? form?.querySelector('[name="email"]')
+            : mainElements.email;
         if (!form || !text) return;
 
         const content = (text.value || '').trim();
@@ -389,11 +433,11 @@
             }
         }
 
-        const wasReply = Boolean(state.replyId);
+        const wasReply = isReply;
         const payload = { content };
         if (name && name.type !== 'hidden') payload.name = (name.value || '').trim();
         if (email && email.type !== 'hidden') payload.email = (email.value || '').trim();
-        if (state.replyId) payload.parent_id = state.replyId;
+        if (parentCommentId) payload.parent_id = Number(parentCommentId);
 
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -417,7 +461,7 @@
             }
 
             form.reset();
-            clearReplyState();
+            if (wasReply) clearReplyState();
             await fetchComments(true);
 
             if (data.comment && data.comment.is_approved) {
@@ -555,20 +599,14 @@
     }
 
     function bindForm() {
-        const { form, replyState } = getElements();
+        const { form } = getElements();
         if (!form || form.dataset.commentsBound === 'true') return;
 
         form.dataset.commentsBound = 'true';
         form.addEventListener('submit', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            submitComment();
-        });
-
-        replyState?.addEventListener('click', (event) => {
-            const cancelButton = event.target.closest('[data-comment-cancel-reply]');
-            if (!cancelButton) return;
-            clearReplyState();
+            submitComment(form);
         });
     }
 
@@ -577,7 +615,22 @@
         if (!list || list.dataset.commentsBound === 'true') return;
 
         list.dataset.commentsBound = 'true';
+        list.addEventListener('submit', (event) => {
+            const replyForm = event.target.closest('[data-comment-inline-reply]');
+            if (!replyForm) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            submitComment(replyForm, Number(replyForm.dataset.parentId));
+        });
+
         list.addEventListener('click', (event) => {
+            const cancelReplyButton = event.target.closest('[data-comment-cancel-reply]');
+            if (cancelReplyButton) {
+                clearReplyState();
+                return;
+            }
+
             const replyButton = event.target.closest('[data-comment-reply]');
             if (replyButton) {
                 startReply(Number(replyButton.dataset.commentReply));

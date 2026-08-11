@@ -1,12 +1,7 @@
 {% extends "admin/base.html" %}
 
 {% block content %}
-<style>
-    .page-loading { opacity: 0; transition: opacity 0.3s ease-in; }
-    .page-loaded { opacity: 1; }
-</style>
-
-<div class="page-loading" id="pageContent">
+<div id="pageContent">
 <!-- Enhanced Header -->
 <div class="admin-header slide-in-up">
     <div class="header-content">
@@ -136,8 +131,12 @@
                     </div>
                 </div>
                 <div class="bulk-actions posts-top-bulk-actions">
+                    <span class="posts-bulk-actions-label">
+                        <i class="fas fa-tasks"></i>
+                        Ações em Massa
+                    </span>
                     <select id="bulkActionSelect" class="form-select" aria-label="Ações em lote">
-                        <option value="">Ações em massa</option>
+                        <option value="">Selecione uma ação</option>
                         <option value="delete">Excluir selecionados</option>
                         <option value="feature">Marcar como destaque</option>
                         <option value="unfeature">Remover destaque</option>
@@ -668,27 +667,13 @@
         </div>
     </div>
 </div>
-</div><!-- Fecha page-loading -->
+</div><!-- Fecha pageContent -->
 
 <!-- Modal de Novo Post -->
 {% include 'admin/components/modal_post.html' %}
 {% endblock %}
 
 {% block scripts %}
-<script>
-    function activatePostsPageContent() {
-        var el = document.getElementById('pageContent');
-        if (el) { el.classList.remove('page-loading'); el.classList.add('page-loaded'); }
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', activatePostsPageContent);
-    } else {
-        activatePostsPageContent();
-    }
-    document.addEventListener('adminPageLoaded', activatePostsPageContent);
-</script>
-
 <script>
     // ========================================
     // FUNÇÕES GLOBAIS DO MODAL DE EDIÇÃO
@@ -1626,12 +1611,6 @@
                 });
         };
 
-        // Animation delays for table rows
-        getTableRows().forEach((row, index) => {
-            row.style.animationDelay = `${index * 0.05}s`;
-            row.classList.add('slide-in-up');
-        });
-
         // Initialize bulk actions visibility
         // showNotification global é definida em admin.js
 
@@ -1904,23 +1883,46 @@
     }
 
     .admin-list-filters {
-        flex-wrap: nowrap;
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(260px, 1.45fr) repeat(3, minmax(150px, 0.8fr));
+        align-items: center;
+        gap: 0.75rem;
     }
 
     .admin-list-filters .search-bar-advanced {
-        flex: 1 1 280px;
+        width: 100%;
         min-width: 210px;
     }
 
     .admin-list-filters .filter-dropdown,
     .admin-list-filters .sort-dropdown {
-        flex: 0 1 190px;
+        width: 100%;
         min-width: 150px;
     }
 
     .admin-list-filters .posts-top-bulk-actions {
-        flex: 0 1 260px;
-        min-width: 220px;
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        grid-template-columns: auto minmax(220px, 380px) auto;
+        justify-content: start;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .posts-bulk-actions-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--admin-text-primary);
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .posts-bulk-actions-label i {
+        color: var(--admin-primary);
     }
 
     .posts-top-bulk-actions .project-select,
@@ -2431,16 +2433,41 @@
 
     @media (max-width: 1100px) {
         .admin-list-filters {
-            flex-wrap: wrap;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .admin-list-filters .search-bar-advanced {
-            flex-basis: 100%;
+            grid-column: 1 / -1;
+        }
+
+        .admin-list-filters .posts-top-bulk-actions {
+            grid-column: 1 / -1;
         }
 
         .posts-table-responsive {
             overflow-x: auto;
             overflow-y: visible;
+        }
+    }
+
+    @media (max-width: 680px) {
+        .admin-list-filters {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .admin-list-filters .search-bar-advanced,
+        .admin-list-filters .posts-top-bulk-actions {
+            grid-column: 1;
+        }
+
+        .admin-list-filters .posts-top-bulk-actions {
+            grid-template-columns: minmax(0, 1fr);
+            align-items: stretch;
+        }
+
+        .posts-top-bulk-actions .btn-admin {
+            width: 100%;
+            justify-content: center;
         }
     }
 

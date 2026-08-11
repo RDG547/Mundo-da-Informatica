@@ -1126,15 +1126,42 @@
     .categories-filter-controls .bulk-actions {
         grid-column: 1 / -1;
         display: grid;
-        grid-template-columns: auto minmax(220px, 1fr) auto;
+        grid-template-columns: auto minmax(210px, 460px) 92px;
+        justify-content: start;
         gap: 0.85rem;
         width: 100%;
         min-width: 0;
     }
 
-    .categories-filter-controls .bulk-actions select {
+    .categories-filter-controls .bulk-actions select,
+    .categories-filter-controls .bulk-actions .project-select,
+    .categories-filter-controls .bulk-actions .project-select-trigger {
         width: 100%;
         min-width: 0;
+        max-width: 460px;
+    }
+
+    .categories-filter-controls .bulk-actions .project-select {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .categories-filter-controls .bulk-actions .project-select-trigger {
+        padding-right: 0.7rem;
+    }
+
+    .categories-filter-controls .bulk-actions .project-select-chevron {
+        font-size: 0.68rem;
+    }
+
+    .categories-filter-controls .bulk-actions #applyBulkAction {
+        width: 92px;
+        min-width: 92px;
+        padding-inline: 0.75rem;
+        justify-content: center;
+        position: relative;
+        z-index: 1;
     }
 
     .stats-live-indicator {
@@ -1556,6 +1583,11 @@
         .categories-filter-controls .bulk-actions .btn-admin {
             width: 100%;
             justify-content: center;
+        }
+
+        .categories-filter-controls .bulk-actions #applyBulkAction {
+            width: 100%;
+            min-width: 0;
         }
 
         .search-input {

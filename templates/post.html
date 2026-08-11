@@ -231,7 +231,6 @@
                         <h4>Deixe seu comentário</h4>
                         <form class="comment-form" id="commentForm" method="post" action="{{ url_for('add_post_comment', post_id=post.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" id="commentParentId" name="parent_id" value="{{ request.args.get('reply_to', '') }}">
                             {% if current_user.is_authenticated %}
                             <input type="hidden" id="commentName" value="{{ current_user.username }}">
                             <input type="hidden" id="commentEmail" value="{{ current_user.email }}">
@@ -253,19 +252,6 @@
                                 <label for="commentText">
                                     <i class="far fa-comment-dots"></i> Comentário *
                                 </label>
-                                <div class="comment-reply-state" id="commentReplyState" hidden>
-                                    <div class="comment-reply-summary">
-                                        <i class="fas fa-reply"></i>
-                                        <div class="comment-reply-copy">
-                                            <strong>Respondendo a <span id="commentReplyAuthor"></span></strong>
-                                            <p id="commentReplyPreview"></p>
-                                        </div>
-                                    </div>
-                                    <button type="button" class="btn-cancel-reply" data-comment-cancel-reply>
-                                        <i class="fas fa-times"></i>
-                                        Cancelar
-                                    </button>
-                                </div>
                                 <textarea class="form-control" id="commentText" name="content" rows="3" placeholder="Escreva seu comentário..." required></textarea>
                             </div>
                             <button type="submit" class="btn-submit-comment">
@@ -675,6 +661,98 @@
     background: rgba(102, 126, 234, 0.06);
 }
 
+.comment-inline-reply-slot:empty {
+    display: none;
+}
+
+.comment-inline-reply {
+    margin: 0.75rem 0 0.25rem 3.65rem;
+    padding: 0.9rem;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.035);
+    animation: commentReplyIn 0.24s ease;
+}
+
+@keyframes commentReplyIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.comment-inline-reply .comment-reply-state {
+    margin-bottom: 0.75rem;
+}
+
+.comment-inline-reply-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 0.7rem;
+}
+
+.comment-inline-reply input,
+.comment-inline-reply textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(102, 126, 234, 0.24);
+    border-radius: 9px;
+    padding: 0.72rem 0.82rem;
+    background: var(--background-secondary, #fff);
+    color: var(--text-primary, #1f2937);
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.comment-inline-reply input {
+    min-height: 44px;
+}
+
+.comment-inline-reply input:focus,
+.comment-inline-reply textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.comment-inline-reply textarea {
+    min-height: 88px;
+    resize: vertical;
+}
+
+.comment-inline-reply-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    margin-top: 0.7rem;
+}
+
+.btn-submit-reply {
+    border: none;
+    border-radius: 8px;
+    padding: 0.68rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.btn-submit-reply:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
 .comment-reply-summary {
     display: flex;
     align-items: flex-start;
@@ -720,6 +798,23 @@
     .comment-reply-state {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .comment-inline-reply {
+        margin-left: 0;
+    }
+
+    .comment-inline-reply-fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .comment-inline-reply-actions {
+        flex-direction: column-reverse;
+    }
+
+    .comment-inline-reply-actions button {
+        width: 100%;
+        justify-content: center;
     }
 }
 

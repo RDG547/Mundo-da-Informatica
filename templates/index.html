@@ -86,10 +86,18 @@
         if (subtitleEl) subtitleEl.style.visibility = 'visible';
         if (searchForm) searchForm.style.opacity = '1';
 
-        if (typeof gsap === 'undefined') return;
+        if (typeof gsap !== 'undefined') {
+            gsap.killTweensOf(titleEl);
+            gsap.killTweensOf(titleEl.querySelectorAll('*'));
+        }
 
         var titleChars = splitIntoChars(titleEl, getHeroTitleLines(titleEl));
         var titleLines = Array.prototype.slice.call(titleEl.querySelectorAll('.hero-line, .hero-line-3d'));
+
+        if (typeof gsap === 'undefined') return;
+
+        gsap.killTweensOf(titleLines);
+        gsap.killTweensOf(titleChars);
 
         gsap.fromTo(titleLines, {
             x: 72,

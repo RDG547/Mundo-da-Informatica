@@ -84,12 +84,12 @@
                 </div>
                 <div class="filter-dropdown">
                     {% set selected_status = current_filters.status if current_filters else '' %}
-                    <div class="admin-smart-select" data-smart-select>
+                    <div class="admin-smart-select status-filter-smart-select" data-smart-select>
                         <select id="filterStatus" name="status" class="smart-select-native" aria-label="Filtrar por status" tabindex="-1">
                             <option value="">Todos os Status</option>
-                            <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Ativos</option>
-                            <option value="featured" {% if selected_status == 'featured' %}selected{% endif %}>Em Destaque</option>
-                            <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inativos</option>
+                            <option value="active" data-tone="success" {% if selected_status == 'active' %}selected{% endif %}>Ativos</option>
+                            <option value="featured" data-tone="warning" {% if selected_status == 'featured' %}selected{% endif %}>Em Destaque</option>
+                            <option value="inactive" data-tone="neutral" {% if selected_status == 'inactive' %}selected{% endif %}>Inativos</option>
                         </select>
                         <button type="button" class="smart-select-trigger" data-smart-select-trigger aria-haspopup="listbox" aria-expanded="false">
                             <span class="smart-select-current">
@@ -100,9 +100,9 @@
                         </button>
                         <div class="smart-select-menu" role="listbox">
                             <button type="button" class="smart-select-option{% if not selected_status %} is-selected{% endif %}" data-value="" data-icon="fas fa-sliders-h"><span><i class="fas fa-sliders-h"></i> Todos os Status</span><i class="fas fa-check option-check"></i></button>
-                            <button type="button" class="smart-select-option{% if selected_status == 'active' %} is-selected{% endif %}" data-value="active" data-icon="fas fa-check-circle"><span><i class="fas fa-check-circle"></i> Ativos</span><i class="fas fa-check option-check"></i></button>
-                            <button type="button" class="smart-select-option{% if selected_status == 'featured' %} is-selected{% endif %}" data-value="featured" data-icon="fas fa-star"><span><i class="fas fa-star"></i> Em Destaque</span><i class="fas fa-check option-check"></i></button>
-                            <button type="button" class="smart-select-option{% if selected_status == 'inactive' %} is-selected{% endif %}" data-value="inactive" data-icon="fas fa-pause-circle"><span><i class="fas fa-pause-circle"></i> Inativos</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'active' %} is-selected{% endif %}" data-value="active" data-icon="fas fa-check-circle" data-tone="success"><span><i class="fas fa-check-circle"></i> Ativos</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'featured' %} is-selected{% endif %}" data-value="featured" data-icon="fas fa-star" data-tone="warning"><span><i class="fas fa-star"></i> Em Destaque</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'inactive' %} is-selected{% endif %}" data-value="inactive" data-icon="fas fa-pause-circle" data-tone="neutral"><span><i class="fas fa-pause-circle"></i> Inativos</span><i class="fas fa-check option-check"></i></button>
                         </div>
                     </div>
                 </div>
@@ -137,11 +137,11 @@
                     </span>
                     <select id="bulkActionSelect" class="form-select" aria-label="Ações em lote">
                         <option value="">Selecione uma ação</option>
-                        <option value="delete">Excluir selecionados</option>
-                        <option value="feature">Marcar como destaque</option>
-                        <option value="unfeature">Remover destaque</option>
-                        <option value="activate">Ativar</option>
-                        <option value="deactivate">Desativar</option>
+                        <option value="delete" data-tone="danger" data-icon="fas fa-trash-alt">Excluir selecionados</option>
+                        <option value="feature" data-tone="warning" data-icon="fas fa-star">Marcar como destaque</option>
+                        <option value="unfeature" data-tone="neutral" data-icon="far fa-star">Remover destaque</option>
+                        <option value="activate" data-tone="success" data-icon="fas fa-check-circle">Ativar</option>
+                        <option value="deactivate" data-tone="neutral" data-icon="fas fa-pause-circle">Desativar</option>
                     </select>
                     <button type="button" id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
                 </div>
@@ -2204,46 +2204,73 @@
         pointer-events: none;
     }
 
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"] {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"],
+    .status-filter-smart-select .smart-select-option[data-value="active"] {
         color: #15803d;
     }
 
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"] > span > i {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"] > span > i,
+    .status-filter-smart-select .smart-select-option[data-value="active"] > span > i {
         color: #16a34a;
     }
 
     .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"]:hover,
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"].is-selected {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="active"].is-selected,
+    .status-filter-smart-select .smart-select-option[data-value="active"]:hover,
+    .status-filter-smart-select .smart-select-option[data-value="active"].is-selected {
         background: #dcfce7;
         color: #166534;
     }
 
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"] {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"],
+    .status-filter-smart-select .smart-select-option[data-value="featured"] {
         color: #b45309;
     }
 
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"] > span > i {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"] > span > i,
+    .status-filter-smart-select .smart-select-option[data-value="featured"] > span > i {
         color: #f59e0b;
     }
 
     .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"]:hover,
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"].is-selected {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="featured"].is-selected,
+    .status-filter-smart-select .smart-select-option[data-value="featured"]:hover,
+    .status-filter-smart-select .smart-select-option[data-value="featured"].is-selected {
         background: #fef3c7;
         color: #92400e;
     }
 
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"] {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"],
+    .status-filter-smart-select .smart-select-option[data-value="inactive"] {
         color: #475569;
     }
 
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"] > span > i {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"] > span > i,
+    .status-filter-smart-select .smart-select-option[data-value="inactive"] > span > i {
         color: #64748b;
     }
 
     .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"]:hover,
-    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"].is-selected {
+    .quick-edit-control[data-quick-edit-control="status"] .quick-edit-option[data-value="inactive"].is-selected,
+    .status-filter-smart-select .smart-select-option[data-value="inactive"]:hover,
+    .status-filter-smart-select .smart-select-option[data-value="inactive"].is-selected {
         background: #e2e8f0;
         color: #334155;
+    }
+
+    .status-filter-smart-select[data-tone="success"] .smart-select-current,
+    .status-filter-smart-select[data-tone="success"] .smart-select-current > i:first-child {
+        color: #15803d;
+    }
+
+    .status-filter-smart-select[data-tone="warning"] .smart-select-current,
+    .status-filter-smart-select[data-tone="warning"] .smart-select-current > i:first-child {
+        color: #b45309;
+    }
+
+    .status-filter-smart-select[data-tone="neutral"] .smart-select-current,
+    .status-filter-smart-select[data-tone="neutral"] .smart-select-current > i:first-child {
+        color: #475569;
     }
 
     [data-theme="dark"] .smart-select-menu,

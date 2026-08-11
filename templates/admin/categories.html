@@ -57,9 +57,9 @@
                         <div class="filter-dropdown">
                             <select id="statusFilter" class="form-select">
                                 <option value="">Todos os Status</option>
-                                <option value="active">Ativas</option>
-                                <option value="inactive">Inativas</option>
-                                <option value="featured">Em Destaque</option>
+                                <option value="active" data-tone="success">Ativas</option>
+                                <option value="inactive" data-tone="neutral">Inativas</option>
+                                <option value="featured" data-tone="warning">Em Destaque</option>
                             </select>
                         </div>
                         <div class="sort-dropdown">
@@ -77,10 +77,10 @@
                             </label>
                             <select id="bulkActionSelect" class="form-select">
                                 <option value="">Selecione uma ação</option>
-                                <option value="toggle-status">Ativar/Desativar selecionados</option>
-                                <option value="feature">Marcar como destaque</option>
-                                <option value="unfeature">Remover destaque</option>
-                                <option value="delete">Excluir selecionados</option>
+                                <option value="toggle-status" data-tone="success" data-icon="fas fa-toggle-on">Ativar/Desativar selecionados</option>
+                                <option value="feature" data-tone="warning" data-icon="fas fa-star">Marcar como destaque</option>
+                                <option value="unfeature" data-tone="neutral" data-icon="far fa-star">Remover destaque</option>
+                                <option value="delete" data-tone="danger" data-icon="fas fa-trash-alt">Excluir selecionados</option>
                             </select>
                             <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
                         </div>

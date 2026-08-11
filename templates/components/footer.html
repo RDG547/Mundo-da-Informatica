@@ -35,10 +35,10 @@
                             </span>
                             <span class="footer-social-label">WhatsApp</span>
                         </a>
-                        <a href="{{ footer_youtube_link or '#' }}"
+                        <a{% if footer_youtube_link %} href="{{ footer_youtube_link }}"{% endif %}
                             class="footer-social-button{% if not footer_youtube_link %} is-disabled{% endif %}"
                             data-live-social="youtube"
-                            {% if footer_youtube_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
+                            {% if footer_youtube_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Canal no YouTube"
                             title="YouTube">
                             <span class="footer-social-icon">
@@ -57,10 +57,10 @@
                             </span>
                             <span class="footer-social-label">Email</span>
                         </a>
-                        <a href="{{ footer_facebook_link or '#' }}"
+                        <a{% if footer_facebook_link %} href="{{ footer_facebook_link }}"{% endif %}
                             class="footer-social-button{% if not footer_facebook_link %} is-disabled{% endif %}"
                             data-live-social="facebook"
-                            {% if footer_facebook_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
+                            {% if footer_facebook_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Facebook"
                             title="Facebook">
                             <span class="footer-social-icon">
@@ -68,10 +68,10 @@
                             </span>
                             <span class="footer-social-label">Facebook</span>
                         </a>
-                        <a href="{{ footer_instagram_link or '#' }}"
+                        <a{% if footer_instagram_link %} href="{{ footer_instagram_link }}"{% endif %}
                             class="footer-social-button{% if not footer_instagram_link %} is-disabled{% endif %}"
                             data-live-social="instagram"
-                            {% if footer_instagram_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
+                            {% if footer_instagram_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Instagram"
                             title="Instagram">
                             <span class="footer-social-icon">
@@ -79,10 +79,10 @@
                             </span>
                             <span class="footer-social-label">Instagram</span>
                         </a>
-                        <a href="{{ footer_twitter_link or '#' }}"
+                        <a{% if footer_twitter_link %} href="{{ footer_twitter_link }}"{% endif %}
                             class="footer-social-button{% if not footer_twitter_link %} is-disabled{% endif %}"
                             data-live-social="twitter"
-                            {% if footer_twitter_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
+                            {% if footer_twitter_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Twitter"
                             title="Twitter">
                             <span class="footer-social-icon">
@@ -285,6 +285,7 @@
 .footer-social-button.is-disabled {
     opacity: 0.62;
     cursor: default;
+    pointer-events: none;
 }
 
 .footer-social-button.is-disabled:hover {

@@ -26,14 +26,17 @@
     function setLinkState(element, url) {
         const enabled = Boolean(String(url || '').trim());
         element.classList.toggle('is-disabled', !enabled);
-        element.setAttribute('href', enabled ? String(url).trim() : '#');
         element.setAttribute('aria-disabled', enabled ? 'false' : 'true');
         if (enabled) {
+            element.setAttribute('href', String(url).trim());
             element.setAttribute('target', '_blank');
             element.setAttribute('rel', 'noopener noreferrer');
+            element.removeAttribute('tabindex');
         } else {
+            element.removeAttribute('href');
             element.removeAttribute('target');
             element.removeAttribute('rel');
+            element.setAttribute('tabindex', '-1');
         }
     }
 
@@ -171,13 +174,22 @@
         setText('[data-live-setting="site_description"]', settings.site_description);
         setText('[data-live-setting="footer_description"]', settings.footer_description || settings.site_description);
         setText('[data-live-setting="footer_text"]', settings.footer_text);
-        setText('[data-live-setting="home_hero_title"]', settings.home_hero_title);
         setText('[data-live-setting="home_hero_subtitle"]', settings.home_hero_subtitle);
 
         const heroTitle = document.querySelector('[data-live-setting="home_hero_title"]');
         if (heroTitle && settings.home_hero_title) {
-            heroTitle.dataset.heroTitle = settings.home_hero_title;
-            heroTitle.setAttribute('aria-label', settings.home_hero_title);
+            const nextHeroTitle = String(settings.home_hero_title).trim();
+            const previousHeroTitle = String(heroTitle.dataset.heroTitle || '').trim();
+            heroTitle.dataset.heroTitle = nextHeroTitle;
+            heroTitle.setAttribute('aria-label', nextHeroTitle);
+
+            if (nextHeroTitle && nextHeroTitle !== previousHeroTitle) {
+                if (window.gsap) window.gsap.killTweensOf(heroTitle.querySelectorAll('*'));
+                heroTitle.textContent = nextHeroTitle;
+                window.requestAnimationFrame(() => {
+                    if (typeof window.initHeroSplitText === 'function') window.initHeroSplitText();
+                });
+            }
         }
         document.querySelectorAll('meta[name="description"]').forEach((meta) => {
             meta.setAttribute('content', settings.site_description || '');

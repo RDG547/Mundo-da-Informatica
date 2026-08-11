@@ -425,6 +425,9 @@
         options.forEach((option) => option.classList.toggle('is-selected', option === selectedOption));
         const label = selectedOption.querySelector('span')?.textContent?.trim() || select.selectedOptions[0]?.textContent || '';
         const icon = selectedOption.dataset.icon || 'fas fa-filter';
+        const tone = selectedOption.dataset.tone || select.selectedOptions[0]?.dataset?.tone || '';
+        if (tone) root.dataset.tone = tone;
+        else delete root.dataset.tone;
         current.innerHTML = `<i class="${escapeHtml(icon)}"></i><span>${escapeHtml(label)}</span>`;
     }
 

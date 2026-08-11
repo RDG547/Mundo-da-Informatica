@@ -72,8 +72,8 @@
                 <div class="filter-dropdown">
                     <select id="filterStatus" name="status" class="form-select">
                         <option value="">Todos os Status</option>
-                        <option value="active" {% if current_filters and current_filters.status == 'active' %}selected{% endif %}>Ativos</option>
-                        <option value="inactive" {% if current_filters and current_filters.status == 'inactive' %}selected{% endif %}>Inativos</option>
+                        <option value="active" data-tone="success" {% if current_filters and current_filters.status == 'active' %}selected{% endif %}>Ativos</option>
+                        <option value="inactive" data-tone="neutral" {% if current_filters and current_filters.status == 'inactive' %}selected{% endif %}>Inativos</option>
                     </select>
                 </div>
                 <div class="sort-dropdown">
@@ -87,12 +87,12 @@
                 <div class="bulk-actions">
                     <select id="bulkActionSelect" class="form-select">
                         <option value="">Ações em massa</option>
-                        <option value="activate">Ativar selecionados</option>
-                        <option value="deactivate">Desativar selecionados</option>
-                        <option value="promote_editor">Promover a Editor</option>
-                        <option value="demote_user">Rebaixar a Usuário</option>
-                        <option value="send_welcome">Enviar Boas-vindas</option>
-                        <option value="delete">Excluir selecionados</option>
+                        <option value="activate" data-tone="success" data-icon="fas fa-user-check">Ativar selecionados</option>
+                        <option value="deactivate" data-tone="neutral" data-icon="fas fa-user-slash">Desativar selecionados</option>
+                        <option value="promote_editor" data-tone="info" data-icon="fas fa-user-edit">Promover a Editor</option>
+                        <option value="demote_user" data-tone="warning" data-icon="fas fa-user">Rebaixar a Usuário</option>
+                        <option value="send_welcome" data-tone="info" data-icon="fas fa-paper-plane">Enviar Boas-vindas</option>
+                        <option value="delete" data-tone="danger" data-icon="fas fa-trash-alt">Excluir selecionados</option>
                     </select>
                     <button type="button" id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
                 </div>

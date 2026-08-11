@@ -9879,6 +9879,8 @@ def admin_delete_comment(comment_id):
     """Excluir um comentário"""
     comment = Comment.query.get_or_404(comment_id)
     author_name = comment.author_name
+    post_id = comment.post_id
+    ajax_request = _is_ajax_request()
 
     try:
         db.session.delete(comment)
@@ -9892,13 +9894,25 @@ def admin_delete_comment(comment_id):
             metadata={
                 'comment_id': comment_id,
                 'author': author_name,
-                'post_id': comment.post_id
+                'post_id': post_id
             }
         )
 
+        if ajax_request:
+            return jsonify({
+                'success': True,
+                'message': 'Comentário excluído com sucesso!',
+                'comment_id': comment_id,
+                'total_comments': Comment.query.count()
+            })
         flash('Comentário excluído com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
+        if ajax_request:
+            return jsonify({
+                'success': False,
+                'message': f'Erro ao excluir comentário: {str(e)}'
+            }), 500
         flash(f'Erro ao excluir comentário: {str(e)}', 'error')
 
     return redirect(url_for('admin_comments'))

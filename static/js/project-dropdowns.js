@@ -119,10 +119,21 @@
         const selected = state.select.options[state.select.selectedIndex] || state.select.options[0];
         const label = selected?.textContent?.trim() || 'Selecione uma opção';
         const iconClass = inferIcon(selected, selected?.value || '');
+        const tone = selected?.dataset?.tone || '';
+        const currentIcon = createIcon(iconClass);
 
-        state.current.replaceChildren(createIcon(iconClass), Object.assign(document.createElement('span'), { textContent: label }));
+        if (selected?.dataset?.color) currentIcon.style.color = selected.dataset.color;
+
+        state.current.replaceChildren(currentIcon, Object.assign(document.createElement('span'), { textContent: label }));
         state.trigger.disabled = state.select.disabled;
         state.trigger.setAttribute('aria-disabled', state.select.disabled ? 'true' : 'false');
+        if (tone) {
+            state.root.dataset.tone = tone;
+            state.trigger.dataset.tone = tone;
+        } else {
+            delete state.root.dataset.tone;
+            delete state.trigger.dataset.tone;
+        }
         state.menu.querySelectorAll('.project-select-option').forEach((button) => {
             const isSelected = button.dataset.value === String(state.select.value || '');
             button.classList.toggle('is-selected', isSelected);
@@ -179,6 +190,7 @@
             button.type = 'button';
             button.className = 'project-select-option';
             button.dataset.value = String(option.value || '');
+            if (option.dataset.tone) button.dataset.tone = option.dataset.tone;
             button.setAttribute('role', 'option');
             button.disabled = option.disabled;
 
@@ -311,7 +323,7 @@
         select.form?.addEventListener('reset', () => setTimeout(() => syncState(state), 0));
 
         state.observer = new MutationObserver(() => rebuildMenu(state));
-        state.observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['selected', 'disabled', 'data-icon', 'data-color'] });
+        state.observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['selected', 'disabled', 'data-icon', 'data-color', 'data-tone'] });
         return state;
     }
 

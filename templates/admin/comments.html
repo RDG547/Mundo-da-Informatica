@@ -655,7 +655,12 @@
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    (function() {
+        function initAdminCommentsPage() {
+        const commentsTableBody = document.querySelector('.admin-table tbody');
+        if (!commentsTableBody || commentsTableBody.dataset.commentsPageInitialized === 'true') return;
+        commentsTableBody.dataset.commentsPageInitialized = 'true';
+
         // Enhanced Comments Management
 
         // Global Functions
@@ -715,7 +720,7 @@
             const searchTerm = searchInput.value.toLowerCase();
             const selectedStatus = commentFilterSelect.value;
 
-            tableRows.forEach(row => {
+            document.querySelectorAll('.comment-row').forEach(row => {
                 const authorName = row.querySelector('.author-name')?.textContent.toLowerCase() || '';
                 const authorEmail = row.querySelector('.author-email')?.textContent.toLowerCase() || '';
                 const commentText = row.querySelector('.comment-preview')?.textContent.toLowerCase() || '';
@@ -740,11 +745,43 @@
         }
 
         function updateResultsCount() {
-            const visibleRows = Array.from(tableRows).filter(row => row.style.display !== 'none');
+            const visibleRows = Array.from(document.querySelectorAll('.comment-row')).filter(row => row.style.display !== 'none');
             const countElement = document.querySelector('.count-badge');
             if (countElement) {
                 countElement.textContent = visibleRows.length;
             }
+        }
+
+        function updateCommentsPaginationInfo(totalComments) {
+            const info = document.querySelector('.pagination-info');
+            if (!info) return;
+            const visibleCount = document.querySelectorAll('.comment-row').length;
+            info.textContent = totalComments > 0
+                ? `Mostrando ${visibleCount} de ${totalComments} comentários`
+                : 'Nenhum comentário encontrado';
+        }
+
+        function getCsrfToken() {
+            return (window.csrfUtils && typeof window.csrfUtils.getCsrfToken === 'function' && window.csrfUtils.getCsrfToken())
+                || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                || '';
+        }
+
+        async function deleteComment(commentId) {
+            const response = await fetch(`/admin/comments/${commentId}/delete`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken()
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível excluir o comentário.');
+            }
+            return data;
         }
 
         function updateStats() {
@@ -904,19 +941,30 @@
         });
 
         document.querySelectorAll('.btn-delete').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', async function(e) {
                 e.preventDefault();
                 const commentId = this.getAttribute('data-comment-id');
                 const authorName = this.getAttribute('data-comment-author');
 
-                if (confirm(`Excluir comentário de ${authorName}? Esta ação não pode ser desfeita.`)) {
-                    // Criar um formulário para enviar via POST
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = `/admin/comments/${commentId}/delete`;
-                    form.style.display = 'none';
-                    document.body.appendChild(form);
-                    form.submit();
+                if (!confirm(`Excluir comentário de ${authorName}? Esta ação não pode ser desfeita.`)) return;
+                if (this.dataset.busy === 'true') return;
+
+                this.dataset.busy = 'true';
+                this.setAttribute('aria-disabled', 'true');
+                try {
+                    const data = await deleteComment(commentId);
+                    this.closest('.comment-row')?.remove();
+                    updateStats();
+                    updateResultsCount();
+                    updateCommentsPaginationInfo(Number(data.total_comments || 0));
+
+                    const sidebarBadge = document.querySelector('[data-sidebar-count="comments"]');
+                    if (sidebarBadge) sidebarBadge.textContent = String(Math.max(0, Number(data.total_comments || 0)));
+                    showNotification(data.message || 'Comentário excluído com sucesso!', 'success');
+                } catch (error) {
+                    this.dataset.busy = 'false';
+                    this.removeAttribute('aria-disabled');
+                    showNotification(error.message, 'error');
                 }
             });
         });
@@ -929,6 +977,14 @@
 
         // Initialize
         updateBulkActionsVisibility();
-    });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAdminCommentsPage, { once: true });
+        } else {
+            initAdminCommentsPage();
+        }
+        document.addEventListener('adminPageLoaded', initAdminCommentsPage);
+    })();
 </script>
 {% endblock %}

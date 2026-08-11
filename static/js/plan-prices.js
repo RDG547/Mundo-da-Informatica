@@ -13,7 +13,8 @@
         return;
     }
 
-    const POLL_INTERVAL_MS = 10000;
+    const POLL_INTERVAL_MS = 3000;
+    window.planAvailability = window.planAvailability || {};
 
     function flashElement(el) {
         if (typeof el.animate !== 'function') {
@@ -62,6 +63,50 @@
             }
             setPriceText(el, plan.display_full);
         });
+
+        Object.entries(plans).forEach(([planKey, plan]) => {
+            const priceInput = document.getElementById(`plan_price_${planKey}`);
+            if (priceInput && document.activeElement !== priceInput && priceInput.dataset.dirty !== 'true') {
+                priceInput.value = plan.display_amount;
+            }
+        });
+
+        Object.entries(plans).forEach(([planKey, plan]) => {
+            const isEnabled = plan.enabled !== false;
+            window.planAvailability[planKey] = isEnabled;
+
+            document.querySelectorAll(`[data-plan-card="${planKey}"]`).forEach((card) => {
+                const wasEnabled = card.dataset.planEnabled !== 'false';
+                card.dataset.planEnabled = isEnabled ? 'true' : 'false';
+                card.classList.toggle('is-plan-disabled', !isEnabled);
+
+                const label = card.querySelector('[data-plan-unavailable-label]');
+                if (label) label.hidden = isEnabled;
+
+                card.querySelectorAll('.plan-cta a, .plan-cta button').forEach((action) => {
+                    action.setAttribute('aria-disabled', isEnabled ? 'false' : 'true');
+                    action.tabIndex = isEnabled ? 0 : -1;
+                });
+
+                if (wasEnabled !== isEnabled) flashElement(card);
+            });
+
+            document.querySelectorAll(`[data-plan-enabled-toggle="${planKey}"]`).forEach((toggle) => {
+                if (document.activeElement !== toggle && !toggle.disabled) {
+                    toggle.checked = isEnabled;
+                }
+            });
+
+            document.querySelectorAll(`[data-plan-state="${planKey}"]`).forEach((state) => {
+                state.textContent = isEnabled ? 'Ativo' : 'Inativo';
+                state.classList.toggle('is-disabled', !isEnabled);
+            });
+            document.querySelectorAll(`[data-plan-settings-card="${planKey}"]`).forEach((card) => {
+                card.classList.toggle('is-disabled', !isEnabled);
+            });
+        });
+
+        window.dispatchEvent(new CustomEvent('planAvailabilityChanged', { detail: { plans } }));
     }
 
     async function fetchPlanPrices() {
@@ -82,22 +127,29 @@
         }
     }
 
-    function hasPriceElements() {
-        return Boolean(document.querySelector('[data-plan-price-amount], [data-plan-price-full]'));
+    function hasPlanElements() {
+        return Boolean(document.querySelector('[data-plan-price-amount], [data-plan-price-full], [data-plan-card], [data-plan-enabled-toggle]'));
     }
 
     window.refreshPlanPrices = fetchPlanPrices;
 
     fetchPlanPrices();
     window.setInterval(() => {
-        if (hasPriceElements()) {
+        if (hasPlanElements()) {
             fetchPlanPrices();
         }
     }, POLL_INTERVAL_MS);
 
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && hasPriceElements()) {
+        if (!document.hidden && hasPlanElements()) {
             fetchPlanPrices();
         }
+    });
+
+    window.addEventListener('planConfigurationUpdated', fetchPlanPrices);
+    document.addEventListener('pageLoaded', fetchPlanPrices);
+    document.addEventListener('adminPageLoaded', fetchPlanPrices);
+    window.addEventListener('storage', (event) => {
+        if (event.key === 'plan_configuration_updated_at') fetchPlanPrices();
     });
 })();

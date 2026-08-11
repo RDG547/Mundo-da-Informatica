@@ -22,7 +22,10 @@
     <div class="container">
         <div class="plans-grid">
             <!-- Free Plan -->
-            <div class="plan-card free">
+            <div class="plan-card free{% if not plan_pricing.free.enabled %} is-plan-disabled{% endif %}" data-plan-card="free" data-plan-enabled="{{ 'true' if plan_pricing.free.enabled else 'false' }}">
+                <div class="plan-unavailable-label" data-plan-unavailable-label {% if plan_pricing.free.enabled %}hidden{% endif %}>
+                    <i class="fas fa-pause-circle"></i> Indisponível
+                </div>
                 <div class="plan-header">
                     <div class="plan-icon">
                         <i class="fas fa-user"></i>
@@ -74,7 +77,7 @@
                     </div>
                 </div>
 
-                <div class="plan-cta">
+                <div class="plan-cta" data-plan-cta="free">
                     {% if not current_user.is_authenticated %}
                     <a href="{{ url_for('register') }}" class="plan-btn">Começar Gratuitamente</a>
                     {% elif current_user.plan == 'free' %}
@@ -87,7 +90,10 @@
             </div>
 
             <!-- Premium Plan -->
-            <div class="plan-card premium">
+            <div class="plan-card premium{% if not plan_pricing.premium.enabled %} is-plan-disabled{% endif %}" data-plan-card="premium" data-plan-enabled="{{ 'true' if plan_pricing.premium.enabled else 'false' }}">
+                <div class="plan-unavailable-label" data-plan-unavailable-label {% if plan_pricing.premium.enabled %}hidden{% endif %}>
+                    <i class="fas fa-pause-circle"></i> Indisponível
+                </div>
                 <div class="popular-badge">Popular</div>
                 <div class="plan-header">
                     <div class="plan-icon">
@@ -140,7 +146,7 @@
                     </div>
                 </div>
 
-                <div class="plan-cta">
+                <div class="plan-cta" data-plan-cta="premium">
                     {% if not current_user.is_authenticated %}
                     <a href="{{ url_for('register', plan='premium') }}" class="plan-btn">Assinar Premium</a>
                     {% elif current_user.plan == 'premium' %}
@@ -155,7 +161,10 @@
             </div>
 
             <!-- VIP Plan -->
-            <div class="plan-card vip">
+            <div class="plan-card vip{% if not plan_pricing.vip.enabled %} is-plan-disabled{% endif %}" data-plan-card="vip" data-plan-enabled="{{ 'true' if plan_pricing.vip.enabled else 'false' }}">
+                <div class="plan-unavailable-label" data-plan-unavailable-label {% if plan_pricing.vip.enabled %}hidden{% endif %}>
+                    <i class="fas fa-pause-circle"></i> Indisponível
+                </div>
                 <div class="plan-header">
                     <div class="plan-icon">
                         <i class="fas fa-crown"></i>
@@ -207,7 +216,7 @@
                     </div>
                 </div>
 
-                <div class="plan-cta">
+                <div class="plan-cta" data-plan-cta="vip">
                     {% if not current_user.is_authenticated %}
                     <a href="{{ url_for('register', plan='vip') }}" class="plan-btn">Assinar VIP</a>
                     {% elif current_user.plan == 'vip' %}

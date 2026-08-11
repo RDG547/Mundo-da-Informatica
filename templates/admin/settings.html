@@ -314,15 +314,56 @@
                 </div>
                 <div class="admin-card-body">
                     <div class="settings-plan-grid">
-                        <article class="settings-plan-card premium">
-                            <div class="settings-plan-icon"><i class="fas fa-star"></i></div>
+                        <article class="settings-plan-card free" data-plan-settings-card="free">
+                            <div class="settings-plan-card-heading">
+                                <div class="settings-plan-icon"><i class="fas fa-user"></i></div>
+                                <div class="settings-plan-availability">
+                                    <span class="settings-plan-state" data-plan-state="free">
+                                        {{ 'Ativo' if site_configs.get('plan_enabled_free', True) else 'Inativo' }}
+                                    </span>
+                                    <label class="settings-switch" title="Ativar ou desativar o Plano Grátis">
+                                        <input type="checkbox" id="plan_enabled_free"
+                                            {{ 'checked' if site_configs.get('plan_enabled_free', True) else '' }}
+                                            data-key="plan_enabled_free" data-type="bool" data-default-value="true"
+                                            data-plan-enabled-toggle="free">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="settings-field">
+                                <label>Plano Grátis</label>
+                                <div class="settings-plan-free-price">R$ 0,00 <small>/mês</small></div>
+                            </div>
+                            <div class="settings-plan-meta">
+                                <span><i class="fas fa-user-plus"></i> Cadastro / downgrade</span>
+                            </div>
+                            <p>Desative para impedir novas adesões e mudanças para o plano grátis. Usuários atuais não perdem o acesso.</p>
+                        </article>
+
+                        <article class="settings-plan-card premium" data-plan-settings-card="premium">
+                            <div class="settings-plan-card-heading">
+                                <div class="settings-plan-icon"><i class="fas fa-star"></i></div>
+                                <div class="settings-plan-availability">
+                                    <span class="settings-plan-state" data-plan-state="premium">
+                                        {{ 'Ativo' if site_configs.get('plan_enabled_premium', True) else 'Inativo' }}
+                                    </span>
+                                    <label class="settings-switch" title="Ativar ou desativar o Plano Premium">
+                                        <input type="checkbox" id="plan_enabled_premium"
+                                            {{ 'checked' if site_configs.get('plan_enabled_premium', True) else '' }}
+                                            data-key="plan_enabled_premium" data-type="bool" data-default-value="true"
+                                            data-plan-enabled-toggle="premium">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
                             <div class="settings-field">
                                 <label for="plan_price_premium">Preço do Plano Premium</label>
                                 <div class="settings-money-input">
                                     <span>R$</span>
-                                    <input type="number" id="plan_price_premium" class="form-control"
+                                    <input type="text" id="plan_price_premium" class="form-control"
                                         value="{{ site_configs.get('plan_price_premium', 29.90) }}"
-                                        min="0" step="0.01"
+                                        inputmode="numeric" autocomplete="off"
+                                        data-currency-input="true"
                                         data-key="plan_price_premium" data-type="float" data-default-value="29.90">
                                 </div>
                             </div>
@@ -333,15 +374,30 @@
                             <p>Use este campo para a vitrine do plano e para o PIX. No cartao, o checkout oficial continua lendo o preco real pela Stripe.</p>
                         </article>
 
-                        <article class="settings-plan-card vip">
-                            <div class="settings-plan-icon"><i class="fas fa-crown"></i></div>
+                        <article class="settings-plan-card vip" data-plan-settings-card="vip">
+                            <div class="settings-plan-card-heading">
+                                <div class="settings-plan-icon"><i class="fas fa-crown"></i></div>
+                                <div class="settings-plan-availability">
+                                    <span class="settings-plan-state" data-plan-state="vip">
+                                        {{ 'Ativo' if site_configs.get('plan_enabled_vip', True) else 'Inativo' }}
+                                    </span>
+                                    <label class="settings-switch" title="Ativar ou desativar o Plano VIP">
+                                        <input type="checkbox" id="plan_enabled_vip"
+                                            {{ 'checked' if site_configs.get('plan_enabled_vip', True) else '' }}
+                                            data-key="plan_enabled_vip" data-type="bool" data-default-value="true"
+                                            data-plan-enabled-toggle="vip">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
                             <div class="settings-field">
                                 <label for="plan_price_vip">Preço do Plano VIP</label>
                                 <div class="settings-money-input">
                                     <span>R$</span>
-                                    <input type="number" id="plan_price_vip" class="form-control"
+                                    <input type="text" id="plan_price_vip" class="form-control"
                                         value="{{ site_configs.get('plan_price_vip', 49.90) }}"
-                                        min="0" step="0.01"
+                                        inputmode="numeric" autocomplete="off"
+                                        data-currency-input="true"
                                         data-key="plan_price_vip" data-type="float" data-default-value="49.90">
                                 </div>
                             </div>
@@ -453,6 +509,9 @@
         contact_email: 'suporte@mundodainformatica.com',
         contact_phone: '(21) 97879-4705',
         contact_address: 'Internet - Brasil',
+        plan_enabled_free: true,
+        plan_enabled_premium: true,
+        plan_enabled_vip: true,
         plan_price_premium: '29.90',
         plan_price_vip: '49.90',
         google_analytics: '',
@@ -471,6 +530,95 @@
             return;
         }
         window.alert(message);
+    }
+
+    function formatCurrencyFromCents(cents) {
+        const safeCents = Math.max(0, Number(cents) || 0);
+        return (safeCents / 100).toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function formatCurrencyFromDecimal(value) {
+        const normalized = String(value ?? '')
+            .trim()
+            .replace(/\s/g, '')
+            .replace(/\.(?=\d{3}(?:\D|$))/g, '')
+            .replace(',', '.');
+        const amount = Number.parseFloat(normalized);
+        return formatCurrencyFromCents(Math.round((Number.isFinite(amount) ? amount : 0) * 100));
+    }
+
+    function getCurrencyDecimalValue(value) {
+        const digits = String(value || '').replace(/\D/g, '');
+        return (Math.max(0, Number.parseInt(digits || '0', 10)) / 100).toFixed(2);
+    }
+
+    function bindCurrencyInput(input) {
+        if (!input || input.dataset.currencyInitialized === 'true') return;
+        input.dataset.currencyInitialized = 'true';
+        input.value = formatCurrencyFromDecimal(input.value);
+        input.addEventListener('input', () => {
+            const digits = input.value.replace(/\D/g, '');
+            input.value = formatCurrencyFromCents(Number.parseInt(digits || '0', 10));
+            input.dataset.dirty = 'true';
+            input.setSelectionRange(input.value.length, input.value.length);
+        });
+        input.addEventListener('focus', () => input.select());
+    }
+
+    function updatePlanToggleUi(toggle) {
+        const plan = toggle?.dataset.planEnabledToggle;
+        if (!plan) return;
+        const card = document.querySelector(`[data-plan-settings-card="${plan}"]`);
+        const state = document.querySelector(`[data-plan-state="${plan}"]`);
+        card?.classList.toggle('is-disabled', !toggle.checked);
+        if (state) {
+            state.textContent = toggle.checked ? 'Ativo' : 'Inativo';
+            state.classList.toggle('is-disabled', !toggle.checked);
+        }
+    }
+
+    async function savePlanAvailability(toggle) {
+        const plan = toggle.dataset.planEnabledToggle;
+        const previousValue = !toggle.checked;
+        toggle.disabled = true;
+        updatePlanToggleUi(toggle);
+
+        try {
+            const response = await fetch('/admin/save_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    [toggle.dataset.key]: { value: toggle.checked, type: 'bool' }
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível atualizar o plano.');
+            }
+
+            showSettingsNotification(
+                `Plano ${plan === 'free' ? 'Grátis' : plan.toUpperCase()} ${toggle.checked ? 'ativado' : 'desativado'} sem recarregar a página.`,
+                'success'
+            );
+            window.dispatchEvent(new CustomEvent('planConfigurationUpdated'));
+            try {
+                localStorage.setItem('plan_configuration_updated_at', String(Date.now()));
+            } catch (_storageError) {
+                // O polling mantém outras abas sincronizadas mesmo sem localStorage.
+            }
+            if (typeof window.refreshPlanPrices === 'function') {
+                window.refreshPlanPrices();
+            }
+        } catch (error) {
+            toggle.checked = previousValue;
+            updatePlanToggleUi(toggle);
+            showSettingsNotification(error.message || 'Erro ao atualizar o plano.', 'error');
+        } finally {
+            toggle.disabled = false;
+        }
     }
 
     function updateThemePreview() {
@@ -515,7 +663,9 @@
             return;
         }
 
-        field.value = value ?? '';
+        field.value = field.matches('[data-currency-input]')
+            ? formatCurrencyFromDecimal(value)
+            : (value ?? '');
     }
 
     function collectSettingsPayload(page) {
@@ -524,7 +674,9 @@
         page.querySelectorAll('[data-key]').forEach((input) => {
             const key = input.dataset.key;
             const type = input.dataset.type || 'string';
-            const value = input.type === 'checkbox' ? input.checked : input.value;
+            const value = input.type === 'checkbox'
+                ? input.checked
+                : (input.matches('[data-currency-input]') ? getCurrencyDecimalValue(input.value) : input.value);
             settings[key] = { value, type };
         });
 
@@ -599,6 +751,11 @@
 
         syncColorInputs('primary_color', 'primary_color_text');
         syncColorInputs('secondary_color', 'secondary_color_text');
+        page.querySelectorAll('[data-currency-input]').forEach(bindCurrencyInput);
+        page.querySelectorAll('[data-plan-enabled-toggle]').forEach((toggle) => {
+            updatePlanToggleUi(toggle);
+            toggle.addEventListener('change', () => savePlanAvailability(toggle));
+        });
         updateThemePreview();
         bindScrollSpy(page);
 
@@ -633,6 +790,7 @@
 
             document.getElementById('primary_color_text').value = document.getElementById('primary_color').value;
             document.getElementById('secondary_color_text').value = document.getElementById('secondary_color').value;
+            page.querySelectorAll('[data-plan-enabled-toggle]').forEach(updatePlanToggleUi);
             updateThemePreview();
             showSettingsNotification('Valores padrão aplicados localmente. Clique em salvar para persistir.', 'info');
         };
@@ -661,6 +819,7 @@
                 }
 
                 showSettingsNotification(data.message || 'Configurações salvas com sucesso!', 'success');
+                page.querySelectorAll('[data-currency-input]').forEach((input) => delete input.dataset.dirty);
 
                 // Atualiza imediatamente os preços exibidos nesta página (cards e estatísticas)
                 if (typeof window.refreshPlanPrices === 'function') {

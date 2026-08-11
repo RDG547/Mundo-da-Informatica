@@ -120,6 +120,48 @@
     flex-direction: column;
 }
 
+.plan-card.is-plan-disabled {
+    opacity: 0.72;
+    filter: saturate(0.45);
+    border-style: dashed;
+}
+
+.plan-card.is-plan-disabled .plan-cta {
+    pointer-events: none;
+    user-select: none;
+}
+
+.plan-card.is-plan-disabled .plan-cta > * {
+    opacity: 0.55;
+}
+
+.plan-card.is-plan-disabled .popular-badge {
+    display: none;
+}
+
+.plan-unavailable-label {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 999px;
+    background: #475569;
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.035em;
+}
+
+.plan-unavailable-label[hidden] {
+    display: none;
+}
+
 .plan-card::before {
     content: '';
     position: absolute;

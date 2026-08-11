@@ -19,6 +19,19 @@ window.initializePlansPage = function () {
     let stripe = null;
     let stripeInitialized = false;
 
+    const isPlanAvailable = (plan) => {
+        const normalizedPlan = String(plan || '').trim().toLowerCase();
+        const card = document.querySelector(`[data-plan-card="${normalizedPlan}"]`);
+        if (card) return card.dataset.planEnabled !== 'false';
+        return window.planAvailability?.[normalizedPlan] !== false;
+    };
+
+    const ensurePlanAvailable = (plan) => {
+        if (isPlanAvailable(plan)) return true;
+        alert('Este plano está temporariamente indisponível. Escolha outra opção.');
+        return false;
+    };
+
     // Function to initialize Stripe when ready
     const initializeStripe = () => {
         // Evitar múltiplas inicializações
@@ -87,6 +100,7 @@ window.initializePlansPage = function () {
     // Checkout Function
     // Checkout Function
     window.checkout = function (plan) {
+        if (!ensurePlanAvailable(plan)) return;
         if (!stripe) {
             alert('Erro: Configuração de pagamento não encontrada. Por favor, contate o suporte.');
             console.error('Stripe public key is missing');
@@ -155,6 +169,7 @@ window.initializePlansPage = function () {
     let selectedPlan = null;
 
     window.showPaymentMethodModal = function (plan) {
+        if (!ensurePlanAvailable(plan)) return;
         selectedPlan = plan;
         console.log('Modal de pagamento aberto para plano:', selectedPlan);
         if (!paymentMethodModal) {
@@ -213,6 +228,7 @@ window.initializePlansPage = function () {
     };
 
     function checkoutPix(plan) {
+        if (!ensurePlanAvailable(plan)) return;
         console.log('checkoutPix chamado com plano:', plan);
 
         const payload = { plan: plan };
@@ -295,6 +311,7 @@ window.initializePlansPage = function () {
     let targetPlan = 'free'; // Plano de destino padrão
 
     window.openDowngradeModal = function (plan = 'free') {
+        if (!ensurePlanAvailable(plan)) return;
         targetPlan = plan; // Salvar plano de destino
 
         if (!modal) {

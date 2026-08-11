@@ -1897,10 +1897,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
         return window.dynamicLoader;
     };
 
+    // O script fica no fim do body: a estrutura de navegação já existe e pode ser
+    // interceptada imediatamente. Esperar DOMContentLoaded fazia o primeiro clique do
+    // painel escapar e recarregar sidebar + conteúdo por completo.
+    window.ensureDynamicLoader();
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', window.ensureDynamicLoader, { once: true });
-    } else {
-        window.ensureDynamicLoader();
     }
 }
 

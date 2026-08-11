@@ -57,35 +57,100 @@
                     </div>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterCategory" name="category" class="form-select" aria-label="Filtrar por categoria">
-                        <option value="">Todas as categorias</option>
-                        {% for category in categories %}
-                        <option value="{{ category.id }}" {% if current_filters and current_filters.category == category.id|string %}selected{% endif %}>{{ category.name }}</option>
-                        {% endfor %}
-                    </select>
+                    {% set selected_category = namespace(name='Todas as categorias', icon='fas fa-layer-group') %}
+                    {% for category in categories %}
+                        {% if current_filters and current_filters.category == category.id|string %}
+                            {% set selected_category.name = category.name %}
+                            {% set selected_category.icon = category.icon or get_category_icon(category) or 'fas fa-folder' %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="admin-smart-select" data-smart-select>
+                        <select id="filterCategory" name="category" class="smart-select-native" aria-label="Filtrar por categoria" tabindex="-1">
+                            <option value="">Todas as categorias</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if current_filters and current_filters.category == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" class="smart-select-trigger" data-smart-select-trigger aria-haspopup="listbox" aria-expanded="false">
+                            <span class="smart-select-current"><i class="{{ selected_category.icon }}"></i><span>{{ selected_category.name }}</span></span>
+                            <i class="fas fa-chevron-down smart-select-chevron"></i>
+                        </button>
+                        <div class="smart-select-menu" role="listbox">
+                            <button type="button" class="smart-select-option{% if not current_filters or not current_filters.category %} is-selected{% endif %}" data-value="" data-icon="fas fa-layer-group">
+                                <span><i class="fas fa-layer-group"></i> Todas as categorias</span><i class="fas fa-check option-check"></i>
+                            </button>
+                            {% for category in categories %}
+                            <button type="button" class="smart-select-option{% if current_filters and current_filters.category == category.id|string %} is-selected{% endif %}" data-value="{{ category.id }}" data-icon="{{ category.icon or get_category_icon(category) or 'fas fa-folder' }}" data-color="{{ category.color or '#3a86ff' }}">
+                                <span><i class="{{ category.icon or get_category_icon(category) or 'fas fa-folder' }}"></i> {{ category.name }}</span><i class="fas fa-check option-check"></i>
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-dropdown">
-                    <select id="filterStatus" name="status" class="form-select" aria-label="Filtrar por status">
-                        <option value="">Todos os Status</option>
-                        <option value="active" {% if current_filters and current_filters.status == 'active' %}selected{% endif %}>Ativos</option>
-                        <option value="featured" {% if current_filters and current_filters.status == 'featured' %}selected{% endif %}>Em Destaque</option>
-                        <option value="inactive" {% if current_filters and current_filters.status == 'inactive' %}selected{% endif %}>Inativos</option>
-                    </select>
+                    {% set selected_status = current_filters.status if current_filters else '' %}
+                    <div class="admin-smart-select" data-smart-select>
+                        <select id="filterStatus" name="status" class="smart-select-native" aria-label="Filtrar por status" tabindex="-1">
+                            <option value="">Todos os Status</option>
+                            <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Ativos</option>
+                            <option value="featured" {% if selected_status == 'featured' %}selected{% endif %}>Em Destaque</option>
+                            <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inativos</option>
+                        </select>
+                        <button type="button" class="smart-select-trigger" data-smart-select-trigger aria-haspopup="listbox" aria-expanded="false">
+                            <span class="smart-select-current">
+                                <i class="fas fa-{% if selected_status == 'active' %}check-circle{% elif selected_status == 'featured' %}star{% elif selected_status == 'inactive' %}pause-circle{% else %}sliders-h{% endif %}"></i>
+                                <span>{% if selected_status == 'active' %}Ativos{% elif selected_status == 'featured' %}Em Destaque{% elif selected_status == 'inactive' %}Inativos{% else %}Todos os Status{% endif %}</span>
+                            </span>
+                            <i class="fas fa-chevron-down smart-select-chevron"></i>
+                        </button>
+                        <div class="smart-select-menu" role="listbox">
+                            <button type="button" class="smart-select-option{% if not selected_status %} is-selected{% endif %}" data-value="" data-icon="fas fa-sliders-h"><span><i class="fas fa-sliders-h"></i> Todos os Status</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'active' %} is-selected{% endif %}" data-value="active" data-icon="fas fa-check-circle"><span><i class="fas fa-check-circle"></i> Ativos</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'featured' %} is-selected{% endif %}" data-value="featured" data-icon="fas fa-star"><span><i class="fas fa-star"></i> Em Destaque</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'inactive' %} is-selected{% endif %}" data-value="inactive" data-icon="fas fa-pause-circle"><span><i class="fas fa-pause-circle"></i> Inativos</span><i class="fas fa-check option-check"></i></button>
+                        </div>
+                    </div>
                 </div>
                 <div class="sort-dropdown">
-                    <select id="sortBy" name="sort" class="form-select" aria-label="Ordenar por">
+                    {% set selected_sort = current_filters.sort if current_filters else 'date' %}
+                    <div class="admin-smart-select" data-smart-select>
+                    <select id="sortBy" name="sort" class="smart-select-native" aria-label="Ordenar por" tabindex="-1">
                         <option value="date" {% if not current_filters or current_filters.sort == 'date' %}selected{% endif %}>Ordenar por Data</option>
                         <option value="title" {% if current_filters and current_filters.sort == 'title' %}selected{% endif %}>Ordenar por Título</option>
                         <option value="views" {% if current_filters and current_filters.sort == 'views' %}selected{% endif %}>Ordenar por Visualizações</option>
                         <option value="downloads" {% if current_filters and current_filters.sort == 'downloads' %}selected{% endif %}>Ordenar por Downloads</option>
                     </select>
+                    <button type="button" class="smart-select-trigger" data-smart-select-trigger aria-haspopup="listbox" aria-expanded="false">
+                        <span class="smart-select-current">
+                            <i class="fas fa-{% if selected_sort == 'title' %}font{% elif selected_sort == 'views' %}eye{% elif selected_sort == 'downloads' %}download{% else %}calendar-alt{% endif %}"></i>
+                            <span>Por {% if selected_sort == 'title' %}Título{% elif selected_sort == 'views' %}Visualizações{% elif selected_sort == 'downloads' %}Downloads{% else %}Data{% endif %}</span>
+                        </span>
+                        <i class="fas fa-chevron-down smart-select-chevron"></i>
+                    </button>
+                    <div class="smart-select-menu smart-select-menu-right" role="listbox">
+                        <button type="button" class="smart-select-option{% if selected_sort == 'date' %} is-selected{% endif %}" data-value="date" data-icon="fas fa-calendar-alt"><span><i class="fas fa-calendar-alt"></i> Por Data</span><i class="fas fa-check option-check"></i></button>
+                        <button type="button" class="smart-select-option{% if selected_sort == 'title' %} is-selected{% endif %}" data-value="title" data-icon="fas fa-font"><span><i class="fas fa-font"></i> Por Título</span><i class="fas fa-check option-check"></i></button>
+                        <button type="button" class="smart-select-option{% if selected_sort == 'views' %} is-selected{% endif %}" data-value="views" data-icon="fas fa-eye"><span><i class="fas fa-eye"></i> Por Visualizações</span><i class="fas fa-check option-check"></i></button>
+                        <button type="button" class="smart-select-option{% if selected_sort == 'downloads' %} is-selected{% endif %}" data-value="downloads" data-icon="fas fa-download"><span><i class="fas fa-download"></i> Por Downloads</span><i class="fas fa-check option-check"></i></button>
+                    </div>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="admin-table enhanced">
+    <div class="table-responsive posts-table-responsive">
+        <table class="admin-table enhanced posts-management-table">
+            <colgroup>
+                <col class="posts-col-check">
+                <col class="posts-col-actions">
+                <col class="posts-col-title">
+                <col class="posts-col-category">
+                <col class="posts-col-date">
+                <col class="posts-col-metric">
+                <col class="posts-col-metric">
+                <col class="posts-col-status">
+            </colgroup>
             <thead>
                 <tr>
                     <th style="width: 40px">
@@ -116,7 +181,7 @@
             </thead>
             <tbody id="postsTableBody" data-per-page="{{ posts.per_page }}">
                 {% for post in posts.items %}
-                <tr data-post-id="{{ post.id }}" data-category-id="{{ post.category_id or '' }}" class="{% if not post.is_active %}inactive-row{% endif %}">
+                <tr data-post-id="{{ post.id }}" data-category-id="{{ post.category_id or '' }}" data-status="{% if post.featured %}featured{% elif post.is_active %}active{% else %}inactive{% endif %}" class="{% if not post.is_active %}inactive-row{% endif %}">
                     <td>
                         <input type="checkbox" class="form-check-input post-checkbox" value="{{ post.id }}">
                     </td>
@@ -124,17 +189,17 @@
                         <div class="action-buttons">
                             <a href="{{ url_for('post', post_id=post.id) }}" class="btn-action btn-view"
                                 title="Visualizar" target="_blank">
-                                <i class="fas fa-eye"></i>
+                                <i class="fas fa-eye"></i><span>Visualizar</span>
                             </a>
                             <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="{{ post.id }}">
-                                <i class="fas fa-edit"></i>
+                                <i class="fas fa-edit"></i><span>Editar</span>
                             </a>
                             <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="{{ post.id }}">
-                                <i class="fas fa-copy"></i>
+                                <i class="fas fa-copy"></i><span>Duplicar</span>
                             </a>
                             <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="{{ post.id }}"
                                 data-post-title="{{ post.title }}">
-                                <i class="fas fa-trash"></i>
+                                <i class="fas fa-trash"></i><span>Excluir</span>
                             </a>
                         </div>
                     </td>
@@ -148,7 +213,7 @@
                                 {% set post_excerpt = post.content|striptags|trim %}
                                 {% if post_excerpt %}
                                 <small class="post-excerpt text-muted">
-                                    {{ post_excerpt[:100] }}{% if post_excerpt|length > 100 %}...{% endif %}
+                                    {{ post_excerpt[:68] }}{% if post_excerpt|length > 68 %}...{% endif %}
                                 </small>
                                 {% endif %}
                                 {% if post.featured %}
@@ -160,19 +225,29 @@
                         </div>
                     </td>
                     <td>
-                        <div class="category-cell">
-                            {% if post.category_rel %}
-                            <!-- CSS validator: ignore next line -->
-                            <span class="category-badge" style="background: {{ post.category_rel.color or '#3a86ff' }}">
-                                <i class="{{ post.category_rel.icon or 'fas fa-folder' }}"></i>
-                                {{ post.category_rel.name }}
-                            </span>
-                            {% else %}
-                            <span class="category-badge">
-                                <i class="fas fa-folder"></i>
-                                {{ post.category_str or 'Sem categoria' }}
-                            </span>
-                            {% endif %}
+                        {% set row_category = namespace(value=post.category_rel) %}
+                        {% if not row_category.value and post.category_id %}
+                            {% for category in categories %}
+                                {% if category.id == post.category_id %}{% set row_category.value = category %}{% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        <div class="category-cell quick-edit-control" data-quick-edit-control="category">
+                            <button type="button" class="category-badge quick-edit-trigger" data-quick-edit-trigger aria-haspopup="listbox" aria-expanded="false"
+                                style="background: {{ row_category.value.color if row_category.value and row_category.value.color else '#3a86ff' }}">
+                                <i class="{{ row_category.value.icon if row_category.value and row_category.value.icon else 'fas fa-folder' }}"></i>
+                                <span>{{ row_category.value.name if row_category.value else (post.category_str or 'Sem categoria') }}</span>
+                                <i class="fas fa-chevron-down quick-edit-chevron"></i>
+                            </button>
+                            <div class="quick-edit-menu" role="listbox">
+                                <button type="button" class="quick-edit-option{% if not post.category_id %} is-selected{% endif %}" data-quick-field="category_id" data-value="" data-icon="fas fa-folder" data-color="#64748b">
+                                    <span><i class="fas fa-folder"></i> Sem categoria</span><i class="fas fa-check option-check"></i>
+                                </button>
+                                {% for category in categories %}
+                                <button type="button" class="quick-edit-option{% if post.category_id == category.id %} is-selected{% endif %}" data-quick-field="category_id" data-value="{{ category.id }}" data-icon="{{ category.icon or get_category_icon(category) or 'fas fa-folder' }}" data-color="{{ category.color or '#3a86ff' }}">
+                                    <span><i class="{{ category.icon or get_category_icon(category) or 'fas fa-folder' }}"></i> {{ category.name }}</span><i class="fas fa-check option-check"></i>
+                                </button>
+                                {% endfor %}
+                            </div>
                         </div>
                     </td>
                     <td>
@@ -200,7 +275,8 @@
                         </div>
                     </td>
                     <td>
-                        <div class="status-cell">
+                        <div class="status-cell quick-edit-control" data-quick-edit-control="status">
+                            <button type="button" class="status-quick-trigger quick-edit-trigger" data-quick-edit-trigger aria-haspopup="listbox" aria-expanded="false">
                             {% if post.featured %}
                             <span class="badge badge-warning">
                                 <i class="fas fa-star"></i> Destaque
@@ -214,6 +290,13 @@
                                 <i class="fas fa-pause-circle"></i> Inativo
                             </span>
                             {% endif %}
+                                <i class="fas fa-chevron-down quick-edit-chevron"></i>
+                            </button>
+                            <div class="quick-edit-menu quick-edit-menu-right" role="listbox">
+                                <button type="button" class="quick-edit-option{% if post.is_active and not post.featured %} is-selected{% endif %}" data-quick-field="status" data-value="active" data-icon="fas fa-check-circle"><span><i class="fas fa-check-circle"></i> Ativo</span><i class="fas fa-check option-check"></i></button>
+                                <button type="button" class="quick-edit-option{% if post.featured %} is-selected{% endif %}" data-quick-field="status" data-value="featured" data-icon="fas fa-star"><span><i class="fas fa-star"></i> Destaque</span><i class="fas fa-check option-check"></i></button>
+                                <button type="button" class="quick-edit-option{% if not post.is_active %} is-selected{% endif %}" data-quick-field="status" data-value="inactive" data-icon="fas fa-pause-circle"><span><i class="fas fa-pause-circle"></i> Inativo</span><i class="fas fa-check option-check"></i></button>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -972,6 +1055,7 @@
             searchInput.value = '';
             categoryFilter.value = '';
             statusFilter.value = '';
+            window.AdminPostsDynamic?.syncSmartSelects();
             filterAndSearchPosts();
             loadAdminFilterUrl('/admin/posts', { pushState: false });
         };
@@ -1456,7 +1540,10 @@
                                 if (titleEl) titleEl.textContent = data.post.title;
 
                                 const excerptEl = row.querySelector('.post-excerpt');
-                                const excerptText = (data.post.excerpt || data.post.description || '').trim();
+                                const rawExcerptText = (data.post.excerpt || data.post.description || '').trim();
+                                const excerptText = rawExcerptText.length > 68
+                                    ? `${rawExcerptText.slice(0, 68)}...`
+                                    : rawExcerptText;
                                 if (excerptEl) {
                                     if (excerptText) {
                                         excerptEl.textContent = excerptText;
@@ -1498,6 +1585,8 @@
                                     }
                                     statusCell.innerHTML = statusHtml;
                                 }
+
+                                window.AdminPostsDynamic?.updatePostRowQuickControls(row, data.post);
 
                                 const deleteBtn = row.querySelector('.btn-delete');
                                 if (deleteBtn) {
@@ -1810,6 +1899,300 @@
     }
 
     /* Enhanced Posts Page Styles */
+    .admin-card-header .header-right {
+        flex: 1 1 700px;
+        min-width: 0;
+    }
+
+    .admin-list-filters {
+        flex-wrap: nowrap;
+    }
+
+    .admin-list-filters .search-bar-advanced {
+        flex: 1 1 280px;
+        min-width: 210px;
+    }
+
+    .admin-list-filters .filter-dropdown,
+    .admin-list-filters .sort-dropdown {
+        flex: 0 1 190px;
+        min-width: 150px;
+    }
+
+    .admin-smart-select {
+        position: relative;
+        width: 100%;
+    }
+
+    .smart-select-native {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .smart-select-trigger {
+        width: 100%;
+        min-height: 46px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        padding: 0.65rem 0.8rem;
+        border: 1px solid var(--admin-border-color);
+        border-radius: 12px;
+        background: var(--admin-card-bg);
+        color: var(--admin-text);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        cursor: pointer;
+        font: inherit;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .admin-smart-select.is-open .smart-select-trigger,
+    .smart-select-trigger:focus-visible {
+        outline: none;
+        border-color: var(--admin-primary);
+        box-shadow: 0 0 0 3px rgba(58, 134, 255, 0.15);
+    }
+
+    .smart-select-current,
+    .smart-select-option > span,
+    .quick-edit-option > span {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+    }
+
+    .smart-select-current > span,
+    .smart-select-option > span,
+    .quick-edit-option > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .smart-select-current > i:first-child,
+    .smart-select-option > span > i,
+    .quick-edit-option > span > i {
+        width: 1.1rem;
+        color: var(--admin-primary);
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    .smart-select-chevron,
+    .quick-edit-chevron {
+        font-size: 0.7rem;
+        transition: transform 0.2s ease;
+    }
+
+    .admin-smart-select.is-open .smart-select-chevron,
+    .quick-edit-control.is-open .quick-edit-chevron {
+        transform: rotate(180deg);
+    }
+
+    .smart-select-menu,
+    .quick-edit-menu {
+        position: absolute;
+        top: calc(100% + 0.45rem);
+        left: 0;
+        z-index: 80;
+        width: max-content;
+        min-width: 100%;
+        max-width: 280px;
+        max-height: 270px;
+        display: none;
+        overflow-y: auto;
+        padding: 0.45rem;
+        border: 1px solid var(--admin-border-color);
+        border-radius: 14px;
+        background: var(--admin-card-bg);
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+    }
+
+    .smart-select-menu-right,
+    .quick-edit-menu-right {
+        right: 0;
+        left: auto;
+    }
+
+    .admin-smart-select.is-open .smart-select-menu,
+    .quick-edit-control.is-open .quick-edit-menu {
+        display: grid;
+        gap: 0.2rem;
+        animation: fadeIn 0.15s ease;
+    }
+
+    .smart-select-option,
+    .quick-edit-option {
+        width: 100%;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.55rem 0.7rem;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--admin-text);
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        font-size: 0.84rem;
+    }
+
+    .smart-select-option:hover,
+    .quick-edit-option:hover {
+        background: rgba(58, 134, 255, 0.08);
+    }
+
+    .smart-select-option.is-selected,
+    .quick-edit-option.is-selected {
+        background: rgba(58, 134, 255, 0.13);
+        color: var(--admin-primary);
+        font-weight: 700;
+    }
+
+    .option-check {
+        visibility: hidden;
+        color: var(--admin-primary);
+        flex-shrink: 0;
+    }
+
+    .is-selected > .option-check {
+        visibility: visible;
+    }
+
+    .posts-table-responsive {
+        overflow: visible;
+    }
+
+    .posts-management-table {
+        width: 100%;
+        min-width: 880px;
+        table-layout: fixed;
+        border-collapse: collapse;
+    }
+
+    .posts-management-table .posts-col-check { width: 4%; }
+    .posts-management-table .posts-col-actions { width: 18%; }
+    .posts-management-table .posts-col-title { width: 25%; }
+    .posts-management-table .posts-col-category { width: 14%; }
+    .posts-management-table .posts-col-date { width: 10%; }
+    .posts-management-table .posts-col-metric { width: 7%; }
+    .posts-management-table .posts-col-status { width: 15%; }
+
+    .posts-management-table th,
+    .posts-management-table td {
+        padding: 0.75rem 0.55rem;
+        border-bottom: 1px solid var(--admin-border-color);
+        white-space: normal;
+        vertical-align: middle;
+    }
+
+    .posts-management-table tbody tr:hover {
+        transform: none;
+    }
+
+    .posts-management-table tbody tr:has(.quick-edit-control.is-open) {
+        position: relative;
+        z-index: 20;
+    }
+
+    .posts-management-table td.actions {
+        display: table-cell;
+        width: auto;
+        min-width: 0;
+        text-align: left;
+    }
+
+    .posts-management-table .action-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.35rem;
+    }
+
+    .posts-management-table .btn-action {
+        width: 100%;
+        height: 31px;
+        padding: 0 0.45rem;
+        border-radius: 8px;
+        gap: 0.35rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .posts-management-table .btn-action i {
+        flex-shrink: 0;
+    }
+
+    .posts-management-table .post-title,
+    .posts-management-table .post-excerpt {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .posts-management-table .post-excerpt {
+        font-size: 0.78rem;
+    }
+
+    .quick-edit-control {
+        position: relative;
+        z-index: 1;
+    }
+
+    .quick-edit-control.is-open {
+        z-index: 90;
+    }
+
+    .quick-edit-trigger {
+        max-width: 100%;
+        border: 0;
+        cursor: pointer;
+        font: inherit;
+    }
+
+    .category-badge.quick-edit-trigger {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 10px;
+    }
+
+    .category-badge.quick-edit-trigger > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .category-badge.quick-edit-trigger .quick-edit-chevron {
+        margin-left: auto;
+    }
+
+    .status-quick-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0;
+        background: transparent;
+    }
+
+    .quick-edit-control.is-saving {
+        opacity: 0.55;
+        pointer-events: none;
+    }
+
+    [data-theme="dark"] .smart-select-menu,
+    [data-theme="dark"] .quick-edit-menu {
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+    }
+
     .quick-stats {
         display: flex;
         gap: 1rem;
@@ -1987,9 +2370,22 @@
 
     .actions-column,
     .admin-table .actions {
-        width: 136px;
-        min-width: 136px;
         text-align: center;
+    }
+
+    @media (max-width: 1100px) {
+        .admin-list-filters {
+            flex-wrap: wrap;
+        }
+
+        .admin-list-filters .search-bar-advanced {
+            flex-basis: 100%;
+        }
+
+        .posts-table-responsive {
+            overflow-x: auto;
+            overflow-y: visible;
+        }
     }
 
     .bulk-actions {

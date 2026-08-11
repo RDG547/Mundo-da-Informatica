@@ -531,6 +531,7 @@ def redirect_back_to_post(post: "Post | None", fallback_endpoint: str = 'home'):
 def get_admin_posts_overview() -> dict[str, int]:
     return {
         'total_posts': Post.query.count(),
+        'active_posts': Post.query.filter_by(is_active=True).count(),
         'featured_posts': Post.query.filter_by(featured=True).count()
     }
 
@@ -875,7 +876,7 @@ def send_contact_support_email(
 
 
 def serialize_post_for_admin(post):
-    category = post.category_rel
+    category = post.category_rel or (db.session.get(Category, post.category_id) if post.category_id else None)
     return {
         'id': post.id,
         'title': post.title,
@@ -2614,6 +2615,9 @@ class SiteConfig(db.Model):
                     'youtube': 'https://www.youtube.com/@_RDTech'
                 },
                 'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
+                'plan_enabled_free': True,
+                'plan_enabled_premium': True,
+                'plan_enabled_vip': True,
                 'plan_price_premium': 29.90,
                 'plan_price_vip': 49.90
             }
@@ -2671,6 +2675,9 @@ class SiteConfig(db.Model):
                     'youtube': 'https://www.youtube.com/@_RDTech'
                 },
                 'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
+                'plan_enabled_free': True,
+                'plan_enabled_premium': True,
+                'plan_enabled_vip': True,
                 'plan_price_premium': 29.90,
                 'plan_price_vip': 49.90
             }
@@ -2838,6 +2845,18 @@ def get_plan_metadata(plan: str | None) -> dict[str, str]:
     return PLAN_METADATA.get(normalize_plan_key(plan), PLAN_METADATA['free'])
 
 
+def is_plan_enabled(plan: str | None, config_values: Mapping[str, Any] | None = None) -> bool:
+    """Indica se um plano pode receber novas adesoes ou alteracoes."""
+    plan_key = normalize_plan_key(plan)
+    config_key = f'plan_enabled_{plan_key}'
+    raw_value = (
+        config_values.get(config_key)
+        if config_values is not None and config_key in config_values
+        else SiteConfig.get_value(config_key, True)
+    )
+    return coerce_bool(raw_value, default=True)
+
+
 def format_brl_from_cents(amount_cents: int) -> str:
     amount = Decimal(max(0, int(amount_cents or 0))) / Decimal('100')
     formatted = f'{amount:,.2f}'
@@ -2873,7 +2892,8 @@ def get_plan_pricing_config(config_values: Mapping[str, Any] | None = None) -> d
         'free': {
             **get_plan_metadata('free'),
             'amount_cents': 0,
-            'display_amount': '0'
+            'display_amount': '0',
+            'enabled': is_plan_enabled('free', config_values=config_values)
         }
     }
 
@@ -2882,7 +2902,8 @@ def get_plan_pricing_config(config_values: Mapping[str, Any] | None = None) -> d
         pricing[plan_key] = {
             **get_plan_metadata(plan_key),
             'amount_cents': amount_cents,
-            'display_amount': format_brl_from_cents(amount_cents)
+            'display_amount': format_brl_from_cents(amount_cents),
+            'enabled': is_plan_enabled(plan_key, config_values=config_values)
         }
 
     return pricing
@@ -4500,19 +4521,22 @@ def plans():
 
 @app.route('/api/plan-prices')
 def api_plan_prices():
-    """Retorna os preços atuais dos planos para atualização dinâmica no frontend"""
+    """Retorna precos e disponibilidade para atualizacao dinamica dos planos."""
     pricing = get_plan_pricing_config()
-    return jsonify({
+    response = jsonify({
         'success': True,
         'plans': {
             plan_key: {
                 'amount_cents': plan_data['amount_cents'],
                 'display_amount': plan_data['display_amount'],
-                'display_full': f"R$ {plan_data['display_amount']}"
+                'display_full': f"R$ {plan_data['display_amount']}",
+                'enabled': bool(plan_data['enabled'])
             }
             for plan_key, plan_data in pricing.items()
         }
     })
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    return response
 
 
 @app.route('/api/user/permissions')
@@ -4646,6 +4670,9 @@ def create_checkout_session():
         if plan_key not in DEFAULT_PLAN_PRICE_CENTS:
             debug_log(f'Stripe Checkout - Plano inválido: {plan_type}')
             return jsonify({'error': 'Plano inválido'}), 400
+
+        if not is_plan_enabled(plan_key):
+            return jsonify({'error': 'Este plano está temporariamente indisponível para novas assinaturas.'}), 409
 
         stripe_price = get_stripe_subscription_price(plan_key)
         if not stripe_price or not stripe_price.get('price_id'):
@@ -4870,6 +4897,9 @@ def create_pix_checkout():
         if plan_key not in DEFAULT_PLAN_PRICE_CENTS:
             print(f'[PIX] ERRO - Plano inválido: {plan_type}')
             return jsonify({'error': 'Plano inválido'}), 400
+
+        if not is_plan_enabled(plan_key):
+            return jsonify({'error': 'Este plano está temporariamente indisponível para novas assinaturas.'}), 409
 
         amount = get_plan_price_cents(plan_key)
         if amount <= 0:
@@ -6487,6 +6517,88 @@ def admin_update_post(post_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao atualizar post: {str(e)}'}), 500
+
+
+@app.route('/admin/posts/<int:post_id>/quick-update', methods=['POST'])
+@login_required
+@editor_required
+def admin_quick_update_post(post_id):
+    """Atualiza categoria ou status diretamente pela tabela administrativa."""
+    post = Post.query.get_or_404(post_id)
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'message': 'JSON inválido.'}), 400
+
+    changed_fields = []
+
+    try:
+        if 'category_id' in data:
+            raw_category_id = data.get('category_id')
+            if raw_category_id in (None, ''):
+                post.category_id = None
+                post.category_str = 'Sem categoria'
+            else:
+                try:
+                    category_id = int(raw_category_id)
+                except (TypeError, ValueError):
+                    return jsonify({'success': False, 'message': 'Categoria inválida.'}), 400
+
+                category = db.session.get(Category, category_id)
+                if not category:
+                    return jsonify({'success': False, 'message': 'Categoria não encontrada.'}), 404
+
+                post.category_id = category.id
+                post.category_str = category.name
+            changed_fields.append('categoria')
+
+        if 'status' in data:
+            status = str(data.get('status') or '').strip().lower()
+            if status == 'featured':
+                post.is_active = True
+                post.featured = True
+            elif status == 'active':
+                post.is_active = True
+                post.featured = False
+            elif status == 'inactive':
+                post.is_active = False
+                post.featured = False
+            else:
+                return jsonify({'success': False, 'message': 'Status inválido.'}), 400
+            changed_fields.append('status')
+
+        if not changed_fields:
+            return jsonify({'success': False, 'message': 'Nenhuma alteração informada.'}), 400
+
+        post.date_updated = datetime.utcnow()
+        db.session.commit()
+
+        try:
+            log_admin_activity(
+                current_user.id,
+                'quick_update_post',
+                f'Atualizou {" e ".join(changed_fields)} do post: {post.title}',
+                metadata={'post_id': post.id, 'fields': changed_fields}
+            )
+        except Exception as log_error:
+            app.logger.warning('Erro ao registrar atualização rápida do post: %s', log_error)
+
+        if changed_fields == ['categoria']:
+            success_message = 'Categoria atualizada com sucesso!'
+        elif changed_fields == ['status']:
+            success_message = 'Status atualizado com sucesso!'
+        else:
+            success_message = 'Categoria e status atualizados com sucesso!'
+        return jsonify({
+            'success': True,
+            'message': success_message,
+            'post': serialize_post_for_admin(post),
+            'stats': get_admin_posts_overview()
+        })
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception('Erro ao atualizar post rapidamente')
+        return jsonify({'success': False, 'message': f'Erro ao atualizar post: {str(exc)}'}), 500
+
 
 @app.route('/admin/posts/<int:post_id>/toggle-featured', methods=['POST'])
 @login_required
@@ -10331,6 +10443,12 @@ def downgrade_plan():
         # Validar plano de destino
         if target_plan not in ['free', 'premium', 'vip']:
             return jsonify({'success': False, 'message': 'Plano inválido.'}), 400
+
+        if not is_plan_enabled(target_plan):
+            return jsonify({
+                'success': False,
+                'message': 'Este plano está temporariamente indisponível para alterações.'
+            }), 409
 
         # Verificar se é realmente um downgrade
         plan_hierarchy = {'free': 0, 'premium': 1, 'vip': 2}

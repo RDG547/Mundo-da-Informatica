@@ -97,11 +97,12 @@
     }
 
     function updateSidebarPostsBadge(total) {
-        const badge = document.querySelector('.admin-nav-item[href="/admin/posts"] .nav-badge')
+        const badge = document.querySelector('[data-sidebar-count="posts"]')
+            || document.querySelector('.admin-nav-item[href="/admin/posts"] .nav-badge')
             || document.querySelector('.admin-nav-item[href="/admin/posts/"] .nav-badge');
 
         if (badge) {
-            badge.textContent = total > 0 ? String(total) : '';
+            badge.textContent = String(Math.max(0, Number(total) || 0));
         }
     }
 
@@ -135,6 +136,7 @@
         }
 
         const totalPosts = Math.max(0, Number(stats.total_posts) || 0);
+        const activePosts = Math.max(0, Number(stats.active_posts) || 0);
         const featuredPosts = Math.max(0, Number(stats.featured_posts) || 0);
 
         setTotalPosts(totalPosts);
@@ -147,7 +149,7 @@
             element.textContent = String(featuredPosts);
         });
 
-        updateSidebarPostsBadge(totalPosts);
+        updateSidebarPostsBadge(activePosts);
         refreshPaginationInfo();
     }
 
@@ -210,27 +212,107 @@
         refreshPaginationInfo();
     }
 
+    function getQuickCategoryOptions() {
+        const categorySelect = document.getElementById('filterCategory');
+        const root = categorySelect?.closest('[data-smart-select]');
+        const options = root
+            ? Array.from(root.querySelectorAll('.smart-select-option[data-value]'))
+                .filter((option) => option.dataset.value)
+                .map((option) => ({
+                    value: option.dataset.value,
+                    label: option.querySelector('span')?.textContent?.trim() || 'Categoria',
+                    icon: option.dataset.icon || 'fas fa-folder',
+                    color: option.dataset.color || '#3a86ff'
+                }))
+            : [];
+
+        return [{ value: '', label: 'Sem categoria', icon: 'fas fa-folder', color: '#64748b' }, ...options];
+    }
+
+    function buildCategoryQuickControl(post) {
+        const selectedId = String(post.category_id || '');
+        const optionsHtml = getQuickCategoryOptions().map((option) => `
+            <button type="button" class="quick-edit-option${option.value === selectedId ? ' is-selected' : ''}"
+                data-quick-field="category_id" data-value="${escapeHtml(option.value)}"
+                data-icon="${escapeHtml(option.icon)}" data-color="${escapeHtml(option.color)}">
+                <span><i class="${escapeHtml(option.icon)}"></i> ${escapeHtml(option.label)}</span>
+                <i class="fas fa-check option-check"></i>
+            </button>
+        `).join('');
+
+        return `
+            <div class="category-cell quick-edit-control" data-quick-edit-control="category">
+                <button type="button" class="category-badge quick-edit-trigger" data-quick-edit-trigger
+                    aria-haspopup="listbox" aria-expanded="false" style="background: ${escapeHtml(post.category_color || '#3a86ff')}">
+                    <i class="${escapeHtml(post.category_icon || 'fas fa-folder')}"></i>
+                    <span>${escapeHtml(post.category_name || 'Sem categoria')}</span>
+                    <i class="fas fa-chevron-down quick-edit-chevron"></i>
+                </button>
+                <div class="quick-edit-menu" role="listbox">${optionsHtml}</div>
+            </div>
+        `;
+    }
+
+    function getPostStatus(post) {
+        if (post.featured) return 'featured';
+        return post.is_active ? 'active' : 'inactive';
+    }
+
+    function buildStatusQuickControl(post) {
+        const currentStatus = getPostStatus(post);
+        const statuses = [
+            { value: 'active', label: 'Ativo', icon: 'fas fa-check-circle', badge: 'badge-success' },
+            { value: 'featured', label: 'Destaque', icon: 'fas fa-star', badge: 'badge-warning' },
+            { value: 'inactive', label: 'Inativo', icon: 'fas fa-pause-circle', badge: 'badge-secondary' }
+        ];
+        const current = statuses.find((status) => status.value === currentStatus) || statuses[0];
+        const optionsHtml = statuses.map((status) => `
+            <button type="button" class="quick-edit-option${status.value === currentStatus ? ' is-selected' : ''}"
+                data-quick-field="status" data-value="${status.value}" data-icon="${status.icon}">
+                <span><i class="${status.icon}"></i> ${status.label}</span><i class="fas fa-check option-check"></i>
+            </button>
+        `).join('');
+
+        return `
+            <div class="status-cell quick-edit-control" data-quick-edit-control="status">
+                <button type="button" class="status-quick-trigger quick-edit-trigger" data-quick-edit-trigger aria-haspopup="listbox" aria-expanded="false">
+                    <span class="badge ${current.badge}"><i class="${current.icon}"></i> ${current.label}</span>
+                    <i class="fas fa-chevron-down quick-edit-chevron"></i>
+                </button>
+                <div class="quick-edit-menu quick-edit-menu-right" role="listbox">${optionsHtml}</div>
+            </div>
+        `;
+    }
+
+    function updatePostRowQuickControls(row, post) {
+        if (!row || !post) return;
+        row.dataset.categoryId = post.category_id || '';
+        row.dataset.status = getPostStatus(post);
+        row.classList.toggle('inactive-row', !post.is_active);
+
+        const categoryControl = row.querySelector('[data-quick-edit-control="category"]');
+        if (categoryControl) categoryControl.outerHTML = buildCategoryQuickControl(post);
+
+        const statusControl = row.querySelector('[data-quick-edit-control="status"]');
+        if (statusControl) statusControl.outerHTML = buildStatusQuickControl(post);
+    }
+
     function buildPostRow(post) {
-        const postExcerpt = String(post.excerpt || post.description || '').trim();
+        const rawExcerpt = String(post.excerpt || post.description || '').trim();
+        const postExcerpt = rawExcerpt.length > 68 ? `${rawExcerpt.slice(0, 68)}...` : rawExcerpt;
         const featuredHtml = post.featured
             ? '<span class="featured-indicator" title="Post em destaque"><i class="fas fa-star"></i></span>'
             : '';
 
-        const statusHtml = post.featured
-            ? '<span class="badge badge-warning"><i class="fas fa-star"></i> Destaque</span>'
-            : (post.is_active
-                ? '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Ativo</span>'
-                : '<span class="badge badge-secondary"><i class="fas fa-pause-circle"></i> Inativo</span>');
-
         return `
-            <tr data-post-id="${post.id}" data-category-id="${escapeHtml(post.category_id || '')}" class="${post.is_active ? '' : 'inactive-row'}">
+            <tr data-post-id="${post.id}" data-category-id="${escapeHtml(post.category_id || '')}" data-status="${getPostStatus(post)}" class="${post.is_active ? '' : 'inactive-row'}">
                 <td><input type="checkbox" class="form-check-input post-checkbox" value="${post.id}"></td>
                 <td class="actions">
                     <div class="action-buttons">
-                        <a href="${escapeHtml(post.post_url || '#')}" class="btn-action btn-view" title="Visualizar" target="_blank"><i class="fas fa-eye"></i></a>
-                        <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="${post.id}"><i class="fas fa-edit"></i></a>
-                        <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="${post.id}"><i class="fas fa-copy"></i></a>
-                        <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="${post.id}" data-post-title="${escapeHtml(post.title)}"><i class="fas fa-trash"></i></a>
+                        <a href="${escapeHtml(post.post_url || '#')}" class="btn-action btn-view" title="Visualizar" target="_blank"><i class="fas fa-eye"></i><span>Visualizar</span></a>
+                        <a href="#" class="btn-action btn-edit" title="Editar" data-post-id="${post.id}"><i class="fas fa-edit"></i><span>Editar</span></a>
+                        <a href="#" class="btn-action btn-duplicate" title="Duplicar" data-post-id="${post.id}"><i class="fas fa-copy"></i><span>Duplicar</span></a>
+                        <a href="#" class="btn-action btn-delete" title="Excluir" data-post-id="${post.id}" data-post-title="${escapeHtml(post.title)}"><i class="fas fa-trash"></i><span>Excluir</span></a>
                     </div>
                 </td>
                 <td>
@@ -245,14 +327,7 @@
                         </div>
                     </div>
                 </td>
-                <td>
-                    <div class="category-cell">
-                        <span class="category-badge" style="background: ${escapeHtml(post.category_color || '#3a86ff')}">
-                            <i class="${escapeHtml(post.category_icon || 'fas fa-folder')}"></i>
-                            ${escapeHtml(post.category_name || 'Sem categoria')}
-                        </span>
-                    </div>
-                </td>
+                <td>${buildCategoryQuickControl(post)}</td>
                 <td>
                     <div class="date-cell">
                         <div class="date-primary">${escapeHtml(post.date_posted || '')}</div>
@@ -271,7 +346,7 @@
                         <div class="metric-trend"><i class="fas fa-arrow-up text-success"></i><span class="trend-percentage">+0%</span></div>
                     </div>
                 </td>
-                <td><div class="status-cell">${statusHtml}</div></td>
+                <td>${buildStatusQuickControl(post)}</td>
             </tr>
         `;
     }
@@ -331,12 +406,111 @@
         }
     }
 
+    function closeAdminDropdowns(exceptRoot) {
+        document.querySelectorAll('.admin-smart-select.is-open, .quick-edit-control.is-open').forEach((root) => {
+            if (root === exceptRoot) return;
+            root.classList.remove('is-open');
+            root.querySelector('[aria-expanded="true"]')?.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function syncSmartSelect(root) {
+        if (!root) return;
+        const select = root.querySelector('select');
+        const current = root.querySelector('.smart-select-current');
+        const options = Array.from(root.querySelectorAll('.smart-select-option'));
+        const selectedOption = options.find((option) => option.dataset.value === select?.value) || options[0];
+        if (!select || !current || !selectedOption) return;
+
+        options.forEach((option) => option.classList.toggle('is-selected', option === selectedOption));
+        const label = selectedOption.querySelector('span')?.textContent?.trim() || select.selectedOptions[0]?.textContent || '';
+        const icon = selectedOption.dataset.icon || 'fas fa-filter';
+        current.innerHTML = `<i class="${escapeHtml(icon)}"></i><span>${escapeHtml(label)}</span>`;
+    }
+
+    function syncAllSmartSelects() {
+        document.querySelectorAll('[data-smart-select]').forEach(syncSmartSelect);
+    }
+
     function bindGlobalHandlers() {
         if (window.__adminPostsDynamicGlobalBound) {
             return;
         }
 
         window.__adminPostsDynamicGlobalBound = true;
+
+        document.addEventListener('click', async function (event) {
+            const smartTrigger = event.target.closest('[data-smart-select-trigger]');
+            if (smartTrigger) {
+                const root = smartTrigger.closest('[data-smart-select]');
+                const willOpen = !root.classList.contains('is-open');
+                closeAdminDropdowns(root);
+                root.classList.toggle('is-open', willOpen);
+                smartTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                return;
+            }
+
+            const smartOption = event.target.closest('.smart-select-option');
+            if (smartOption) {
+                const root = smartOption.closest('[data-smart-select]');
+                const select = root?.querySelector('select');
+                if (root && select) {
+                    select.value = smartOption.dataset.value || '';
+                    syncSmartSelect(root);
+                    root.classList.remove('is-open');
+                    root.querySelector('[data-smart-select-trigger]')?.setAttribute('aria-expanded', 'false');
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                return;
+            }
+
+            const quickTrigger = event.target.closest('[data-quick-edit-trigger]');
+            if (quickTrigger) {
+                const root = quickTrigger.closest('.quick-edit-control');
+                const willOpen = !root.classList.contains('is-open');
+                closeAdminDropdowns(root);
+                root.classList.toggle('is-open', willOpen);
+                quickTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                return;
+            }
+
+            const quickOption = event.target.closest('.quick-edit-option');
+            if (quickOption) {
+                const row = quickOption.closest('tr[data-post-id]');
+                const control = quickOption.closest('.quick-edit-control');
+                if (!row || !control || quickOption.classList.contains('is-selected')) {
+                    closeAdminDropdowns();
+                    return;
+                }
+
+                const field = quickOption.dataset.quickField;
+                const postId = row.dataset.postId;
+                if (!field || !postId) return;
+
+                control.classList.add('is-saving');
+                try {
+                    const result = await ajaxPost(`/admin/posts/${postId}/quick-update`, {
+                        [field]: quickOption.dataset.value || ''
+                    });
+                    updatePostRowQuickControls(row, result.post);
+                    updatePostsOverview(result.stats);
+                    reapplyCurrentFilters();
+                    showToast(result.message || 'Post atualizado com sucesso!', 'success');
+                } catch (error) {
+                    control.classList.remove('is-saving');
+                    showToast(error.message, 'error');
+                } finally {
+                    closeAdminDropdowns();
+                }
+                return;
+            }
+
+            closeAdminDropdowns();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') closeAdminDropdowns();
+        });
 
         document.addEventListener('click', function (event) {
             const deleteBtn = event.target.closest('.btn-delete');
@@ -500,14 +674,16 @@
         bindDeleteForm();
         bindEditForm();
         bindCreateForm();
+        syncAllSmartSelects();
         refreshPaginationInfo();
-        updateSidebarPostsBadge(getTotalPosts());
     }
 
     window.AdminPostsDynamic = {
         init,
         updatePostsOverview,
-        refreshPaginationInfo
+        refreshPaginationInfo,
+        syncSmartSelects: syncAllSmartSelects,
+        updatePostRowQuickControls
     };
 
     document.addEventListener('DOMContentLoaded', init);

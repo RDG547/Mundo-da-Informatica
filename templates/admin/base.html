@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="pt-br" data-theme="light">
+<html lang="pt-br" data-theme="light" data-site-name="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ title }} - Painel Administrativo | Mundo da Informática</title>
+    <title>{{ title }} - Painel Administrativo | {{ site_configs.get('site_name', 'Mundo da Informática') }}</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
@@ -121,6 +121,7 @@
     <script src="{{ url_for('static', filename='js/sidebar.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/profile-images.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/plan-prices.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/site-settings-live.js') }}" data-static-base-script="true"></script>
     {% block scripts %}{% endblock %}
 
     <!-- Scroll to Top -->

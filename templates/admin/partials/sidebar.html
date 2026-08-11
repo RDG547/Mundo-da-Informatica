@@ -2,10 +2,7 @@
     <div class="admin-nav-header">
         <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-logo">
             <i class="fas fa-laptop-code admin-icon"></i>
-            <span class="logo-text">
-                <span class="admin-mundo">Mundo</span>
-                <span class="admin-informatica">da Informática</span>
-            </span>
+            <span class="logo-text" data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
         </a>
         <button id="sidebarToggle" class="sidebar-toggle" aria-label="Alternar menu lateral">
             <i class="fas fa-bars"></i>

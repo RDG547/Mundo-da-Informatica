@@ -393,11 +393,36 @@
     async function refreshStats() {
         try {
             const data = await requestJSON('/admin/categories/stats', 'GET');
-            const statsValues = document.querySelectorAll('.stats-summary .stats-value');
-            if (statsValues.length >= 3) {
-                statsValues[0].textContent = String(data.total || 0);
-                statsValues[1].textContent = String(data.active || 0);
-                statsValues[2].textContent = String(data.featured || 0);
+            const values = {
+                total: data.total || 0,
+                active: data.active || 0,
+                inactive: data.inactive || 0,
+                featured: data.featured || 0,
+                total_posts: data.total_posts || 0,
+                average: data.average || 0,
+                top: data.top_category
+                    ? `${data.top_category.name} (${data.top_category.post_count} posts)`
+                    : ''
+            };
+            Object.entries(values).forEach(([key, value]) => {
+                const element = document.querySelector(`[data-category-stat="${key}"]`);
+                if (element) element.textContent = String(value);
+            });
+
+            const topRow = document.querySelector('[data-category-stat-row="top"]');
+            if (topRow) topRow.hidden = !data.top_category;
+            const inactiveRow = document.querySelector('[data-category-stat-row="inactive"]');
+            if (inactiveRow) inactiveRow.hidden = Number(data.inactive || 0) <= 0;
+
+            const chartCanvas = document.getElementById('categoriesChart');
+            const chart = chartCanvas && window.Chart && typeof window.Chart.getChart === 'function'
+                ? window.Chart.getChart(chartCanvas)
+                : null;
+            if (chart && data.chart) {
+                chart.data.labels = data.chart.labels.length ? data.chart.labels : ['Nenhuma categoria'];
+                chart.data.datasets[0].data = data.chart.data.length ? data.chart.data : [0];
+                chart.data.datasets[0].backgroundColor = data.chart.colors || ['#cccccc'];
+                chart.update('none');
             }
             const countBadge = document.querySelector('.count-badge');
             if (countBadge && typeof data.total !== 'undefined') {
@@ -409,7 +434,9 @@
     }
 
     function init() {
-        if (!document.getElementById('categoriesTableBody')) return;
+        const page = document.getElementById('pageContent');
+        if (!document.getElementById('categoriesTableBody') || !page || page.dataset.categoriesDynamicInit === 'true') return;
+        page.dataset.categoriesDynamicInit = 'true';
 
         applyPagination(getCurrentPage());
 
@@ -653,11 +680,23 @@
             }
         }, true);
 
-        // Sobrescrever refresh sem reload
+        // Atualiza silenciosamente e mantém a tela sincronizada sem ação manual.
         window.refreshStats = function () {
-            notify('Atualizando estatísticas...', 'info');
-            refreshStats();
+            return refreshStats();
         };
+
+        if (window.__categoriesStatsRefreshTimer) {
+            window.clearInterval(window.__categoriesStatsRefreshTimer);
+        }
+        refreshStats();
+        window.__categoriesStatsRefreshTimer = window.setInterval(() => {
+            if (!document.getElementById('categoriesTableBody')) {
+                window.clearInterval(window.__categoriesStatsRefreshTimer);
+                window.__categoriesStatsRefreshTimer = null;
+                return;
+            }
+            if (!document.hidden) refreshStats();
+        }, 5000);
 
         // Sobrescrever helpers globais para garantir comportamento consistente
         window.deleteCategory = function (categoryId, categoryName) {
@@ -670,4 +709,5 @@
     }
 
     document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('adminPageLoaded', init);
 })();

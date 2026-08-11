@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-site-name="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -257,11 +257,11 @@
         }
     </style>
 </head>
-<body>
+<body data-live-maintenance-page="true" data-is-admin="false">
     <div class="maintenance-container">
         <div class="maintenance-topline">
             <i class="fas fa-circle-notch fa-spin"></i>
-            {{ site_configs.get('site_name', 'Mundo da Informática') }}
+            <span data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
         </div>
 
         <div class="maintenance-hero">
@@ -294,41 +294,35 @@
             <p>
                 <i class="fas fa-envelope"></i>
                 Para urgências, entre em contato:
-                <a href="mailto:{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}">
-                    {{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}
+                <a href="mailto:{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}" data-live-email-link>
+                    <span data-live-contact-email>{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}</span>
                 </a>
             </p>
         </div>
 
         <div class="social-links">
-            {% if site_configs.get('social_links', {}).get('facebook') %}
-            <a href="{{ site_configs.social_links.facebook }}" class="social-link" target="_blank">
+            <a href="{{ site_configs.get('social_links', {}).get('facebook') or '#' }}" class="social-link{% if not site_configs.get('social_links', {}).get('facebook') %} is-disabled{% endif %}" data-live-social="facebook" {% if site_configs.get('social_links', {}).get('facebook') %}target="_blank"{% else %}aria-disabled="true"{% endif %}>
                 <i class="fab fa-facebook-f"></i>
             </a>
-            {% endif %}
 
-            {% if site_configs.get('social_links', {}).get('instagram') %}
-            <a href="{{ site_configs.social_links.instagram }}" class="social-link" target="_blank">
+            <a href="{{ site_configs.get('social_links', {}).get('instagram') or '#' }}" class="social-link{% if not site_configs.get('social_links', {}).get('instagram') %} is-disabled{% endif %}" data-live-social="instagram" {% if site_configs.get('social_links', {}).get('instagram') %}target="_blank"{% else %}aria-disabled="true"{% endif %}>
                 <i class="fab fa-instagram"></i>
             </a>
-            {% endif %}
 
-            {% if site_configs.get('social_links', {}).get('twitter') %}
-            <a href="{{ site_configs.social_links.twitter }}" class="social-link" target="_blank">
+            <a href="{{ site_configs.get('social_links', {}).get('twitter') or '#' }}" class="social-link{% if not site_configs.get('social_links', {}).get('twitter') %} is-disabled{% endif %}" data-live-social="twitter" {% if site_configs.get('social_links', {}).get('twitter') %}target="_blank"{% else %}aria-disabled="true"{% endif %}>
                 <i class="fab fa-twitter"></i>
             </a>
-            {% endif %}
 
-            {% if site_configs.get('social_links', {}).get('youtube') %}
-            <a href="{{ site_configs.social_links.youtube }}" class="social-link" target="_blank">
+            <a href="{{ site_configs.get('social_links', {}).get('youtube') or '#' }}" class="social-link{% if not site_configs.get('social_links', {}).get('youtube') %} is-disabled{% endif %}" data-live-social="youtube" {% if site_configs.get('social_links', {}).get('youtube') %}target="_blank"{% else %}aria-disabled="true"{% endif %}>
                 <i class="fab fa-youtube"></i>
             </a>
-            {% endif %}
         </div>
 
 
     </div>
 
+    <style>.social-link.is-disabled { display: none; }</style>
+    <script src="{{ url_for('static', filename='js/site-settings-live.js') }}"></script>
     <script>
         // Auto-refresh da página a cada 5 minutos para verificar se a manutenção terminou
         setTimeout(function() {

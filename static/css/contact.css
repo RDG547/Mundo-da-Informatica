@@ -685,6 +685,10 @@
     background: #1da1f2;
 }
 
+.social-platform.facebook .platform-icon {
+    background: #1877f2;
+}
+
 .platform-info {
     flex: 1;
 }

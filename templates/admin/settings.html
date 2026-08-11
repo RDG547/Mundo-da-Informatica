@@ -27,96 +27,6 @@
         </div>
     </div>
 
-    <div class="stats-grid enhanced settings-stats-grid slide-in-up">
-        <article class="stat-card settings-stat-card brand" style="animation-delay: 0.1s">
-            <div class="stat-header">
-                <div class="stat-icon">
-                    <i class="fas fa-signature"></i>
-                </div>
-                <div class="stat-trend neutral">
-                    <i class="fas fa-swatchbook"></i>
-                    <span>Branding</span>
-                </div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number">{{ site_configs.get('site_name', 'Mundo da Informática') }}</h3>
-                <p class="stat-label">Marca principal do site</p>
-                <div class="stat-details">
-                    <span class="detail-item">
-                        <i class="fas fa-envelope"></i>
-                        {{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}
-                    </span>
-                </div>
-            </div>
-        </article>
-
-        <article class="stat-card settings-stat-card premium" style="animation-delay: 0.2s">
-            <div class="stat-header">
-                <div class="stat-icon">
-                    <i class="fas fa-star"></i>
-                </div>
-                <div class="stat-trend positive">
-                    <i class="fas fa-desktop"></i>
-                    <span>Visual</span>
-                </div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number" data-plan-price-full="premium">R$ {{ site_configs.get('plan_price_premium', 29.90) }}</h3>
-                <p class="stat-label">Card do Plano Premium</p>
-                <div class="stat-details">
-                    <span class="detail-item">
-                        <i class="fas fa-link"></i>
-                        Stripe: {{ plan_product_ids.premium }}
-                    </span>
-                </div>
-            </div>
-        </article>
-
-        <article class="stat-card settings-stat-card vip" style="animation-delay: 0.3s">
-            <div class="stat-header">
-                <div class="stat-icon">
-                    <i class="fas fa-crown"></i>
-                </div>
-                <div class="stat-trend positive">
-                    <i class="fas fa-crown"></i>
-                    <span>VIP</span>
-                </div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number" data-plan-price-full="vip">R$ {{ site_configs.get('plan_price_vip', 49.90) }}</h3>
-                <p class="stat-label">Card do Plano VIP</p>
-                <div class="stat-details">
-                    <span class="detail-item">
-                        <i class="fas fa-link"></i>
-                        Stripe: {{ plan_product_ids.vip }}
-                    </span>
-                </div>
-            </div>
-        </article>
-
-        <article class="stat-card settings-stat-card maintenance" style="animation-delay: 0.4s">
-            <div class="stat-header">
-                <div class="stat-icon">
-                    <i class="fas fa-tools"></i>
-                </div>
-                <div class="stat-trend {% if site_configs.get('maintenance_mode', False) %}negative{% else %}neutral{% endif %}">
-                    <i class="fas fa-{% if site_configs.get('maintenance_mode', False) %}lock{% else %}globe{% endif %}"></i>
-                    <span>{{ 'Restrito' if site_configs.get('maintenance_mode', False) else 'Online' }}</span>
-                </div>
-            </div>
-            <div class="stat-info">
-                <h3 class="stat-number">{{ 'Ativo' if site_configs.get('maintenance_mode', False) else 'Desativado' }}</h3>
-                <p class="stat-label">Modo de manutenção</p>
-                <div class="stat-details">
-                    <span class="detail-item">
-                        <i class="fas fa-shield-alt"></i>
-                        {{ 'Somente admins acessam o site.' if site_configs.get('maintenance_mode', False) else 'Frontend liberado para todos.' }}
-                    </span>
-                </div>
-            </div>
-        </article>
-    </div>
-
     <div class="settings-workspace">
         <aside class="settings-sidebar slide-in-up">
             <div class="admin-card settings-sidebar-card">
@@ -154,11 +64,6 @@
                         <span>Avançado</span>
                         <small>Analytics e manutenção</small>
                     </button>
-                </div>
-
-                <div class="settings-sidebar-note">
-                    <h3><i class="fas fa-lightbulb"></i> Dica</h3>
-                    <p>Os valores configurados aqui atualizam a exibicao dos cards e o valor do PIX. No checkout por cartao, Premium e VIP continuam vinculados aos produtos fixos da Stripe.</p>
                 </div>
             </div>
         </aside>
@@ -421,25 +326,25 @@
                 <div class="admin-card-body">
                     <div class="settings-fields-grid two-columns">
                         <div class="settings-field">
-                            <label for="facebook_url">Facebook</label>
+                            <label for="facebook_url" class="settings-social-label facebook"><i class="fab fa-facebook-f"></i> Facebook</label>
                             <input type="url" class="form-control" id="facebook_url"
                                 value="{{ site_configs.get('social_links', {}).get('facebook', '') }}"
                                 data-social="facebook" data-default-value="">
                         </div>
                         <div class="settings-field">
-                            <label for="instagram_url">Instagram</label>
+                            <label for="instagram_url" class="settings-social-label instagram"><i class="fab fa-instagram"></i> Instagram</label>
                             <input type="url" class="form-control" id="instagram_url"
                                 value="{{ site_configs.get('social_links', {}).get('instagram', '') }}"
                                 data-social="instagram" data-default-value="">
                         </div>
                         <div class="settings-field">
-                            <label for="twitter_url">Twitter</label>
+                            <label for="twitter_url" class="settings-social-label twitter"><i class="fab fa-twitter"></i> Twitter</label>
                             <input type="url" class="form-control" id="twitter_url"
                                 value="{{ site_configs.get('social_links', {}).get('twitter', '') }}"
                                 data-social="twitter" data-default-value="">
                         </div>
                         <div class="settings-field">
-                            <label for="youtube_url">YouTube</label>
+                            <label for="youtube_url" class="settings-social-label youtube"><i class="fab fa-youtube"></i> YouTube</label>
                             <input type="url" class="form-control" id="youtube_url"
                                 value="{{ site_configs.get('social_links', {}).get('youtube', 'https://www.youtube.com/@_RDTech') }}"
                                 data-social="youtube" data-default-value="https://www.youtube.com/@_RDTech">
@@ -501,6 +406,7 @@
         site_name: 'Mundo da Informática',
         site_description: 'Seu portal de recursos para técnicos de informática',
         footer_text: 'Mundo da Informática - Todos os direitos reservados',
+        footer_description: 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.',
         home_hero_title: 'Bem-vindo ao Mundo da Informática',
         home_hero_subtitle: 'Seu portal completo de recursos para técnicos e entusiastas de informática',
         enable_dark_mode: true,
@@ -600,9 +506,12 @@
             }
 
             showSettingsNotification(
-                `Plano ${plan === 'free' ? 'Grátis' : plan.toUpperCase()} ${toggle.checked ? 'ativado' : 'desativado'} sem recarregar a página.`,
+                `Plano ${plan === 'free' ? 'Grátis' : plan.toUpperCase()} ${toggle.checked ? 'ativado' : 'desativado'}.`,
                 'success'
             );
+            if (typeof window.publishSiteSettings === 'function' && data.settings) {
+                window.publishSiteSettings(data.settings);
+            }
             window.dispatchEvent(new CustomEvent('planConfigurationUpdated'));
             try {
                 localStorage.setItem('plan_configuration_updated_at', String(Date.now()));
@@ -820,6 +729,10 @@
 
                 showSettingsNotification(data.message || 'Configurações salvas com sucesso!', 'success');
                 page.querySelectorAll('[data-currency-input]').forEach((input) => delete input.dataset.dirty);
+
+                if (typeof window.publishSiteSettings === 'function' && data.settings) {
+                    window.publishSiteSettings(data.settings);
+                }
 
                 // Atualiza imediatamente os preços exibidos nesta página (cards e estatísticas)
                 if (typeof window.refreshPlanPrices === 'function') {

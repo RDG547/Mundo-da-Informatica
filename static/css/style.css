@@ -2584,6 +2584,21 @@ footer {
     transform: rotate(45deg);
 }
 
+.dark-mode[hidden] {
+    display: none !important;
+}
+
+.auth-section .dark-mode {
+    position: static;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    margin-right: 0.55rem;
+    border: 0;
+    font-size: 0.95rem;
+    z-index: auto;
+}
+
 /* Modo escuro (preparado para implementação futura) */
 [data-theme="dark"] {
     --light-color: #1a1c20;

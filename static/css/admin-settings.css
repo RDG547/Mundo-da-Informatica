@@ -378,6 +378,34 @@
     gap: 1.25rem;
 }
 
+.settings-social-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.settings-social-label i {
+    width: 1.2rem;
+    text-align: center;
+    font-size: 1.08rem;
+}
+
+.settings-social-label.facebook i {
+    color: #1877f2;
+}
+
+.settings-social-label.instagram i {
+    color: #e4405f;
+}
+
+.settings-social-label.twitter i {
+    color: #1da1f2;
+}
+
+.settings-social-label.youtube i {
+    color: #ff0000;
+}
+
 .settings-panel {
     overflow: hidden;
 }

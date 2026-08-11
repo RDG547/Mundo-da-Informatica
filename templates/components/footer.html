@@ -1,8 +1,10 @@
 {% set footer_whatsapp_number = site_configs.get('contact_phone', '(21) 97879-4705') %}
 {% set footer_whatsapp_link = whatsapp_link_from_phone(footer_whatsapp_number) %}
-{% set footer_youtube_link = site_configs.get('social_links', {}).get('youtube') or 'https://www.youtube.com/@_RDTech' %}
+{% set footer_youtube_link = site_configs.get('social_links', {}).get('youtube', '') %}
 {% set footer_email = site_configs.get('contact_email', 'suporte@mundodainformatica.com') %}
 {% set footer_instagram_link = site_configs.get('social_links', {}).get('instagram', '') %}
+{% set footer_facebook_link = site_configs.get('social_links', {}).get('facebook', '') %}
+{% set footer_twitter_link = site_configs.get('social_links', {}).get('twitter', '') %}
 {% set footer_site_name = site_configs.get('site_name', 'Mundo da Informática') %}
 {% set footer_description = site_configs.get('footer_description') or site_configs.get('site_description') or 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.' %}
 {% set footer_text = site_configs.get('footer_text', 'Mundo da Informática - Todos os direitos reservados') %}
@@ -14,15 +16,16 @@
                 <section class="footer-brand">
                     <div class="footer-logo">
                         <i class="fas fa-microchip"></i>
-                        <span class="logo-text">{{ footer_site_name }}</span>
+                        <span class="logo-text" data-live-setting="site_name">{{ footer_site_name }}</span>
                     </div>
-                    <p class="footer-description">
+                    <p class="footer-description" data-live-setting="footer_description">
                         {{ footer_description }}
                     </p>
 
                     <div class="footer-contact-actions" aria-label="Contatos e redes sociais">
                         <a href="{{ footer_whatsapp_link }}"
                             class="footer-social-button"
+                            data-live-whatsapp-link
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="WhatsApp {{ footer_whatsapp_number }}"
@@ -32,10 +35,10 @@
                             </span>
                             <span class="footer-social-label">WhatsApp</span>
                         </a>
-                        <a href="{{ footer_youtube_link }}"
-                            class="footer-social-button"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <a href="{{ footer_youtube_link or '#' }}"
+                            class="footer-social-button{% if not footer_youtube_link %} is-disabled{% endif %}"
+                            data-live-social="youtube"
+                            {% if footer_youtube_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
                             aria-label="Canal no YouTube"
                             title="YouTube">
                             <span class="footer-social-icon">
@@ -45,6 +48,7 @@
                         </a>
                         <a href="mailto:{{ footer_email }}"
                             class="footer-social-button footer-social-button-email"
+                            data-live-email-link
                             aria-label="Enviar email para {{ footer_email }}">
                             <span class="footer-social-icon">
                                 <svg class="footer-email-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -53,11 +57,21 @@
                             </span>
                             <span class="footer-social-label">Email</span>
                         </a>
-                        {% if footer_instagram_link %}
-                        <a href="{{ footer_instagram_link }}"
-                            class="footer-social-button"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <a href="{{ footer_facebook_link or '#' }}"
+                            class="footer-social-button{% if not footer_facebook_link %} is-disabled{% endif %}"
+                            data-live-social="facebook"
+                            {% if footer_facebook_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
+                            aria-label="Facebook"
+                            title="Facebook">
+                            <span class="footer-social-icon">
+                                <i class="fab fa-facebook-f"></i>
+                            </span>
+                            <span class="footer-social-label">Facebook</span>
+                        </a>
+                        <a href="{{ footer_instagram_link or '#' }}"
+                            class="footer-social-button{% if not footer_instagram_link %} is-disabled{% endif %}"
+                            data-live-social="instagram"
+                            {% if footer_instagram_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
                             aria-label="Instagram"
                             title="Instagram">
                             <span class="footer-social-icon">
@@ -65,14 +79,17 @@
                             </span>
                             <span class="footer-social-label">Instagram</span>
                         </a>
-                        {% else %}
-                        <span class="footer-social-button is-disabled" aria-disabled="true" title="Instagram em breve">
+                        <a href="{{ footer_twitter_link or '#' }}"
+                            class="footer-social-button{% if not footer_twitter_link %} is-disabled{% endif %}"
+                            data-live-social="twitter"
+                            {% if footer_twitter_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}
+                            aria-label="Twitter"
+                            title="Twitter">
                             <span class="footer-social-icon">
-                                <i class="fab fa-instagram"></i>
+                                <i class="fab fa-twitter"></i>
                             </span>
-                            <span class="footer-social-label">Instagram</span>
-                        </span>
-                        {% endif %}
+                            <span class="footer-social-label">Twitter</span>
+                        </a>
                     </div>
                 </section>
 
@@ -111,7 +128,7 @@
                 </section>
             </div>
             <div class="footer-bottom">
-                <p>{{ footer_text }}</p>
+                <p data-live-setting="footer_text">{{ footer_text }}</p>
             </div>
         </div>
     </div>
@@ -241,6 +258,10 @@
     color: #FF0000;
 }
 
+.footer-social-button .fa-facebook-f {
+    color: #1877F2;
+}
+
 .footer-email-icon {
     width: 25px;
     height: 25px;
@@ -255,6 +276,10 @@
 
 .footer-social-button .fa-instagram {
     color: #E4405F;
+}
+
+.footer-social-button .fa-twitter {
+    color: #1DA1F2;
 }
 
 .footer-social-button.is-disabled {

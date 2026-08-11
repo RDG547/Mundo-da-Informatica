@@ -39,13 +39,13 @@
                                 <h3>Email Suporte</h3>
                                 <p>Para dúvidas técnicas, solicitações e suporte geral</p>
                                 <div class="method-info">
-                                    <span class="contact-detail">{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}</span>
+                                    <span class="contact-detail" data-live-contact-email>{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}</span>
                                     <div class="response-time">
                                         <i class="fas fa-clock"></i>
                                         <span>Resposta rápida</span>
                                     </div>
                                 </div>
-                                <a href="mailto:{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}" class="method-action">
+                                <a href="mailto:{{ site_configs.get('contact_email', 'suporte@mundodainformatica.com') }}" class="method-action" data-live-email-link>
                                     <i class="fas fa-paper-plane"></i> Enviar Email
                                 </a>
                             </div>
@@ -59,13 +59,13 @@
                                 <h3>WhatsApp</h3>
                                 <p>Para suporte técnico imediato e orientação direta com nossa equipe</p>
                                 <div class="method-info">
-                                    <span class="contact-detail">{{ site_configs.get('contact_phone', '(21) 97879-4705') }}</span>
+                                    <span class="contact-detail" data-live-contact-phone>{{ site_configs.get('contact_phone', '(21) 97879-4705') }}</span>
                                     <div class="availability">
                                         <i class="fas fa-calendar-alt"></i>
                                         <span>Seg-Sex: 9h às 18h</span>
                                     </div>
                                 </div>
-                                <a href="{{ whatsapp_link_from_phone(site_configs.get('contact_phone', '(21) 97879-4705')) }}" target="_blank" class="method-action">
+                                <a href="{{ whatsapp_link_from_phone(site_configs.get('contact_phone', '(21) 97879-4705')) }}" target="_blank" class="method-action" data-live-whatsapp-link>
                                     <i class="fab fa-whatsapp"></i> Enviar Mensagem
                                 </a>
                             </div>
@@ -79,7 +79,7 @@
                                 <h3>Nossa Localização</h3>
                                 <p>Atendemos todo território nacional via internet</p>
                                 <div class="method-info">
-                                    <span class="contact-detail">{{ site_configs.get('contact_address', 'Internet - Brasil') }}</span>
+                                    <span class="contact-detail" data-live-contact-address>{{ site_configs.get('contact_address', 'Internet - Brasil') }}</span>
                                     <div class="coverage">
                                         <i class="fas fa-map-marked-alt"></i>
                                         <span>Cobertura Nacional</span>
@@ -274,7 +274,20 @@
                             </div>
                         </a>
 
-                        <a href="{{ site_configs.get('social_links', {}).get('instagram') or '#' }}" class="social-platform instagram {% if not site_configs.get('social_links', {}).get('instagram') %}is-disabled{% endif %}" {% if site_configs.get('social_links', {}).get('instagram') %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}>
+                        <a href="{{ site_configs.get('social_links', {}).get('facebook') or '#' }}" class="social-platform facebook {% if not site_configs.get('social_links', {}).get('facebook') %}is-disabled{% endif %}" data-live-social="facebook" {% if site_configs.get('social_links', {}).get('facebook') %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}>
+                            <div class="platform-icon">
+                                <i class="fab fa-facebook-f"></i>
+                            </div>
+                            <div class="platform-info">
+                                <h4>Facebook</h4>
+                                <p>Novidades e comunidade</p>
+                            </div>
+                            <div class="platform-action">
+                                <i class="fas fa-external-link-alt"></i>
+                            </div>
+                        </a>
+
+                        <a href="{{ site_configs.get('social_links', {}).get('instagram') or '#' }}" class="social-platform instagram {% if not site_configs.get('social_links', {}).get('instagram') %}is-disabled{% endif %}" data-live-social="instagram" {% if site_configs.get('social_links', {}).get('instagram') %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}>
                             <div class="platform-icon">
                                 <i class="fab fa-instagram"></i>
                             </div>
@@ -287,7 +300,7 @@
                             </div>
                         </a>
 
-                        <a href="{{ site_configs.get('social_links', {}).get('youtube') or 'https://www.youtube.com/@_RDTech' }}" class="social-platform youtube" target="_blank" rel="noopener noreferrer">
+                        <a href="{{ site_configs.get('social_links', {}).get('youtube') or '#' }}" class="social-platform youtube {% if not site_configs.get('social_links', {}).get('youtube') %}is-disabled{% endif %}" data-live-social="youtube" {% if site_configs.get('social_links', {}).get('youtube') %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}>
                             <div class="platform-icon">
                                 <i class="fab fa-youtube"></i>
                             </div>
@@ -300,7 +313,7 @@
                             </div>
                         </a>
 
-                        <a href="#" class="social-platform twitter">
+                        <a href="{{ site_configs.get('social_links', {}).get('twitter') or '#' }}" class="social-platform twitter {% if not site_configs.get('social_links', {}).get('twitter') %}is-disabled{% endif %}" data-live-social="twitter" {% if site_configs.get('social_links', {}).get('twitter') %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}>
                             <div class="platform-icon">
                                 <i class="fab fa-twitter"></i>
                             </div>

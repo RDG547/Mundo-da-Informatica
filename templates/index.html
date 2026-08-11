@@ -5,8 +5,8 @@
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
-        <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}">{{ home_hero_title }}</h1>
-        <p class="hero-subtitle-split">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
+        <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}" data-live-setting="home_hero_title">{{ home_hero_title }}</h1>
+        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
                 <input type="text" name="q" id="home-search-input" placeholder="Pesquisar BIOS, drivers, esquemas..." autocomplete="off">

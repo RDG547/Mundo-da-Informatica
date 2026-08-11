@@ -2146,7 +2146,7 @@ def before_request():
         maintenance_mode = SiteConfig.get_value('maintenance_mode', False)
         if maintenance_mode and not (current_user.is_authenticated and current_user.role in ('admin', 'editor')):
             # Permitir acesso apenas a rotas específicas durante manutenção
-            allowed_routes = ['static', 'admin', 'login', 'maintenance']
+            allowed_routes = ['static', 'admin', 'login', 'maintenance', 'api_site_settings']
             if not request.endpoint or not any(request.endpoint.startswith(route) for route in allowed_routes):
                 return render_template('errors/maintenance.html'), 503
     except Exception:
@@ -2561,12 +2561,8 @@ class SiteConfig(db.Model):
     is_public = db.Column(db.Boolean, default=True)  # Se pode ser exibido no frontend
 
     @staticmethod
-    def get_value(key, default=None):
-        """Obtém o valor de uma configuração, convertido para o tipo apropriado"""
-        config = SiteConfig.query.filter_by(key=key).first()
-        if not config:
-            return default
-
+    def _converted_value(config, default=None):
+        """Converte o valor persistido sem executar uma nova consulta."""
         value = config.value
         if config.value_type == 'int':
             return int(value) if value else default
@@ -2583,19 +2579,28 @@ class SiteConfig(db.Model):
         return value if value is not None else default
 
     @staticmethod
+    def get_value(key, default=None):
+        """Obtém o valor de uma configuração, convertido para o tipo apropriado"""
+        config = SiteConfig.query.filter_by(key=key).first()
+        if not config:
+            return default
+        return SiteConfig._converted_value(config, default)
+
+    @staticmethod
     def get_config():
         """Retorna um dicionário com todas as configurações públicas do site"""
         try:
             configs = SiteConfig.query.filter_by(is_public=True).all()
             config_dict = {}
             for config in configs:
-                config_dict[config.key] = SiteConfig.get_value(config.key)
+                config_dict[config.key] = SiteConfig._converted_value(config)
 
             # Configurações padrão caso não existam no banco
             defaults = {
                 'site_name': 'Mundo da Informática',
                 'site_description': 'Portal de tecnologia e informática',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
+                'footer_description': 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.',
                 'home_hero_title': 'Bem-vindo ao Mundo da Informática',
                 'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
                 'enable_dark_mode': True,
@@ -2656,6 +2661,7 @@ class SiteConfig(db.Model):
                 'site_name': 'Mundo da Informática',
                 'site_description': 'Portal de tecnologia e informática',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
+                'footer_description': 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.',
                 'home_hero_title': 'Bem-vindo ao Mundo da Informática',
                 'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
                 'enable_dark_mode': True,
@@ -2737,6 +2743,42 @@ def whatsapp_link_from_phone(phone_value):
     if len(digits) in (10, 11) and not digits.startswith('55'):
         digits = f'55{digits}'
     return f'https://wa.me/{digits}' if digits else '#'
+
+
+LIVE_SITE_SETTING_KEYS = (
+    'site_name',
+    'site_description',
+    'footer_text',
+    'footer_description',
+    'home_hero_title',
+    'home_hero_subtitle',
+    'enable_dark_mode',
+    'primary_color',
+    'secondary_color',
+    'contact_email',
+    'contact_phone',
+    'contact_address',
+    'social_links',
+    'plan_enabled_free',
+    'plan_enabled_premium',
+    'plan_enabled_vip',
+    'plan_price_premium',
+    'plan_price_vip',
+    'google_analytics',
+    'maintenance_mode',
+)
+
+
+def get_live_site_settings():
+    """Retorna apenas configurações públicas usadas pela atualização dinâmica."""
+    config = SiteConfig.get_config()
+    settings = {key: config.get(key) for key in LIVE_SITE_SETTING_KEYS}
+    settings['primary_color'] = normalize_hex_color(settings.get('primary_color'), '#3a86ff')
+    settings['secondary_color'] = normalize_hex_color(settings.get('secondary_color'), '#8338ec')
+    settings['primary_rgb'] = hex_to_rgb_string(settings['primary_color'])
+    settings['secondary_rgb'] = hex_to_rgb_string(settings['secondary_color'], '131, 56, 236')
+    settings['contact_whatsapp_url'] = whatsapp_link_from_phone(settings.get('contact_phone'))
+    return settings
 
 
 def get_user_plan_limits(user):
@@ -4539,6 +4581,17 @@ def api_plan_prices():
             }
             for plan_key, plan_data in pricing.items()
         }
+    })
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    return response
+
+
+@app.route('/api/site-settings')
+def api_site_settings():
+    """Snapshot público para sincronizar a aparência e os contatos sem reload."""
+    response = jsonify({
+        'success': True,
+        'settings': get_live_site_settings(),
     })
     response.headers['Cache-Control'] = 'no-store, max-age=0'
     return response
@@ -9502,15 +9555,33 @@ def admin_categories_stats():
     Retornar estatísticas atualizadas das categorias
     """
     try:
-        total_categories = Category.query.count()
-        active_categories = Category.query.filter_by(is_active=True).count()
-        featured_categories = Category.query.filter_by(featured=True).count()
+        categories = Category.query.order_by(Category.order.asc(), Category.name.asc()).all()
+        category_payloads = [build_category_admin_payload(category) for category in categories]
+        total_categories = len(category_payloads)
+        active_categories = sum(1 for category in category_payloads if category['is_active'])
+        featured_categories = sum(1 for category in category_payloads if category['is_featured'])
+        inactive_categories = total_categories - active_categories
+        total_posts = sum(int(category['post_count'] or 0) for category in category_payloads)
+        average = round(total_posts / total_categories, 1) if total_categories else 0
+        top_category = max(category_payloads, key=lambda category: category['post_count']) if category_payloads else None
 
         return jsonify({
             'success': True,
             'total': total_categories,
             'active': active_categories,
-            'featured': featured_categories
+            'inactive': inactive_categories,
+            'featured': featured_categories,
+            'total_posts': total_posts,
+            'average': average,
+            'top_category': {
+                'name': top_category['name'],
+                'post_count': top_category['post_count'],
+            } if top_category else None,
+            'chart': {
+                'labels': [category['name'] for category in category_payloads[:5]],
+                'data': [category['post_count'] for category in category_payloads[:5]],
+                'colors': ['#3a86ff', '#ff006e', '#8338ec', '#38b000', '#ffbe0b'],
+            },
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Erro ao buscar estatísticas: {str(e)}'}), 500
@@ -10753,7 +10824,11 @@ def admin_save_settings():
         except Exception as e:
             print(f"Erro ao registrar atividade: {e}")
 
-        return jsonify({'success': True, 'message': 'Configurações salvas com sucesso!'})
+        return jsonify({
+            'success': True,
+            'message': 'Configurações salvas com sucesso!',
+            'settings': get_live_site_settings(),
+        })
 
     except Exception as e:
         print(f"Erro ao salvar configurações: {e}")

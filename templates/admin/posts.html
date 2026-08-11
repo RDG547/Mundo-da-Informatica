@@ -135,6 +135,17 @@
                     </div>
                     </div>
                 </div>
+                <div class="bulk-actions posts-top-bulk-actions">
+                    <select id="bulkActionSelect" class="form-select" aria-label="Ações em lote">
+                        <option value="">Ações em massa</option>
+                        <option value="delete">Excluir selecionados</option>
+                        <option value="feature">Marcar como destaque</option>
+                        <option value="unfeature">Remover destaque</option>
+                        <option value="activate">Ativar</option>
+                        <option value="deactivate">Desativar</option>
+                    </select>
+                    <button type="button" id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
+                </div>
             </form>
         </div>
     </div>
@@ -320,19 +331,7 @@
     </div>
 
     <!-- Enhanced Footer -->
-    <div class="admin-card-footer">
-        <div class="bulk-actions">
-            <select id="bulkActionSelect" class="form-select" aria-label="Ações em lote">
-                <option value="">Ações em massa</option>
-                <option value="delete">Excluir selecionados</option>
-                <option value="feature">Marcar como destaque</option>
-                <option value="unfeature">Remover destaque</option>
-                <option value="activate">Ativar</option>
-                <option value="deactivate">Desativar</option>
-            </select>
-            <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
-        </div>
-
+    <div class="admin-card-footer posts-management-footer">
         <!-- Enhanced Pagination -->
         <div class="pagination-container" id="postsPaginationContainer" data-current-page="{{ posts.page }}" data-per-page="{{ posts.per_page }}" data-total="{{ posts.total }}">
             <div class="pagination-info" id="postsPaginationInfo">
@@ -1917,6 +1916,21 @@
     .admin-list-filters .sort-dropdown {
         flex: 0 1 190px;
         min-width: 150px;
+    }
+
+    .admin-list-filters .posts-top-bulk-actions {
+        flex: 0 1 260px;
+        min-width: 220px;
+    }
+
+    .posts-top-bulk-actions .project-select,
+    .posts-top-bulk-actions select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .posts-management-footer {
+        justify-content: flex-end;
     }
 
     .admin-smart-select {

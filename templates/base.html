@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-site-name="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
 
 <head>
     <meta charset="UTF-8">
@@ -118,7 +118,7 @@
 
     <!-- Google Analytics -->
     {% if site_configs.get('google_analytics') %}
-    <script async src="https://www.googletagmanager.com/gtag/js?id={{ site_configs.google_analytics }}" data-static-base-script="true"></script>
+    <script id="site-live-analytics-loader" async src="https://www.googletagmanager.com/gtag/js?id={{ site_configs.google_analytics }}" data-static-base-script="true"></script>
     <script data-static-base-script="true">
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
@@ -151,7 +151,7 @@
             <div class="container">
                 <div class="logo">
                     <a href="{{ url_for('home') }}">
-                        <i class="fas fa-microchip"></i> <span>{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
+                        <i class="fas fa-microchip"></i> <span data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
                     </a>
                 </div>
 
@@ -243,6 +243,9 @@
                 </ul>
 
                 <div class="auth-section">
+                    <button type="button" class="dark-mode" aria-label="Alternar tema claro e escuro"{% if not site_configs.get('enable_dark_mode', True) %} hidden{% endif %}>
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                    </button>
                     {% if current_user.is_authenticated %}
                     <div class="dropdown user-dropdown">
                         <a href="#" class="dropdown-toggle">
@@ -381,6 +384,7 @@
     <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/plan-prices.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/site-settings-live.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/project-dropdowns.js') }}" data-static-base-script="true"></script>
     {% block extra_js %}{% endblock %}

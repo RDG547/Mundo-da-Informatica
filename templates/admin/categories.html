@@ -34,18 +34,19 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8">
+<div class="row categories-layout-row">
+    <div class="col-md-8 categories-main-column">
         <div class="admin-card slide-in-up">
-            <div class="admin-card-header">
+            <div class="admin-card-header categories-card-heading">
                 <div class="header-left">
                     <h2 class="admin-card-title">
                         <i class="fas fa-table"></i> Categorias
                         <span class="count-badge">{{ categories|length }}</span>
                     </h2>
                 </div>
-                <div class="header-right">
-                    <div class="filter-controls">
+            </div>
+            <div class="categories-controls-bar">
+                    <div class="filter-controls categories-filter-controls">
                         <div class="search-bar-advanced">
                             <div class="search-input-container">
                                 <input type="text" placeholder="Pesquisar categorias..." id="searchCategories" class="search-input">
@@ -84,7 +85,6 @@
                             <button id="applyBulkAction" class="btn-admin btn-admin-outline">Aplicar</button>
                         </div>
                     </div>
-                </div>
             </div>
 
             <!-- Visualização em Grid -->
@@ -312,35 +312,31 @@
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-4 categories-stats-column">
         <!-- Estatísticas Gerais -->
         <div class="admin-card slide-in-up">
             <div class="admin-card-header">
                 <h2 class="admin-card-title">
                     <i class="fas fa-chart-pie"></i> Estatísticas Gerais
                 </h2>
-                <div class="card-actions">
-                    <button class="btn-refresh" onclick="refreshStats()" title="Atualizar Dados">
-                        <i class="fas fa-sync"></i>
-                    </button>
-                </div>
+                <span class="stats-live-indicator"><i class="fas fa-circle"></i> Automático</span>
             </div>
             <div class="admin-card-body">
                 <div class="stats-summary">
                     <div class="stats-item">
-                        <span class="stats-value">{{ summary_stats.total_categories }}</span>
+                        <span class="stats-value" data-category-stat="total">{{ summary_stats.total_categories }}</span>
                         <span class="stats-label">Total de Categorias</span>
                     </div>
                     <div class="stats-item">
-                        <span class="stats-value">{{ summary_stats.active_categories }}</span>
+                        <span class="stats-value" data-category-stat="active">{{ summary_stats.active_categories }}</span>
                         <span class="stats-label">Ativas</span>
                     </div>
                     <div class="stats-item">
-                        <span class="stats-value">{{ summary_stats.featured_categories }}</span>
+                        <span class="stats-value" data-category-stat="featured">{{ summary_stats.featured_categories }}</span>
                         <span class="stats-label">Em Destaque</span>
                     </div>
                     <div class="stats-item">
-                        <span class="stats-value">{{ summary_stats.total_posts }}</span>
+                        <span class="stats-value" data-category-stat="total_posts">{{ summary_stats.total_posts }}</span>
                         <span class="stats-label">Total de Posts</span>
                     </div>
                 </div>
@@ -348,20 +344,16 @@
                 <div class="additional-stats mt-3">
                     <div class="stat-row">
                         <span class="stat-label">Média de posts por categoria:</span>
-                        <span class="stat-value">{{ summary_stats.avg_posts_per_category }}</span>
+                        <span class="stat-value" data-category-stat="average">{{ summary_stats.avg_posts_per_category }}</span>
                     </div>
-                    {% if summary_stats.top_category %}
-                    <div class="stat-row">
+                    <div class="stat-row" data-category-stat-row="top"{% if not summary_stats.top_category %} hidden{% endif %}>
                         <span class="stat-label">Categoria mais popular:</span>
-                        <span class="stat-value">{{ summary_stats.top_category.name }} ({{ summary_stats.top_category.post_count }} posts)</span>
+                        <span class="stat-value" data-category-stat="top">{% if summary_stats.top_category %}{{ summary_stats.top_category.name }} ({{ summary_stats.top_category.post_count }} posts){% endif %}</span>
                     </div>
-                    {% endif %}
-                    {% if summary_stats.inactive_categories > 0 %}
-                    <div class="stat-row text-warning">
+                    <div class="stat-row text-warning" data-category-stat-row="inactive"{% if summary_stats.inactive_categories <= 0 %} hidden{% endif %}>
                         <span class="stat-label">Categorias inativas:</span>
-                        <span class="stat-value">{{ summary_stats.inactive_categories }}</span>
+                        <span class="stat-value" data-category-stat="inactive">{{ summary_stats.inactive_categories }}</span>
                     </div>
-                    {% endif %}
                 </div>
 
                 <div class="chart-container mt-4">
@@ -1101,6 +1093,73 @@
         flex-wrap: wrap;
     }
 
+    .categories-controls-bar {
+        width: 100%;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--admin-border-color);
+        background: rgba(248, 250, 252, 0.58);
+        box-sizing: border-box;
+    }
+
+    .categories-filter-controls {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        grid-template-columns: minmax(220px, 1.35fr) minmax(170px, 0.8fr) minmax(190px, 0.9fr);
+        align-items: center;
+        gap: 0.85rem;
+    }
+
+    .categories-filter-controls > *,
+    .categories-filter-controls .project-select {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .categories-filter-controls .search-input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .categories-filter-controls .bulk-actions {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: auto minmax(220px, 1fr) auto;
+        gap: 0.85rem;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .categories-filter-controls .bulk-actions select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .stats-live-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        color: #047857;
+        background: rgba(16, 185, 129, 0.12);
+        font-size: 0.75rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .stats-live-indicator i {
+        color: #10b981;
+        font-size: 0.45rem;
+        animation: categories-live-pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes categories-live-pulse {
+        50% { opacity: 0.35; }
+    }
+
     .admin-card-header {
         display: flex;
         justify-content: space-between;
@@ -1438,6 +1497,28 @@
         color: var(--admin-primary);
     }
 
+    @media (max-width: 1400px) {
+        .categories-layout-row .categories-main-column,
+        .categories-layout-row .categories-stats-column {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+        }
+
+        .categories-layout-row .categories-stats-column {
+            margin-top: 1.5rem;
+        }
+    }
+
+    @media (max-width: 1100px) {
+        .categories-filter-controls {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .categories-filter-controls .search-bar-advanced {
+            grid-column: 1 / -1;
+        }
+    }
+
     /* Responsividade para telas menores */
     @media (max-width: 768px) {
         .stats-summary {
@@ -1453,13 +1534,32 @@
             justify-content: space-between;
         }
 
-        .filter-controls {
-            flex-direction: column;
-            gap: 0.5rem;
+        .categories-controls-bar {
+            padding: 0.85rem;
+        }
+
+        .categories-filter-controls {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 0.65rem;
+        }
+
+        .categories-filter-controls .search-bar-advanced,
+        .categories-filter-controls .bulk-actions {
+            grid-column: 1;
+        }
+
+        .categories-filter-controls .bulk-actions {
+            grid-template-columns: minmax(0, 1fr);
+            align-items: stretch;
+        }
+
+        .categories-filter-controls .bulk-actions .btn-admin {
+            width: 100%;
+            justify-content: center;
         }
 
         .search-input {
-            width: 150px;
+            width: 100%;
         }
 
         .categories-grid {

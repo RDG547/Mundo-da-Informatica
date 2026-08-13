@@ -2781,20 +2781,72 @@ def get_live_site_settings():
     return settings
 
 
+PLAN_ENTITLEMENTS = {
+    'free': {
+        'download_limit': 1,
+        'download_period': 'weekly',
+        'support': 'Suporte em até 48H',
+        'favorites_limit': 10,
+        'device_limit': 1,
+        'download_history_access': False,
+        'download_history_limit': None,
+        'comments_limit': 3,
+        'public_chat': False,
+        'request_content': False,
+        'vip_area': False,
+    },
+    'premium': {
+        'download_limit': 15,
+        'download_period': 'weekly',
+        'support': 'Suporte em até 24H',
+        'favorites_limit': None,
+        'device_limit': 2,
+        'download_history_access': True,
+        'download_history_limit': 5,
+        'comments_limit': 10,
+        'public_chat': False,
+        'request_content': False,
+        'vip_area': False,
+    },
+    'vip': {
+        'download_limit': None,
+        'download_period': 'unlimited',
+        'support': 'Suporte Prioritário',
+        'favorites_limit': None,
+        'device_limit': 5,
+        'download_history_access': True,
+        'download_history_limit': None,
+        'comments_limit': None,
+        'public_chat': True,
+        'request_content': True,
+        'vip_area': True,
+    },
+}
+
+
+def get_plan_entitlements(user_or_plan):
+    """Retorna a matriz canônica de recursos do plano informado."""
+    raw_plan = getattr(user_or_plan, 'plan', user_or_plan)
+    plan_key = str(raw_plan or 'free').strip().lower()
+    return PLAN_ENTITLEMENTS.get(plan_key, PLAN_ENTITLEMENTS['free'])
+
+
 def get_user_plan_limits(user):
-    if user.plan == 'premium':
-        daily_limit = 5
-        weekly_limit = 15
-    elif user.plan == 'vip':
-        daily_limit = 999
-        weekly_limit = 999
-    else:
-        daily_limit = 1
-        weekly_limit = 7
+    entitlements = get_plan_entitlements(user)
+    period = entitlements['download_period']
+    default_limit = entitlements['download_limit']
+
+    daily_limit = None
+    weekly_limit = None
+    if period == 'daily':
+        daily_limit = user.custom_daily_limit if user.custom_daily_limit is not None else default_limit
+    elif period == 'weekly':
+        weekly_limit = user.custom_weekly_limit if user.custom_weekly_limit is not None else default_limit
 
     return {
-        'daily_limit': user.custom_daily_limit if user.custom_daily_limit is not None else daily_limit,
-        'weekly_limit': user.custom_weekly_limit if user.custom_weekly_limit is not None else weekly_limit,
+        'daily_limit': daily_limit,
+        'weekly_limit': weekly_limit,
+        'download_period': period,
     }
 
 
@@ -2837,6 +2889,7 @@ def serialize_user_for_admin(user):
         'profile_image_url': get_image_url_for_response(user.profile_image, folder='profiles', default='default_profile.jpg'),
         'daily_limit': limits['daily_limit'],
         'weekly_limit': limits['weekly_limit'],
+        'download_period': limits['download_period'],
         'daily_downloads': user.daily_downloads or 0,
         'weekly_downloads': user.weekly_downloads or 0,
         'download_reset_date': user.download_reset_date.isoformat() if user.download_reset_date else (today_start + timedelta(days=1)).isoformat(),
@@ -3852,71 +3905,16 @@ def post_by_slug(category, slug):
 
 def check_download_limit_legacy(user):
     """[DEPRECATED] Verifica se o usuário pode fazer download baseado no plano - Use check_user_download_limit()"""
-    if user.role == 'admin' or user.role == 'editor':
-        return True, "Acesso administrativo."
+    can_download, remaining, limit, reset_time, period = check_user_download_limit(user)
+    if period == 'unlimited':
+        return True, "Downloads ilimitados."
+    if period == 'blocked':
+        return False, "Downloads bloqueados para este usuário."
+    if can_download:
+        return True, f"Download autorizado. Você tem {int(remaining)} download(s) restante(s) nesta semana."
 
-    if user.plan == 'vip':
-        return True, "Downloads ilimitados no plano VIP."
-
-    # Converter para horário de Brasília (UTC-3)
-    from pytz import timezone
-    brasilia_tz = timezone('America/Sao_Paulo')
-    now_utc = datetime.utcnow().replace(tzinfo=timezone('UTC'))
-    now_brasilia = now_utc.astimezone(brasilia_tz)
-
-    if user.plan == 'premium':
-        # 15 downloads semanais - Reset toda segunda às 9h
-        # Encontrar a última segunda-feira às 9h
-        days_since_monday = (now_brasilia.weekday()) % 7  # 0 = segunda
-        last_monday = now_brasilia.replace(hour=9, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
-
-        # Se ainda não passou das 9h da segunda atual, voltar para segunda anterior
-        if now_brasilia < last_monday:
-            last_monday -= timedelta(days=7)
-
-        # Converter para UTC para comparação no banco
-        last_monday_utc = last_monday.astimezone(timezone('UTC')).replace(tzinfo=None)
-
-        count = Download.query.filter(
-            Download.user_id == user.id,
-            Download.timestamp >= last_monday_utc
-        ).count()
-
-        if count >= 15:
-            # Calcular próxima segunda às 9h
-            days_until_monday = (7 - now_brasilia.weekday()) % 7
-            if days_until_monday == 0:
-                days_until_monday = 7
-            next_reset = (now_brasilia + timedelta(days=days_until_monday)).replace(hour=9, minute=0, second=0, microsecond=0)
-            return False, f"Você atingiu seu limite de 15 downloads semanais. Próximo reset: {next_reset.strftime('%d/%m/%Y às %H:%M')}. Faça upgrade para VIP para downloads ilimitados."
-        return True, f"Download autorizado. Você tem {15 - count} downloads restantes esta semana."
-
-    # Plano Grátis: 1 download por dia - Reset todo dia às 9h
-    today_9am = now_brasilia.replace(hour=9, minute=0, second=0, microsecond=0)
-
-    # Se ainda não passou das 9h hoje, considerar o reset de ontem às 9h
-    if now_brasilia < today_9am:
-        last_reset = today_9am - timedelta(days=1)
-    else:
-        last_reset = today_9am
-
-    # Converter para UTC para comparação no banco
-    last_reset_utc = last_reset.astimezone(timezone('UTC')).replace(tzinfo=None)
-
-    count = Download.query.filter(
-        Download.user_id == user.id,
-        Download.timestamp >= last_reset_utc
-    ).count()
-
-    if count >= 1:
-        # Calcular próximo reset
-        if now_brasilia < today_9am:
-            next_reset = today_9am
-        else:
-            next_reset = today_9am + timedelta(days=1)
-        return False, f"Você atingiu seu limite de 1 download diário. Próximo reset: {next_reset.strftime('%d/%m/%Y às %H:%M')}. Faça upgrade para Premium (15/semana) ou VIP (ilimitado)."
-
-    return True, "Download autorizado."
+    reset_label = reset_time.strftime('%d/%m/%Y às %H:%M') if reset_time else 'data não informada'
+    return False, f"Você atingiu seu limite de {int(limit)} download(s) semanais. Próximo reset: {reset_label}."
 
 @app.route('/download/<int:post_id>')
 @login_required
@@ -3959,11 +3957,11 @@ def download_post(post_id):
     new_download = Download(user_id=user.id, post_id=post.id, timestamp=datetime.utcnow())
     db.session.add(new_download)
 
-    # Incrementar contador correto baseado no plano
-    if user.plan == 'premium':
+    # Incrementar somente o contador usado pelo período do plano.
+    if period == 'weekly':
         user.weekly_downloads = (user.weekly_downloads or 0) + 1
         debug_log(f"Download registrado para {user.username} - Total esta semana: {user.weekly_downloads}")
-    else:
+    elif period == 'daily':
         user.daily_downloads = (user.daily_downloads or 0) + 1
         debug_log(f"Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
 
@@ -4562,7 +4560,8 @@ def about():
 @app.route('/planos')
 def plans():
     """Página de planos e preços"""
-    checkout_plan = request.args.get('checkout')
+    requested_checkout = str(request.args.get('checkout') or '').strip().lower()
+    checkout_plan = requested_checkout if requested_checkout in ('premium', 'vip') else ''
     return render_template('plans.html', title='Planos e Preços', stripe_public_key=app.config['STRIPE_PUBLIC_KEY'], checkout_plan=checkout_plan)
 
 
@@ -4602,77 +4601,64 @@ def api_site_settings():
 def get_user_permissions():
     """Retorna as permissões e limites do usuário baseado no plano"""
     user = current_user
+    entitlements = get_plan_entitlements(user)
 
     # Calcular downloads restantes
-    now = datetime.utcnow()
-    downloads_info = {}
-
-    if user.plan == 'free':
-        one_day_ago = now - timedelta(days=1)
-        count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_day_ago).count()
-        downloads_info = {
-            'limit': 1,
-            'period': 'dia',
-            'used': count,
-            'remaining': max(0, 1 - count)
-        }
-    elif user.plan == 'premium':
-        one_week_ago = now - timedelta(days=7)
-        count = Download.query.filter(Download.user_id == user.id, Download.timestamp >= one_week_ago).count()
-        downloads_info = {
-            'limit': 15,
-            'period': 'semana',
-            'used': count,
-            'remaining': max(0, 15 - count)
-        }
-    else:  # VIP
+    can_download, remaining, download_limit, reset_time, download_period = check_user_download_limit(user)
+    if download_period == 'unlimited':
         downloads_info = {
             'limit': 'ilimitado',
             'period': 'sempre',
             'used': 0,
-            'remaining': 'ilimitado'
+            'remaining': 'ilimitado',
+            'can_download': True,
+            'reset_time': None,
+        }
+    else:
+        used = user.weekly_downloads or 0 if download_period == 'weekly' else user.daily_downloads or 0
+        downloads_info = {
+            'limit': int(download_limit),
+            'period': 'semana' if download_period == 'weekly' else 'dia',
+            'used': used,
+            'remaining': int(remaining),
+            'can_download': can_download,
+            'reset_time': reset_time.isoformat() if reset_time else None,
         }
 
     # Calcular comentários restantes hoje
+    now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     comments_today = Comment.query.filter(
         Comment.user_id == user.id,
         Comment.date_posted >= today_start
     ).count()
 
-    comments_info = {}
-    if user.plan == 'free':
-        comments_info = {
-            'allowed': True,
-            'limit': 3,
-            'used': comments_today,
-            'remaining': max(0, 3 - comments_today)
-        }
-    elif user.plan == 'premium':
-        comments_info = {
-            'allowed': True,
-            'limit': 10,
-            'used': comments_today,
-            'remaining': max(0, 10 - comments_today)
-        }
-    else:  # VIP
+    comment_limit = entitlements['comments_limit']
+    if comment_limit is None:
         comments_info = {
             'allowed': True,
             'limit': 'ilimitado',
             'used': comments_today,
             'remaining': 'ilimitado'
         }
+    else:
+        comments_info = {
+            'allowed': comments_today < comment_limit,
+            'limit': comment_limit,
+            'used': comments_today,
+            'remaining': max(0, comment_limit - comments_today)
+        }
 
     # Favoritos
     favorites_count = Favorite.query.filter_by(user_id=user.id).count()
-    favorites_info = {}
-    if user.plan == 'free':
+    favorite_limit = entitlements['favorites_limit']
+    if favorite_limit is not None:
         favorites_info = {
-            'limit': 10,
+            'limit': favorite_limit,
             'used': favorites_count,
-            'remaining': max(0, 10 - favorites_count)
+            'remaining': max(0, favorite_limit - favorites_count)
         }
-    else:  # Premium e VIP
+    else:
         favorites_info = {
             'limit': 'ilimitado',
             'used': favorites_count,
@@ -4694,11 +4680,11 @@ def get_user_permissions():
         },
         'support': check_support_priority(user),
         'devices': {
-            'limit': {'free': 1, 'premium': 2, 'vip': 5}.get(user.plan, 1),
+            'limit': entitlements['device_limit'],
             'active': user.active_sessions
         },
         'can_request_content': can_request_specific_content(user),
-        'vip_area': user.plan == 'vip',
+        'vip_area': entitlements['vip_area'],
         'live_chat': {
             'community': _can_user_write_public_chat(user),
             'support': True
@@ -5845,16 +5831,28 @@ def contact():
         else:
             phone = ''
 
-        # Verificar plano apenas para categoria 'solicitacao'
-        if category == 'solicitacao' and current_user.is_authenticated and current_user.plan == 'free':
+        # Solicitação de conteúdo é um recurso autenticado e exclusivo do VIP.
+        if category == 'solicitacao' and not current_user.is_authenticated:
+            login_url = url_for('login', next=url_for('contact', category='solicitacao'))
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({
                     'success': False,
-                    'message': 'A solicitação de conteúdo está disponível apenas para planos Premium e VIP.',
+                    'message': 'Entre na sua conta para solicitar conteúdo específico.',
+                    'requires_login': True,
+                    'redirect_url': login_url,
+                }), 401
+            flash('Entre na sua conta para solicitar conteúdo específico.', 'warning')
+            return redirect(login_url)
+
+        if category == 'solicitacao' and not can_request_specific_content(current_user):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'success': False,
+                    'message': 'A solicitação de conteúdo é exclusiva do plano VIP.',
                     'requires_upgrade': True
                 }), 403
             else:
-                flash('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso!', 'warning')
+                flash('A solicitação de conteúdo é exclusiva do plano VIP. Faça upgrade para ter acesso!', 'warning')
                 return redirect(url_for('plans'))
 
         # Sanitizar e validar inputs
@@ -7228,7 +7226,7 @@ def _chat_actor_role(user) -> str:
 
 
 def _can_user_write_public_chat(user) -> bool:
-    return normalize_plan_key(user.plan) == 'vip'
+    return bool(get_plan_entitlements(user)['public_chat'])
 
 
 def _get_chat_permissions_for_user(user) -> dict[str, Any]:
@@ -7237,7 +7235,7 @@ def _get_chat_permissions_for_user(user) -> dict[str, Any]:
         'public_write': _can_user_write_public_chat(user),
         'support_read': True,
         'support_write': True,
-        'vip_area': normalize_plan_key(user.plan) == 'vip'
+        'vip_area': bool(get_plan_entitlements(user)['vip_area'])
     }
 
 
@@ -7473,7 +7471,13 @@ def _get_chat_support_tickets(db_firestore) -> list[dict[str, Any]]:
             }
         })
 
-    tickets.sort(key=lambda item: int(item['data'].get('updatedAtMs') or 0), reverse=True)
+    # VIP entra primeiro na fila, seguido de Premium e Grátis; dentro de cada
+    # plano, o chamado mais recente aparece antes.
+    support_priority = {'vip': 0, 'premium': 1, 'free': 2}
+    tickets.sort(key=lambda item: (
+        support_priority.get(normalize_plan_key(item['data'].get('ownerPlan')), 2),
+        -int(item['data'].get('updatedAtMs') or 0),
+    ))
     return tickets
 
 
@@ -7787,6 +7791,14 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('home'))
 
+    requested_plan = str(
+        request.form.get('selected_plan')
+        or request.args.get('plan')
+        or ''
+    ).strip().lower()
+    selected_plan = requested_plan if requested_plan in ('premium', 'vip') else ''
+    register_url = url_for('register', plan=selected_plan) if selected_plan else url_for('register')
+
     if request.method == 'POST':
         # Obter dados do formulário e sanitizar
         name = sanitize_input(request.form.get('name', '').strip())
@@ -7799,15 +7811,15 @@ def register():
         # Validações de tamanho antes de processar
         if name and len(name) > 100:
             flash('Nome muito longo (máximo 100 caracteres)', 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
         if username and len(username) > 50:
             flash('Nome de usuário muito longo (máximo 50 caracteres)', 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
         if email and len(email) > 255:
             flash('Email muito longo', 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
         # Validações
         error = ''
@@ -7833,18 +7845,18 @@ def register():
         # Se houver erro, exiba a mensagem e redirecione
         if error:
             flash(error, 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
         # Verificar se usuário ou email já existem
         user_exists = User.query.filter_by(username=username).first()
         if user_exists:
             flash('Este nome de usuário já está em uso. Escolha outro.', 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
         email_exists = User.query.filter_by(email=email).first()
         if email_exists:
             flash('Este email já está cadastrado. Faça login ou recupere sua senha.', 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
         # Criar novo usuário
         name = name or ""  # Garantir que name não seja None
@@ -7869,14 +7881,16 @@ def register():
 
             # Feedback de sucesso
             flash('Conta criada com sucesso! Você já pode fazer login.', 'success')
+            if selected_plan:
+                return redirect(url_for('login', next=url_for('plans', checkout=selected_plan)))
             return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Erro ao registrar usuário: {e}")
             flash('Ocorreu um erro ao criar sua conta. Por favor, tente novamente.', 'danger')
-            return redirect(url_for('register'))
+            return redirect(register_url)
 
-    return render_template('register.html', title='Criar Conta')
+    return render_template('register.html', title='Criar Conta', selected_plan=selected_plan)
 
 # Rota de recuperação de senha (nova)
 @app.route('/reset-password', methods=['GET', 'POST'])
@@ -10156,6 +10170,23 @@ def admin_update_user(user_id):
         custom_daily_limit = field_value('custom_daily_limit', user.custom_daily_limit if user.custom_daily_limit is not None else '')
         custom_weekly_limit = field_value('custom_weekly_limit', user.custom_weekly_limit if user.custom_weekly_limit is not None else '')
 
+        def parse_optional_limit(value, maximum):
+            if value in ('', None):
+                return None
+            parsed = int(value)
+            if parsed < 0 or parsed > maximum:
+                raise ValueError
+            return parsed
+
+        try:
+            parsed_daily_limit = parse_optional_limit(custom_daily_limit, 1000)
+            parsed_weekly_limit = parse_optional_limit(custom_weekly_limit, 10000)
+        except (TypeError, ValueError):
+            return jsonify({
+                'success': False,
+                'message': 'Informe limites de download válidos e não negativos.'
+            }), 400
+
         # Validações
         # Validações de segurança
         if user_id == current_user.id and not is_active:
@@ -10222,8 +10253,8 @@ def admin_update_user(user_id):
 
         # Atualizar permissões de download
         user.can_download = can_download
-        user.custom_daily_limit = int(custom_daily_limit) if custom_daily_limit else None
-        user.custom_weekly_limit = int(custom_weekly_limit) if custom_weekly_limit else None
+        user.custom_daily_limit = parsed_daily_limit
+        user.custom_weekly_limit = parsed_weekly_limit
 
         db.session.commit()
 
@@ -11092,6 +11123,10 @@ def get_download_history_api():
 def clear_download_history():
     """Limpa o histórico de downloads do usuário"""
     try:
+        has_access, _limit = check_download_history_access(current_user)
+        if not has_access:
+            return jsonify({'success': False, 'message': 'Seu plano não inclui histórico de downloads.'}), 403
+
         # Deletar todos os downloads do usuário
         Download.query.filter_by(user_id=current_user.id).delete()
         db.session.commit()
@@ -11106,6 +11141,10 @@ def clear_download_history():
 def remove_download(download_id):
     """Remove um download específico do histórico"""
     try:
+        has_access, _limit = check_download_history_access(current_user)
+        if not has_access:
+            return jsonify({'success': False, 'message': 'Seu plano não inclui histórico de downloads.'}), 403
+
         download = Download.query.filter_by(id=download_id, user_id=current_user.id).first()
         if not download:
             return jsonify({'success': False, 'message': 'Download não encontrado'}), 404
@@ -11586,13 +11625,13 @@ def check_favorite_limit(user):
     """Verifica se o usuário pode adicionar favoritos baseado no plano"""
     if user.role == 'admin' or user.role == 'editor':
         return True, "Acesso administrativo."
-    if user.plan in ['premium', 'vip']:
+    limit = get_plan_entitlements(user)['favorites_limit']
+    if limit is None:
         return True, "Favoritos ilimitados."
 
-    # Plano Grátis: Máximo 10 favoritos
     count = Favorite.query.filter_by(user_id=user.id).count()
-    if count >= 10:
-        return False, "Você atingiu o limite de 10 favoritos do plano Grátis. Faça upgrade para Premium ou VIP para favoritos ilimitados."
+    if count >= limit:
+        return False, f"Você atingiu o limite de {limit} favoritos do seu plano. Faça upgrade para ter favoritos ilimitados."
     return True, "Favorito autorizado."
 
 
@@ -11601,7 +11640,8 @@ def check_comment_limit(user):
     if user.role == 'admin' or user.role == 'editor':
         return True, "Acesso administrativo."
 
-    if user.plan == 'vip':
+    limit = get_plan_entitlements(user)['comments_limit']
+    if limit is None:
         return True, "Comentários ilimitados no plano VIP."
 
     now = datetime.utcnow()
@@ -11613,16 +11653,9 @@ def check_comment_limit(user):
         Comment.date_posted >= today_start
     ).count()
 
-    if user.plan == 'premium':
-        # Premium: 10 comentários diários
-        if count >= 10:
-            return False, "Você atingiu o limite de 10 comentários diários. Faça upgrade para VIP para comentários ilimitados."
-        return True, f"Comentário autorizado. Você tem {10 - count} comentários restantes hoje."
-
-    # Plano Grátis: 3 comentários diários
-    if count >= 3:
-        return False, "Você atingiu o limite de 3 comentários diários. Faça upgrade para Premium ou VIP para ampliar esse limite."
-    return True, f"Comentário autorizado. Você tem {3 - count} comentários restantes hoje."
+    if count >= limit:
+        return False, f"Você atingiu o limite de {limit} comentários diários do seu plano. Faça upgrade para ampliar esse limite."
+    return True, f"Comentário autorizado. Você tem {limit - count} comentários restantes hoje."
 
 
 def check_download_history_access(user):
@@ -11630,18 +11663,15 @@ def check_download_history_access(user):
     if user.role == 'admin' or user.role == 'editor':
         return True, None  # Acesso total
 
-    if user.plan == 'vip':
-        return True, None  # Histórico completo
-
-    if user.plan == 'premium':
-        return True, 5  # Últimos 5 downloads
-
-    # Plano Grátis: Sem acesso ao histórico
-    return False, None
+    entitlements = get_plan_entitlements(user)
+    return (
+        bool(entitlements['download_history_access']),
+        entitlements['download_history_limit'],
+    )
 
 
 def check_user_download_limit(user):
-    """Verifica se o usuário atingiu o limite de downloads (diários para Free, semanais para Premium)"""
+    """Verifica o limite de download definido pela matriz canônica de planos."""
 
     # Verificar se o usuário tem permissão para fazer downloads
     if hasattr(user, 'can_download') and not user.can_download:
@@ -11654,14 +11684,16 @@ def check_user_download_limit(user):
     now = datetime.utcnow()
     now_brasilia = pytz.utc.localize(now).astimezone(brasilia_tz)
 
-    # VIP: ilimitado
-    if user.plan == 'vip':
+    entitlements = get_plan_entitlements(user)
+    period = entitlements['download_period']
+
+    if period == 'unlimited':
         return True, float('inf'), float('inf'), None, 'unlimited'
 
-    # PREMIUM: 15 downloads semanais (reset domingo 00:00 Brasília) - ou limite personalizado
-    elif user.plan == 'premium':
+    if period == 'weekly':
         # Usar limite personalizado se definido, caso contrário usar padrão
-        limit = user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') and user.custom_weekly_limit else 15
+        custom_limit = getattr(user, 'custom_weekly_limit', None)
+        limit = custom_limit if custom_limit is not None else entitlements['download_limit']
 
         # Calcular próximo domingo às 00:00 (horário Brasília)
         days_until_sunday = (6 - now_brasilia.weekday()) % 7  # 0=segunda, 6=domingo
@@ -11689,10 +11721,10 @@ def check_user_download_limit(user):
 
         return can_download, remaining, limit, reset_time, 'weekly'
 
-    # FREE: 1 download diário (reset meia-noite Brasília) - ou limite personalizado
-    else:
+    if period == 'daily':
         # Usar limite personalizado se definido, caso contrário usar padrão
-        limit = user.custom_daily_limit if hasattr(user, 'custom_daily_limit') and user.custom_daily_limit else 1
+        custom_limit = getattr(user, 'custom_daily_limit', None)
+        limit = custom_limit if custom_limit is not None else entitlements['download_limit']
 
         # Calcular próxima meia-noite (horário Brasília)
         next_midnight = (now_brasilia + timedelta(days=1)).replace(
@@ -11716,20 +11748,15 @@ def check_user_download_limit(user):
 
         return can_download, remaining, limit, reset_time, 'daily'
 
+    return False, 0, 0, None, 'blocked'
+
 
 def check_support_priority(user):
     """Retorna o tempo de resposta do suporte baseado no plano"""
     if user.role == 'admin' or user.role == 'editor':
         return "Suporte prioritário"
 
-    if user.plan == 'vip':
-        return "Suporte Prioritário"
-
-    if user.plan == 'premium':
-        return "Suporte em até 24H"
-
-    # Plano Grátis
-    return "Suporte em até 48H"
+    return str(get_plan_entitlements(user)['support'])
 
 
 def check_device_limit(user):
@@ -11737,13 +11764,7 @@ def check_device_limit(user):
     if user.role == 'admin' or user.role == 'editor':
         return True, "Acesso administrativo."
 
-    max_devices = {
-        'vip': 5,
-        'premium': 2,
-        'free': 1
-    }
-
-    limit = max_devices.get(user.plan, 1)
+    limit = int(get_plan_entitlements(user)['device_limit'])
 
     if user.active_sessions >= limit:
         return False, f"Você atingiu o limite de {limit} dispositivo(s) simultâneo(s) do plano {user.plan.capitalize()}. Faça upgrade para acessar de mais dispositivos."
@@ -11756,8 +11777,7 @@ def can_request_specific_content(user):
     if user.role == 'admin' or user.role == 'editor':
         return True
 
-    # Apenas VIP pode pedir conteúdo específico
-    return user.plan == 'vip'
+    return bool(get_plan_entitlements(user)['request_content'])
 
 @app.route('/favorite/<int:post_id>', methods=['POST'])
 @login_required

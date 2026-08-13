@@ -45,7 +45,9 @@
             || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
             || '';
 
-        const next = new URLSearchParams(window.location.search).get('next') || '';
+        const selectedPlan = document.querySelector('input[name="selected_plan"]')?.value || '';
+        const next = new URLSearchParams(window.location.search).get('next')
+            || (['premium', 'vip'].includes(selectedPlan) ? `/planos?checkout=${encodeURIComponent(selectedPlan)}` : '');
 
         const response = await fetch('/auth/google', {
             method: 'POST',

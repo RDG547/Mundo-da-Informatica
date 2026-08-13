@@ -227,6 +227,15 @@
 
                 const data = await response.json().catch(() => ({}));
 
+                if (data.requires_login) {
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        showMessage(data.message || 'Entre na sua conta para continuar.', 'warning');
+                    }
+                    return;
+                }
+
                 if (data.requires_upgrade) {
                     if (typeof window.showContentRequestModal === 'function') {
                         window.showContentRequestModal(data.message);

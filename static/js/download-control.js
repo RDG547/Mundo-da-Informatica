@@ -79,15 +79,75 @@ function createDownloadLimitModal() {
     }
 }
 
+// Modal integrado ao layout para visitantes que tentam iniciar um download.
+function createLoginRequiredModal() {
+    if (document.getElementById('downloadLoginRequiredModal')) return;
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="downloadLoginRequiredModal" class="download-limit-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="downloadLoginTitle">
+            <div class="download-limit-overlay" data-login-modal-close></div>
+            <div class="download-limit-content">
+                <button type="button" class="download-login-close" data-login-modal-close aria-label="Fechar">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="download-limit-icon download-login-icon">
+                    <i class="fas fa-user-lock"></i>
+                </div>
+                <h2 class="download-limit-title" id="downloadLoginTitle">Entre para fazer o download</h2>
+                <p class="download-limit-message">Você precisa estar conectado à sua conta para baixar este conteúdo.</p>
+                <div class="download-limit-actions">
+                    <a class="btn btn-gradient primary" data-download-login-link>
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </a>
+                    <button type="button" class="btn btn-outline" data-login-modal-close>
+                        <i class="fas fa-times"></i> Agora não
+                    </button>
+                </div>
+            </div>
+        </div>
+    `);
+
+    const modal = document.getElementById('downloadLoginRequiredModal');
+    modal.querySelectorAll('[data-login-modal-close]').forEach((element) => {
+        element.addEventListener('click', closeLoginRequiredModal);
+    });
+}
+
+function showLoginRequiredModal() {
+    createLoginRequiredModal();
+    const modal = document.getElementById('downloadLoginRequiredModal');
+    const loginLink = modal.querySelector('[data-download-login-link]');
+    const nextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    loginLink.href = `/login?next=${encodeURIComponent(nextPath)}`;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    loginLink.focus();
+}
+
+function closeLoginRequiredModal() {
+    const modal = document.getElementById('downloadLoginRequiredModal');
+    if (!modal || modal.style.display === 'none') return;
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') closeLoginRequiredModal();
+});
+
 // Mostrar modal de limite excedido (SEM redirecionamento automático)
 function showDownloadLimitModal(message) {
     createDownloadLimitModal();
 
     const modal = document.getElementById('downloadLimitModal');
+    const titleEl = modal.querySelector('.download-limit-title');
     const messageEl = document.getElementById('limitMessage');
+    const iconEl = modal.querySelector('.download-limit-icon i');
     const countdownContainer = modal.querySelector('.download-limit-countdown');
 
+    titleEl.textContent = 'Limite de Downloads Atingido!';
     messageEl.textContent = message;
+    iconEl.className = 'fas fa-exclamation-circle';
 
     // Ocultar contador regressivo (usuário decide se quer ver planos)
     if (countdownContainer) {
@@ -138,7 +198,7 @@ function closeDownloadLimitModal() {
 
 // Redirecionar para página de planos
 function redirectToPlans() {
-    window.location.href = '/plans';
+    window.location.href = '/planos';
 }
 
 // Verificar limite de downloads antes de baixar
@@ -207,8 +267,7 @@ window.setupDownloadButtons = function setupDownloadButtons() {
                 const isAuthenticated = document.body.dataset.authenticated === 'true';
 
                 if (!isAuthenticated) {
-                    alert('Você precisa estar logado para fazer downloads!');
-                    window.location.href = '/login';
+                    showLoginRequiredModal();
                     return false;
                 }
 

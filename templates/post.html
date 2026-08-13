@@ -268,25 +268,27 @@
                 </div>
 
                 <!-- Share Card -->
+                {% set share_category = post.category_rel.name if post.category_rel else (post.category_str or 'Geral') %}
+                {% set share_text = '[' ~ share_category ~ '] ' ~ post.title %}
                 <div class="sidebar-share-card animate-slide-up">
                     <div class="share-header">
                         <i class="fas fa-share-alt"></i>
                         <h3>Compartilhar</h3>
                     </div>
                     <div class="share-buttons-grid">
-                        <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" class="share-btn facebook">
+                        <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url|urlencode }}&quote={{ share_text|urlencode }}" target="_blank" class="share-btn facebook">
                             <i class="fab fa-facebook-f"></i>
                             <span>Facebook</span>
                         </a>
-                        <a href="https://twitter.com/intent/tweet?url={{ request.url }}&text={{ post.title }}" target="_blank" class="share-btn twitter">
+                        <a href="https://twitter.com/intent/tweet?url={{ request.url|urlencode }}&text={{ share_text|urlencode }}" target="_blank" class="share-btn twitter">
                             <i class="fab fa-twitter"></i>
                             <span>Twitter</span>
                         </a>
-                        <a href="https://wa.me/?text={{ post.title }}%20{{ request.url }}" target="_blank" class="share-btn whatsapp">
+                        <a href="https://wa.me/?text={{ (share_text ~ ' ' ~ request.url)|urlencode }}" target="_blank" class="share-btn whatsapp">
                             <i class="fab fa-whatsapp"></i>
                             <span>WhatsApp</span>
                         </a>
-                        <a href="https://t.me/share/url?url={{ request.url }}&text={{ post.title }}" target="_blank" class="share-btn telegram">
+                        <a href="https://t.me/share/url?url={{ request.url|urlencode }}&text={{ share_text|urlencode }}" target="_blank" class="share-btn telegram">
                             <i class="fab fa-telegram-plane"></i>
                             <span>Telegram</span>
                         </a>

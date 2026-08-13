@@ -51,9 +51,9 @@ async function checkPlanForContentRequest(isAuthenticated, userPlan, contactUrl,
     };
 
     if (isAuthenticated) {
-        if (userPlan === 'free') {
+        if (userPlan !== 'vip') {
             // Mostrar modal de upgrade com conteúdo personalizado
-            showContentRequestModal('A solicitação de conteúdo está disponível apenas para planos Premium e VIP. Faça upgrade para ter acesso a esse recurso exclusivo e solicitar materiais personalizados!');
+            showContentRequestModal('A solicitação de conteúdo é exclusiva do plano VIP. Faça upgrade para solicitar materiais personalizados!');
         } else {
             // Redirecionar para página de contato com categoria pré-selecionada
             const contactTarget = new URL(contactUrl, window.location.origin);

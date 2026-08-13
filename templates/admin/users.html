@@ -752,8 +752,8 @@
 
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle"></i>
-                            <strong>Importante:</strong> Se o usuário tiver um plano ativo (Premium ou VIP), os limites
-                            do plano prevalecerão sobre as configurações manuais abaixo.
+                            <strong>Importante:</strong> O limite semanal personalizado substitui a cota dos planos
+                            Grátis e Premium. O VIP permanece ilimitado; use o bloqueio acima para impedir downloads.
                         </div>
 
                         <div class="row mb-4">
@@ -776,8 +776,8 @@
                                         <i class="fas fa-calendar-day"></i> Limite Diário Personalizado
                                     </label>
                                     <input type="number" id="customDailyLimit" name="custom_daily_limit"
-                                        class="form-control modern-input" min="0" max="1000" placeholder="Padrão: 1">
-                                    <small class="form-text">Deixe vazio para usar limite padrão do plano</small>
+                                        class="form-control modern-input" min="0" max="1000" placeholder="Uso legado">
+                                    <small class="form-text">Nenhum plano atual usa cota diária</small>
                                 </div>
                             </div>
 
@@ -787,8 +787,8 @@
                                         <i class="fas fa-calendar-week"></i> Limite Semanal Personalizado
                                     </label>
                                     <input type="number" id="customWeeklyLimit" name="custom_weekly_limit"
-                                        class="form-control modern-input" min="0" max="10000" placeholder="Padrão: 15">
-                                    <small class="form-text">Deixe vazio para usar limite padrão do plano</small>
+                                        class="form-control modern-input" min="0" max="10000" placeholder="Grátis: 1 | Premium: 15">
+                                    <small class="form-text">Deixe vazio para usar a cota semanal do plano</small>
                                 </div>
                             </div>
                         </div>
@@ -3119,8 +3119,8 @@
                     // Populate Download Stats (from previous update logic)
                     if (document.getElementById('currentDailyDownloads')) document.getElementById('currentDailyDownloads').textContent = data.daily_downloads || 0;
                     if (document.getElementById('currentWeeklyDownloads')) document.getElementById('currentWeeklyDownloads').textContent = data.weekly_downloads || 0;
-                    if (document.getElementById('dailyLimit')) document.getElementById('dailyLimit').textContent = data.daily_limit || 1;
-                    if (document.getElementById('weeklyLimit')) document.getElementById('weeklyLimit').textContent = data.weekly_limit || 15;
+                    if (document.getElementById('dailyLimit')) document.getElementById('dailyLimit').textContent = data.daily_limit ?? '—';
+                    if (document.getElementById('weeklyLimit')) document.getElementById('weeklyLimit').textContent = data.weekly_limit ?? '—';
 
                     // Formatar datas de reset
                     if (data.download_reset_date) {
@@ -3184,12 +3184,12 @@
 
                 const customDailyLimitField = document.getElementById('customDailyLimit');
                 if (customDailyLimitField) {
-                    customDailyLimitField.value = user.custom_daily_limit || '';
+                    customDailyLimitField.value = user.custom_daily_limit ?? '';
                 }
 
                 const customWeeklyLimitField = document.getElementById('customWeeklyLimit');
                 if (customWeeklyLimitField) {
-                    customWeeklyLimitField.value = user.custom_weekly_limit || '';
+                    customWeeklyLimitField.value = user.custom_weekly_limit ?? '';
                 }
 
                 console.log('Dados preenchidos no modal'); // Debug

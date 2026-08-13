@@ -47,10 +47,6 @@ window.initializePlansPage = function () {
                     stripeInitialized = true;
                     console.log('Stripe initialized successfully');
 
-                    // Auto-checkout if plan is specified
-                    if (checkoutPlan && checkoutPlan !== 'None') {
-                        window.checkout(checkoutPlan);
-                    }
                 } else {
                     console.error('Stripe.js not loaded');
                 }
@@ -285,6 +281,16 @@ window.initializePlansPage = function () {
         }
 
         return { label: 'Plano', amountText };
+    }
+
+    // Retoma a escolha feita antes do cadastro/login sem pular a seleção
+    // entre cartão e PIX.
+    if (
+        checkoutPlan
+        && checkoutPlan !== 'None'
+        && document.body.dataset.authenticated === 'true'
+    ) {
+        window.setTimeout(() => window.showPaymentMethodModal(checkoutPlan), 0);
     }
 
     // FAQ Toggle

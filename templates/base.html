@@ -13,6 +13,20 @@
     <meta name="keywords" content="informática, BIOS, esquemas, drivers, softwares, técnicos">
     <meta name="author" content="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% if post is defined and post %}
+    {% set social_category = post.category_rel.name if post.category_rel else (post.category_str or 'Geral') %}
+    {% set social_title = '[' ~ social_category ~ '] ' ~ post.title %}
+    {% set social_image = get_image_url(post.image_url, folder='posts', default='default.jpg') %}
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:title" content="{{ site_configs.get('site_name', 'Mundo da Informática') }} - {{ social_title }}">
+    <meta property="og:description" content="{{ (post.seo_description or post.content)|striptags|truncate(180, True) }}">
+    <meta property="og:image" content="{% if social_image.startswith('http') %}{{ social_image }}{% else %}{{ request.url_root.rstrip('/') }}{{ social_image }}{% endif %}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ social_title }}">
+    <meta name="twitter:description" content="{{ (post.seo_description or post.content)|striptags|truncate(180, True) }}">
+    <meta name="twitter:image" content="{% if social_image.startswith('http') %}{{ social_image }}{% else %}{{ request.url_root.rstrip('/') }}{{ social_image }}{% endif %}">
+    {% endif %}
 
     <!-- Meta Pixel Code -->
     <script>
@@ -184,7 +198,10 @@
                                 {% if nav_subcategories %}
                                 <div class="submenu-content">
                                     {% for subcategory_name in nav_subcategories %}
-                                    <a href="{{ url_for('subcategory', subcategory=subcategory_name) }}">{{ format_subcategory_label(subcategory_name) }}</a>
+                                    <a href="{{ url_for('subcategory', subcategory=subcategory_name) }}">
+                                        <i class="{{ nav_category.icon or 'fas fa-folder' }}"></i>
+                                        <span>{{ format_subcategory_label(subcategory_name) }}</span>
+                                    </a>
                                     {% endfor %}
                                 </div>
                                 {% endif %}
@@ -281,8 +298,8 @@
                     </div>
                     {% else %}
                     <div class="auth-buttons">
-                        <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm">Entrar</a>
-                        <a href="{{ url_for('register') }}" class="btn btn-sm">Cadastrar</a>
+                        <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Entrar</a>
+                        <a href="{{ url_for('register') }}" class="btn btn-sm"><i class="fas fa-user-plus" aria-hidden="true"></i> Cadastrar</a>
                     </div>
                     {% endif %}
                 </div>
@@ -1398,7 +1415,7 @@
         });
 
         document.addEventListener('click', function(e) {
-            var cardImage = e.target.closest('.post-card .post-image img, .download-title-thumb:not(.download-title-thumb-placeholder)');
+            var cardImage = e.target.closest('.post-card .post-image img, .related-post-image img, .download-title-thumb:not(.download-title-thumb-placeholder)');
             if (!cardImage) return;
             if (cardImage.tagName !== 'IMG') return;
             e.preventDefault();
@@ -1420,7 +1437,13 @@
             <h4 style="margin:0 0 6px; font-size:1.1rem; color:var(--text-primary, #333);">
                 <i class="fas fa-download" style="color:var(--primary-color);"></i> Selecione o Download
             </h4>
-            <p id="multiDownloadTitle" style="margin:0 0 18px; font-size:0.85rem; color:var(--text-secondary, #888); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
+            <div class="multi-download-resource" style="display:flex; align-items:flex-start; gap:12px; margin:0 0 18px;">
+                <img id="multiDownloadThumb" src="" alt="" style="display:none; width:54px; height:54px; flex:0 0 54px; border-radius:9px; object-fit:cover; background:#eef2f7;">
+                <div id="multiDownloadThumbPlaceholder" aria-hidden="true" style="display:flex; width:54px; height:54px; flex:0 0 54px; border-radius:9px; align-items:center; justify-content:center; background:#eef2f7; color:var(--primary-color);">
+                    <i class="fas fa-file-download"></i>
+                </div>
+                <p id="multiDownloadTitle" style="margin:0; min-width:0; font-size:0.88rem; line-height:1.45; font-weight:600; color:var(--text-secondary, #666); white-space:normal; overflow-wrap:anywhere;"></p>
+            </div>
             <div id="multiDownloadOptions" style="display:flex; flex-direction:column; gap:10px;"></div>
         </div>
     </div>
@@ -1434,11 +1457,28 @@
         var modal = document.getElementById('multiDownloadModal');
         var optionsDiv = document.getElementById('multiDownloadOptions');
         var titleEl = document.getElementById('multiDownloadTitle');
+        var thumbEl = document.getElementById('multiDownloadThumb');
+        var thumbPlaceholder = document.getElementById('multiDownloadThumbPlaceholder');
         var closeBtn = document.getElementById('multiDownloadClose');
         if (!modal) return;
 
-        function openModal(postId, postTitle, files) {
+        function openModal(postId, postTitle, files, postImage) {
             titleEl.textContent = postTitle;
+            if (postImage) {
+                thumbEl.src = postImage;
+                thumbEl.alt = postTitle;
+                thumbEl.style.display = 'block';
+                thumbPlaceholder.style.display = 'none';
+                thumbEl.onerror = function() {
+                    thumbEl.style.display = 'none';
+                    thumbPlaceholder.style.display = 'flex';
+                };
+            } else {
+                thumbEl.removeAttribute('src');
+                thumbEl.alt = '';
+                thumbEl.style.display = 'none';
+                thumbPlaceholder.style.display = 'flex';
+            }
             optionsDiv.innerHTML = '';
             files.forEach(function(f) {
                 var btn = document.createElement('a');
@@ -1491,9 +1531,15 @@
             e.stopPropagation();
             var postId = trigger.getAttribute('data-post-id');
             var postTitle = trigger.getAttribute('data-post-title');
+            var postImage = trigger.getAttribute('data-post-image');
+            if (!postImage) {
+                var resourceCard = trigger.closest('.post-card, .modern-post-card, .download-card, .favorite-post-item');
+                var resourceImage = resourceCard ? resourceCard.querySelector('img') : null;
+                postImage = resourceImage ? resourceImage.src : '';
+            }
             try {
                 var files = JSON.parse(trigger.getAttribute('data-download-files'));
-                if (files && files.length > 1) openModal(postId, postTitle, files);
+                if (files && files.length > 1) openModal(postId, postTitle, files, postImage);
             } catch(err) {}
         });
     })();

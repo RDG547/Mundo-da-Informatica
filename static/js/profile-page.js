@@ -4,44 +4,35 @@
 
 // Modal functions - GLOBAL
 window.openEditModal = function () {
-    console.log('openEditModal chamada');
     const modal = document.getElementById('editModal');
-    console.log('Modal encontrado:', modal);
     if (modal) {
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        console.log('Modal aberto com sucesso');
     } else {
         console.error('Modal não encontrado!');
     }
 };
 
 window.closeEditModal = function () {
-    console.log('closeEditModal chamada');
     const modal = document.getElementById('editModal');
     if (modal) {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
-        console.log('Modal fechado com sucesso');
     }
 };
 
 // Password Modal functions - GLOBAL
 window.openPasswordModal = function () {
-    console.log('openPasswordModal chamada');
     const modal = document.getElementById('passwordModal');
-    console.log('Password Modal encontrado:', modal);
     if (modal) {
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        console.log('Password Modal aberto com sucesso');
     } else {
         console.error('Password Modal não encontrado!');
     }
 };
 
 window.closePasswordModal = function () {
-    console.log('closePasswordModal chamada');
     const modal = document.getElementById('passwordModal');
     if (modal) {
         modal.style.display = 'none';
@@ -49,23 +40,19 @@ window.closePasswordModal = function () {
         // Limpar campos do formulário
         const form = document.getElementById('changePasswordForm');
         if (form) form.reset();
-        console.log('Password Modal fechado com sucesso');
     }
 };
 
 // Remove Image Modal functions - GLOBAL
 window.openRemoveImageModal = function () {
-    console.log('openRemoveImageModal chamada');
     const modal = document.getElementById('removeImageModal');
     if (modal) {
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        console.log('Remove Image Modal aberto com sucesso');
     }
 };
 
 window.closeRemoveImageModal = function (event) {
-    console.log('closeRemoveImageModal chamada');
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -74,7 +61,6 @@ window.closeRemoveImageModal = function (event) {
     if (modal) {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
-        console.log('Remove Image Modal fechado com sucesso');
     }
 };
 
@@ -252,21 +238,18 @@ window.removeFavorite = async function (postId) {
         // Invalidar cache para garantir dados atualizados
         if (window.dynamicLoader && window.dynamicLoader.cache) {
             window.dynamicLoader.cache.clear();
-            console.log('[DEBUG] Cache invalidado após remover favorito');
         }
     }
 };
 
 // Função para atualizar navbar dinamicamente
 function updateNavbar(user) {
-    console.log('[DEBUG] Atualizando navbar com:', user);
 
     // Atualizar foto de perfil na navbar
     const navbarImg = document.querySelector('.user-dropdown img');
     if (navbarImg && user.profile_image) {
         const imageUrl = `/static/uploads/profiles/${user.profile_image}`;
         navbarImg.src = imageUrl;
-        console.log('[DEBUG] Navbar image atualizada:', imageUrl);
     }
 
     // Atualizar nome de usuário na navbar
@@ -279,20 +262,17 @@ function updateNavbar(user) {
             navbarUsername.appendChild(imgElement.cloneNode(true));
             navbarUsername.appendChild(document.createTextNode(' ' + user.username));
         }
-        console.log('[DEBUG] Navbar username atualizado:', user.username);
     }
 }
 
 // Função para atualizar sidebar dinamicamente
 function updateSidebar(user) {
-    console.log('[DEBUG] Atualizando sidebar com:', user);
 
     // Atualizar foto na sidebar
     const sidebarImg = document.querySelector('.sidebar-profile-header img, .admin-sidebar-profile img');
     if (sidebarImg && user.profile_image) {
         const imageUrl = `/static/uploads/profiles/${user.profile_image}`;
         sidebarImg.src = imageUrl;
-        console.log('[DEBUG] Sidebar image atualizada:', imageUrl);
     }
 
     // Atualizar título (nome completo ou username) na sidebar
@@ -307,14 +287,12 @@ function updateSidebar(user) {
         } else {
             sidebarTitle.textContent = displayName;
         }
-        console.log('[DEBUG] Sidebar title atualizado:', displayName);
     }
 
     // Atualizar username (@username) na sidebar
     const sidebarSubtitle = document.querySelector('.sidebar-profile-subtitle');
     if (sidebarSubtitle && user.username) {
         sidebarSubtitle.textContent = '@' + user.username;
-        console.log('[DEBUG] Sidebar username atualizado:', user.username);
     }
 
     // Atualizar bio na sidebar
@@ -332,11 +310,9 @@ function updateSidebar(user) {
                 profileHeader.appendChild(bioElement);
             }
         }
-        console.log('[DEBUG] Sidebar bio atualizada:', user.bio);
     } else if (sidebarBio) {
         // Se a bio foi removida, remover o elemento
         sidebarBio.remove();
-        console.log('[DEBUG] Sidebar bio removida');
     }
 }
 
@@ -525,12 +501,10 @@ function updateAllProfileImages(userData) {
         sidebarAvatar.src = imagePath;
     }
 
-    console.log('Todas as imagens de perfil atualizadas');
 }
 
 // Update profile header with new data
 function updateProfileHeader(userData) {
-    console.log('Atualizando header do perfil com:', userData);
 
     // Update name in profile title
     const profileTitle = document.querySelector('.profile-title');
@@ -620,7 +594,6 @@ function updateProfileHeader(userData) {
         }
     });
 
-    console.log('Perfil atualizado com sucesso em tempo real');
 }
 
 // Show toast notification - GLOBAL
@@ -658,7 +631,6 @@ window.showToast = function(message, type = 'success') {
 
 // Initialize profile page functionality
 function initializeProfilePage() {
-    console.log('Inicializando página de perfil...');
     initializeProfileSectionNav();
 
     // Image upload functionality
@@ -791,11 +763,9 @@ function initializeProfilePage() {
 
     // Edit Profile Form Handler
     const editProfileForm = document.getElementById('editProfileForm');
-    console.log('[DEBUG] Edit Profile Form:', editProfileForm ? 'encontrado' : 'NÃO encontrado');
 
     if (editProfileForm) {
         editProfileForm.addEventListener('submit', async function (e) {
-            console.log('[DEBUG] Form submit interceptado');
             e.preventDefault();
             e.stopPropagation(); // Previne que o DynamicLoader intercepte
 
@@ -808,7 +778,6 @@ function initializeProfilePage() {
 
             try {
                 const formData = new FormData(this);
-                console.log('[DEBUG] Enviando requisição AJAX para:', this.action);
 
                 const response = await fetch(this.action, {
                     method: 'POST',
@@ -818,12 +787,9 @@ function initializeProfilePage() {
                     }
                 });
 
-                console.log('[DEBUG] Response status:', response.status);
                 const data = await response.json();
-                console.log('[DEBUG] Response data:', data);
 
                 if (data.success) {
-                    console.log('[DEBUG] Sucesso! Fechando modal e atualizando interface');
 
                     // Close modal
                     window.closeEditModal();
@@ -843,25 +809,21 @@ function initializeProfilePage() {
                     // Invalidar cache do Dynamic Loading para forçar recarga na próxima navegação
                     if (window.dynamicLoader && window.dynamicLoader.cache) {
                         window.dynamicLoader.cache.clear();
-                        console.log('[DEBUG] Cache do Dynamic Loading invalidado');
                     }
 
                     // Show success message
                     showToast('Perfil atualizado com sucesso!', 'success');
                 } else {
-                    console.log('[DEBUG] Erro na resposta:', data.message);
                     showToast(data.message || 'Erro ao atualizar perfil', 'error');
                 }
             } catch (error) {
-                console.error('[DEBUG] Erro ao atualizar perfil:', error);
+                console.error('Erro ao atualizar perfil:', error);
                 showToast('Erro ao atualizar perfil. Tente novamente.', 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             }
         });
-    } else {
-        console.error('[DEBUG] Formulário editProfileForm não encontrado no DOM!');
     }
 
     // Stats animation
@@ -946,7 +908,6 @@ function initializeProfilePage() {
         });
     }
 
-    console.log('Página de perfil inicializada com sucesso');
 }
 
 // Toggle para expandir/colapsar favoritos - GLOBAL

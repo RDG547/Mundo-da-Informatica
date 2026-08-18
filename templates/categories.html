@@ -11,8 +11,9 @@
                 <i class="fas fa-folder-open"></i>
             </div>
             <h1 class="hero-title animate-fade-up">Todas as Categorias</h1>
-            <p class="hero-subtitle animate-fade-up-delayed">Explore nosso acervo completo organizado por categorias e subcategorias para facilitar sua busca.</p>
+            <p class="hero-subtitle animate-fade-up-delayed">Explore o acervo organizado por categorias e subcategorias para facilitar sua busca.</p>
         </div>
+
     </div>
 </div>
 
@@ -32,23 +33,23 @@
                     </div>
 
                     <div class="category-description">
-                        <p>Organizamos todo nosso conteúdo em categorias especializadas para facilitar sua busca. Cada categoria contém recursos cuidadosamente selecionados e verificados por nossa equipe técnica.</p>
+                        <p>Organizamos os recursos por categoria para reduzir o tempo de busca. O status de verificação, quando disponível, aparece individualmente em cada arquivo.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="verified" style="cursor: pointer;">
                                 <i class="fas fa-shield-alt"></i>
-                                <span>Verificado</span>
+                                <span>Status explícito</span>
                             </div>
                             <div class="feature-item" data-feature="updated" style="cursor: pointer;">
                                 <i class="fas fa-rocket"></i>
-                                <span>Atualizado</span>
+                                <span>Metadados</span>
                             </div>
                             <div class="feature-item" data-feature="professional" style="cursor: pointer;">
                                 <i class="fas fa-users"></i>
-                                <span>Profissional</span>
+                                <span>Busca técnica</span>
                             </div>
                             <div class="feature-item" data-feature="support" style="cursor: pointer;">
                                 <i class="fas fa-headset"></i>
-                                <span>Suporte</span>
+                                <span>Sugestões</span>
                             </div>
                         </div>
                     </div>
@@ -114,6 +115,18 @@
                     {% endif %}
                 </div>
 
+                {% if expanding_categories %}
+                <section class="expanding-categories" aria-labelledby="expanding-title">
+                    <h2 id="expanding-title"><i class="fas fa-seedling" aria-hidden="true"></i> Em expansão</h2>
+                    <p>Estas áreas estão organizadas no catálogo e serão destacadas quando receberem conteúdo.</p>
+                    <div class="expanding-category-list">
+                        {% for category in expanding_categories %}
+                        <span><i class="{{ category.icon or 'fas fa-folder' }}" aria-hidden="true"></i> {{ category.name }}</span>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
                 <!-- CTA Section -->
                 <div class="category-cta">
                     <div class="cta-content">
@@ -121,14 +134,14 @@
                             <i class="fas fa-question" style="color: white !important;"></i>
                         </div>
                         <h4>Não encontrou o que procura?</h4>
-                        <p>Use nossa busca avançada para encontrar recursos específicos em todas as categorias disponíveis. Se não encontrar o que precisa, entre em contato conosco para solicitar conteúdo específico. Nossa equipe está sempre trabalhando para adicionar novos recursos!</p>
+                        <p>Pesquise pelo modelo ou pelo código da placa. Se o arquivo ainda não estiver disponível, envie uma sugestão; usuários VIP também podem solicitar busca prioritária.</p>
                         <div class="cta-buttons" id="ctaButtonsContainer" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
                             <button type="button" class="btn btn-gradient primary" id="toggleSearchBtnCategories"
                                 onclick="transformToSearchBarCategories()" style="flex: 0 0 auto;">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <a href="{{ url_for('contact', category='solicitacao') }}#contact-form-section" class="btn btn-gradient secondary" style="flex: 0 0 auto;">
-                                <i class="fas fa-envelope"></i> Solicitar Conteúdo
+                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary" style="flex: 0 0 auto;">
+                                <i class="fas fa-lightbulb"></i> Sugerir conteúdo
                             </a>
                         </div>
                         <form action="{{ url_for('search') }}" method="get" class="inline-search-form"

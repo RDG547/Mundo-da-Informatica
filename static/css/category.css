@@ -1195,3 +1195,15 @@
         font-size: 1rem;
     }
 }
+.expanding-categories {
+    margin: 2rem 0;
+    padding: 1.25rem;
+    border: 1px dashed rgba(var(--primary-rgb), 0.35);
+    border-radius: 14px;
+    color: var(--text-color);
+    background: rgba(var(--primary-rgb), 0.05);
+}
+
+.expanding-categories h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.expanding-category-list { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1rem; }
+.expanding-category-list span { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.75rem; border-radius: 999px; background: var(--card-bg, #fff); }

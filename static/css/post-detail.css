@@ -986,3 +986,101 @@
         grid-template-columns: 1fr;
     }
 }
+.verified-file-badge,
+.review-file-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.verified-file-badge { color: #047857; background: rgba(16, 185, 129, 0.13); }
+.review-file-badge { color: #a16207; background: rgba(234, 179, 8, 0.14); }
+
+.thumbnail-inline-notice,
+.firmware-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 1rem 0;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    line-height: 1.55;
+}
+
+.thumbnail-inline-notice {
+    color: var(--text-color);
+    background: rgba(var(--primary-rgb), 0.07);
+    border: 1px solid rgba(var(--primary-rgb), 0.16);
+}
+
+.firmware-warning {
+    color: #854d0e;
+    background: rgba(250, 204, 21, 0.12);
+    border: 1px solid rgba(202, 138, 4, 0.28);
+}
+
+.technical-info-card {
+    margin: 1.25rem 0;
+    padding: 1.25rem;
+    border-radius: 16px;
+    border: 1px solid rgba(var(--primary-rgb), 0.16);
+    background: var(--card-bg, #fff);
+    box-shadow: var(--shadow-sm);
+}
+
+.technical-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.technical-info-item {
+    min-width: 0;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.technical-info-item:nth-child(odd) { border-right: 1px solid rgba(148, 163, 184, 0.18); }
+.technical-info-item dt { color: var(--text-secondary, #64748b); font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.technical-info-item dd { margin: 0.3rem 0 0; color: var(--text-color); font-weight: 600; overflow-wrap: anywhere; }
+.verification-date { margin-top: 1rem; color: var(--text-color); }
+
+.hash-block {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 10px;
+    color: var(--text-color);
+    background: rgba(15, 23, 42, 0.05);
+}
+
+.hash-block code { display: block; margin-top: 0.35rem; overflow-wrap: anywhere; font-size: 0.8rem; }
+.copy-hash-btn { flex: 0 0 auto; padding: 0.65rem 0.85rem; border: 0; border-radius: 8px; color: #fff; background: var(--primary-color); cursor: pointer; }
+
+@media (max-width: 620px) {
+    .technical-info-grid { grid-template-columns: 1fr; }
+    .technical-info-item:nth-child(odd) { border-right: 0; }
+    .hash-block { align-items: stretch; flex-direction: column; }
+    .copy-hash-btn { width: 100%; }
+}
+
+[data-theme="dark"] .firmware-warning,
+body.dark-mode .firmware-warning { color: #fde68a; background: rgba(202, 138, 4, 0.14); }
+
+.multi-file-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.multi-file-item { display: grid; gap: 0.45rem; padding: 0.75rem; border: 1px solid rgba(var(--primary-rgb), 0.18); border-radius: 12px; background: rgba(var(--primary-rgb), 0.04); }
+.multi-file-item .btn-download-primary { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.file-hash-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.file-hash-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.multi-file-security-note { margin: 0.25rem 0 0; font-size: 0.82rem; opacity: 0.78; }

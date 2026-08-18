@@ -49,7 +49,7 @@
                 <!-- Post Header Card with Image -->
                 <article class="post-header-card animate-slide-up">
                     <div class="post-header-content">
-                        {% set header_download_files = post.get_metadata('download_files') %}
+                        {% set header_download_files = get_public_download_files(post) %}
                         {% set header_download_types = namespace(items=[]) %}
                         {% if header_download_files %}
                             {% for file in header_download_files %}
@@ -60,7 +60,7 @@
                         {% endif %}
                         <!-- Thumbnail Image -->
                         <div class="post-thumbnail-container">
-                            <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}" class="post-thumbnail-image">
+                            <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ post.title }}" class="post-thumbnail-image" width="900" height="506" fetchpriority="high">
                             <div class="thumbnail-overlay">
                                 <i class="fas fa-search-plus"></i>
                             </div>
@@ -100,6 +100,11 @@
                                     <i class="fas fa-star"></i> Destaque
                                 </div>
                                 {% endif %}
+                                {% if post.is_verified_file %}
+                                <div class="verified-file-badge"><i class="fas fa-check-circle" aria-hidden="true"></i> Arquivo verificado</div>
+                                {% elif post.verification_status == 'needs_review' %}
+                                <div class="review-file-badge"><i class="fas fa-rotate" aria-hidden="true"></i> Revisão necessária</div>
+                                {% endif %}
                             </div>
 
                             <!-- Title -->
@@ -138,6 +143,49 @@
                         </div>
                     </div>
                 </article>
+
+                <div class="thumbnail-inline-notice" role="note">
+                    <i class="fas fa-circle-info" aria-hidden="true"></i>
+                    <span><strong>Miniatura ilustrativa</strong> — confirme sempre o modelo e o código da placa antes da gravação ou utilização do arquivo.</span>
+                </div>
+
+                {% if post.technical_details or post.sha256 or post.last_verified_at %}
+                <section class="technical-info-card animate-slide-up" aria-labelledby="technical-info-title">
+                    <div class="card-header-custom">
+                        <i class="fas fa-microchip" aria-hidden="true"></i>
+                        <h2 id="technical-info-title">Informações técnicas</h2>
+                    </div>
+                    {% if post.technical_details %}
+                    <dl class="technical-info-grid">
+                        {% for label, value in post.technical_details %}
+                        <div class="technical-info-item">
+                            <dt>{{ label }}</dt>
+                            <dd>{{ value }}</dd>
+                        </div>
+                        {% endfor %}
+                    </dl>
+                    {% endif %}
+                    {% if post.last_verified_at %}
+                    <div class="verification-date"><strong>Última verificação:</strong> {{ post.last_verified_at.strftime('%d/%m/%Y') }}</div>
+                    {% endif %}
+                    {% if post.sha256 %}
+                    <div class="hash-block">
+                        <div><strong>SHA-256</strong><code id="postSha256">{{ post.sha256 }}</code></div>
+                        <button type="button" class="copy-hash-btn" data-copy-hash="{{ post.sha256 }}" aria-label="Copiar hash SHA-256">
+                            <i class="far fa-copy" aria-hidden="true"></i> Copiar hash
+                        </button>
+                    </div>
+                    {% endif %}
+                </section>
+                {% endif %}
+
+                {% set resource_kind = ((post.file_type or '') ~ ' ' ~ (post.category_str or ''))|lower %}
+                {% if 'bios' in resource_kind or 'ec' in resource_kind %}
+                <div class="firmware-warning" role="note">
+                    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                    <span><strong>Atenção:</strong> confirme sempre o modelo, código e revisão da placa antes de gravar qualquer firmware. O uso de arquivo incompatível pode impedir o funcionamento do equipamento.</span>
+                </div>
+                {% endif %}
 
                 <!-- Post Description -->
                 <div class="post-description-card animate-slide-up">
@@ -181,28 +229,37 @@
                     </div>
                     <div class="download-card-body">
                         <div class="download-info">
+                            {% if post.is_verified_file %}
                             <div class="info-item">
                                 <i class="fas fa-check-circle"></i>
                                 <span>Arquivo verificado</span>
                             </div>
+                            {% else %}
                             <div class="info-item">
-                                <i class="fas fa-shield-alt"></i>
-                                <span>Download seguro</span>
+                                <i class="fas fa-circle-info"></i>
+                                <span>{{ 'Revisão necessária' if post.verification_status == 'needs_review' else 'Arquivo não verificado' }}</span>
                             </div>
-                            <div class="info-item">
-                                <i class="fas fa-sync-alt"></i>
-                                <span>Atualizado</span>
-                            </div>
+                            {% endif %}
                         </div>
-                        {% set dl_files_detail = post.get_metadata('download_files') %}
+                        {% set dl_files_detail = get_public_download_files(post) %}
                         {% if dl_files_detail and dl_files_detail|length > 1 %}
-                        <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div class="multi-file-list">
                             {% for df in dl_files_detail %}
-                            <a href="{{ url_for('download_post', post_id=post.id) }}?type={{ df.type|urlencode }}" class="btn-download-primary download-btn" data-action="download" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                                <i class="fas fa-download"></i>
-                                <span>Download {{ df.type }}{% if df.size %} ({{ df.size }}){% endif %}</span>
-                            </a>
+                            <div class="multi-file-item">
+                                <a href="{{ url_for('download_post', post_id=post.id, file=loop.index0) }}" class="btn-download-primary download-btn" data-action="download">
+                                    <i class="fas fa-download" aria-hidden="true"></i>
+                                    <span>Download {{ df.name or df.type or ('Arquivo ' ~ loop.index) }}</span>
+                                </a>
+                                {% if df.format or df.size %}<small>{{ [df.format, df.size]|select|join(' · ') }}</small>{% endif %}
+                                {% if df.sha256 %}
+                                <div class="file-hash-row">
+                                    <code>{{ df.sha256 }}</code>
+                                    <button type="button" class="copy-hash-btn" data-copy-hash="{{ df.sha256 }}" aria-label="Copiar SHA-256 de {{ df.name or df.type or 'arquivo' }}"><i class="far fa-copy" aria-hidden="true"></i></button>
+                                </div>
+                                {% endif %}
+                            </div>
                             {% endfor %}
+                            <p class="multi-file-security-note"><i class="fas fa-shield-alt" aria-hidden="true"></i> Os arquivos são baixados individualmente para evitar múltiplas aberturas automáticas no navegador.</p>
                         </div>
                         {% else %}
                         <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn-download-primary download-btn" data-action="download">
@@ -212,7 +269,7 @@
                         {% endif %}
                         <p class="download-notice">
                             <i class="fas fa-info-circle"></i>
-                            O download será iniciado diretamente no nosso site
+                            {% if current_user.is_authenticated %}O acesso ao arquivo respeita os limites do seu plano.{% else %}Entre na sua conta para iniciar o download.{% endif %}
                         </p>
                     </div>
                 </div>
@@ -276,19 +333,19 @@
                         <h3>Compartilhar</h3>
                     </div>
                     <div class="share-buttons-grid">
-                        <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url|urlencode }}&quote={{ share_text|urlencode }}" target="_blank" class="share-btn facebook">
+                        <a href="https://www.facebook.com/sharer/sharer.php?u={{ canonical_url|urlencode }}&quote={{ share_text|urlencode }}" target="_blank" rel="noopener noreferrer" class="share-btn facebook">
                             <i class="fab fa-facebook-f"></i>
                             <span>Facebook</span>
                         </a>
-                        <a href="https://twitter.com/intent/tweet?url={{ request.url|urlencode }}&text={{ share_text|urlencode }}" target="_blank" class="share-btn twitter">
+                        <a href="https://twitter.com/intent/tweet?url={{ canonical_url|urlencode }}&text={{ share_text|urlencode }}" target="_blank" rel="noopener noreferrer" class="share-btn twitter">
                             <i class="fab fa-twitter"></i>
                             <span>Twitter</span>
                         </a>
-                        <a href="https://wa.me/?text={{ (share_text ~ ' ' ~ request.url)|urlencode }}" target="_blank" class="share-btn whatsapp">
+                        <a href="https://wa.me/?text={{ (share_text ~ ' ' ~ canonical_url)|urlencode }}" target="_blank" rel="noopener noreferrer" class="share-btn whatsapp">
                             <i class="fab fa-whatsapp"></i>
                             <span>WhatsApp</span>
                         </a>
-                        <a href="https://t.me/share/url?url={{ request.url|urlencode }}&text={{ share_text|urlencode }}" target="_blank" class="share-btn telegram">
+                        <a href="https://t.me/share/url?url={{ canonical_url|urlencode }}&text={{ share_text|urlencode }}" target="_blank" rel="noopener noreferrer" class="share-btn telegram">
                             <i class="fab fa-telegram-plane"></i>
                             <span>Telegram</span>
                         </a>
@@ -305,7 +362,7 @@
             </div>
             <div class="related-posts-grid">
                 {% for related in related_posts %}
-                {% set related_download_files = related.get_metadata('download_files') %}
+                {% set related_download_files = get_public_download_files(related) %}
                 {% set related_download_types = namespace(items=[]) %}
                 {% if related_download_files %}
                     {% for file in related_download_files %}
@@ -316,7 +373,7 @@
                 {% endif %}
                 <a href="{{ post_url(related) }}" class="related-post-item">
                     <div class="related-post-image">
-                        <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="{{ related.title }}">
+                        <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ related.title }}" loading="lazy" width="420" height="236">
                     </div>
                     <div class="related-post-content">
                         <span class="related-post-category">
@@ -357,6 +414,34 @@
 <script src="{{ url_for('static', filename='js/comments.js') }}"></script>
 <!-- Script de favoritos -->
 <script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
+<script>
+if (typeof window.trackSiteEvent === 'function') {
+    window.trackSiteEvent('view_item', {
+        content_type: 'technical_file',
+        content_id: {{ post.id|tojson }},
+        item_category: {{ (post.category_rel.name if post.category_rel else post.category_str)|tojson }}
+    }, 'ViewContent');
+}
+document.querySelectorAll('[data-copy-hash]').forEach(function (button) {
+    button.addEventListener('click', async function () {
+        const hash = this.dataset.copyHash || '';
+        try {
+            await navigator.clipboard.writeText(hash);
+            const previousLabel = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> Copiado';
+            window.setTimeout(() => { this.innerHTML = previousLabel; }, 1800);
+        } catch (_error) {
+            const code = this.closest('.hash-block, .file-hash-row')?.querySelector('code');
+            if (!code) return;
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(code);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    });
+});
+</script>
 
 <!-- Lightbox para imagem do post -->
 <script>

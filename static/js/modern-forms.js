@@ -515,7 +515,14 @@ class ModernPostForm {
             const typeSelect = entry.querySelector('select');
             const urlInput = entry.querySelector('input[type="url"]');
             if (typeSelect && urlInput && urlInput.value.trim()) {
-                files.push({ type: typeSelect.value, url: urlInput.value.trim() });
+                files.push({
+                    type: typeSelect.value,
+                    url: urlInput.value.trim(),
+                    name: entry.querySelector('.download-name-input')?.value.trim() || '',
+                    format: entry.querySelector('.download-format-input')?.value.trim() || '',
+                    size: entry.querySelector('.download-size-input')?.value.trim() || '',
+                    sha256: entry.querySelector('.download-sha256-input')?.value.trim() || ''
+                });
             }
         });
         const downloadFilesData = document.getElementById('downloadFilesData');

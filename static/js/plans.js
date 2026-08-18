@@ -9,7 +9,6 @@ window.initializePlansPage = function () {
 
     // Prevenir inicialização duplicada
     if (window.plansPageInitialized) {
-        console.log('Plans page already initialized, skipping');
         return;
     }
     window.plansPageInitialized = true;
@@ -36,7 +35,6 @@ window.initializePlansPage = function () {
     const initializeStripe = () => {
         // Evitar múltiplas inicializações
         if (stripeInitialized) {
-            console.log('Stripe already initialized, skipping');
             return;
         }
 
@@ -45,8 +43,6 @@ window.initializePlansPage = function () {
                 if (typeof Stripe !== 'undefined') {
                     stripe = Stripe(stripePublicKey);
                     stripeInitialized = true;
-                    console.log('Stripe initialized successfully');
-
                 } else {
                     console.error('Stripe.js not loaded');
                 }
@@ -167,7 +163,6 @@ window.initializePlansPage = function () {
     window.showPaymentMethodModal = function (plan) {
         if (!ensurePlanAvailable(plan)) return;
         selectedPlan = plan;
-        console.log('Modal de pagamento aberto para plano:', selectedPlan);
         if (!paymentMethodModal) {
             paymentMethodModal = document.getElementById('paymentMethodModal');
         }
@@ -192,20 +187,24 @@ window.initializePlansPage = function () {
             return;
         }
 
-        console.log('Método de pagamento selecionado:', method);
-        console.log('Plano selecionado:', selectedPlan);
-
         // Salvar o plano antes de fechar o modal
         const planToCheckout = selectedPlan;
 
-        // Meta Pixel: início do checkout (valor lido do card do plano, formato "29,90")
-        if (typeof fbq === 'function') {
-            const amountElement = document.querySelector(`.plan-card.${planToCheckout} .plan-price .amount`);
-            const amountValue = amountElement
-                ? parseFloat(amountElement.textContent.trim().replace(/\./g, '').replace(',', '.'))
-                : NaN;
-            if (!isNaN(amountValue)) {
+        // Analytics de checkout sem dados pessoais.
+        const amountElement = document.querySelector(`.plan-card.${planToCheckout} .plan-price .amount`);
+        const amountValue = amountElement
+            ? parseFloat(amountElement.textContent.trim().replace(/\./g, '').replace(',', '.'))
+            : NaN;
+        if (!isNaN(amountValue)) {
+            if (typeof fbq === 'function') {
                 fbq('track', 'InitiateCheckout', {value: amountValue, currency: 'BRL', content_name: planToCheckout});
+            }
+            if (typeof gtag === 'function') {
+                gtag('event', 'begin_checkout', {
+                    currency: 'BRL',
+                    value: amountValue,
+                    items: [{item_id: planToCheckout, item_name: planToCheckout}]
+                });
             }
         }
 
@@ -225,10 +224,7 @@ window.initializePlansPage = function () {
 
     function checkoutPix(plan) {
         if (!ensurePlanAvailable(plan)) return;
-        console.log('checkoutPix chamado com plano:', plan);
-
         const payload = { plan: plan };
-        console.log('Payload enviado:', payload);
 
         fetch('/create-pix-checkout', {
             method: 'POST',
@@ -239,7 +235,6 @@ window.initializePlansPage = function () {
         })
             .then(response => response.json())
             .then(data => {
-                console.log('Resposta recebida:', data);
                 const planDetails = getPlanPixDetails(plan);
 
                 if (data.billing_id && typeof window.openPixCheckoutModal === 'function') {

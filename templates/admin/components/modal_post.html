@@ -591,6 +591,11 @@
                                                 <option value="KB">KB</option>
                                             </select>
                                         </div>
+                                        <div class="download-file-metadata-row">
+                                            <input type="text" name="download_name_0" class="form-control modern-input download-name-input" maxlength="200" placeholder="Nome do arquivo (opcional)">
+                                            <input type="text" name="download_format_0" class="form-control modern-input download-format-input" maxlength="30" placeholder="Formato, ex.: BIN">
+                                            <input type="text" name="download_sha256_0" class="form-control modern-input download-sha256-input" minlength="64" maxlength="64" pattern="[A-Fa-f0-9]{64}" spellcheck="false" placeholder="SHA-256 (opcional)">
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="download-types-toolbar">
@@ -679,6 +684,8 @@
                             </div>
                         </div>
                     </div>
+                    {% set technical_prefix = 'create_' %}
+                    {% include 'admin/components/technical_fields.html' %}
                 </div>
 
                 <!-- Step 3: SEO & Publicação -->

@@ -12,29 +12,29 @@ if (typeof window.featureData !== 'undefined') {
 window.featureData = {
     verified: {
         icon: 'fas fa-shield-alt',
-        title: 'Conteúdo Verificado',
-        text: 'Todos os arquivos em nossa plataforma passam por uma verificação de segurança e qualidade. Checamos a integridade dos arquivos, para garantir que você baixe apenas conteúdo funcional, seguro e livre de malware. Nossa equipe técnica revisa manualmente cada arquivo antes de disponibilizá-lo.'
+        title: 'Estado de verificação',
+        text: 'O selo aparece somente quando o cadastro possui estado verificado. Quando disponíveis, a data da última verificação e o hash SHA-256 ficam na página do item.'
     },
     updated: {
         icon: 'fas fa-rocket',
-        title: 'Sempre Atualizado',
-        text: 'Nossa plataforma é constantemente atualizada com novos conteúdos. Adicionamos regularmente novos arquivos ao nosso banco de dados para garantir que você tenha acesso a um acervo cada vez mais completo e diversificado.'
+        title: 'Datas transparentes',
+        text: 'As datas de publicação, atualização e verificação são exibidas somente quando registradas no cadastro.'
     },
     professional: {
         icon: 'fas fa-users',
         title: 'Feito para Profissionais',
-        text: 'Nossa plataforma foi desenvolvida pensando nas necessidades de profissionais de informática. Organizamos o conteúdo de forma intuitiva, com filtros avançados, descrições detalhadas e informações técnicas precisas. Economize tempo em suas pesquisas e encontre exatamente o que precisa para seu trabalho.'
+        text: 'A organização por fabricante, modelo, código da placa e tipo de arquivo ajuda profissionais de informática a comparar os dados disponíveis antes do download.'
     },
     support: {
         icon: 'fas fa-headset',
-        title: 'Suporte Dedicado',
-        text: 'Nossa equipe de suporte está pronta para ajudá-lo. Se você não encontrar o arquivo que procura, tiver dúvidas sobre compatibilidade ou precisar de assistência técnica, entre em contato conosco. Respondemos rapidamente e fazemos o possível para atender suas solicitações específicas de recursos.'
+        title: 'Canais de contato',
+        text: 'O contato atende questões de conta, cobrança e problemas no site. Para itens ausentes, qualquer pessoa pode sugerir conteúdo e o plano VIP oferece busca prioritária.'
     },
     // BIOS Features
     'bios-notebooks': {
         icon: 'fas fa-laptop',
         title: 'BIOS para Notebooks',
-        text: 'Arquivos de BIOS específicos para notebooks de todas as principais marcas (Dell, HP, Lenovo, Acer, Asus, etc.). Essencial para reparos de placa-mãe.'
+        text: 'Arquivos de BIOS para notebooks de diferentes fabricantes, conforme os itens cadastrados. Pesquise pelo modelo e pelo código da placa.'
     },
     'bios-desktops': {
         icon: 'fas fa-desktop',
@@ -76,7 +76,7 @@ window.featureData = {
     'drivers-video': {
         icon: 'fas fa-tv',
         title: 'Drivers de Placas de Vídeo',
-        text: 'Drivers para GPUs NVIDIA, AMD e Intel. Encontre o driver correto para sua placa de vídeo através do modelo ou Hardware ID, garantindo compatibilidade perfeita e melhor desempenho gráfico.'
+        text: 'Cadastros de drivers para GPUs NVIDIA, AMD e Intel podem ser pesquisados por modelo ou Hardware ID. Confira a compatibilidade informada antes de instalar.'
     },
     'drivers-som': {
         icon: 'fas fa-volume-up',
@@ -118,7 +118,7 @@ window.featureData = {
     'impressoras-drivers': {
         icon: 'fas fa-download',
         title: 'Drivers de Impressoras',
-        text: 'Drivers oficiais e atualizados para impressoras de todas as marcas principais: HP, Canon, Epson, Brother, Samsung, Xerox. Inclui drivers para impressoras laser, jato de tinta, multifuncionais e plotters. Compatível com Windows, Linux e macOS.'
+        text: 'Cadastros de drivers de impressoras podem informar fabricante, modelo e sistema compatível. Confirme os dados e a origem indicados na página antes de instalar.'
     },
     'impressoras-firmwares': {
         icon: 'fas fa-microchip',
@@ -148,8 +148,8 @@ window.featureData = {
     },
     'cursos-certificados': {
         icon: 'fas fa-certificate',
-        title: 'Cursos com Certificados',
-        text: 'Cursos completos que oferecem certificado de conclusão reconhecido. Inclui trilhas de aprendizado estruturadas em manutenção de computadores, redes, Linux, segurança e gestão de TI. Certificações válidas para comprovar conhecimento técnico.'
+        title: 'Cursos e certificados',
+        text: 'Quando um curso informar certificado, consulte na página do item quem é o emissor e quais são as condições. O site não presume reconhecimento externo.'
     },
     'cursos-praticos': {
         icon: 'fas fa-book-open',

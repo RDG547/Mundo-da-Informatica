@@ -1,0 +1,47 @@
+{% set tf_prefix = technical_prefix or '' %}
+<fieldset class="technical-fields-panel">
+    <legend><i class="fas fa-microchip" aria-hidden="true"></i> Informações técnicas</legend>
+    <p class="form-text">Preencha somente o que foi confirmado. Campos vazios não aparecem publicamente.</p>
+    <div class="technical-fields-grid">
+        {% set fields = [
+            ('manufacturer', 'Fabricante', 'Lenovo'), ('brand', 'Marca', 'ThinkPad'),
+            ('model', 'Modelo', 'Edge E430C'), ('series', 'Série', 'E430'),
+            ('board_code', 'Código da placa', 'LA-8131P'), ('board_revision', 'Revisão', 'Rev. 1.0'),
+            ('platform', 'Plataforma', 'Intel'), ('bios_chip', 'Chip BIOS', 'U5'),
+            ('ec_chip', 'Chip EC', 'U6'), ('me_chip', 'Chip ME', 'U10'),
+            ('file_type', 'Tipo de arquivo', 'BIOS / EC / BoardView'),
+            ('file_extension', 'Formato', 'BIN'), ('technical_file_size', 'Tamanho', '8 MB'),
+            ('version', 'Versão', 'R0210Z5')
+        ] %}
+        {% for name, label, placeholder in fields %}
+        <div class="form-group">
+            <label class="form-label" for="{{ tf_prefix }}{{ name }}">{{ label }}</label>
+            <input class="form-control modern-input" id="{{ tf_prefix }}{{ name }}" name="{{ name }}" type="text" maxlength="160" placeholder="{{ placeholder }}">
+        </div>
+        {% endfor %}
+        <div class="form-group">
+            <label class="form-label" for="{{ tf_prefix }}verification_status">Status de verificação</label>
+            <select class="form-control modern-select" id="{{ tf_prefix }}verification_status" name="verification_status">
+                <option value="unverified">Não verificado</option>
+                <option value="verified">Verificado</option>
+                <option value="needs_review">Revisão necessária</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="{{ tf_prefix }}last_verified_at">Última verificação</label>
+            <input class="form-control modern-input" id="{{ tf_prefix }}last_verified_at" name="last_verified_at" type="date">
+        </div>
+        <div class="form-group technical-field-wide">
+            <label class="form-label" for="{{ tf_prefix }}sha256">SHA-256</label>
+            <input class="form-control modern-input technical-hash-input" id="{{ tf_prefix }}sha256" name="sha256" type="text" minlength="64" maxlength="64" spellcheck="false" autocomplete="off" placeholder="64 caracteres hexadecimais">
+        </div>
+        <div class="form-group technical-field-wide">
+            <label class="form-label" for="{{ tf_prefix }}compatibility">Compatibilidade</label>
+            <textarea class="form-control modern-input" id="{{ tf_prefix }}compatibility" name="compatibility" rows="2" maxlength="2000"></textarea>
+        </div>
+        <div class="form-group technical-field-wide">
+            <label class="form-label" for="{{ tf_prefix }}technical_notes">Observações técnicas</label>
+            <textarea class="form-control modern-input" id="{{ tf_prefix }}technical_notes" name="technical_notes" rows="2" maxlength="2000"></textarea>
+        </div>
+    </div>
+</fieldset>

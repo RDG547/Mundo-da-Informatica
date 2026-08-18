@@ -6,7 +6,7 @@
 {% set footer_facebook_link = site_configs.get('social_links', {}).get('facebook', '') %}
 {% set footer_twitter_link = site_configs.get('social_links', {}).get('twitter', '') %}
 {% set footer_site_name = site_configs.get('site_name', 'Mundo da Informática') %}
-{% set footer_description = site_configs.get('footer_description') or site_configs.get('site_description') or 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.' %}
+{% set footer_description = site_configs.get('footer_description') or site_configs.get('site_description') or 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.' %}
 {% set footer_text = site_configs.get('footer_text', 'Mundo da Informática - Todos os direitos reservados') %}
 
 <footer class="modern-footer">
@@ -22,7 +22,7 @@
                         {{ footer_description }}
                     </p>
 
-                    <div class="footer-contact-actions" aria-label="Contatos e redes sociais">
+                    <div class="footer-contact-actions" role="group" aria-label="Contatos e redes sociais">
                         <a href="{{ footer_whatsapp_link }}"
                             class="footer-social-button"
                             data-live-whatsapp-link
@@ -38,7 +38,7 @@
                         <a{% if footer_youtube_link %} href="{{ footer_youtube_link }}"{% endif %}
                             class="footer-social-button{% if not footer_youtube_link %} is-disabled{% endif %}"
                             data-live-social="youtube"
-                            {% if footer_youtube_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
+                            {% if footer_youtube_link %}target="_blank" rel="noopener noreferrer"{% else %}role="link" aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Canal no YouTube"
                             title="YouTube">
                             <span class="footer-social-icon">
@@ -60,7 +60,7 @@
                         <a{% if footer_facebook_link %} href="{{ footer_facebook_link }}"{% endif %}
                             class="footer-social-button{% if not footer_facebook_link %} is-disabled{% endif %}"
                             data-live-social="facebook"
-                            {% if footer_facebook_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
+                            {% if footer_facebook_link %}target="_blank" rel="noopener noreferrer"{% else %}role="link" aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Facebook"
                             title="Facebook">
                             <span class="footer-social-icon">
@@ -71,7 +71,7 @@
                         <a{% if footer_instagram_link %} href="{{ footer_instagram_link }}"{% endif %}
                             class="footer-social-button{% if not footer_instagram_link %} is-disabled{% endif %}"
                             data-live-social="instagram"
-                            {% if footer_instagram_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
+                            {% if footer_instagram_link %}target="_blank" rel="noopener noreferrer"{% else %}role="link" aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Instagram"
                             title="Instagram">
                             <span class="footer-social-icon">
@@ -82,7 +82,7 @@
                         <a{% if footer_twitter_link %} href="{{ footer_twitter_link }}"{% endif %}
                             class="footer-social-button{% if not footer_twitter_link %} is-disabled{% endif %}"
                             data-live-social="twitter"
-                            {% if footer_twitter_link %}target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true" tabindex="-1"{% endif %}
+                            {% if footer_twitter_link %}target="_blank" rel="noopener noreferrer"{% else %}role="link" aria-disabled="true" tabindex="-1"{% endif %}
                             aria-label="Twitter"
                             title="Twitter">
                             <span class="footer-social-icon">
@@ -122,6 +122,7 @@
                         <li><a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> Sobre Nós</a></li>
                         <li><a href="{{ url_for('faq') }}"><i class="fas fa-question-circle"></i> Perguntas Frequentes</a></li>
                         <li><a href="{{ url_for('contact') }}"><i class="fas fa-envelope"></i> Contato</a></li>
+                        <li><a href="{{ url_for('content_requests') }}"><i class="fas fa-lightbulb"></i> Sugerir conteúdo</a></li>
                         <li><a href="{{ url_for('terms_of_service') }}"><i class="fas fa-file-contract"></i> Termos de Uso</a></li>
                         <li><a href="{{ url_for('privacy_policy') }}"><i class="fas fa-shield-alt"></i> Política de Privacidade</a></li>
                     </ul>

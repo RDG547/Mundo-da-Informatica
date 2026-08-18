@@ -50,21 +50,9 @@ async function checkPlanForContentRequest(isAuthenticated, userPlan, contactUrl,
         window.location.href = url;
     };
 
-    if (isAuthenticated) {
-        if (userPlan !== 'vip') {
-            // Mostrar modal de upgrade com conteúdo personalizado
-            showContentRequestModal('A solicitação de conteúdo é exclusiva do plano VIP. Faça upgrade para solicitar materiais personalizados!');
-        } else {
-            // Redirecionar para página de contato com categoria pré-selecionada
-            const contactTarget = new URL(contactUrl, window.location.origin);
-            contactTarget.searchParams.set('category', 'solicitacao');
-            contactTarget.hash = 'contact-form-section';
-            await navigate(contactTarget.toString());
-        }
-    } else {
-        // Redirecionar para login
-        await navigate(loginUrl + '?next=' + encodeURIComponent(contactUrl));
-    }
+    // Compatibilidade com chamadas antigas: a página de solicitações decide
+    // entre sugestão geral e busca prioritária conforme o plano no servidor.
+    await navigate(contactUrl);
 }
 
 function showContentRequestModal(message) {

@@ -93,25 +93,25 @@
                         <div class="settings-field full-width">
                             <label for="site_description">Descrição do Site (meta)</label>
                             <textarea id="site_description" class="form-control" rows="3"
-                                data-key="site_description" data-type="string" data-default-value="Seu portal de recursos para técnicos de informática">{{ site_configs.get('site_description', 'Seu portal de recursos para técnicos de informática') }}</textarea>
+                                data-key="site_description" data-type="string" data-default-value="Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.">{{ site_configs.get('site_description', 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.') }}</textarea>
                         </div>
                         <div class="settings-field full-width">
                             <label for="footer_description">Texto de Descrição do Rodapé</label>
                             <textarea id="footer_description" class="form-control" rows="3"
-                                data-key="footer_description" data-type="string" data-default-value="Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.">{{ site_configs.get('footer_description', 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.') }}</textarea>
+                                data-key="footer_description" data-type="string" data-default-value="Recursos técnicos organizados por modelo e placa para profissionais de manutenção.">{{ site_configs.get('footer_description', 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.') }}</textarea>
                             <small class="form-text text-muted">Texto exibido na coluna de marca do rodapé do site.</small>
                         </div>
                         <div class="settings-field">
                             <label for="home_hero_title">Título Principal da Home</label>
                             <input type="text" id="home_hero_title" class="form-control"
-                                value="{{ site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') }}"
-                                data-key="home_hero_title" data-type="string" data-default-value="Bem-vindo ao Mundo da Informática">
+                                value="{{ site_configs.get('home_hero_title', 'Encontre o arquivo certo para o reparo.') }}"
+                                data-key="home_hero_title" data-type="string" data-default-value="Encontre o arquivo certo para o reparo.">
                         </div>
                         <div class="settings-field">
                             <label for="home_hero_subtitle">Subtítulo da Home</label>
                             <input type="text" id="home_hero_subtitle" class="form-control"
-                                value="{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}"
-                                data-key="home_hero_subtitle" data-type="string" data-default-value="Seu portal completo de recursos para técnicos e entusiastas de informática">
+                                value="{{ site_configs.get('home_hero_subtitle', 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.') }}"
+                                data-key="home_hero_subtitle" data-type="string" data-default-value="BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.">
                         </div>
                     </div>
                 </div>
@@ -404,11 +404,11 @@
 (() => {
     const DEFAULT_VALUES = {
         site_name: 'Mundo da Informática',
-        site_description: 'Seu portal de recursos para técnicos de informática',
+        site_description: 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
         footer_text: 'Mundo da Informática - Todos os direitos reservados',
-        footer_description: 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.',
-        home_hero_title: 'Bem-vindo ao Mundo da Informática',
-        home_hero_subtitle: 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+        footer_description: 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
+        home_hero_title: 'Encontre o arquivo certo para o reparo.',
+        home_hero_subtitle: 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
         enable_dark_mode: true,
         primary_color: '#3a86ff',
         secondary_color: '#8338ec',

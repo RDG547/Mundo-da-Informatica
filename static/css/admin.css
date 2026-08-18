@@ -2441,3 +2441,45 @@ button,
     visibility: visible !important;
 }
 
+.technical-fields-panel {
+    margin: 1.5rem 0 0;
+    padding: 1.25rem;
+    border: 1px solid rgba(58, 134, 255, 0.2);
+    border-radius: 14px;
+    background: rgba(58, 134, 255, 0.035);
+}
+
+.technical-fields-panel legend {
+    padding: 0 0.5rem;
+    color: var(--admin-primary, #3a86ff);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.technical-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem 1rem;
+    margin-top: 1rem;
+}
+
+.technical-field-wide { grid-column: 1 / -1; }
+.technical-hash-input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+@media (max-width: 900px) {
+    .technical-fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 580px) {
+    .technical-fields-grid { grid-template-columns: 1fr; }
+}
+.download-file-metadata-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(90px, 0.7fr) minmax(0, 2fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 760px) {
+    .download-file-metadata-row { grid-template-columns: 1fr; }
+}

@@ -32,23 +32,23 @@
                     </div>
 
                     <div class="category-description">
-                        <p>Organizamos todo nosso conteúdo em posts especializados para facilitar sua busca. Cada post contém recursos cuidadosamente selecionados e verificados por nossa equipe técnica.</p>
+                        <p>Organizamos arquivos e materiais técnicos por categoria. Quando cadastrados, modelo, código da placa, tipo de arquivo, hash e estado de verificação aparecem de forma explícita.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="verified" style="cursor: pointer;">
                                 <i class="fas fa-shield-alt"></i>
-                                <span>Verificado</span>
+                                <span>Status explícito</span>
                             </div>
                             <div class="feature-item" data-feature="updated" style="cursor: pointer;">
                                 <i class="fas fa-rocket"></i>
-                                <span>Atualizado</span>
+                                <span>Metadados técnicos</span>
                             </div>
                             <div class="feature-item" data-feature="professional" style="cursor: pointer;">
                                 <i class="fas fa-users"></i>
-                                <span>Profissional</span>
+                                <span>Busca por placa</span>
                             </div>
                             <div class="feature-item" data-feature="support" style="cursor: pointer;">
                                 <i class="fas fa-headset"></i>
-                                <span>Suporte</span>
+                                <span>Sugestões abertas</span>
                             </div>
                         </div>
                     </div>
@@ -85,10 +85,10 @@
                     <div class="posts-grid" id="all-posts-grid" data-load-more-endpoint="{{ url_for('api_posts') }}" data-next-page="{{ posts.next_num if posts.has_next else '' }}" data-has-next="{{ 'true' if posts.has_next else 'false' }}">
                         {% for post in posts.items %}
                         <div class="post-card">
-                            {% set dl_files = post.get_metadata('download_files') %}
+                            {% set dl_files = get_public_download_files(post) %}
                             <div class="post-image">
                                 {% if post.image_url %}
-                                <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}">
+                                <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}" loading="lazy" decoding="async">
                                 {% else %}
                                 <div style="width: 100%; height: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center;">
                                     <i class="fas fa-file-alt" style="font-size: 3rem; color: white;"></i>
@@ -114,6 +114,7 @@
                                 <i class="fas fa-folder"></i>
                                 {% endif %}
                                 <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
+                                {% if post.is_verified_file %}<span class="verified-badge"><i class="fas fa-check-circle"></i> Verificado</span>{% endif %}
                                 {% if dl_files and dl_files|length > 1 %}
                                 <span class="download-types-badge" style="margin-left:6px;background:rgba(var(--primary-rgb),0.15);color:var(--primary-color);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">
                                     {{ dl_files|map(attribute='type')|join('/') }}
@@ -128,7 +129,7 @@
                                 </div>
                                 <div class="post-description-section">
                                     <div class="post-description-title">Descrição</div>
-                                    <div class="post-description-text">{{ (post.short_description or post.content)|striptags }}</div>
+                                    <div class="post-description-text">{{ (post.short_description or post.content)|striptags|truncate(220, true) }}</div>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                     {% if post.download_link %}
@@ -186,13 +187,13 @@
                             <i class="fas fa-question" style="color: white !important;"></i>
                         </div>
                         <h4>Não encontrou o que procura?</h4>
-                        <p>Use nossa busca avançada para encontrar recursos específicos em todos os posts disponíveis. Se não encontrar o que precisa, entre em contato conosco para solicitar conteúdo específico. Nossa equipe está sempre trabalhando para adicionar novos recursos!</p>
+                        <p>Busque pelo modelo, fabricante ou código da placa. Se o item ainda não estiver no acervo, envie uma sugestão; no VIP, a mesma página permite abrir uma busca prioritária.</p>
                         <div class="cta-buttons">
                             <button type="button" class="btn btn-gradient primary" id="toggleSearchBtn" onclick="toggleInlineSearch()">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <a href="{{ url_for('contact', category='solicitacao') }}#contact-form-section" class="btn btn-gradient secondary">
-                                <i class="fas fa-envelope"></i> Solicitar Conteúdo
+                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary">
+                                <i class="fas fa-lightbulb"></i> Sugerir Conteúdo
                             </a>
                         </div>
                         <form action="{{ url_for('search') }}" method="get" class="inline-search-form" id="inlineSearchForm" style="display: none; margin-top: 1.5rem;">

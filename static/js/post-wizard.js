@@ -874,6 +874,11 @@ function initPostWizard() {
                         <option value="KB">KB</option>
                     </select>
                 </div>
+                <div class="download-file-metadata-row">
+                    <input type="text" name="download_name_${idx}" class="form-control modern-input download-name-input" maxlength="200" placeholder="Nome do arquivo (opcional)">
+                    <input type="text" name="download_format_${idx}" class="form-control modern-input download-format-input" maxlength="30" placeholder="Formato, ex.: BIN">
+                    <input type="text" name="download_sha256_${idx}" class="form-control modern-input download-sha256-input" minlength="64" maxlength="64" pattern="[A-Fa-f0-9]{64}" spellcheck="false" placeholder="SHA-256 (opcional)">
+                </div>
             `;
             container.appendChild(entry);
 
@@ -942,7 +947,10 @@ function initPostWizard() {
                 files.push({
                     type: typeSelect.value,
                     url: urlInput.value.trim(),
-                    size: size
+                    name: entry.querySelector('.download-name-input')?.value.trim() || '',
+                    format: entry.querySelector('.download-format-input')?.value.trim() || '',
+                    size: size,
+                    sha256: entry.querySelector('.download-sha256-input')?.value.trim() || ''
                 });
             }
         });

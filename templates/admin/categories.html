@@ -538,7 +538,15 @@
                                     <label for="categoryActive" class="form-check-label">
                                         <i class="fas fa-toggle-on"></i> Categoria Ativa
                                     </label>
-                                    <small>Visível no site público</small>
+                                    <small>Disponível para gerenciamento e publicação</small>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="categoryVisible" name="is_visible" class="form-check-input" checked>
+                                    <label for="categoryVisible" class="form-check-label">
+                                        <i class="fas fa-eye"></i> Exibir publicamente
+                                    </label>
+                                    <small>Desative para manter categorias vazias em expansão</small>
                                 </div>
 
                                 <div class="form-check">
@@ -681,7 +689,15 @@
                                     <label for="editCategoryActive" class="form-check-label">
                                         <i class="fas fa-toggle-on"></i> Categoria Ativa
                                     </label>
-                                    <small>Visível no site público</small>
+                                    <small>Disponível para gerenciamento e publicação</small>
+                                </div>
+
+                                <div class="form-check">
+                                    <input type="checkbox" id="editCategoryVisible" name="is_visible" class="form-check-input" checked>
+                                    <label for="editCategoryVisible" class="form-check-label">
+                                        <i class="fas fa-eye"></i> Exibir publicamente
+                                    </label>
+                                    <small>Desative para manter categorias vazias em expansão</small>
                                 </div>
 
                                 <div class="form-check">
@@ -2048,6 +2064,7 @@
 
             // Adicionar campos boolean do checkbox
             categoryData.is_active = document.getElementById('categoryActive').checked;
+            categoryData.is_visible = document.getElementById('categoryVisible').checked;
             categoryData.featured = document.getElementById('categoryFeatured').checked;
             categoryData.show_in_menu = document.getElementById('categoryShowInMenu').checked;
 
@@ -2159,6 +2176,7 @@
 
                         // Preencher checkboxes de configuração
                         document.getElementById('editCategoryActive').checked = category.is_active || false;
+                        document.getElementById('editCategoryVisible').checked = category.is_visible !== false;
                         document.getElementById('editCategoryFeatured').checked = category.is_featured || false;
                         document.getElementById('editCategoryShowInMenu').checked = category.show_in_menu !== false;
 
@@ -2386,6 +2404,7 @@
                 color: (document.getElementById('editCategoryColor') || {value: '#4a90e2'}).value,
                 order: parseInt(document.getElementById('editCategoryOrder').value) || 0,
                 is_active: document.getElementById('editCategoryActive').checked,
+                is_visible: document.getElementById('editCategoryVisible').checked,
                 featured: document.getElementById('editCategoryFeatured').checked,
                 show_in_menu: document.getElementById('editCategoryShowInMenu').checked
             };

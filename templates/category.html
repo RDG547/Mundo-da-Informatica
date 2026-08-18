@@ -95,8 +95,7 @@
 
                     <div class="category-description">
                         {% if category == 'BIOS' %}
-                        <p>Nossa coleção de BIOS inclui arquivos verificados e testados para notebooks, desktops e
-                            dispositivos eletrônicos de todas as principais marcas.</p>
+                        <p>Consulte arquivos de BIOS por fabricante, modelo e código da placa. O estado de verificação é informado individualmente em cada cadastro.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="bios-notebooks" style="cursor: pointer;">
                                 <i class="fas fa-laptop"></i>
@@ -116,7 +115,7 @@
                             </div>
                         </div>
                         {% elif category == 'Drivers' %}
-                        <p>Encontre drivers pelo ID do Hardware ou modelo do seu dispositivo. Identifique e baixe o driver correto para qualquer componente, garantindo compatibilidade total com seu equipamento.</p>
+                        <p>Encontre drivers pelo ID de hardware ou modelo do dispositivo e confira os dados de compatibilidade informados no cadastro antes da instalação.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="drivers-video" style="cursor: pointer;">
                                 <i class="fas fa-tv"></i>
@@ -239,23 +238,23 @@
                             </div>
                         </div>
                         {% else %}
-                        <p>Encontre recursos especializados em {{ category }} organizados com o mesmo padrão das categorias principais, com materiais revisados e busca rápida para facilitar o acesso.</p>
+                        <p>Encontre recursos de {{ category }} organizados por cadastro, com busca e os metadados técnicos disponíveis para cada item.</p>
                         <div class="features-grid">
                             <div class="feature-item" data-feature="verified" style="cursor: pointer;">
                                 <i class="fas fa-shield-alt"></i>
-                                <span>Verificado</span>
+                                <span>Status explícito</span>
                             </div>
                             <div class="feature-item" data-feature="updated" style="cursor: pointer;">
                                 <i class="fas fa-rocket"></i>
-                                <span>Atualizado</span>
+                                <span>Metadados</span>
                             </div>
                             <div class="feature-item" data-feature="professional" style="cursor: pointer;">
                                 <i class="fas fa-users"></i>
-                                <span>Profissional</span>
+                                <span>Busca técnica</span>
                             </div>
                             <div class="feature-item" data-feature="support" style="cursor: pointer;">
                                 <i class="fas fa-headset"></i>
-                                <span>Suporte</span>
+                                <span>Sugestões</span>
                             </div>
                         </div>
                         {% endif %}
@@ -315,7 +314,7 @@
                                 <i class="fas fa-folder"></i>
                                 {% endif %}
                                 <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
-                                {% set dl_files = post.get_metadata('download_files') %}
+                                {% set dl_files = get_public_download_files(post) %}
                                 {% if dl_files and dl_files|length > 1 %}
                                 <span class="download-types-badge" style="margin-left: 6px; background: rgba(var(--primary-rgb),0.15); color: var(--primary-color); padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600;">
                                     {{ dl_files|map(attribute='type')|join('/') }}
@@ -335,7 +334,7 @@
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                     {% if post.download_link %}
-                                    {% set dl_files_btn = post.get_metadata('download_files') %}
+                                    {% set dl_files_btn = get_public_download_files(post) %}
                                     {% if dl_files_btn and dl_files_btn|length > 1 %}
                                     <button type="button" class="btn btn-download download-btn multi-download-trigger"
                                         data-post-id="{{ post.id }}"
@@ -399,17 +398,15 @@
                             <i class="fas fa-question" style="color: white !important;"></i>
                         </div>
                         <h4>Não encontrou o que procura?</h4>
-                        <p>Entre em contato conosco para solicitar conteúdo específico! Nossa equipe está sempre pronta
-                            para ajudar e pode localizar recursos específicos para suas necessidades. Estamos
-                            constantemente adicionando novos materiais e suas sugestões são muito importantes.</p>
+                        <p>Faça uma busca pelo modelo ou código da placa. Se o item não estiver no acervo, envie uma sugestão; assinantes VIP podem optar pela busca prioritária.</p>
                         <div class="cta-buttons" id="ctaButtonsContainer" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
                             <button type="button" class="btn btn-gradient primary" id="toggleSearchBtnCat"
                                 onclick="transformToSearchBar()" style="flex: 0 0 auto;">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <button type="button" class="btn btn-gradient secondary" id="requestContentBtn" onclick="checkPlanForContentRequestWrapper()" style="flex: 0 0 auto;">
-                                <i class="fas fa-envelope"></i> Solicitar Conteúdo
-                            </button>
+                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary" id="requestContentBtn" style="flex: 0 0 auto;">
+                                <i class="fas fa-lightbulb"></i> Sugerir conteúdo
+                            </a>
                         </div>
                         <form action="{{ url_for('search') }}" method="get" class="inline-search-form"
                             id="inlineSearchFormCat" style="display: none; opacity: 0; transform: translateY(-10px); transition: all 0.4s ease; max-width: 600px; margin: 1.5rem auto 0; position: relative; z-index: 1000;">
@@ -454,16 +451,6 @@
 <script src="{{ url_for('static', filename='js/category-cta.js') }}"></script>
 <script src="{{ url_for('static', filename='js/load-more-posts.js') }}"></script>
 <script>
-    // Configurar função checkPlanForContentRequest com dados do servidor
-    window.checkPlanForContentRequestWrapper = function() {
-        checkPlanForContentRequest(
-            {{ 'true' if current_user.is_authenticated else 'false' }},
-            '{{ current_user.plan if current_user.is_authenticated else "free" }}',
-            '{{ url_for("contact") }}',
-            '{{ url_for("login") }}'
-        );
-    };
-
     console.log('Script de features carregado!');
 
     // Adiciona dados específicos de monitores ao featureData existente (declarado em feature-modals.js)

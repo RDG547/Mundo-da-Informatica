@@ -13,29 +13,29 @@
                 <i class="fas fa-crown"></i>
             </div>
 
-            <h1>Área VIP em Construção</h1>
+            <h1>Central VIP</h1>
             <p>
-                Estamos preparando uma área exclusiva com recursos premium, conteúdos avançados e experiências especiais para assinantes VIP.
+                Seus limites ampliados já estão ativos. Use esta central para abrir uma busca prioritária e acessar o acervo com as regras do plano VIP.
             </p>
 
             <div class="vip-area-highlights">
                 <div class="vip-highlight">
-                    <i class="fas fa-toolbox"></i>
-                    <span>Ferramentas exclusivas</span>
+                    <i class="fas fa-download"></i>
+                    <span>Downloads ilimitados</span>
                 </div>
                 <div class="vip-highlight">
-                    <i class="fas fa-bolt"></i>
-                    <span>Acesso antecipado</span>
+                    <i class="fas fa-comments"></i>
+                    <span>Comentários e chat</span>
                 </div>
                 <div class="vip-highlight">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span>Conteúdo avançado</span>
+                    <i class="fas fa-laptop"></i>
+                    <span>Até 5 dispositivos</span>
                 </div>
             </div>
 
             <div class="vip-area-actions">
-                <a href="{{ url_for('home') }}" class="btn btn-gradient primary">
-                    <i class="fas fa-home"></i> Voltar ao Início
+                <a href="{{ url_for('content_requests', type='vip_priority') }}" class="btn btn-gradient primary">
+                    <i class="fas fa-bolt"></i> Abrir busca prioritária
                 </a>
                 <a href="{{ url_for('contact') }}" class="btn btn-outline-light">
                     <i class="fas fa-envelope"></i> Falar com o Suporte

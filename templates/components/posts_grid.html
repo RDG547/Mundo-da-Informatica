@@ -10,7 +10,7 @@
                         <i class="fas fa-eye"></i>
                     </a>
                     {% if post.download_link %}
-                    {% set dl_files_grid = post.get_metadata('download_files') %}
+                    {% set dl_files_grid = get_public_download_files(post) %}
                     {% if dl_files_grid and dl_files_grid|length > 1 %}
                     <button type="button" class="action-btn download-btn multi-download-trigger"
                         data-post-id="{{ post.id }}"

@@ -233,24 +233,16 @@ window.setupDownloadButtons = function setupDownloadButtons() {
     // Selecionar todos os botões de download - APENAS rotas /download/
     const downloadButtons = document.querySelectorAll('a[href*="/download/"], .download-btn[href*="/download/"], [data-action="download"][href*="/download/"]');
 
-    console.log(`[DOWNLOAD-CONTROL] Encontrados ${downloadButtons.length} botões de download`);
-    downloadButtons.forEach(btn => console.log('[DOWNLOAD-CONTROL] Botão:', btn.href, btn.className));
-
     downloadButtons.forEach(button => {
         // Verificar se já foi processado (evita duplicação)
         if (button.dataset.downloadControlled === 'true') {
-            console.log('[DOWNLOAD-CONTROL] Botão já controlado:', button.href);
             return;
         }
 
         // Marcar como processado
         button.dataset.downloadControlled = 'true';
-        console.log('[DOWNLOAD-CONTROL] ✅ Listener adicionado ao botão:', button.href);
-
         // Adicionar listener com PREVENÇÃO IMEDIATA
         button.addEventListener('click', async function(e) {
-            console.log('[DOWNLOAD-CONTROL] 🎯 CLICK INTERCEPTADO!', button.href);
-
             // SEMPRE prevenir comportamento padrão primeiro
             e.preventDefault();
             e.stopPropagation();
@@ -278,16 +270,17 @@ window.setupDownloadButtons = function setupDownloadButtons() {
                 const canDownload = await checkDownloadLimit();
 
                 if (!canDownload) {
-                    console.log('[DOWNLOAD] Limite atingido, bloqueando download');
                     button.dataset.downloading = 'false';
                     return false; // Modal já foi exibido, não fazer nada mais
                 }
 
-                console.log('[DOWNLOAD] Limite OK, redirecionando para download');
-
                 // Apenas se passou na verificação, fazer navegação manual
                 const downloadUrl = button.href || button.dataset.href;
                 if (downloadUrl) {
+                    const postIdMatch = downloadUrl.match(/\/download\/(\d+)/);
+                    if (typeof window.trackSiteEvent === 'function') {
+                        window.trackSiteEvent('download', {content_id: postIdMatch ? postIdMatch[1] : undefined});
+                    }
                     window.location.href = downloadUrl;
 
                     // Atualizar histórico de download após 1 segundo
@@ -394,8 +387,6 @@ function confirmClearHistory() {
 
 // Função para recarregar TODA a seção de histórico (similar ao reloadFavoritesSection)
 async function reloadDownloadHistorySection() {
-    console.log('[DOWNLOAD] 🔄 Recarregando seção de histórico...');
-
     try {
         const response = await fetch('/api/download-history');
         const data = await response.json();
@@ -428,7 +419,6 @@ async function reloadDownloadHistorySection() {
                     <p class="text-muted">Seus downloads aparecerão aqui!</p>
                 </div>
             `;
-            console.log('[DOWNLOAD] ✅ Seção vazia renderizada');
             return;
         }
 
@@ -530,8 +520,6 @@ async function reloadDownloadHistorySection() {
             historySection.style.opacity = '1';
         }, 10);
 
-        console.log('[DOWNLOAD] ✅ Histórico recarregado:', data.downloads.length, 'downloads');
-
     } catch (error) {
         console.error('[DOWNLOAD] ❌ Erro ao recarregar histórico:', error);
     }
@@ -544,14 +532,11 @@ async function refreshDownloadHistory() {
 
 // Inicializar quando o DOM estiver pronto E após pequeno delay
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[DOWNLOAD-CONTROL] DOMContentLoaded - iniciando configuração');
-
     // Chamar imediatamente
     setupDownloadButtons();
 
     // E também após 500ms para garantir que pegou botões carregados dinamicamente
     setTimeout(() => {
-        console.log('[DOWNLOAD-CONTROL] Setup atrasado (500ms) - reprocessando botões');
         setupDownloadButtons();
     }, 500);
 
@@ -561,7 +546,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Debounce: aguardar 100ms antes de processar mudanças
         clearTimeout(observerTimeout);
         observerTimeout = setTimeout(() => {
-            console.log('[DOWNLOAD-CONTROL] MutationObserver detectou mudanças');
             setupDownloadButtons();
         }, 100);
     });
@@ -573,7 +557,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Se estiver na página de perfil, apenas inicializar botões de download
     if (window.location.pathname.includes('/profile')) {
-        console.log('[DOWNLOAD-CONTROL] Página de perfil detectada, inicializando botões');
         setTimeout(() => {
             setupDownloadButtons();
         }, 500);
@@ -778,8 +761,6 @@ function removeDownload(downloadId) {
 
 // Função para injetar histórico pré-carregado (usado pelo dynamic-loading)
 window.injectPreloadedHistory = function(data) {
-    console.log('[DOWNLOAD] ⚡ Injetando histórico pré-carregado');
-
     const historyContainer = document.querySelector('.download-history-grid');
     if (!historyContainer) {
         console.warn('[DOWNLOAD] Container de histórico não encontrado');
@@ -793,7 +774,6 @@ window.injectPreloadedHistory = function(data) {
 
     if (data.downloads.length === 0) {
         historyContainer.innerHTML = '<p style="text-align: center; color: #999;">Nenhum download registrado ainda.</p>';
-        console.log('[DOWNLOAD] ✅ Histórico vazio injetado');
         return;
     }
 
@@ -838,5 +818,4 @@ window.injectPreloadedHistory = function(data) {
         historyContainer.appendChild(card);
     });
 
-    console.log('[DOWNLOAD] ✅ Histórico injetado:', data.downloads.length, 'downloads');
 };

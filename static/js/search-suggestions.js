@@ -5,7 +5,6 @@
 
 // Verificar se já foi carregado
 if (typeof window.SearchSuggestions !== 'undefined') {
-    console.log('search-suggestions.js já carregado, ignorando redeclaração');
 } else {
 
 window.SearchSuggestions = class SearchSuggestions {
@@ -14,7 +13,6 @@ window.SearchSuggestions = class SearchSuggestions {
         this.suggestionsContainer = document.querySelector(suggestionsSelector);
 
         if (!this.input) {
-            console.warn('Search input not found:', inputSelector);
             return;
         }
 
@@ -107,7 +105,6 @@ window.SearchSuggestions = class SearchSuggestions {
         try {
             const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
             const suggestions = await response.json();
-            console.log('Sugestões recebidas:', suggestions); // Debug
             this.displaySuggestions(suggestions);
         } catch (error) {
             console.error('Error fetching suggestions:', error);

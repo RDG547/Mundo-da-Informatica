@@ -21,7 +21,15 @@ services:
       - key: DATABASE_URL
         value: sqlite:////opt/render/project/src/data/site.db
       - key: SITE_URL
-        value: https://www.mundodainformatica.com
+        value: https://mundodainformatica.com
+      - key: CANONICAL_HOST
+        value: mundodainformatica.com
+      # IDs de produto são identificadores públicos; chaves e webhooks devem
+      # ser configurados como secrets no painel do Render.
+      - key: STRIPE_PRODUCT_PREMIUM
+        value: prod_TWO90kFHcUFjHq
+      - key: STRIPE_PRODUCT_VIP
+        value: prod_TWOCCLcm6V4BRN
     # Disco persistente unificado para banco e uploads
     disk:
       name: persistent-data

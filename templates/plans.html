@@ -36,24 +36,25 @@
                         <span class="amount">0</span>
                         <span class="period">/mês</span>
                     </div>
+                    <p class="plan-audience"><strong>{{ plan_entitlements.free.audience }}</strong><span>{{ plan_entitlements.free.description }}</span></p>
                 </div>
 
                 <div class="plan-features">
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">1 Download por semana</div>
+                        <div class="feature-text">{{ plan_entitlements.free.download_limit }} download por semana</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Suporte em até 48H</div>
+                        <div class="feature-text">{{ plan_entitlements.free.support }}</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Lista de Favoritos (Max 10)</div>
+                        <div class="feature-text">Até {{ plan_entitlements.free.favorites_limit }} favoritos</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Acesso a 1 dispositivo</div>
+                        <div class="feature-text">Acesso a {{ plan_entitlements.free.device_limit }} dispositivo</div>
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
@@ -61,7 +62,7 @@
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">3 Comentários Diários</div>
+                        <div class="feature-text">{{ plan_entitlements.free.comments_limit }} comentários por dia</div>
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
@@ -69,7 +70,7 @@
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
-                        <div class="feature-text">Pedir Conteúdo Específico</div>
+                        <div class="feature-text">Solicitação prioritária</div>
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
@@ -105,16 +106,17 @@
                         <span class="amount" data-plan-price-amount="premium">{{ plan_pricing.premium.display_amount }}</span>
                         <span class="period">/mês</span>
                     </div>
+                    <p class="plan-audience"><strong>{{ plan_entitlements.premium.audience }}</strong><span>{{ plan_entitlements.premium.description }}</span></p>
                 </div>
 
                 <div class="plan-features">
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">15 Downloads Semanais</div>
+                        <div class="feature-text">{{ plan_entitlements.premium.download_limit }} downloads por semana</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Suporte em até 24H</div>
+                        <div class="feature-text">{{ plan_entitlements.premium.support }}</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
@@ -122,15 +124,15 @@
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Acesso a 2 dispositivos</div>
+                        <div class="feature-text">Acesso a {{ plan_entitlements.premium.device_limit }} dispositivos</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Histórico (Últimos 5)</div>
+                        <div class="feature-text">Histórico dos últimos {{ plan_entitlements.premium.download_history_limit }}</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">10 Comentários Diários</div>
+                        <div class="feature-text">{{ plan_entitlements.premium.comments_limit }} comentários por dia</div>
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
@@ -138,7 +140,7 @@
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
-                        <div class="feature-text">Pedir Conteúdo Específico</div>
+                        <div class="feature-text">Solicitação prioritária</div>
                     </div>
                     <div class="feature-item excluded">
                         <div class="feature-icon"><i class="fas fa-times"></i></div>
@@ -175,6 +177,7 @@
                         <span class="amount" data-plan-price-amount="vip">{{ plan_pricing.vip.display_amount }}</span>
                         <span class="period">/mês</span>
                     </div>
+                    <p class="plan-audience"><strong>{{ plan_entitlements.vip.audience }}</strong><span>{{ plan_entitlements.vip.description }}</span></p>
                 </div>
 
                 <div class="plan-features">
@@ -184,7 +187,7 @@
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Suporte Prioritário</div>
+                        <div class="feature-text">{{ plan_entitlements.vip.support }}</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
@@ -192,7 +195,7 @@
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Acesso a 5 dispositivos</div>
+                        <div class="feature-text">Acesso a {{ plan_entitlements.vip.device_limit }} dispositivos</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
@@ -208,7 +211,7 @@
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
-                        <div class="feature-text">Pedir Conteúdo Específico</div>
+                        <div class="feature-text">Solicitação prioritária de conteúdo</div>
                     </div>
                     <div class="feature-item included">
                         <div class="feature-icon"><i class="fas fa-check"></i></div>
@@ -227,6 +230,27 @@
                 </div>
             </div>
         </div>
+
+        <section class="plans-comparison" aria-labelledby="plans-comparison-title">
+            <h2 id="plans-comparison-title">Compare os planos</h2>
+            <div class="comparison-scroll" tabindex="0" aria-label="Tabela comparativa dos planos">
+                <table>
+                    <thead><tr><th scope="col">Recurso</th><th scope="col">Grátis</th><th scope="col">Premium</th><th scope="col">VIP</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Downloads</th><td>{{ plan_entitlements.free.download_limit }}/semana</td><td>{{ plan_entitlements.premium.download_limit }}/semana</td><td>Ilimitados</td></tr>
+                        <tr><th scope="row">Dispositivos</th><td>{{ plan_entitlements.free.device_limit }}</td><td>{{ plan_entitlements.premium.device_limit }}</td><td>{{ plan_entitlements.vip.device_limit }}</td></tr>
+                        <tr><th scope="row">Favoritos</th><td>Até {{ plan_entitlements.free.favorites_limit }}</td><td>Ilimitados</td><td>Ilimitados</td></tr>
+                        <tr><th scope="row">Histórico</th><td>Sem acesso</td><td>Últimos {{ plan_entitlements.premium.download_history_limit }}</td><td>Completo</td></tr>
+                        <tr><th scope="row">Comentários</th><td>{{ plan_entitlements.free.comments_limit }}/dia</td><td>{{ plan_entitlements.premium.comments_limit }}/dia</td><td>Ilimitados</td></tr>
+                        <tr><th scope="row">Chat público</th><td>Não</td><td>Não</td><td>Sim</td></tr>
+                        <tr><th scope="row">Suporte</th><td>{{ plan_entitlements.free.support }}</td><td>{{ plan_entitlements.premium.support }}</td><td>{{ plan_entitlements.vip.support }}</td></tr>
+                        <tr><th scope="row">Solicitação prioritária</th><td>Não</td><td>Não</td><td>Sim</td></tr>
+                        <tr><th scope="row">Área VIP</th><td>Não</td><td>Não</td><td>Sim</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="comparison-note">Todos os usuários podem sugerir novos conteúdos. A busca prioritária é um benefício exclusivo do plano VIP e depende da disponibilidade do arquivo.</p>
+        </section>
     </div>
 </section>
 
@@ -279,8 +303,7 @@
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        Sim! Você pode fazer upgrade para um plano superior a qualquer momento. O valor será ajustado
-                        proporcionalmente ao tempo restante da sua assinatura atual.
+                        Sim. Ao escolher um plano superior, o checkout mostra as condições aplicáveis antes da confirmação.
                     </div>
                 </div>
             </div>
@@ -295,9 +318,8 @@
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        A Área VIP oferece conteúdos exclusivos, tutoriais avançados, ferramentas especiais e acesso
-                        antecipado a novos recursos. É uma área dedicada para profissionais que buscam o máximo de
-                        recursos.
+                        A Área VIP reúne os benefícios efetivamente disponíveis: downloads ilimitados, histórico
+                        completo, chat público e acompanhamento de solicitações prioritárias.
                     </div>
                 </div>
             </div>
@@ -312,8 +334,8 @@
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        Assinantes VIP têm suas solicitações de suporte priorizadas e atendidas primeiro. Além disso,
-                        você terá acesso a um canal de suporte dedicado com tempo de resposta ainda mais rápido.
+                        Solicitações de assinantes VIP entram com prioridade de atendimento. O prazo pode variar conforme
+                        a complexidade e a disponibilidade do recurso solicitado.
                     </div>
                 </div>
             </div>

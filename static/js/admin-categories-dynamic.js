@@ -37,6 +37,7 @@
             is_active: Boolean(raw.is_active),
             is_featured: Boolean(raw.featured ?? raw.is_featured),
             show_in_menu: raw.show_in_menu !== false,
+            is_visible: raw.is_visible !== false,
             color: raw.color || '#4a90e2'
         };
     }
@@ -372,6 +373,7 @@
             if (_colorEl) _colorEl.value = category.color || '#4a90e2';
             if (_colorTextEl) _colorTextEl.value = category.color || '#4a90e2';
             document.getElementById('editCategoryActive').checked = category.is_active;
+            document.getElementById('editCategoryVisible').checked = category.is_visible !== false;
             document.getElementById('editCategoryFeatured').checked = category.is_featured;
             document.getElementById('editCategoryShowInMenu').checked = category.show_in_menu;
 
@@ -553,6 +555,7 @@
             const formData = new FormData(form);
             const payload = Object.fromEntries(formData.entries());
             payload.is_active = document.getElementById('categoryActive')?.checked || false;
+            payload.is_visible = document.getElementById('categoryVisible')?.checked || false;
             payload.featured = document.getElementById('categoryFeatured')?.checked || false;
             payload.show_in_menu = document.getElementById('categoryShowInMenu')?.checked || false;
 
@@ -591,6 +594,7 @@
                 color: document.getElementById('editCategoryColor')?.value || '#4a90e2',
                 order: parseInt(document.getElementById('editCategoryOrder')?.value || '0', 10) || 0,
                 is_active: document.getElementById('editCategoryActive')?.checked || false,
+                is_visible: document.getElementById('editCategoryVisible')?.checked || false,
                 featured: document.getElementById('editCategoryFeatured')?.checked || false,
                 show_in_menu: document.getElementById('editCategoryShowInMenu')?.checked || false
             };

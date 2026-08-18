@@ -14,8 +14,9 @@
             {% if query %}
                 <p class="hero-subtitle">Você pesquisou por: <strong>"{{ query }}"</strong></p>
                 <p class="search-count">
-                    {% if results and results|length > 0 %}
-                        Encontramos <strong>{{ results|length }}</strong> {{ 'resultado' if results|length == 1 else 'resultados' }}
+                    {% set result_count = (posts|length if posts else 0) + (categories|length if categories else 0) %}
+                    {% if result_count > 0 %}
+                        Encontramos <strong>{{ result_count }}</strong> {{ 'resultado' if result_count == 1 else 'resultados' }}
                     {% else %}
                         Nenhum resultado encontrado
                     {% endif %}
@@ -25,7 +26,8 @@
             <!-- Campo de pesquisa simples (mesmo da home) -->
             <form action="{{ url_for('search') }}" method="get" class="search-bar" id="search-form-results">
                 <div class="search-input-wrapper">
-                    <input type="text" name="q" value="{{ query }}" placeholder="Refinar sua pesquisa..." autocomplete="off" id="search-input-results">
+                    <label for="search-input-results" class="sr-only">Pesquisar por modelo ou código da placa</label>
+                    <input type="search" name="q" value="{{ query }}" placeholder="Modelo ou placa: LA-8131P, NM-A804..." autocomplete="off" id="search-input-results">
                     <div class="search-suggestions-dropdown" id="search-suggestions-results" style="display: none;"></div>
                     <button type="submit"><i class="fas fa-search"></i> Buscar</button>
                 </div>
@@ -130,9 +132,9 @@
                 <div class="post-card">
                     <div class="post-image">
                         {% if post.image_url %}
-                            <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}">
+                            <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ post.title }}" loading="lazy" width="640" height="360">
                         {% else %}
-                            <img src="{{ url_for('static', filename='images/default.jpg') }}" alt="{{ post.title }}">
+                            <img src="{{ url_for('static', filename='images/default.jpg') }}" alt="Miniatura padrão de {{ post.title }}" loading="lazy" width="640" height="360">
                         {% endif %}
                     </div>
                     <div class="post-category">
@@ -157,13 +159,15 @@
                     </div>
                     <div class="post-content">
                         <h3>{{ post.title }}</h3>
+                        {% if post.board_code %}<div class="post-board-code">{{ post.board_code }}</div>{% endif %}
+                        {% if post.is_verified_file %}<span class="verified-resource-badge"><i class="fas fa-check-circle"></i> Arquivo verificado</span>{% endif %}
                         <div class="post-meta">
                             <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
                             <span><i class="far fa-eye"></i> {{ post.views }}</span>
                         </div>
                         <div class="post-description-section">
                             <div class="post-description-title">Descrição</div>
-                            <div class="post-description-text">{{ post.description or post.content|striptags }}</div>
+                            <div class="post-description-text">{{ (post.description or post.content)|striptags|truncate(160, True) }}</div>
                         </div>
                         <a href="{{ url_for('post_by_slug', category=(post.category_rel.name|lower if post.category_rel and post.category_rel.name else post.category_str|lower if post.category_str else 'geral'), slug=post.slug) if post.slug else url_for('post', post_id=post.id) }}" class="btn" style="display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-eye"></i> Ver Detalhes</a>
                     </div>
@@ -177,15 +181,15 @@
                 <div class="no-results-icon">
                     <i class="fas fa-search"></i>
                 </div>
-                <h2>Nenhum resultado encontrado</h2>
-                <p>Não encontramos nenhuma categoria ou post correspondente à sua pesquisa por <strong>"{{ query }}"</strong></p>
+                <h2>Não encontrou o arquivo?</h2>
+                <p>Não localizamos conteúdo correspondente a <strong>"{{ query }}"</strong>. Tente pelo modelo ou pelo código exato da placa.</p>
 
                 <div class="no-results-suggestions">
                     <h3>Sugestões:</h3>
                     <ul>
-                        <li><i class="fas fa-check"></i> Verifique a ortografia das palavras</li>
-                        <li><i class="fas fa-check"></i> Tente usar termos mais genéricos</li>
-                        <li><i class="fas fa-check"></i> Tente usar menos palavras-chave</li>
+                        <li><i class="fas fa-check"></i> Pesquise o código impresso na placa</li>
+                        <li><i class="fas fa-check"></i> Tente somente o modelo do equipamento</li>
+                        <li><i class="fas fa-check"></i> Confira hífens e revisão da placa</li>
                         <li><i class="fas fa-check"></i> Navegue pelas <a href="{{ url_for('all_categories') }}">categorias</a></li>
                     </ul>
                 </div>
@@ -194,8 +198,8 @@
                     <a href="{{ url_for('home') }}" class="btn-primary">
                         <i class="fas fa-home"></i> Voltar ao Início
                     </a>
-                    <a href="{{ url_for('contact') }}" class="btn-secondary">
-                        <i class="fas fa-envelope"></i> Entre em Contato
+                    <a href="{{ url_for('content_requests', q=query, type='vip_priority' if current_user.is_authenticated and current_user.plan == 'vip' else 'suggestion') }}" class="btn-secondary">
+                        <i class="fas fa-lightbulb"></i> {{ 'Solicitar busca prioritária' if current_user.is_authenticated and current_user.plan == 'vip' else 'Sugerir conteúdo' }}
                     </a>
                 </div>
             </div>
@@ -666,8 +670,6 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault(); // Prevenir reload padrão
         e.stopPropagation(); // Prevenir propagação
 
-        console.log('Form submit interceptado - carregamento dinâmico ativo');
-
         const input = document.getElementById('search-input-results');
         const query = input.value.trim();
 
@@ -697,7 +699,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function performDynamicSearch(query, filter = 'all') {
-    console.log('Iniciando busca dinâmica para:', query, 'com filtro:', filter);
+    if (typeof window.trackSiteEvent === 'function') {
+        window.trackSiteEvent('search', {search_scope: filter}, 'Search');
+    }
 
     const resultsSection = document.querySelector('.search-results-section');
     const heroSubtitle = document.querySelector('.hero-subtitle strong');
@@ -720,8 +724,6 @@ function performDynamicSearch(query, filter = 'all') {
             return response.text();
         })
         .then(html => {
-            console.log('HTML recebido, parseando...');
-
             // Criar elemento temporário para parsear HTML
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
@@ -764,7 +766,6 @@ function performDynamicSearch(query, filter = 'all') {
                     // Scroll suave até os resultados
                     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-                    console.log('Resultados atualizados com sucesso!');
                 }, 300);
             } else {
                 console.error('Nova seção de resultados não encontrada no HTML');
@@ -778,6 +779,13 @@ function performDynamicSearch(query, filter = 'all') {
         });
 }
 
+if (typeof window.trackSiteEvent === 'function') {
+    window.trackSiteEvent('search', {
+        search_scope: {{ filter_type|tojson }},
+        result_count: {{ (posts|length + categories|length)|tojson }}
+    }, 'Search');
+}
+
 // Suporte ao botão voltar do navegador
 window.addEventListener('popstate', function(event) {
     if (event.state && event.state.query) {
@@ -787,11 +795,4 @@ window.addEventListener('popstate', function(event) {
 });
 </script>
 
-<script src="{{ url_for('static', filename='js/search-suggestions.js') }}"></script>
-<script>
-// Inicializar sugestões de pesquisa no campo de resultados
-if (typeof SearchSuggestions !== 'undefined') {
-    new SearchSuggestions('search-input-results', 'search-suggestions-results');
-}
-</script>
 {% endblock %}

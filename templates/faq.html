@@ -57,7 +57,7 @@
                                 <div class="question-icon">
                                     <i class="fas fa-download"></i>
                                 </div>
-                                <h3>Como faço para solicitar um recurso específico?</h3>
+                                <h3>Como sugerir ou pedir uma busca por um recurso?</h3>
                                 <div class="question-badge">
                                     <span class="badge badge-primary">Downloads</span>
                                 </div>
@@ -71,10 +71,10 @@
                                 <div class="answer-icon">
                                     <i class="fas fa-info-circle"></i>
                                 </div>
-                                <p>Para solicitar um recurso específico, você pode entrar em contato conosco através do formulário de contato ou enviar um e-mail diretamente para nossa equipe de suporte. Faremos o possível para localizar e disponibilizar o recurso solicitado o mais rapidamente possível.</p>
+                                <p>Qualquer pessoa pode enviar uma sugestão para expansão do acervo, sem prazo ou prioridade garantidos. Assinantes VIP podem abrir uma busca prioritária, sujeita à disponibilidade do arquivo.</p>
                                 <div class="answer-actions">
-                                    <a href="{{ url_for('contact') }}" class="answer-btn">
-                                        <i class="fas fa-envelope"></i> Entrar em Contato
+                                    <a href="{{ url_for('content_requests') }}" class="answer-btn">
+                                        <i class="fas fa-lightbulb"></i> Enviar sugestão
                                     </a>
                                     <button class="answer-helpful" onclick="markHelpful(this)">
                                         <i class="fas fa-thumbs-up"></i> Útil
@@ -140,11 +140,11 @@
                                 </div>
                                 <p>Há várias maneiras de contribuir com o Mundo da Informática. Você pode compartilhar recursos técnicos, enviar tutoriais, reportar links quebrados ou erros, ou até mesmo ajudar a divulgar o site para outros profissionais.</p>
                                 <div class="contribution-ways">
-                                    <a href="{{ url_for('contact', category='solicitacao') }}#contact-form-section" class="contrib-item">
+                                    <a href="{{ url_for('content_requests') }}" class="contrib-item">
                                         <i class="fas fa-share-alt"></i>
                                         <span>Compartilhar recursos</span>
                                     </a>
-                                    <a href="{{ url_for('contact', category='solicitacao') }}#contact-form-section" class="contrib-item">
+                                    <a href="{{ url_for('contact', category='sugestao') }}#contact-form-section" class="contrib-item">
                                         <i class="fas fa-book"></i>
                                         <span>Enviar tutoriais</span>
                                     </a>
@@ -328,7 +328,7 @@
                             <i class="fas fa-question-circle"></i>
                         </div>
                         <h4>Não encontrou sua resposta?</h4>
-                        <p>Nossa equipe de suporte está sempre pronta para ajudá-lo!</p>
+                        <p>Use o formulário de contato para dúvidas sobre conta, cobrança ou problemas no site.</p>
                         <div class="cta-buttons">
                             <a href="{{ url_for('contact') }}" class="btn btn-gradient primary">
                                 <i class="fas fa-envelope"></i> Entrar em Contato

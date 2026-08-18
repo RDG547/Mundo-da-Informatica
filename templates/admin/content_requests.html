@@ -1,0 +1,33 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+<div class="admin-page-header">
+    <div><h1>Solicitações de conteúdo</h1><p>Sugestões gerais e buscas prioritárias VIP, ordenadas por prioridade.</p></div>
+</div>
+
+<div class="admin-card">
+    <div style="overflow-x:auto">
+        <table class="admin-table enhanced">
+            <thead><tr><th>Tipo</th><th>Conteúdo</th><th>Solicitante</th><th>Status</th><th>Atualizar</th></tr></thead>
+            <tbody>
+                {% for item in content_requests %}
+                <tr>
+                    <td><span class="badge {{ 'badge-warning' if item.request_type == 'vip_priority' else 'badge-secondary' }}">{{ 'VIP prioritária' if item.request_type == 'vip_priority' else 'Sugestão' }}</span></td>
+                    <td><strong>{{ item.title }}</strong>{% if item.board_code %}<br><code>{{ item.board_code }}</code>{% endif %}{% if item.description %}<br><small>{{ item.description }}</small>{% endif %}</td>
+                    <td>{{ item.requester_name or (item.user.get_full_name() if item.user else 'Não informado') }}<br><small>{{ item.requester_email or (item.user.email if item.user else '') }}</small></td>
+                    <td>{{ request_statuses.get(item.status, item.status) }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin_update_content_request', request_id=item.id) }}" style="display:grid;gap:.45rem;min-width:240px">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="status" class="form-control">{% for value,label in request_statuses.items() %}<option value="{{ value }}"{% if item.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                            <textarea name="admin_notes" class="form-control" rows="2" maxlength="4000" placeholder="Observações internas">{{ item.admin_notes or '' }}</textarea>
+                            <button class="btn-admin btn-admin-primary" type="submit">Salvar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}<tr><td colspan="5">Nenhuma solicitação recebida.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

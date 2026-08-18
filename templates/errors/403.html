@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="error-page">
+    <div class="container">
+        <div class="error-content">
+            <div class="error-number" aria-hidden="true">403</div>
+            <h1>Acesso não permitido</h1>
+            <p>Esta conta ou plano não tem permissão para concluir a ação solicitada.</p>
+            <a href="{{ url_for('home') }}" class="btn">Voltar ao início <i class="fas fa-home" aria-hidden="true"></i></a>
+            <a href="{{ url_for('plans') }}" class="btn btn-outline">Comparar planos</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

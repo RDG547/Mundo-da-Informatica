@@ -617,6 +617,9 @@
                         </div>
                     </div>
 
+                    {% set technical_prefix = 'edit_' %}
+                    {% include 'admin/components/technical_fields.html' %}
+
                     <div class="step-navigation">
                         <button type="button" class="btn-admin btn-admin-outline" onclick="prevEditStep()">
                             <i class="fas fa-arrow-left"></i> Anterior
@@ -1358,6 +1361,17 @@
             document.getElementById('editPostFeatured').checked = post.featured || false;
             document.getElementById('editPostActive').checked = post.is_active !== false; // Default true
 
+            const technicalFields = [
+                'manufacturer', 'brand', 'model', 'series', 'board_code', 'board_revision',
+                'platform', 'bios_chip', 'ec_chip', 'me_chip', 'file_type', 'file_extension',
+                'technical_file_size', 'version', 'sha256', 'last_verified_at',
+                'verification_status', 'compatibility', 'technical_notes'
+            ];
+            technicalFields.forEach((fieldName) => {
+                const field = document.getElementById(`edit_${fieldName}`);
+                if (field) field.value = post[fieldName] || (fieldName === 'verification_status' ? 'unverified' : '');
+            });
+
             // Atualizar preview SEO
             updateEditSeoPreview();
 
@@ -1393,11 +1407,11 @@
             }
 
             files.forEach(function(f, i) {
-                addEditDownloadEntry(f.type, f.url, f.size || '', i === 0);
+                addEditDownloadEntry(f.type, f.url, f.size || '', i === 0, f.name || '', f.format || '', f.sha256 || '');
             });
         }
 
-        function addEditDownloadEntry(type, url, size, isFirst) {
+        function addEditDownloadEntry(type, url, size, isFirst, name, format, sha256) {
             var container = document.getElementById('editDownloadLinksContainer');
             var idx = editDownloadIdx++;
             var entry = document.createElement('div');
@@ -1417,7 +1431,7 @@
                 (window.renderDownloadTypeOptions ? window.renderDownloadTypeOptions(type || '') : '<option value="' + (type || 'BIOS') + '" selected>' + (type || 'BIOS') + '</option>') +
                 '</select>' +
                 '<div class="input-group download-url-group">' +
-                '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip" value="' + (url || '') + '">' +
+                '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip">' +
                 '</div>' + removeHtml + '</div>' +
                 '<div class="download-size-row">' +
                 '<input type="number" name="edit_download_size_' + idx + '" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0" value="' + sizeVal + '">' +
@@ -1426,8 +1440,17 @@
                 '<option value="GB"' + (sizeUnit === 'GB' ? ' selected' : '') + '>GB</option>' +
                 '<option value="KB"' + (sizeUnit === 'KB' ? ' selected' : '') + '>KB</option>' +
                 '</select>' +
+                '</div>' +
+                '<div class="download-file-metadata-row">' +
+                '<input type="text" class="form-control modern-input download-name-input" maxlength="200" placeholder="Nome do arquivo (opcional)">' +
+                '<input type="text" class="form-control modern-input download-format-input" maxlength="30" placeholder="Formato, ex.: BIN">' +
+                '<input type="text" class="form-control modern-input download-sha256-input" minlength="64" maxlength="64" pattern="[A-Fa-f0-9]{64}" spellcheck="false" placeholder="SHA-256 (opcional)">' +
                 '</div>';
             container.appendChild(entry);
+            entry.querySelector('input[type="url"]').value = url || '';
+            entry.querySelector('.download-name-input').value = name || '';
+            entry.querySelector('.download-format-input').value = format || '';
+            entry.querySelector('.download-sha256-input').value = sha256 || '';
 
             var removeBtn = entry.querySelector('.edit-remove-dl');
             if (removeBtn) {
@@ -1436,7 +1459,7 @@
         }
 
         document.getElementById('editAddDownloadEntry')?.addEventListener('click', function() {
-            addEditDownloadEntry('BIOS', '', '', false);
+            addEditDownloadEntry('BIOS', '', '', false, '', '', '');
         });
 
         function collectEditDownloadData() {
@@ -1453,7 +1476,14 @@
                         var unit = unitSelect ? unitSelect.value : 'MB';
                         size = sizeInput.value + ' ' + unit;
                     }
-                    files.push({type: sel.value, url: inp.value.trim(), size: size});
+                    files.push({
+                        type: sel.value,
+                        url: inp.value.trim(),
+                        name: entry.querySelector('.download-name-input')?.value.trim() || '',
+                        format: entry.querySelector('.download-format-input')?.value.trim() || '',
+                        size: size,
+                        sha256: entry.querySelector('.download-sha256-input')?.value.trim() || ''
+                    });
                 }
             });
             var dataField = document.getElementById('editDownloadFilesData');

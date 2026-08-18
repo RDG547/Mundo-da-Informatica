@@ -197,7 +197,7 @@
                                         title="Remover dos favoritos">
                                         <i class="fas fa-times"></i>
                                     </button>
-                                    {% set dl_files_fav_badge = post.get_metadata('download_files') %}
+                                    {% set dl_files_fav_badge = get_public_download_files(post) %}
                                     <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left">
                                         <i class="fas fa-tag"></i> {% if dl_files_fav_badge and dl_files_fav_badge|length > 1 %}{{ dl_files_fav_badge|map(attribute='type')|join('/') }}{% else %}{{ post.category_str or 'Geral' }}{% endif %}
                                     </a>
@@ -228,7 +228,7 @@
                                         </div>
                                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
-                                            {% set dl_files_fav = post.get_metadata('download_files') %}
+                                            {% set dl_files_fav = get_public_download_files(post) %}
                                             {% if dl_files_fav and dl_files_fav|length > 1 %}
                                             <button type="button" class="btn btn-download download-btn multi-download-trigger"
                                                 data-post-id="{{ post.id }}"
@@ -257,7 +257,7 @@
                                         title="Remover dos favoritos">
                                         <i class="fas fa-times"></i>
                                     </button>
-                                    {% set dl_files_fav_badge2 = post.get_metadata('download_files') %}
+                                    {% set dl_files_fav_badge2 = get_public_download_files(post) %}
                                     <a href="{{ url_for('category', category=post.category_str or 'Geral') }}" class="category-badge-left">
                                         <i class="fas fa-tag"></i> {% if dl_files_fav_badge2 and dl_files_fav_badge2|length > 1 %}{{ dl_files_fav_badge2|map(attribute='type')|join('/') }}{% else %}{{ post.category_str or 'Geral' }}{% endif %}
                                     </a>
@@ -288,7 +288,7 @@
                                         </div>
                                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                                             {% if post.download_link %}
-                                            {% set dl_files_fav2 = post.get_metadata('download_files') %}
+                                            {% set dl_files_fav2 = get_public_download_files(post) %}
                                             {% if dl_files_fav2 and dl_files_fav2|length > 1 %}
                                             <button type="button" class="btn btn-download download-btn multi-download-trigger"
                                                 data-post-id="{{ post.id }}"
@@ -401,7 +401,7 @@
                                         <i class="far fa-clock"></i>
                                         <span>{{ download._brasilia_time.strftime('%d/%m/%Y às %H:%M') }}</span>
                                     </div>
-                                    {% set dl_files_hist_badge = download.post.get_metadata('download_files') %}
+                                    {% set dl_files_hist_badge = get_public_download_files(download.post) %}
                                     {% if download.post._category_cache %}
                                     <a href="{{ url_for('category', category=download.post._category_cache.name) }}" class="download-card-category">
                                         <i class="fas fa-folder"></i>
@@ -418,7 +418,7 @@
                                         <i class="fas fa-eye"></i> Ver Post
                                     </a>
                                     {% endif %}
-                                    {% set dl_files_hist = download.post.get_metadata('download_files') %}
+                                    {% set dl_files_hist = get_public_download_files(download.post) %}
                                     {% if dl_files_hist and dl_files_hist|length > 1 %}
                                     <button type="button" class="download-card-btn download-card-btn-primary multi-download-trigger"
                                         data-post-id="{{ download.post.id }}"
@@ -427,9 +427,9 @@
                                         <i class="fas fa-download"></i> Baixar
                                     </button>
                                     {% else %}
-                                    <a href="{{ download.post.download_link }}"
+                                    <a href="{{ url_for('download_post', post_id=download.post.id) }}"
                                        class="download-card-btn download-card-btn-primary"
-                                       target="_blank">
+                                       data-action="download">
                                         <i class="fas fa-download"></i> Baixar
                                     </a>
                                     {% endif %}
@@ -549,7 +549,7 @@
                         </div>
                         {% endif %}
 
-                        {% if user.phone %}
+                        {% if user.phone and (current_user.id == user.id or current_user.is_admin()) %}
                         <div class="info-item-enhanced">
                             <div class="info-icon-enhanced">
                                 <i class="fas fa-phone"></i>

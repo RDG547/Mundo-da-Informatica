@@ -26,12 +26,17 @@
 
     function syncMobileMenuIcon() {
         const navMenu = document.querySelector('.nav-menu');
-        const menuToggleIcon = document.querySelector('.mobile-menu-toggle i');
-        if (!navMenu || !menuToggleIcon) {
+        const menuToggle = document.querySelector('.mobile-menu-toggle');
+        const menuToggleIcon = menuToggle && menuToggle.querySelector('i');
+        if (!navMenu || !menuToggle || !menuToggleIcon) {
             return;
         }
 
-        if (navMenu.classList.contains('active')) {
+        const isOpen = navMenu.classList.contains('active');
+        menuToggle.setAttribute('aria-expanded', String(isOpen));
+        menuToggle.setAttribute('aria-label', isOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação');
+
+        if (isOpen) {
             menuToggleIcon.classList.remove('fa-bars');
             menuToggleIcon.classList.add('fa-times');
         } else {

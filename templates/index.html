@@ -1,19 +1,25 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% set home_hero_title = site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') %}
+{% set home_hero_title = site_configs.get('home_hero_title', 'Encontre o arquivo certo para o reparo.') %}
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
         <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}" data-live-setting="home_hero_title">{{ home_hero_title }}</h1>
-        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
+        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
-                <input type="text" name="q" id="home-search-input" placeholder="Pesquisar BIOS, drivers, esquemas..." autocomplete="off">
+                <label for="home-search-input" class="sr-only">Pesquisar por modelo ou código da placa</label>
+                <input type="search" name="q" id="home-search-input" placeholder="Digite modelo ou código da placa: LA-8131P, NM-A804, BA41-02731A..." autocomplete="off">
                 <div class="search-suggestions-dropdown" id="home-search-suggestions" style="display: none;"></div>
             </div>
             <button type="submit"><i class="fas fa-search"></i> Buscar</button>
         </form>
+        <div class="hero-value-points" role="list" aria-label="Benefícios da biblioteca">
+            <span role="listitem"><i class="fas fa-search" aria-hidden="true"></i> Busca por modelo e placa</span>
+            <span role="listitem"><i class="fas fa-layer-group" aria-hidden="true"></i> Recursos técnicos centralizados</span>
+            <span role="listitem"><i class="fas fa-history" aria-hidden="true"></i> Histórico conforme seu plano</span>
+        </div>
     </div>
 </section>
 
@@ -58,7 +64,7 @@
     }
 
     function getHeroTitleLines(titleEl) {
-        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Bem-vindo ao Mundo da Informática').trim();
+        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Encontre o arquivo certo para o reparo.').trim();
         var explicitLines = rawTitle.split('|').map(function (line) { return line.trim(); }).filter(Boolean);
         if (explicitLines.length > 1) return explicitLines;
 
@@ -207,8 +213,8 @@
 <section class="recent-posts" data-page="home">
     <div class="container">
         <div class="section-header">
-            <h2>Adições Recentes</h2>
-            <p>Nosso acervo é constantemente atualizado com novos recursos</p>
+            <h2>Adicionados recentemente</h2>
+            <p>Novos recursos técnicos organizados para consulta rápida</p>
         </div>
 
         <!-- Top Pagination -->
@@ -235,7 +241,7 @@
                 {% for post in posts %}
                 <div class="post-card">
                     <div class="post-image">
-                        <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="{{ post.title }}">
+                        <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ post.title }}" loading="lazy" width="640" height="360">
                     </div>
                     <div class="post-category">
                         {% if post.category_rel and post.category_rel.icon %}
@@ -258,7 +264,7 @@
                             <i class="fas fa-folder"></i>
                         {% endif %}
                         <span>{{ post.category_rel.name if post.category_rel else post.category_str }}</span>
-                        {% set dl_files_badge = post.get_metadata('download_files') %}
+                        {% set dl_files_badge = get_public_download_files(post) %}
                         {% if dl_files_badge and dl_files_badge|length > 1 %}
                         <span class="download-types-badge" style="margin-left: 6px; background: rgba(var(--primary-rgb),0.15); color: var(--primary-color); padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600;">
                             {{ dl_files_badge|map(attribute='type')|join('/') }}
@@ -267,17 +273,19 @@
                     </div>
                     <div class="post-content">
                         <h3><a href="{{ post_url(post) }}" style="text-decoration: none; color: inherit;">{{ post.title }}</a></h3>
+                        {% if post.board_code %}<div class="post-board-code"><i class="fas fa-microchip" aria-hidden="true"></i> {{ post.board_code }}</div>{% endif %}
+                        {% if post.is_verified_file %}<span class="verified-resource-badge"><i class="fas fa-check-circle" aria-hidden="true"></i> Arquivo verificado</span>{% endif %}
                         <div class="post-meta">
                             <span><i class="far fa-calendar-alt"></i> {{ post.date_posted.strftime('%d/%m/%Y') }}</span>
                             <span><i class="far fa-eye"></i> {{ post.views }}</span>
                         </div>
                         <div class="post-description-section">
                             <div class="post-description-title">Descrição</div>
-                            <div class="post-description-text">{{ post.content|striptags }}</div>
+                            <div class="post-description-text">{{ post.content|striptags|truncate(160, True) }}</div>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
                             {% if post.download_link %}
-                            {% set dl_files_idx = post.get_metadata('download_files') %}
+                            {% set dl_files_idx = get_public_download_files(post) %}
                             {% if dl_files_idx and dl_files_idx|length > 1 %}
                             <button type="button" class="btn btn-download download-btn multi-download-trigger"
                                 data-post-id="{{ post.id }}"
@@ -332,6 +340,27 @@
         </div>
     </div>
 </section>
+
+{% if most_used %}
+<section class="most-used-section" aria-labelledby="most-used-title">
+    <div class="container">
+        <div class="section-header">
+            <h2 id="most-used-title">Mais utilizados</h2>
+            <p>Recursos com mais downloads registrados na plataforma</p>
+        </div>
+        <div class="most-used-grid">
+            {% for item in most_used %}
+            <a class="most-used-card" href="{{ post_url(item) }}">
+                <span class="most-used-type">{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}</span>
+                <strong>{{ item.model or item.title }}</strong>
+                {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
+                <span><i class="fas fa-download" aria-hidden="true"></i> {{ item.downloads }} downloads</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
 
 <!-- Help CTA Section -->
 {% include 'components/help-cta.html' %}

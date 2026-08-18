@@ -1,4 +1,4 @@
-from flask import Flask, Response, render_template, redirect, url_for, request, jsonify, flash, send_file
+from flask import Flask, Response, abort, render_template, redirect, url_for, request, jsonify, flash, send_file, session as flask_session
 from flask.typing import ResponseReturnValue
 from flask_sqlalchemy import SQLAlchemy
 from flask_assets import Environment
@@ -23,6 +23,7 @@ import uuid
 import secrets
 import hmac
 import hashlib
+import logging
 import unicodedata
 import urllib.request
 import urllib.error
@@ -53,12 +54,20 @@ from urllib.parse import quote, urlparse as url_parse
 from itsdangerous import URLSafeTimedSerializer as Serializer
 import re
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from PIL import Image, ImageOps
 from PIL.Image import Resampling
 from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from services.entitlement_service import (
+    PLAN_ENTITLEMENTS,
+    can_request_priority_content,
+    can_use_public_chat,
+    get_plan_entitlements as resolve_plan_entitlements,
+)
+from sqlalchemy.exc import IntegrityError
 try:
     import firebase_admin
     from firebase_admin import credentials, auth as firebase_auth, firestore as firebase_firestore
@@ -252,6 +261,7 @@ def find_abacatepay_transaction(charge_id=None, external_id=None):
 
 # Configuração da aplicação Flask
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # Usar SECRET_KEY forte - obrigatório em produção
 secret_key = os.environ.get('SECRET_KEY')
@@ -280,7 +290,7 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY')
 
 # Configuração do Meta Pixel (Facebook) - Conversions API
-app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '3117485985088560')
+app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '')
 app.config['META_ACCESS_TOKEN'] = os.environ.get('META_ACCESS_TOKEN')
 
 # Configuração Firebase (Google Sign-In)
@@ -296,12 +306,9 @@ app.config['FIREBASE_SERVICE_ACCOUNT_JSON'] = os.environ.get('FIREBASE_SERVICE_A
 
 # Configuração do Abacate Pay
 app.config['ABACATEPAY_API_KEY'] = os.environ.get('ABACATEPAY_API_KEY')
-app.config['ABACATEPAY_API_URL'] = 'https://api.abacatepay.com/v2'
+app.config['ABACATEPAY_API_URL'] = os.environ.get('ABACATEPAY_API_URL', 'https://api.abacatepay.com/v2').rstrip('/')
 app.config['ABACATEPAY_WEBHOOK_SECRET'] = os.environ.get('ABACATEPAY_WEBHOOK_SECRET', '')
-app.config['ABACATEPAY_PUBLIC_KEY'] = os.environ.get(
-    'ABACATEPAY_PUBLIC_KEY',
-    't9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9'
-)
+app.config['ABACATEPAY_PUBLIC_KEY'] = os.environ.get('ABACATEPAY_PUBLIC_KEY', '')
 
 # Configuração do Cloudinary
 cloudinary.config(
@@ -314,7 +321,7 @@ cloudinary.config(
 # Garantir que o diretório instance existe
 os.makedirs(app.instance_path, exist_ok=True)
 
-# Configuração do banco SQLite
+# Banco configurável: SQLite é o padrão atual e PostgreSQL permanece compatível.
 database_url = os.environ.get('DATABASE_URL')
 if not database_url:
     # Desenvolvimento: caminho relativo local
@@ -323,7 +330,8 @@ if not database_url:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-print(f"📁 Banco SQLite: Será criado em {database_url}")
+app.logger.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
+app.logger.info("Banco de dados configurado com o driver %s", database_url.split(':', 1)[0])
 
 # Configurações específicas do SQLite
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -381,7 +389,52 @@ limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
+    storage_uri=os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
+)
+
+
+# A aplicação ainda contém estilos e scripts inline legados. ``unsafe-inline``
+# fica restrito a esses dois tipos até a migração gradual para nonces/hashes.
+CONTENT_SECURITY_POLICY = {
+    'default-src': ["'self'"],
+    'base-uri': ["'self'"],
+    'object-src': ["'none'"],
+    'frame-ancestors': ["'self'"],
+    'form-action': ["'self'", 'https://checkout.stripe.com'],
+    'script-src': [
+        "'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com',
+        'https://cdn.jsdelivr.net', 'https://www.gstatic.com',
+        'https://js.stripe.com', 'https://connect.facebook.net',
+        'https://www.googletagmanager.com',
+    ],
+    'style-src': [
+        "'self'", "'unsafe-inline'", 'https://fonts.googleapis.com',
+        'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net',
+    ],
+    'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
+    'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+    'connect-src': [
+        "'self'", 'https://api.stripe.com', 'https://*.googleapis.com',
+        'https://*.firebaseio.com', 'wss://*.firebaseio.com',
+        'wss://*.googleapis.com', 'https://www.google-analytics.com',
+        'https://region1.google-analytics.com', 'https://graph.facebook.com',
+        'https://api.cloudinary.com',
+    ],
+    'frame-src': [
+        "'self'", 'https://js.stripe.com', 'https://hooks.stripe.com',
+        'https://accounts.google.com',
+    ],
+}
+
+talisman = Talisman(
+    app,
+    force_https=is_production_environment(),
+    strict_transport_security=is_production_environment(),
+    strict_transport_security_max_age=31536000,
+    strict_transport_security_include_subdomains=True,
+    content_security_policy=CONTENT_SECURITY_POLICY,
+    referrer_policy='strict-origin-when-cross-origin',
+    frame_options='SAMEORIGIN',
 )
 
 
@@ -656,7 +709,7 @@ def get_category_subcategories_map(include_defaults: bool = False) -> dict[str, 
 
     if include_defaults:
         default_subcategories = get_default_category_subcategories()
-        categories = Category.query.filter_by(is_active=True).all()
+        categories = Category.query.filter_by(is_active=True, is_visible=True).all()
         for category in categories:
             defaults = default_subcategories.get(category.name, [])
             if defaults:
@@ -878,6 +931,26 @@ def send_contact_support_email(
         msg.attach(filename, mimetype, file_bytes)
 
     mail.send(msg)
+
+
+def send_password_reset_email(user, token: str) -> bool:
+    """Envia recuperação de senha sem registrar o token em logs."""
+    if not app.config.get('MAIL_SERVER'):
+        app.logger.warning('SMTP nao configurado; email de redefinicao nao enviado')
+        return False
+
+    reset_url = _absolute_public_url(url_for('reset_password', token=token))
+    message = Message(
+        subject='Redefinição de senha — Mundo da Informática',
+        recipients=[user.email],
+        body=(
+            'Recebemos uma solicitação para redefinir sua senha.\n\n'
+            f'Acesse o link abaixo para escolher uma nova senha:\n{reset_url}\n\n'
+            'Se você não fez esta solicitação, ignore este email.'
+        ),
+    )
+    mail.send(message)
+    return True
 
 
 def serialize_post_for_admin(post):
@@ -1260,8 +1333,22 @@ def handle_403_error(e):
     if _is_json_like_request():
         return jsonify({'success': False, 'error': message}), 403
 
-    flash(message, 'danger')
-    return redirect(request.referrer or url_for('home')), 403
+    return render_template('errors/403.html', title='Acesso não permitido'), 403
+
+
+@app.errorhandler(404)
+def handle_404_error(e):
+    if _is_json_like_request():
+        return jsonify({'success': False, 'error': 'Recurso não encontrado.'}), 404
+    return render_template('errors/404.html', title='Página não encontrada'), 404
+
+
+@app.errorhandler(500)
+def handle_500_error(e):
+    db.session.rollback()
+    if _is_json_like_request():
+        return jsonify({'success': False, 'error': 'Erro interno do servidor.'}), 500
+    return render_template('errors/500.html', title='Erro interno'), 500
 
 
 @app.errorhandler(400)
@@ -1275,16 +1362,6 @@ def handle_400_error(e):
 
     flash(message, 'warning')
     return redirect(request.referrer or url_for('home')), 400
-
-# Headers de Segurança HTTP (Talisman)
-# DESABILITADO: CSP estava bloqueando recursos externos
-# TODO: Reconfigurar CSP adequadamente no futuro
-# if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER'):
-#     Talisman(app,
-#              force_https=True,
-#              strict_transport_security=True,
-#              content_security_policy=csp,
-#              content_security_policy_nonce_in=['script-src'])
 
 # Bundles de CSS e JS para otimização
 css = Bundle('css/style.css', 'css/additional.css', 'css/social.css', filters='cssmin', output='gen/style.min.css')
@@ -1301,6 +1378,7 @@ class Category(db.Model):
     color = db.Column(db.String(20), default='#4a90e2')
     slug = db.Column(db.String(50), nullable=False, unique=True)
     is_active = db.Column(db.Boolean, default=True)
+    is_visible = db.Column(db.Boolean, default=True, nullable=False)
     featured = db.Column(db.Boolean, default=False)  # Campo para categorias em destaque
     show_in_menu = db.Column(db.Boolean, default=True)
     order = db.Column(db.Integer, default=0)
@@ -1350,6 +1428,27 @@ class Post(db.Model):
 
     # Metadados flexíveis em formato JSON
     custom_metadata = db.Column(db.Text, nullable=True)
+
+    # Metadados técnicos estruturados (todos opcionais para compatibilidade).
+    manufacturer = db.Column(db.String(120), nullable=True)
+    brand = db.Column(db.String(120), nullable=True)
+    model = db.Column(db.String(160), nullable=True)
+    series = db.Column(db.String(160), nullable=True)
+    board_code = db.Column(db.String(120), nullable=True, index=True)
+    board_revision = db.Column(db.String(80), nullable=True)
+    platform = db.Column(db.String(120), nullable=True)
+    bios_chip = db.Column(db.String(120), nullable=True)
+    ec_chip = db.Column(db.String(120), nullable=True)
+    me_chip = db.Column(db.String(120), nullable=True)
+    file_type = db.Column(db.String(80), nullable=True)
+    file_extension = db.Column(db.String(30), nullable=True)
+    technical_file_size = db.Column(db.String(50), nullable=True)
+    version = db.Column(db.String(80), nullable=True)
+    sha256 = db.Column(db.String(64), nullable=True)
+    last_verified_at = db.Column(db.DateTime, nullable=True)
+    verification_status = db.Column(db.String(30), nullable=False, default='unverified')
+    compatibility = db.Column(db.Text, nullable=True)
+    technical_notes = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
         return f"Post('{self.title}', '{self.date_posted}')"
@@ -1421,6 +1520,184 @@ class Post(db.Model):
 
         metadata_dict[key] = value
         self.custom_metadata = json.dumps(metadata_dict)
+
+    @property
+    def is_verified_file(self):
+        return self.verification_status == 'verified'
+
+    @property
+    def technical_details(self):
+        """Linhas preenchidas para exibição, sem inventar dados ausentes."""
+        details = (
+            ('Fabricante', self.manufacturer),
+            ('Marca', self.brand),
+            ('Modelo', self.model),
+            ('Série', self.series),
+            ('Código da placa', self.board_code),
+            ('Revisão da placa', self.board_revision),
+            ('Plataforma', self.platform),
+            ('Chip BIOS', self.bios_chip),
+            ('Chip EC', self.ec_chip),
+            ('Chip ME', self.me_chip),
+            ('Tipo de arquivo', self.file_type),
+            ('Formato', self.file_extension),
+            ('Tamanho', self.technical_file_size),
+            ('Versão', self.version),
+            ('Compatibilidade', self.compatibility),
+            ('Observações técnicas', self.technical_notes),
+        )
+        return [(label, value) for label, value in details if value]
+
+
+POST_TECHNICAL_FIELDS = (
+    'manufacturer', 'brand', 'model', 'series', 'board_code', 'board_revision',
+    'platform', 'bios_chip', 'ec_chip', 'me_chip', 'file_type',
+    'file_extension', 'technical_file_size', 'version', 'compatibility',
+    'technical_notes',
+)
+VERIFICATION_STATUSES = {'unverified', 'verified', 'needs_review'}
+
+
+def parse_optional_date(value):
+    raw_value = str(value or '').strip()
+    if not raw_value:
+        return None
+    for date_format in ('%Y-%m-%d', '%Y-%m-%dT%H:%M', '%d/%m/%Y'):
+        try:
+            return datetime.strptime(raw_value, date_format)
+        except ValueError:
+            continue
+    raise ValueError('Data de verificação inválida.')
+
+
+def normalize_sha256(value):
+    normalized = re.sub(r'\s+', '', str(value or '')).lower()
+    if normalized and not re.fullmatch(r'[a-f0-9]{64}', normalized):
+        raise ValueError('O SHA-256 deve conter exatamente 64 caracteres hexadecimais.')
+    return normalized or None
+
+
+def normalize_download_url(value):
+    """Aceita somente URLs HTTP(S) ou caminhos internos absolutos."""
+    candidate = str(value or '').strip()
+    if not candidate:
+        return None
+    try:
+        parsed = url_parse(candidate)
+    except (TypeError, ValueError):
+        return None
+    if parsed.scheme in {'http', 'https'} and parsed.netloc:
+        return candidate
+    if not parsed.scheme and not parsed.netloc and candidate.startswith('/') and not candidate.startswith('//'):
+        return candidate
+    return None
+
+
+def normalize_optional_external_url(value):
+    """Normaliza um link opcional de perfil e rejeita esquemas executáveis."""
+    candidate = str(value or '').strip()
+    if not candidate:
+        return ''
+    try:
+        parsed = url_parse(candidate)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('Informe uma URL válida, iniciada por http:// ou https://.') from exc
+    if parsed.scheme.lower() not in {'http', 'https'} or not parsed.netloc:
+        raise ValueError('Informe uma URL válida, iniciada por http:// ou https://.')
+    return candidate
+
+
+def normalize_download_files(raw_value):
+    """Valida metadados de múltiplos arquivos antes de armazená-los como JSON."""
+    if not raw_value:
+        return []
+    try:
+        items = json.loads(raw_value) if isinstance(raw_value, str) else raw_value
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ValueError('A lista de arquivos é inválida.') from exc
+    if not isinstance(items, list):
+        raise ValueError('A lista de arquivos é inválida.')
+
+    normalized_files = []
+    for item in items[:20]:
+        if not isinstance(item, dict):
+            continue
+        file_url = normalize_download_url(item.get('url'))
+        if not file_url:
+            raise ValueError('Um dos links de download é inválido.')
+        normalized_files.append({
+            'type': sanitize_input(str(item.get('type') or 'Arquivo'))[:50],
+            'url': file_url,
+            'name': sanitize_input(str(item.get('name') or ''))[:200],
+            'format': sanitize_input(str(item.get('format') or ''))[:30],
+            'size': sanitize_input(str(item.get('size') or ''))[:50],
+            'sha256': normalize_sha256(item.get('sha256')),
+        })
+    return normalized_files
+
+
+def get_public_download_files(post):
+    """Expõe metadados úteis sem revelar os links externos de origem."""
+    files = post.get_metadata('download_files') or []
+    if not isinstance(files, list):
+        return []
+    public_files = []
+    for index, item in enumerate(files):
+        if not isinstance(item, dict):
+            continue
+        try:
+            file_hash = normalize_sha256(item.get('sha256')) or ''
+        except ValueError:
+            file_hash = ''
+        public_files.append({
+            'type': sanitize_input(str(item.get('type') or 'Arquivo'))[:50],
+            'name': sanitize_input(str(item.get('name') or ''))[:200],
+            'format': sanitize_input(str(item.get('format') or ''))[:30],
+            'size': sanitize_input(str(item.get('size') or ''))[:50],
+            'sha256': file_hash,
+            'url': url_for('download_post', post_id=post.id, file=index),
+        })
+    return public_files
+
+
+def apply_post_technical_form(post, form):
+    """Valida e aplica os campos técnicos enviados pelo painel."""
+    for field_name in POST_TECHNICAL_FIELDS:
+        raw_value = str(form.get(field_name, '') or '').strip()
+        max_length = 2000 if field_name in {'compatibility', 'technical_notes'} else 160
+        setattr(post, field_name, sanitize_input(raw_value[:max_length]) or None)
+
+    status = str(form.get('verification_status', 'unverified') or 'unverified').strip().lower()
+    if status not in VERIFICATION_STATUSES:
+        raise ValueError('Status de verificação inválido.')
+
+    post.verification_status = status
+    post.last_verified_at = parse_optional_date(form.get('last_verified_at'))
+    post.sha256 = normalize_sha256(form.get('sha256'))
+
+
+def post_search_values(post):
+    return (
+        post.title, post.model, post.manufacturer, post.brand, post.series,
+        post.board_code, post.board_revision, post.platform, post.bios_chip,
+        post.ec_chip, post.me_chip, post.file_type, post.file_extension,
+        post.version, post.compatibility, post.technical_notes, post.content,
+        post.seo_title, post.seo_description, post.tags, post.category_str,
+        post.subcategory, post.slug,
+    )
+
+
+def get_post_search_score(query, post):
+    """Prioriza código exato de placa e depois os demais campos técnicos."""
+    board_score = get_search_match_score(query, post.board_code)
+    if board_score is not None:
+        return board_score - 20
+
+    model_score = get_search_match_score(query, post.model)
+    if model_score is not None:
+        return model_score - 8
+
+    return get_search_match_score(query, *post_search_values(post))
 
 # Funções helper para analytics
 def get_device_type(user_agent_string):
@@ -1702,13 +1979,13 @@ def delete_old_image(image_path, protected_images=None):
         # Deletar se existir
         if os.path.exists(full_path):
             os.remove(full_path)
-            print(f"✓ Imagem antiga deletada: {full_path}")
+            app.logger.info('Imagem antiga removida: %s', full_path)
             return True
 
         return True  # Não existia, então não há problema
 
     except Exception as e:
-        print(f"✗ Erro ao deletar imagem {image_path}: {e}")
+        app.logger.error('Erro ao remover imagem %s: %s', image_path, e)
         return False
 
 # ==========================================
@@ -1722,31 +1999,31 @@ def get_default_category_data():
     return {
         'BIOS': {
             'icon': 'fas fa-microchip',
-            'description': 'Arquivos de BIOS atualizados para diversos modelos de notebooks e desktops, facilitando reparos e atualizações de hardware.'
+            'description': 'Arquivos de BIOS organizados por modelo e código da placa, conforme os cadastros disponíveis.'
         },
         'Esquemas': {
             'icon': 'fas fa-project-diagram',
-            'description': 'Esquemas elétricos detalhados de placas-mãe e outros componentes eletrônicos, essenciais para manutenção e reparo avançado.'
+            'description': 'Esquemas elétricos e documentos de placa organizados para consulta em diagnóstico e reparo.'
         },
         'Drivers': {
             'icon': 'fas fa-cogs',
-            'description': 'Drivers atualizados para diversos componentes de hardware, incluindo placas de rede, áudio, vídeo e periféricos específicos.'
+            'description': 'Drivers cadastrados por dispositivo, fabricante e compatibilidade informada.'
         },
         'Softwares': {
             'icon': 'fas fa-laptop-code',
-            'description': 'Programas essenciais para técnicos de informática, incluindo ferramentas de diagnóstico, otimização e recuperação de dados.'
+            'description': 'Programas e utilitários para diagnóstico, manutenção e recuperação, conforme o acervo cadastrado.'
         },
         'Impressoras': {
             'icon': 'fas fa-print',
-            'description': 'Drivers, firmwares e recursos especializados para impressoras de diversas marcas e modelos, facilitando manutenção e configuração.'
+            'description': 'Drivers, firmwares e recursos de impressoras organizados por marca e modelo.'
         },
         'Cursos': {
             'icon': 'fas fa-graduation-cap',
-            'description': 'Materiais educativos e cursos técnicos para aprimoramento profissional em informática, eletrônica e tecnologia.'
+            'description': 'Materiais educativos e cursos cadastrados sobre informática, eletrônica e tecnologia.'
         },
         'Datasheet': {
             'icon': 'fas fa-file-alt',
-            'description': 'Datasheets técnicos de componentes eletrônicos, circuitos integrados e semicondutores para consulta e referência profissional.'
+            'description': 'Datasheets de componentes eletrônicos, circuitos integrados e semicondutores para consulta.'
         }
     }
 
@@ -1796,6 +2073,8 @@ def get_category_query_filter(category):
     ).first()
 
     if category_record:
+        if not category_record.is_active or not category_record.is_visible:
+            abort(404)
         category_filter = db.or_(
             Post.category_id == category_record.id,
             Post.category_str == category_record.name
@@ -1824,6 +2103,7 @@ def build_category_admin_payload(category):
         'featured_posts': featured_posts,
         'total_downloads': int(total_downloads or 0),
         'is_active': bool(category.is_active),
+        'is_visible': bool(category.is_visible),
         'is_featured': bool(category.featured),
         'featured': bool(category.featured),
         'show_in_menu': bool(category.show_in_menu),
@@ -1832,6 +2112,20 @@ def build_category_admin_payload(category):
         'last_post_date': last_post.date_posted if last_post else None,
         'last_post_title': last_post.title if last_post else None
     }
+
+
+def get_public_categories_partition():
+    """Separa categorias com conteúdo das categorias ainda em expansão."""
+    visible_categories = Category.query.filter_by(is_active=True, is_visible=True).order_by(
+        Category.order.asc(), Category.name.asc()
+    ).all()
+    populated = []
+    empty = []
+    for category in visible_categories:
+        category_filter = db.or_(Post.category_id == category.id, Post.category_str == category.name)
+        category.public_post_count = Post.query.filter(category_filter, Post.is_active == True).count()
+        (populated if category.public_post_count else empty).append(category)
+    return populated, empty
 
 class ListPagination:
     def __init__(self, items, page=1, per_page=10):
@@ -2029,7 +2323,7 @@ def log_admin_activity(user_id, action, description=None, metadata=None):
         db.session.commit()
 
     except Exception as e:
-        print(f"Erro ao registrar atividade administrativa: {e}")
+        app.logger.error('Erro ao registrar atividade administrativa: %s', e)
         try:
             db.session.rollback()
         except Exception:
@@ -2068,7 +2362,7 @@ def log_visitor():
             db.session.commit()
     except Exception as e:
         # Em caso de erro, apenas logar mas não interromper a aplicação
-        print(f"Erro ao registrar visitante: {e}")
+        app.logger.error('Erro ao registrar visitante: %s', e)
         try:
             db.session.rollback()
         except Exception:
@@ -2094,7 +2388,7 @@ def increment_post_views(post_id):
 
         db.session.commit()
     except Exception as e:
-        print(f"Erro ao incrementar views do post {post_id}: {e}")
+        app.logger.error('Erro ao incrementar visualizacoes do post %s: %s', post_id, e)
         try:
             db.session.rollback()
         except Exception:
@@ -2120,7 +2414,7 @@ def increment_post_downloads(post_id):
 
         db.session.commit()
     except Exception as e:
-        print(f"Erro ao incrementar downloads do post {post_id}: {e}")
+        app.logger.error('Erro ao incrementar downloads do post %s: %s', post_id, e)
         try:
             db.session.rollback()
         except Exception:
@@ -2129,6 +2423,16 @@ def increment_post_downloads(post_id):
 @app.before_request
 def before_request():
     """Executado antes de cada requisição"""
+    canonical_host = (os.environ.get('CANONICAL_HOST') or 'mundodainformatica.com').strip().lower()
+    request_host = (request.host or '').split(':', 1)[0].lower()
+    alternate_hosts = {f'www.{canonical_host}'} if not canonical_host.startswith('www.') else {canonical_host[4:]}
+    if is_production_environment() and request_host in alternate_hosts:
+        canonical_target = f'https://{canonical_host}{request.full_path if request.query_string else request.path}'
+        return redirect(canonical_target.rstrip('?'), code=301)
+
+    if request.path == '/home':
+        return redirect('/', code=301)
+
     # Atualizar last_login do usuário autenticado
     if current_user.is_authenticated:
         # Atualizar a cada request, mas apenas se passou mais de 5 minutos desde a última atualização
@@ -2139,7 +2443,7 @@ def before_request():
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
-                print(f"Erro ao atualizar last_login: {e}")
+                app.logger.error('Erro ao atualizar last_login: %s', e)
 
     # Verificar modo de manutenção
     try:
@@ -2174,17 +2478,19 @@ def inject_admin_data():
                 'unread_comments': Comment.query.count(),
                 'total_users': User.query.filter_by(is_active=True).count(),
                 'total_subscribers': Subscriber.query.filter_by(is_active=True).count(),
+                'content_request_count': ContentRequest.query.filter(ContentRequest.status.in_(['pending', 'reviewing', 'searching'])).count(),
                 'download_file_types': get_download_file_types(),
                 'app_version': '1.6.2'
             }
         except Exception as e:
-            print(f"Erro ao injetar dados admin: {e}")
+            app.logger.error('Erro ao injetar dados admin: %s', e)
             return {
                 'post_count': 0,
                 'category_count': 0,
                 'unread_comments': 0,
                 'total_users': 0,
                 'total_subscribers': 0,
+                'content_request_count': 0,
                 'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
                 'app_version': '1.6.2'
             }
@@ -2415,6 +2721,97 @@ class Transaction(db.Model):
     def __repr__(self):
         return f"Transaction(user_id={self.user_id}, plan={self.plan_type}, gateway={self.payment_gateway}, status={self.status})"
 
+
+class PaymentWebhookEvent(db.Model):
+    """Registro mínimo para garantir processamento idempotente de webhooks."""
+    __tablename__ = 'payment_webhook_events'
+    __table_args__ = (
+        db.UniqueConstraint('provider', 'external_event_id', name='uq_webhook_provider_event'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(30), nullable=False)
+    external_event_id = db.Column(db.String(255), nullable=False)
+    event_type = db.Column(db.String(120), nullable=True)
+    received_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    status = db.Column(db.String(30), nullable=False, default='processing')
+    payload_hash = db.Column(db.String(64), nullable=False)
+    error_message = db.Column(db.String(500), nullable=True)
+
+
+class ContentRequest(db.Model):
+    """Sugestões gerais e buscas prioritárias do plano VIP."""
+    __tablename__ = 'content_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    request_type = db.Column(db.String(30), nullable=False, default='suggestion')
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(100), nullable=True)
+    board_code = db.Column(db.String(120), nullable=True)
+    status = db.Column(db.String(30), nullable=False, default='pending')
+    priority = db.Column(db.Integer, nullable=False, default=0)
+    admin_notes = db.Column(db.Text, nullable=True)
+    requester_name = db.Column(db.String(120), nullable=True)
+    requester_email = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('content_requests', lazy=True))
+
+
+def begin_webhook_event(provider: str, external_event_id: str, event_type: str, raw_body: bytes):
+    """Reserva um evento antes de executar efeitos financeiros.
+
+    A restrição única no banco resolve inclusive entregas concorrentes. Eventos
+    que falharam podem ser tentados novamente; processados ou em andamento são
+    reconhecidos como duplicados.
+    """
+    provider = (provider or '').strip().lower()[:30]
+    external_event_id = (external_event_id or '').strip()[:255]
+    if not provider or not external_event_id:
+        raise ValueError('Webhook sem identificador idempotente.')
+
+    event = PaymentWebhookEvent(
+        provider=provider,
+        external_event_id=external_event_id,
+        event_type=(event_type or '')[:120] or None,
+        payload_hash=hashlib.sha256(raw_body).hexdigest(),
+        status='processing',
+    )
+    db.session.add(event)
+    try:
+        db.session.commit()
+        return event.id, False
+    except IntegrityError:
+        db.session.rollback()
+        existing = PaymentWebhookEvent.query.filter_by(
+            provider=provider,
+            external_event_id=external_event_id,
+        ).first()
+        if existing and existing.status == 'failed':
+            existing.status = 'processing'
+            existing.error_message = None
+            existing.payload_hash = hashlib.sha256(raw_body).hexdigest()
+            existing.received_at = datetime.utcnow()
+            db.session.commit()
+            return existing.id, False
+        return existing.id if existing else None, True
+
+
+def finish_webhook_event(event_id: int | None, status: str, error: Exception | str | None = None):
+    if not event_id:
+        return
+    event = db.session.get(PaymentWebhookEvent, event_id)
+    if not event:
+        return
+    event.status = status
+    event.processed_at = datetime.utcnow()
+    event.error_message = str(error)[:500] if error else None
+    db.session.commit()
+
 # Adicionar o modelo Comment depois de definir User
 class Comment(db.Model):
     __tablename__ = 'comments'
@@ -2598,11 +2995,11 @@ class SiteConfig(db.Model):
             # Configurações padrão caso não existam no banco
             defaults = {
                 'site_name': 'Mundo da Informática',
-                'site_description': 'Portal de tecnologia e informática',
+                'site_description': 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
-                'footer_description': 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.',
-                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
-                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+                'footer_description': 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
+                'home_hero_title': 'Encontre o arquivo certo para o reparo.',
+                'home_hero_subtitle': 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
                 'enable_dark_mode': True,
                 'primary_color': '#3a86ff',
                 'secondary_color': '#8338ec',
@@ -2659,11 +3056,11 @@ class SiteConfig(db.Model):
             # Em caso de erro, retorna configurações básicas
             return {
                 'site_name': 'Mundo da Informática',
-                'site_description': 'Portal de tecnologia e informática',
+                'site_description': 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
-                'footer_description': 'Seu portal completo de recursos para técnicos e entusiastas de informática, com suporte, downloads e conteúdo especializado.',
-                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
-                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+                'footer_description': 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
+                'home_hero_title': 'Encontre o arquivo certo para o reparo.',
+                'home_hero_subtitle': 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
                 'enable_dark_mode': True,
                 'primary_color': '#3a86ff',
                 'secondary_color': '#8338ec',
@@ -2781,54 +3178,9 @@ def get_live_site_settings():
     return settings
 
 
-PLAN_ENTITLEMENTS = {
-    'free': {
-        'download_limit': 1,
-        'download_period': 'weekly',
-        'support': 'Suporte em até 48H',
-        'favorites_limit': 10,
-        'device_limit': 1,
-        'download_history_access': False,
-        'download_history_limit': None,
-        'comments_limit': 3,
-        'public_chat': False,
-        'request_content': False,
-        'vip_area': False,
-    },
-    'premium': {
-        'download_limit': 15,
-        'download_period': 'weekly',
-        'support': 'Suporte em até 24H',
-        'favorites_limit': None,
-        'device_limit': 2,
-        'download_history_access': True,
-        'download_history_limit': 5,
-        'comments_limit': 10,
-        'public_chat': False,
-        'request_content': False,
-        'vip_area': False,
-    },
-    'vip': {
-        'download_limit': None,
-        'download_period': 'unlimited',
-        'support': 'Suporte Prioritário',
-        'favorites_limit': None,
-        'device_limit': 5,
-        'download_history_access': True,
-        'download_history_limit': None,
-        'comments_limit': None,
-        'public_chat': True,
-        'request_content': True,
-        'vip_area': True,
-    },
-}
-
-
 def get_plan_entitlements(user_or_plan):
     """Retorna a matriz canônica de recursos do plano informado."""
-    raw_plan = getattr(user_or_plan, 'plan', user_or_plan)
-    plan_key = str(raw_plan or 'free').strip().lower()
-    return PLAN_ENTITLEMENTS.get(plan_key, PLAN_ENTITLEMENTS['free'])
+    return resolve_plan_entitlements(user_or_plan)
 
 
 def get_user_plan_limits(user):
@@ -2924,8 +3276,8 @@ DEFAULT_PLAN_PRICE_CENTS = {
 }
 
 STRIPE_PLAN_PRODUCT_IDS = {
-    'premium': 'prod_TWO90kFHcUFjHq',
-    'vip': 'prod_TWOCCLcm6V4BRN'
+    'premium': os.environ.get('STRIPE_PRODUCT_PREMIUM', '').strip(),
+    'vip': os.environ.get('STRIPE_PRODUCT_VIP', '').strip(),
 }
 
 STRIPE_PLAN_PRICE_CACHE_TTL_SECONDS = 300
@@ -3257,7 +3609,7 @@ def inject_global_data():
         return get_image_url_for_response(image_path, folder=folder, default=default)
 
     # Categorias públicas, sempre vindas do banco para refletir o painel admin.
-    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all()
+    categories, _expanding_categories = get_public_categories_partition()
     for category_item in categories:
         apply_default_category_data(category_item)
     menu_categories = [category_item for category_item in categories if category_item.show_in_menu]
@@ -3290,6 +3642,9 @@ def inject_global_data():
         'appId': app.config.get('FIREBASE_APP_ID', ''),
         'measurementId': app.config.get('FIREBASE_MEASUREMENT_ID', '')
     }
+    analytics_event = flask_session.pop('analytics_event', '')
+    if analytics_event not in {'login', 'sign_up'}:
+        analytics_event = ''
 
     # Dados específicos para admin (só quando necessário)
     admin_data = {}
@@ -3313,6 +3668,7 @@ def inject_global_data():
         featured_posts=featured_posts,
         post_url=post_url,
         get_image_url=get_image_url,  # Adicionar helper de imagens
+        get_public_download_files=get_public_download_files,
         hex_to_rgb=hex_to_rgb_string,
         whatsapp_link_from_phone=whatsapp_link_from_phone,
         config=config,
@@ -3323,8 +3679,13 @@ def inject_global_data():
         site_secondary_rgb=hex_to_rgb_string(secondary_color, '131, 56, 236'),
         stats=stats,
         plan_pricing=plan_pricing,
+        plan_entitlements=PLAN_ENTITLEMENTS,
+        canonical_url=_absolute_public_url(request.path),
+        public_base_url=_get_public_base_url(),
         firebase_public_config=firebase_public_config,
+        meta_pixel_id=app.config.get('META_PIXEL_ID', ''),
         chat_backend_available=is_firebase_admin_configured(),
+        analytics_event=analytics_event,
         current_year=datetime.now().year,
         datetime=datetime,  # Adicionar datetime para uso em templates
         **admin_data
@@ -3607,7 +3968,7 @@ def _build_sitemap_entries() -> list[dict[str, str]]:
         lastmod = latest_content_date if path in {'/', '/categorias', '/posts'} else None
         _add_sitemap_entry(entries, seen_urls, path, lastmod=lastmod, changefreq=changefreq, priority=priority)
 
-    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all()
+    categories, _expanding_categories = get_public_categories_partition()
     for category_item in categories:
         category_filter = db.or_(Post.category_id == category_item.id, Post.category_str == category_item.name)
         _add_sitemap_entry(
@@ -3705,6 +4066,9 @@ def home():
         posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
         posts = posts_paginated.items
         featured = Post.query.filter_by(featured=True).limit(4).all()
+        most_used = Post.query.filter(Post.is_active == True, Post.downloads > 0).order_by(
+            Post.downloads.desc(), Post.date_posted.desc()
+        ).limit(4).all()
 
         # Lista de IDs de posts favoritados pelo usuário atual
         favorite_post_ids = []
@@ -3721,24 +4085,12 @@ def home():
             'total_subscribers': Subscriber.query.filter_by(is_active=True).count()
         }
 
-        return render_template('index.html', posts=posts, posts_pagination=posts_paginated, featured=featured, stats=stats, favorite_post_ids=favorite_post_ids, title='Início')
-    except Exception as e:
-        print(f"Erro ao acessar a página inicial: {e}")
-        # Tentar inicializar o banco de dados novamente (já estamos no contexto da rota)
-        initialize_db()
-        # Tentar novamente após inicialização
-        posts = Post.query.order_by(Post.date_posted.desc()).limit(8).all()
-        featured = Post.query.filter_by(featured=True).limit(4).all()
-
-        # Estatísticas reais para fallback
-        stats = {
-            'total_posts': Post.query.filter_by(is_active=True).count(),
-            'total_downloads': db.session.query(db.func.sum(Post.downloads)).scalar() or 0,
-            'total_users': User.query.filter_by(is_active=True).count(),
-            'total_subscribers': Subscriber.query.filter_by(is_active=True).count()
-        }
-
-        return render_template('index.html', posts=posts, featured=featured, stats=stats, title='Início')
+        return render_template('index.html', posts=posts, posts_pagination=posts_paginated,
+                               featured=featured, most_used=most_used, stats=stats,
+                               favorite_post_ids=favorite_post_ids, title='Início')
+    except Exception:
+        app.logger.exception('Erro ao carregar a pagina inicial')
+        return render_template('500.html'), 500
 
 # Atualizar a rota /setup para redirecionar para o painel admin
 @app.route('/setup')
@@ -3751,25 +4103,16 @@ def setup():
 def all_categories():
     """Página exclusiva de todas as categorias"""
     # Buscar todas as categorias do banco de dados
-    categories = Category.query.filter_by(is_active=True).order_by(Category.order.asc(), Category.name.asc()).all()
-    default_data = get_default_category_data()
-
+    categories, expanding_categories = get_public_categories_partition()
     if categories:
         for cat in categories:
             apply_default_category_data(cat)
-    else:
-        # Se não houver categorias no banco, criar objetos dict com dados padrão
-        categories = [
-            {
-                'name': name,
-                'slug': generate_slug(name),
-                'icon': data['icon'],
-                'description': data['description']
-            }
-            for name, data in default_data.items()
-        ]
+    for cat in expanding_categories:
+        apply_default_category_data(cat)
 
-    return render_template('categories.html', categories=categories, title='Todas as Categorias')
+    return render_template('categories.html', categories=categories,
+                           expanding_categories=expanding_categories,
+                           title='Todas as Categorias')
 
 @app.route('/categoria/<string:category>')
 def category(category):
@@ -3923,6 +4266,27 @@ def download_post(post_id):
     post = Post.query.get_or_404(post_id)
     user = current_user
 
+    # Resolver o arquivo solicitado antes de consumir o limite. O índice torna
+    # possível ter dois arquivos do mesmo tipo; ``type`` segue como fallback
+    # retrocompatível para links antigos.
+    redirect_url = post.download_link
+    download_files = post.get_metadata('download_files')
+    if isinstance(download_files, list) and download_files:
+        file_index = request.args.get('file', type=int)
+        download_type = request.args.get('type', '')
+        if file_index is not None and 0 <= file_index < len(download_files):
+            redirect_url = download_files[file_index].get('url', post.download_link)
+        elif download_type:
+            for download_file in download_files:
+                if download_file.get('type') == download_type:
+                    redirect_url = download_file.get('url', post.download_link)
+                    break
+
+    redirect_url = normalize_download_url(redirect_url)
+    if not redirect_url:
+        flash('Link de download indisponível ou inválido para este post.', 'error')
+        return redirect(url_for('post', post_id=post_id))
+
     # Log para debug
     debug_log(f"Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
 
@@ -3985,23 +4349,7 @@ def download_post(post_id):
     except Exception:
         pass  # Não interromper o download se o log falhar
 
-    # Redirecionar para o link de download real
-    download_type = request.args.get('type', '')
-    redirect_url = post.download_link
-
-    if download_type:
-        download_files = post.get_metadata('download_files')
-        if download_files and isinstance(download_files, list):
-            for f in download_files:
-                if f.get('type') == download_type:
-                    redirect_url = f.get('url', post.download_link)
-                    break
-
-    if redirect_url:
-        return redirect(redirect_url)
-    else:
-        flash('Link de download não disponível para este post.', 'error')
-        return redirect(url_for('post', post_id=post_id))
+    return redirect(redirect_url)
 
 
 # ====================
@@ -4478,7 +4826,7 @@ def search():
     from difflib import get_close_matches
 
     # Lista de termos conhecidos para sugestão
-    all_categories = Category.query.all()
+    all_categories = Category.query.filter_by(is_active=True, is_visible=True).all()
     category_names = [cat.name.lower() for cat in all_categories]
     all_posts = Post.query.filter_by(is_active=True).all()
     post_titles = [post.title.lower() for post in all_posts]
@@ -4494,7 +4842,7 @@ def search():
     categories = []
     if filter_type in ['all', 'categories']:
         scored_categories = []
-        for cat in Category.query.filter_by(is_active=True).all():
+        for cat in Category.query.filter_by(is_active=True, is_visible=True).all():
             score = get_search_match_score(query, cat.name, cat.description, cat.slug)
             if score is not None:
                 scored_categories.append((score, cat.name.casefold(), cat))
@@ -4510,17 +4858,7 @@ def search():
 
         scored_posts = []
         for post in posts_query.all():
-            score = get_search_match_score(
-                query,
-                post.title,
-                post.content,
-                post.seo_title,
-                post.seo_description,
-                post.tags,
-                post.category_str,
-                post.subcategory,
-                post.slug,
-            )
+            score = get_post_search_score(query, post)
             if score is not None:
                 sort_date = post.date_posted or datetime.min
                 scored_posts.append((score, -sort_date.toordinal(), post.title.casefold(), post))
@@ -4545,7 +4883,6 @@ def about():
         'total_downloads': db.session.query(db.func.sum(Post.downloads)).scalar() or 0,
         'total_users': User.query.filter_by(is_active=True).count(),
         'total_subscribers': Subscriber.query.filter_by(is_active=True).count(),
-        'satisfaction_rate': 98  # Este pode ficar fixo ou ser calculado de outra forma
     }
 
     categories = Category.query.order_by(Category.name).all()
@@ -4615,7 +4952,7 @@ def get_user_permissions():
             'reset_time': None,
         }
     else:
-        used = user.weekly_downloads or 0 if download_period == 'weekly' else user.daily_downloads or 0
+        used = (user.weekly_downloads or 0) if download_period == 'weekly' else (user.daily_downloads or 0)
         downloads_info = {
             'limit': int(download_limit),
             'period': 'semana' if download_period == 'weekly' else 'dia',
@@ -4687,7 +5024,7 @@ def get_user_permissions():
         'vip_area': entitlements['vip_area'],
         'live_chat': {
             'community': _can_user_write_public_chat(user),
-            'support': True
+            'support': _can_user_write_public_chat(user)
         }
     }
 
@@ -4857,9 +5194,9 @@ def checkout_success():
         else:
             flash('O pagamento ainda não foi confirmado. Aguarde alguns instantes ou entre em contato com o suporte.', 'warning')
 
-    except Exception as e:
-        flash(f'Erro ao verificar pagamento: {str(e)}', 'danger')
-        print(f"Error verifying payment: {e}")
+    except Exception:
+        app.logger.exception('Erro ao verificar pagamento Stripe')
+        flash('Não foi possível verificar o pagamento agora. Tente novamente em instantes.', 'danger')
 
     return redirect(url_for('plans'))
 
@@ -4933,13 +5270,9 @@ def create_pix_checkout():
         if not plan_type:
             return jsonify({'error': 'Plano é obrigatório'}), 400
 
-        print(f'[PIX] Dados recebidos: {data}')
-        print(f'[PIX] Plano: {plan_type}')
-        print(f'[PIX] User ID: {current_user.id}')
-
         plan_key = normalize_plan_key(plan_type)
         if plan_key not in DEFAULT_PLAN_PRICE_CENTS:
-            print(f'[PIX] ERRO - Plano inválido: {plan_type}')
+            app.logger.warning('Tentativa de checkout PIX com plano invalido')
             return jsonify({'error': 'Plano inválido'}), 400
 
         if not is_plan_enabled(plan_key):
@@ -4947,13 +5280,11 @@ def create_pix_checkout():
 
         amount = get_plan_price_cents(plan_key)
         if amount <= 0:
-            print(f'[PIX] ERRO - Preço inválido para plano: {plan_key}')
+            app.logger.error('Preco PIX invalido para o plano %s', plan_key)
             return jsonify({'error': 'Preço do plano inválido. Ajuste o valor visual no painel administrativo.'}), 400
-        print(f'[PIX] Amount: {amount}')
 
         # Gerar ID único para o PIX
         pix_id = f'{plan_key}_{current_user.id}_{int(datetime.utcnow().timestamp())}'
-        print(f'[PIX] PIX ID gerado: {pix_id}')
 
         # Criar transação pendente IMEDIATAMENTE para redirecionamento rápido
         try:
@@ -4966,25 +5297,17 @@ def create_pix_checkout():
                 currency='brl',
                 status='processing'  # Status temporário até API responder
             )
-            print(f'[PIX] Transaction object criado')
-
             db.session.add(transaction)
-            print(f'[PIX] Transaction adicionado à sessão')
-
             db.session.commit()
-            print(f'[PIX] Commit realizado - Transaction ID: {transaction.id}')
 
-        except Exception as db_error:
+        except Exception:
             db.session.rollback()
-            print(f'[PIX] ERRO DATABASE: {str(db_error)}')
-            import traceback
-            print(traceback.format_exc())
+            app.logger.exception('Erro ao salvar transacao PIX')
             return jsonify({'error': 'Erro ao salvar transação'}), 500
 
         # Retornar imediatamente para redirecionamento rápido
         # O processamento da API será feito em background
         redirect_url = url_for('pix_checkout_page', billing_id=pix_id, _external=True)
-        print(f'[PIX] Redirect URL: {redirect_url}')
 
         return jsonify({
             'billing_id': pix_id,
@@ -4993,10 +5316,8 @@ def create_pix_checkout():
             'success_redirect_url': url_for('pix_checkout_success', billing_id=pix_id, next=url_for('plans'))
         })
 
-    except Exception as e:
-        print(f'[PIX] ERRO GERAL: {str(e)}')
-        import traceback
-        print(traceback.format_exc())
+    except Exception:
+        app.logger.exception('Erro geral ao criar checkout PIX')
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
 
@@ -5309,7 +5630,7 @@ def stripe_webhook():
             return jsonify({'error': 'Webhook secret not configured'}), 500
 
     try:
-        # Verificar assinatura do webhook (SEGURANÇA CRÍTICA)
+        # Verificar assinatura antes de persistir ou processar o evento.
         if webhook_secret:
             if not sig_header:
                 debug_log('ERRO CRÍTICO: Stripe-Signature ausente com STRIPE_WEBHOOK_SECRET configurado.')
@@ -5322,51 +5643,50 @@ def stripe_webhook():
             if os.environ.get('FLASK_ENV') != 'development':
                 debug_log('ERRO CRÍTICO: Fallback sem assinatura bloqueado fora de FLASK_ENV=development.')
                 return jsonify({'error': 'Webhook secret not configured'}), 500
-            print('⚠️⚠️⚠️ WARNING: Stripe webhook signature validation BYPASSED in development mode (FLASK_ENV=development). NEVER use this in production. ⚠️⚠️⚠️')
+            app.logger.warning('Validação da assinatura Stripe desativada apenas no ambiente de desenvolvimento.')
             event = json.loads(payload)
+    except SignatureVerificationError as e:
+        app.logger.warning('Assinatura Stripe inválida: %s', e)
+        return jsonify({'error': 'Invalid signature'}), 400
+    except (ValueError, TypeError, json.JSONDecodeError) as e:
+        app.logger.warning('Payload Stripe inválido: %s', e)
+        return jsonify({'error': 'Invalid payload'}), 400
 
-        debug_log(f'Webhook recebido: {event["type"]}')
+    event_record_id = None
+    try:
+        event_type = str(event.get('type') or '')
+        event_id = str(event.get('id') or '')
+        event_record_id, duplicate = begin_webhook_event('stripe', event_id, event_type, payload)
+        if duplicate:
+            return jsonify({'status': 'duplicate'}), 200
 
-        # Processar eventos de pagamento
-        if event['type'] == 'checkout.session.completed':
+        debug_log(f'Webhook Stripe recebido: {event_type}')
+        if event_type == 'checkout.session.completed':
             session = event['data']['object']
             handle_checkout_completed(session)
-
-        elif event['type'] == 'customer.subscription.created':
+        elif event_type == 'customer.subscription.created':
             subscription = event['data']['object']
             debug_log(f'Assinatura criada: {subscription["id"]}')
-
-        elif event['type'] == 'customer.subscription.updated':
+        elif event_type == 'customer.subscription.updated':
             subscription = event['data']['object']
             handle_subscription_updated(subscription)
-
-        elif event['type'] == 'customer.subscription.deleted':
+        elif event_type == 'customer.subscription.deleted':
             subscription = event['data']['object']
             handle_subscription_cancelled(subscription)
-
-        elif event['type'] == 'invoice.payment_succeeded':
+        elif event_type == 'invoice.payment_succeeded':
             invoice = event['data']['object']
             debug_log(f'Pagamento bem-sucedido: {invoice["id"]}')
-
-        elif event['type'] == 'invoice.payment_failed':
+        elif event_type == 'invoice.payment_failed':
             invoice = event['data']['object']
             debug_log(f'Falha no pagamento: {invoice["id"]}')
 
+        finish_webhook_event(event_record_id, 'processed')
         return jsonify({'status': 'success'}), 200
-
-    except ValueError as e:
-        # Payload inválido
-        debug_log(f'Erro no payload do webhook: {str(e)}')
-        return jsonify({'error': 'Invalid payload'}), 400
-
-    except SignatureVerificationError as e:
-        # Assinatura inválida
-        debug_log(f'Erro na verificação da assinatura: {str(e)}')
-        return jsonify({'error': 'Invalid signature'}), 400
-
     except Exception as e:
-        debug_log(f'Erro ao processar webhook: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        db.session.rollback()
+        finish_webhook_event(event_record_id, 'failed', e)
+        app.logger.exception('Erro ao processar webhook Stripe')
+        return jsonify({'error': 'Erro interno do servidor'}), 500
 
 @app.route('/abacatepay-webhook', methods=['POST'])
 @csrf.exempt
@@ -5382,6 +5702,7 @@ def abacatepay_webhook():
     - transparent.disputed/transparent.lost: Pagamento contestado/perdido (V2)
     - billing.paid/billing.failed/billing.refunded: compatibilidade com payloads antigos
     """
+    event_record_id = None
     try:
         raw_body = request.get_data(cache=True)
         webhook_error = verify_abacatepay_webhook_request(raw_body)
@@ -5393,11 +5714,6 @@ def abacatepay_webhook():
             return jsonify({'error': 'JSON inválido'}), 400
         if not payload:
             return jsonify({'error': 'Dados inválidos'}), 400
-
-        debug_log(f'Webhook Abacate Pay recebido: {payload}')
-
-        if not payload:
-            return jsonify({'error': 'Payload inválido'}), 400
 
         event_type = str(payload.get('event') or '')
         event_data = payload.get('data') or {}
@@ -5421,10 +5737,21 @@ def abacatepay_webhook():
             debug_log('ERRO: identificador da cobrança não encontrado no webhook')
             return jsonify({'error': 'Missing billing_id'}), 400
 
+        provider_event_id = str(
+            payload.get('id')
+            or f"{event_type}:{charge_id or external_id}"
+        )
+        event_record_id, duplicate = begin_webhook_event(
+            'abacatepay', provider_event_id, event_type, raw_body
+        )
+        if duplicate:
+            return jsonify({'status': 'duplicate'}), 200
+
         transaction = find_abacatepay_transaction(charge_id=charge_id, external_id=external_id)
 
         if not transaction:
             debug_log(f'ERRO: Transação não encontrada para charge_id={charge_id} external_id={external_id}')
+            finish_webhook_event(event_record_id, 'failed', 'Transação não encontrada')
             return jsonify({'error': 'Transaction not found'}), 404
 
         if charge_id and not transaction.abacatepay_charge_id:
@@ -5440,10 +5767,12 @@ def abacatepay_webhook():
         else:
             sync_abacatepay_transaction_status(transaction, billing_data)
 
+        finish_webhook_event(event_record_id, 'processed')
         return jsonify({'status': 'success'}), 200
 
     except Exception as e:
-        debug_log(f'Erro ao processar webhook Abacate Pay: {str(e)}')
+        db.session.rollback()
+        finish_webhook_event(event_record_id, 'failed', e)
         app.logger.exception('Erro ao processar webhook Abacate Pay')
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
@@ -5515,8 +5844,10 @@ def handle_abacatepay_payment_success(transaction, billing_data):
     try:
         user = User.query.get(transaction.user_id)
         if not user:
-            debug_log(f'ERRO: Usuário {transaction.user_id} não encontrado')
-            return
+            raise ValueError(f'Usuário {transaction.user_id} não encontrado.')
+
+        if transaction.plan_type not in {'premium', 'vip', 'donation'}:
+            raise ValueError('Plano inválido na transação Abacate Pay.')
 
         # Verificar se já foi processado
         if transaction.status == 'completed':
@@ -5553,6 +5884,7 @@ def handle_abacatepay_payment_success(transaction, billing_data):
     except Exception as e:
         debug_log(f'Erro ao processar pagamento PIX: {str(e)}')
         db.session.rollback()
+        raise
 
 def handle_abacatepay_payment_failed(transaction, billing_data):
     """Processa falha no pagamento PIX"""
@@ -5564,6 +5896,7 @@ def handle_abacatepay_payment_failed(transaction, billing_data):
     except Exception as e:
         debug_log(f'Erro ao processar falha PIX: {str(e)}')
         db.session.rollback()
+        raise
 
 def handle_abacatepay_payment_refunded(transaction, billing_data):
     """Processa estorno de pagamento PIX"""
@@ -5581,6 +5914,7 @@ def handle_abacatepay_payment_refunded(transaction, billing_data):
     except Exception as e:
         debug_log(f'Erro ao processar estorno PIX: {str(e)}')
         db.session.rollback()
+        raise
 
 def handle_checkout_completed(session):
     """Processa checkout completado - ATIVA O PLANO AUTOMATICAMENTE"""
@@ -5590,15 +5924,15 @@ def handle_checkout_completed(session):
 
     debug_log(f'Checkout completado: session_id={session_id}, user_id={user_id}, plan={plan_type}')
 
-    if not user_id or not plan_type:
-        debug_log('ERRO: Metadata incompleto no checkout')
-        return
+    if not user_id or plan_type not in {'premium', 'vip', 'donation'}:
+        raise ValueError('Metadata de checkout ausente ou inválida.')
+    if session.get('payment_status') not in {'paid', 'no_payment_required'}:
+        raise ValueError('Checkout ainda não possui pagamento confirmado.')
 
     try:
         user = User.query.get(int(user_id))
         if not user:
-            debug_log(f'ERRO: Usuário {user_id} não encontrado')
-            return
+            raise ValueError(f'Usuário {user_id} não encontrado.')
 
         if plan_type == 'donation':
             existing_transaction = Transaction.query.filter_by(stripe_session_id=session_id).first()
@@ -5679,6 +6013,7 @@ def handle_checkout_completed(session):
     except Exception as e:
         db.session.rollback()
         debug_log(f'ERRO ao processar checkout: {str(e)}')
+        raise
 
 def handle_subscription_updated(subscription):
     """Processa atualização de assinatura"""
@@ -5809,8 +6144,15 @@ def vip_area():
 
 @app.route('/contato', methods=['GET', 'POST'])
 def contact():
+    if request.args.get('category') == 'solicitacao':
+        return redirect(url_for('content_requests'))
     if request.method == 'POST':
         category = sanitize_input(request.form.get('category', ''))
+        if category == 'solicitacao':
+            target = url_for('content_requests')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': True, 'redirect_url': target})
+            return redirect(target)
         raw_phone = request.form.get('phone', '').strip()
         phone_digits = re.sub(r'\D', '', raw_phone)
         if len(phone_digits) > 11:
@@ -5830,30 +6172,6 @@ def contact():
                 phone = f'({phone_digits[:2]}) {phone_digits[2:6]}-{phone_digits[6:10]}'
         else:
             phone = ''
-
-        # Solicitação de conteúdo é um recurso autenticado e exclusivo do VIP.
-        if category == 'solicitacao' and not current_user.is_authenticated:
-            login_url = url_for('login', next=url_for('contact', category='solicitacao'))
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': False,
-                    'message': 'Entre na sua conta para solicitar conteúdo específico.',
-                    'requires_login': True,
-                    'redirect_url': login_url,
-                }), 401
-            flash('Entre na sua conta para solicitar conteúdo específico.', 'warning')
-            return redirect(login_url)
-
-        if category == 'solicitacao' and not can_request_specific_content(current_user):
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': False,
-                    'message': 'A solicitação de conteúdo é exclusiva do plano VIP.',
-                    'requires_upgrade': True
-                }), 403
-            else:
-                flash('A solicitação de conteúdo é exclusiva do plano VIP. Faça upgrade para ter acesso!', 'warning')
-                return redirect(url_for('plans'))
 
         # Sanitizar e validar inputs
         name = sanitize_input(request.form.get('name', '').strip())
@@ -5950,6 +6268,135 @@ def contact():
         return redirect(url_for('contact'))
 
     return render_template('contact.html', title='Contato')
+
+
+CONTENT_REQUEST_STATUSES = {
+    'pending': 'Recebida',
+    'reviewing': 'Em análise',
+    'searching': 'Em busca',
+    'found': 'Encontrado',
+    'completed': 'Concluído',
+    'unavailable': 'Indisponível',
+    'rejected': 'Não aprovado',
+}
+
+
+@app.route('/solicitacoes', methods=['GET', 'POST'])
+@limiter.limit('10 per hour', methods=['POST'])
+def content_requests():
+    """Sugestões abertas a todos e buscas prioritárias exclusivas do VIP."""
+    if request.method == 'POST':
+        request_type = str(request.form.get('request_type') or 'suggestion').strip().lower()
+        if request_type not in {'suggestion', 'vip_priority'}:
+            return jsonify({'success': False, 'message': 'Tipo de solicitação inválido.'}), 400
+
+        if request_type == 'vip_priority':
+            if not current_user.is_authenticated:
+                flash('Entre na sua conta VIP para solicitar uma busca prioritária.', 'warning')
+                return redirect(url_for('login', next=url_for('content_requests', type='vip_priority')))
+            if not can_request_specific_content(current_user):
+                flash('A busca prioritária é exclusiva do plano VIP. Você ainda pode enviar uma sugestão.', 'warning')
+                return redirect(url_for('content_requests', type='suggestion'))
+
+        title = sanitize_input(str(request.form.get('title') or '').strip())
+        description = sanitize_input(str(request.form.get('description') or '').strip())
+        category_name = sanitize_input(str(request.form.get('category') or '').strip())
+        board_code = sanitize_input(str(request.form.get('board_code') or '').strip())
+        requester_name = sanitize_input(str(request.form.get('requester_name') or '').strip())
+        requester_email = str(request.form.get('requester_email') or '').strip().lower()
+
+        if not title or len(title) > 200:
+            flash('Informe o conteúdo procurado em até 200 caracteres.', 'danger')
+            return redirect(url_for('content_requests'))
+        if len(description) > 4000 or len(board_code) > 120 or len(category_name) > 100:
+            flash('Revise os campos: um dos valores excede o tamanho permitido.', 'danger')
+            return redirect(url_for('content_requests'))
+
+        user_id = current_user.id if current_user.is_authenticated else None
+        if current_user.is_authenticated:
+            requester_name = current_user.get_full_name()
+            requester_email = current_user.email
+        elif not requester_name or not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', requester_email):
+            flash('Informe nome e e-mail válidos para enviar a sugestão.', 'danger')
+            return redirect(url_for('content_requests'))
+
+        content_request = ContentRequest(
+            user_id=user_id,
+            request_type=request_type,
+            title=title,
+            description=description or None,
+            category=category_name or None,
+            board_code=board_code or None,
+            priority=100 if request_type == 'vip_priority' else 0,
+            requester_name=requester_name or None,
+            requester_email=requester_email or None,
+        )
+        db.session.add(content_request)
+        db.session.commit()
+        flash(
+            'Busca prioritária recebida. A disponibilidade depende da possibilidade de obtenção do arquivo.'
+            if request_type == 'vip_priority'
+            else 'Sugestão recebida. Ela será considerada na expansão do acervo, sem prazo ou prioridade garantidos.',
+            'success',
+        )
+        return redirect(url_for('content_requests'))
+
+    selected_type = str(request.args.get('type') or 'suggestion').strip().lower()
+    priority_locked = selected_type == 'vip_priority' and not (
+        current_user.is_authenticated and can_request_specific_content(current_user)
+    )
+    if selected_type == 'vip_priority' and not (
+        current_user.is_authenticated and can_request_specific_content(current_user)
+    ):
+        selected_type = 'suggestion'
+    own_requests = []
+    if current_user.is_authenticated:
+        own_requests = ContentRequest.query.filter_by(user_id=current_user.id).order_by(
+            ContentRequest.created_at.desc()
+        ).all()
+    public_categories, _empty_categories = get_public_categories_partition()
+    return render_template(
+        'content_requests.html',
+        title='Sugestões e solicitações',
+        selected_type=selected_type,
+        priority_locked=priority_locked,
+        requested_query=str(request.args.get('q') or '').strip(),
+        own_requests=own_requests,
+        request_statuses=CONTENT_REQUEST_STATUSES,
+        request_categories=public_categories,
+    )
+
+
+@app.route('/admin/solicitacoes')
+@login_required
+@admin_required
+def admin_content_requests():
+    requests_list = ContentRequest.query.order_by(
+        ContentRequest.priority.desc(), ContentRequest.created_at.asc()
+    ).all()
+    return render_template(
+        'admin/content_requests.html',
+        title='Solicitações de conteúdo',
+        content_requests=requests_list,
+        request_statuses=CONTENT_REQUEST_STATUSES,
+    )
+
+
+@app.route('/admin/solicitacoes/<int:request_id>/status', methods=['POST'])
+@login_required
+@admin_required
+def admin_update_content_request(request_id):
+    content_request = ContentRequest.query.get_or_404(request_id)
+    status = str(request.form.get('status') or '').strip().lower()
+    if status not in CONTENT_REQUEST_STATUSES:
+        flash('Status inválido.', 'danger')
+        return redirect(url_for('admin_content_requests'))
+    content_request.status = status
+    content_request.admin_notes = sanitize_input(str(request.form.get('admin_notes') or '').strip())[:4000] or None
+    content_request.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash('Solicitação atualizada.', 'success')
+    return redirect(url_for('admin_content_requests'))
 
 @app.route('/newsletter', methods=['POST'])
 @limiter.limit("10 per hour")  # Limitar inscrições na newsletter
@@ -6100,7 +6547,7 @@ def _serialize_posts(posts_list, favorite_post_ids):
                 'Datasheet': 'fas fa-file-alt'}
     posts_data = []
     for post in posts_list:
-        dl_files = post.get_metadata('download_files') or []
+        dl_files = get_public_download_files(post)
         cat_slug = generate_slug(post.category_str) if post.category_str else ''
         post_link = f'/{cat_slug}/{post.slug}' if post.slug and cat_slug else f'/post/{post.id}'
         img_url = ''
@@ -6125,7 +6572,7 @@ def _serialize_posts(posts_list, favorite_post_ids):
             'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
             'views': post.views or 0,
             'image_url': img_url,
-            'download_link': post.download_link,
+            'download_link': url_for('download_post', post_id=post.id) if post.download_link else '',
             'category_str': post.category_str or 'Geral',
             'category_icon': cat_icon,
             'post_url': post_link,
@@ -6136,6 +6583,8 @@ def _serialize_posts(posts_list, favorite_post_ids):
     return posts_data
 
 @app.route('/api/debug/posts')
+@login_required
+@admin_required
 def api_debug_posts():
     """Endpoint de debug para verificar posts no banco"""
     total_posts = Post.query.count()
@@ -6166,7 +6615,19 @@ def api_debug_posts():
 @app.route('/api/posts/<int:post_id>')
 def api_post(post_id):
     post = Post.query.get_or_404(post_id)
-    return jsonify(post.to_dict())
+    return jsonify({
+        'id': post.id,
+        'title': post.title,
+        'content': post.content,
+        'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+        'category': post.category_rel.name if post.category_rel else post.category_str,
+        'model': post.model,
+        'board_code': post.board_code,
+        'file_type': post.file_type,
+        'verification_status': post.verification_status,
+        'download_files': get_public_download_files(post),
+        'download_url': url_for('download_post', post_id=post.id) if post.download_link else None,
+    })
 
 @app.route('/api/search/suggestions')
 def search_suggestions():
@@ -6185,7 +6646,7 @@ def search_suggestions():
     # Se não há categoria específica, buscar categorias também
     if not category:
         scored_categories = []
-        for cat in Category.query.filter_by(is_active=True).all():
+        for cat in Category.query.filter_by(is_active=True, is_visible=True).all():
             score = get_search_match_score(query, cat.name, cat.description, cat.slug)
             if score is not None:
                 scored_categories.append((score, cat.name.casefold(), cat))
@@ -6210,17 +6671,7 @@ def search_suggestions():
 
     scored_posts = []
     for post in posts_query.all():
-        score = get_search_match_score(
-            query,
-            post.title,
-            post.content,
-            post.seo_title,
-            post.seo_description,
-            post.tags,
-            post.category_str,
-            post.subcategory,
-            post.slug,
-        )
+        score = get_post_search_score(query, post)
         if score is not None:
             sort_date = post.date_posted or datetime.min
             scored_posts.append((score, -sort_date.toordinal(), post.title.casefold(), post))
@@ -6257,7 +6708,7 @@ def search_suggestions():
         suggestions.append({
             'type': 'post',
             'title': post.title,
-            'description': f'{category_name}',
+            'description': ' · '.join(filter(None, [post.model, post.board_code, post.file_type or category_name])),
             'category': category_name,
             'url': url_for('post_by_slug', category=generate_slug(post.category_str), slug=post.slug) if post.slug else url_for('post', post_id=post.id),
             'icon': category_icon,
@@ -6379,6 +6830,11 @@ def admin_duplicate_post(post_id):
             seo_description=original_post.seo_description,
             slug=slug
         )
+        for field_name in POST_TECHNICAL_FIELDS:
+            setattr(new_post, field_name, getattr(original_post, field_name))
+        new_post.sha256 = original_post.sha256
+        new_post.last_verified_at = original_post.last_verified_at
+        new_post.verification_status = original_post.verification_status
 
         db.session.add(new_post)
 
@@ -6426,6 +6882,16 @@ def admin_post_data(post_id):
     """Retorna dados do post em JSON para edição"""
     post = Post.query.get_or_404(post_id)
 
+    technical_data = {
+        field_name: getattr(post, field_name)
+        for field_name in POST_TECHNICAL_FIELDS
+    }
+    technical_data.update({
+        'sha256': post.sha256 or '',
+        'verification_status': post.verification_status or 'unverified',
+        'last_verified_at': post.last_verified_at.strftime('%Y-%m-%d') if post.last_verified_at else '',
+    })
+
     return jsonify({
         'id': post.id,
         'title': post.title,
@@ -6445,7 +6911,8 @@ def admin_post_data(post_id):
         'tags': post.tags,
         'seo_title': post.seo_title,
         'seo_description': post.seo_description,
-        'custom_metadata': post.get_metadata() or {}
+        'custom_metadata': post.get_metadata() or {},
+        **technical_data,
     })
 
 @app.route('/admin/posts/<int:post_id>/update', methods=['POST'])
@@ -6470,6 +6937,8 @@ def admin_update_post(post_id):
         is_active = request.form.get('is_active') == 'true'
 
         # Validações
+        if download_link and not normalize_download_url(download_link):
+            return jsonify({'success': False, 'message': 'Link de download inválido.'}), 400
         if not title:
             return jsonify({'success': False, 'message': 'Título é obrigatório'})
 
@@ -6539,18 +7008,15 @@ def admin_update_post(post_id):
         post.seo_title = seo_title or None
         post.seo_description = seo_description or None
         post.date_updated = datetime.utcnow()
+        apply_post_technical_form(post, request.form)
 
         # Armazenar download_files no custom_metadata
         if download_files_json:
-            try:
-                download_files = json.loads(download_files_json)
-                if isinstance(download_files, list) and len(download_files) > 0:
-                    post.set_metadata('download_files', download_files)
-                    # Atualizar download_link com o primeiro link
-                    if not download_link and download_files[0].get('url'):
-                        post.download_link = download_files[0]['url']
-            except (json.JSONDecodeError, TypeError):
-                pass
+            download_files = normalize_download_files(download_files_json)
+            if download_files:
+                post.set_metadata('download_files', download_files)
+                if not download_link:
+                    post.download_link = download_files[0]['url']
 
         db.session.commit()
 
@@ -6570,6 +7036,9 @@ def admin_update_post(post_id):
             'stats': get_admin_posts_overview()
         })
 
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao atualizar post: {str(e)}'}), 500
@@ -6750,17 +7219,20 @@ def initialize_db():
         db_path = os.path.join(instance_dir, 'site.db')
         db_exists = os.path.exists(db_path)
 
-        print(f"📁 Banco SQLite: {'Encontrado' if db_exists else 'Será criado'} em {db_path}")
+        app.logger.info('Banco SQLite %s em %s', 'encontrado' if db_exists else 'sera criado', db_path)
 
         # Criar todas as tabelas
         db.create_all()
-        print("✅ Tabelas SQLite criadas/verificadas com sucesso!")
+        app.logger.info('Tabelas SQLite criadas/verificadas')
 
         # Adicionar configurações iniciais do site se não existirem
         if SiteConfig.query.count() == 0:
             default_configs = [
                 SiteConfig(key='site_name', value='Mundo da Informática'),
-                SiteConfig(key='site_description', value='Seu portal de tecnologia'),
+                SiteConfig(
+                    key='site_description',
+                    value='Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
+                ),
                 SiteConfig(key='contact_email', value=DEFAULT_SUPPORT_EMAIL),
                 SiteConfig(key='contact_phone', value='(21) 97879-4705'),
                 SiteConfig(key='admin_email', value='admin@mundodainformatica.com'),
@@ -6788,7 +7260,7 @@ def initialize_db():
             for config in default_configs:
                 db.session.add(config)
 
-            print("✅ Configurações iniciais do site adicionadas!")
+            app.logger.info('Configuracoes iniciais do site adicionadas')
 
         # Adicionar categorias padrão que não existirem
         default_categories = [
@@ -6813,24 +7285,26 @@ def initialize_db():
                     order=cat_data['order']
                 ))
                 added_count += 1
-                print(f"  ➕ Categoria '{cat_data['name']}' adicionada")
+                app.logger.info('Categoria padrao adicionada: %s', cat_data['name'])
 
         if added_count > 0:
-            print(f"✅ {added_count} categoria(s) padrão adicionada(s)!")
+            app.logger.info('%s categoria(s) padrao adicionada(s)', added_count)
         else:
-            print("✅ Todas as categorias padrão já existem.")
+            app.logger.debug('Todas as categorias padrao ja existem')
 
         # Salvar todas as configurações
         db.session.commit()
-        print("✅ Banco de dados SQLite inicializado com sucesso!")
+        app.logger.info('Banco SQLite inicializado')
 
         # Exibir estatísticas
-        print(f"📊 Status: Posts: {Post.query.count()}, Categorias: {Category.query.count()}, Usuários: {User.query.count()}")
+        app.logger.info(
+            'Status do banco: posts=%s categorias=%s usuarios=%s',
+            Post.query.count(), Category.query.count(), User.query.count()
+        )
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Erro na inicialização do banco: {e}")
-        print("🔄 Continuando com configuração mínima...")
+        app.logger.exception('Erro na inicializacao do banco: %s', e)
 
 
 # Rota de login
@@ -6908,6 +7382,7 @@ def login():
         db.session.commit()
 
         flash('Login realizado com sucesso!', 'success')
+        flask_session['analytics_event'] = 'login'
 
         # Redirecionar para a página que o usuário tentou acessar ou para o dashboard
         next_page = request.args.get('next')
@@ -6959,6 +7434,7 @@ def auth_google():
     photo_url = (decoded.get('picture') or '').strip()
 
     user = User.query.filter_by(email=email).first()
+    created_with_google = user is None
 
     try:
         if user is None:
@@ -7005,6 +7481,7 @@ def auth_google():
         user.referrer = (request.referrer or 'Google Sign-In')[:500]
 
         db.session.commit()
+        flask_session['analytics_event'] = 'sign_up' if created_with_google else 'login'
     except Exception as e:
         db.session.rollback()
         app.logger.error(f'Erro no login Google: {e}')
@@ -7039,6 +7516,8 @@ def chat_firebase_token():
     """
     if not current_user.is_active:
         return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+    if not _can_user_write_public_chat(current_user):
+        return jsonify({'success': False, 'message': 'O chat está disponível no plano VIP.'}), 403
 
     if firebase_auth is None:
         return jsonify({'success': False, 'message': 'Firebase Admin indisponível no servidor.'}), 503
@@ -7226,15 +7705,16 @@ def _chat_actor_role(user) -> str:
 
 
 def _can_user_write_public_chat(user) -> bool:
-    return bool(get_plan_entitlements(user)['public_chat'])
+    return bool(getattr(user, 'role', '') in {'admin', 'editor'} or can_use_public_chat(user))
 
 
 def _get_chat_permissions_for_user(user) -> dict[str, Any]:
+    has_chat_access = _can_user_write_public_chat(user)
     return {
-        'public_read': True,
-        'public_write': _can_user_write_public_chat(user),
-        'support_read': True,
-        'support_write': True,
+        'public_read': has_chat_access,
+        'public_write': has_chat_access,
+        'support_read': has_chat_access,
+        'support_write': has_chat_access,
         'vip_area': bool(get_plan_entitlements(user)['vip_area'])
     }
 
@@ -7273,6 +7753,8 @@ def _chat_backend_unavailable_response(user):
 
 
 def _validate_chat_room_access(user, room_id: str, *, write: bool = False) -> tuple[bool, str, int]:
+    if not _can_user_write_public_chat(user):
+        return False, 'O chat está disponível no plano VIP.', 403
     normalized_room_id = str(room_id or '').strip()
     if not normalized_room_id:
         return False, 'Sala de chat inválida.', 400
@@ -7537,6 +8019,8 @@ def chat_bootstrap():
     """
     if not current_user.is_active:
         return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+    if not _can_user_write_public_chat(current_user):
+        return jsonify({'success': False, 'message': 'O chat está disponível no plano VIP.'}), 403
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
@@ -7564,6 +8048,8 @@ def chat_bootstrap():
 def chat_state():
     if not current_user.is_active:
         return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
+    if not _can_user_write_public_chat(current_user):
+        return jsonify({'success': False, 'message': 'O chat está disponível no plano VIP.'}), 403
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
@@ -7878,6 +8364,7 @@ def register():
         try:
             db.session.add(new_user)
             db.session.commit()
+            flask_session['analytics_event'] = 'sign_up'
 
             # Feedback de sucesso
             flash('Conta criada com sucesso! Você já pode fazer login.', 'success')
@@ -7894,6 +8381,7 @@ def register():
 
 # Rota de recuperação de senha (nova)
 @app.route('/reset-password', methods=['GET', 'POST'])
+@limiter.limit("5 per hour")
 def reset_password_request():
     if current_user.is_authenticated:
         return redirect(url_for('home'))
@@ -7913,10 +8401,10 @@ def reset_password_request():
         if user:
             # Gerar token de redefinição
             token = user.get_reset_token()
-
-            # Na versão atual, apenas simulamos o envio do email
-            # No futuro, você pode implementar o envio real
-            app.logger.info(f"Link de redefinição para {email}: {url_for('reset_password', token=token, _external=True)}")
+            try:
+                send_password_reset_email(user, token)
+            except Exception:
+                app.logger.exception('Falha ao enviar email de redefinicao para user_id=%s', user.id)
 
         return redirect(url_for('login'))
 
@@ -8083,22 +8571,6 @@ def admin_dashboard():
     except Exception:
         # Se não há dados, criar estrutura vazia
         chart_data['downloads_by_category'] = []
-
-    # Debug: Imprimir valores reais no console
-    debug_log(f"- Stats reais do banco:")
-    print(f"  Posts ativos: {posts_count}")
-    print(f"  Posts em destaque: {featured_posts_count}")
-    print(f"  Total de visualizações: {total_views}")
-    print(f"  Categorias ativas: {categories_count}")
-    print(f"  Usuários ativos: {users_count}")
-    print(f"  Admins: {admin_users_count}")
-    print(f"  Novos usuários hoje: {new_users_today}")
-    print(f"  Inscritos ativos: {subscribers_count}")
-    print(f"  Total downloads: {total_downloads}")
-    print(f"  Downloads hoje: {downloads_today}")
-    print(f"  Visitantes únicos: {unique_visitors}")
-    print(f"  Visualizações de página: {page_views}")
-    print(f"  Comentários: {comments_count}")
 
     stats = {
         "posts": posts_count,
@@ -8413,6 +8885,8 @@ def admin_create_post():
 
 
         errors = {}
+        if download_link and not normalize_download_url(download_link):
+            errors['download_link'] = 'O link de download é inválido.'
         if not title:
             errors['title'] = 'O título é obrigatório.'
         if not content:
@@ -8548,16 +9022,15 @@ def admin_create_post():
             slug=slug
         )
 
+        apply_post_technical_form(new_post, request.form)
+
         db.session.add(new_post)
 
         # Armazenar download_files no custom_metadata
         if download_files_json:
-            try:
-                download_files = json.loads(download_files_json)
-                if isinstance(download_files, list) and len(download_files) > 0:
-                    new_post.set_metadata('download_files', download_files)
-            except (json.JSONDecodeError, TypeError):
-                pass
+            download_files = normalize_download_files(download_files_json)
+            if download_files:
+                new_post.set_metadata('download_files', download_files)
 
         db.session.commit()
 
@@ -8572,6 +9045,12 @@ def admin_create_post():
         flash(f'Post "{title}" criado com sucesso!', 'success')
         return redirect(url_for('admin_posts'))
 
+    except ValueError as e:
+        db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': str(e)}), 400
+        flash(str(e), 'error')
+        return redirect(url_for('admin_posts'))
     except Exception as e:
         db.session.rollback()
         if _is_ajax_request():
@@ -8724,17 +9203,7 @@ def admin_posts():
     if search_query:
         posts_list = [
             post for post in posts_list
-            if get_search_match_score(
-                search_query,
-                post.title,
-                post.content,
-                post.seo_title,
-                post.seo_description,
-                post.tags,
-                post.category_str,
-                post.subcategory,
-                post.slug,
-            ) is not None
+            if get_post_search_score(search_query, post) is not None
         ]
 
     if category_filter:
@@ -9269,6 +9738,7 @@ def admin_create_category():
         color = sanitize_input((data.get('color') or '#4a90e2').strip()) or '#4a90e2'
         order = coerce_int(data.get('order'), 0)
         is_active = coerce_bool(data.get('is_active'), True)
+        is_visible = coerce_bool(data.get('is_visible'), True)
         featured = coerce_bool(data.get('featured'), False)
         show_in_menu = coerce_bool(data.get('show_in_menu'), True)
 
@@ -9300,6 +9770,7 @@ def admin_create_category():
             color=color,
             order=order,
             is_active=is_active,
+            is_visible=is_visible,
             show_in_menu=show_in_menu
         )
 
@@ -9352,6 +9823,7 @@ def admin_get_category(category_id):
                 'color': category.color or '#4a90e2',
                 'order': category.order or 0,
                 'is_active': category.is_active,
+                'is_visible': bool(category.is_visible),
                 'is_featured': bool(category.featured),
                 'show_in_menu': bool(category.show_in_menu),
             }
@@ -9380,6 +9852,7 @@ def admin_update_category(category_id):
         color = sanitize_input((data.get('color', category.color or '#4a90e2') or '#4a90e2').strip()) or '#4a90e2'
         order = coerce_int(data.get('order'), category.order or 0)
         is_active = coerce_bool(data.get('is_active'), bool(category.is_active))
+        is_visible = coerce_bool(data.get('is_visible'), bool(category.is_visible))
         featured = coerce_bool(data.get('featured'), bool(category.featured))
         show_in_menu = coerce_bool(data.get('show_in_menu'), bool(category.show_in_menu))
 
@@ -9404,6 +9877,7 @@ def admin_update_category(category_id):
         category.color = color
         category.order = order
         category.is_active = is_active
+        category.is_visible = is_visible
         category.show_in_menu = show_in_menu
 
         # Atualizar campo featured se existe
@@ -10867,7 +11341,7 @@ def admin_save_settings():
                 metadata={'updated_keys': list(data.keys())}
             )
         except Exception as e:
-            print(f"Erro ao registrar atividade: {e}")
+            app.logger.error('Erro ao registrar atividade: %s', e)
 
         return jsonify({
             'success': True,
@@ -10875,8 +11349,8 @@ def admin_save_settings():
             'settings': get_live_site_settings(),
         })
 
-    except Exception as e:
-        print(f"Erro ao salvar configurações: {e}")
+    except Exception:
+        app.logger.exception('Erro ao salvar configuracoes')
         return jsonify({'success': False, 'message': 'Erro interno do servidor'})
 
 @app.route("/admin/profile")
@@ -11007,8 +11481,8 @@ def get_user_favorites_api():
                     'image_url': post.image_url,
                     'category_str': post.category_str or 'Geral',
                     'category_slug': Category.query.get(post.category_id).slug if post.category_id else None,
-                    'download_link': post.download_link,
-                    'download_files': post.get_metadata('download_files') or [],
+                    'download_link': url_for('download_post', post_id=post.id) if post.download_link else '',
+                    'download_files': get_public_download_files(post),
                     'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
                     'views': post.views or 0,
                     'downloads': post.downloads or 0,
@@ -11020,11 +11494,9 @@ def get_user_favorites_api():
             'posts': posts_data,
             'total': len(favorites)
         })
-    except Exception as e:
-        print(f"[ERRO] Ao buscar favoritos: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'message': str(e)}), 500
+    except Exception:
+        app.logger.exception('Erro ao buscar favoritos')
+        return jsonify({'success': False, 'message': 'Não foi possível buscar os favoritos.'}), 500
 
 @app.route('/api/reorder-favorites', methods=['POST'])
 @login_required
@@ -11106,8 +11578,8 @@ def get_download_history_api():
                     'post_title': download.post.title,
                     'post_slug': download.post.slug,
                     'post_image': download.post.image_url,
-                    'download_link': download.post.download_link,
-                    'download_files': download.post.get_metadata('download_files') or [],
+                    'download_link': url_for('download_post', post_id=download.post.id) if download.post.download_link else '',
+                    'download_files': get_public_download_files(download.post),
                     'category_name': category.name if category else None,
                     'category_slug': category.slug if category else None,
                     'timestamp': brasilia_time.strftime('%d/%m/%Y às %H:%M')
@@ -11302,7 +11774,7 @@ def upload_to_cloudinary(file, folder='profiles'):
         return True, result['secure_url']
 
     except Exception as e:
-        print(f"Erro ao fazer upload para Cloudinary: {e}")
+        app.logger.error('Erro ao fazer upload para Cloudinary: %s', e)
         return False, str(e)
 
 def delete_from_cloudinary(image_url):
@@ -11322,9 +11794,9 @@ def delete_from_cloudinary(image_url):
             public_id = public_id_with_ext.rsplit('.', 1)[0]
 
             cloudinary.uploader.destroy(public_id)
-            print(f"Imagem deletada do Cloudinary: {public_id}")
+            app.logger.info('Imagem removida do Cloudinary: %s', public_id)
     except Exception as e:
-        print(f"Erro ao deletar do Cloudinary: {e}")
+        app.logger.error('Erro ao remover imagem do Cloudinary: %s', e)
 
 # Rotas para atualizar a imagem de perfil de usuários regulares
 @app.route('/update-profile-image', methods=['POST'])
@@ -11368,8 +11840,8 @@ def update_profile_image():
             else:
                 flash(f'Erro ao fazer upload da imagem: {result}', 'error')
 
-        except Exception as e:
-            print(f"Erro ao processar imagem: {e}")
+        except Exception:
+            app.logger.exception('Erro ao processar imagem de perfil')
             flash('Erro ao processar a imagem. Tente novamente.', 'error')
     else:
         flash('Formato de arquivo não permitido. Use JPG, JPEG, PNG ou GIF.', 'error')
@@ -11457,8 +11929,8 @@ def admin_update_profile_image():
             db.session.commit()
 
             flash('Imagem de perfil atualizada com sucesso!', 'success')
-        except Exception as e:
-            print(f"Erro ao processar imagem: {e}")
+        except Exception:
+            app.logger.exception('Erro ao processar imagem administrativa')
             flash('Erro ao processar a imagem. Tente novamente.', 'error')
     else:
         flash('Formato de arquivo não permitido. Use JPG, JPEG, PNG ou GIF.', 'error')
@@ -11535,30 +12007,61 @@ def admin_remove_user_photo(user_id):
 
 @app.route('/admin/update-profile', methods=['POST'])
 @login_required
-@editor_required
 def admin_update_profile():
-    # Atualiza os dados básicos do perfil
-    if request.method == 'POST':
-        current_user.name = request.form.get('name')
-        current_user.username = request.form.get('username')
-        current_user.email = request.form.get('email')
-        current_user.bio = request.form.get('bio')
-        current_user.phone = request.form.get('phone')
-        current_user.location = request.form.get('location')
-        current_user.website = request.form.get('website')
+    """Atualiza somente o perfil da conta autenticada, com validação no servidor."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    return_endpoint = 'admin_profile' if request.form.get('profile_context') == 'admin' else 'profile'
 
-        # Redes sociais
-        current_user.facebook = request.form.get('facebook')
-        current_user.twitter = request.form.get('twitter')
-        current_user.instagram = request.form.get('instagram')
-        current_user.linkedin = request.form.get('linkedin')
-        current_user.github = request.form.get('github')
+    def validation_error(message, status=400):
+        if is_ajax:
+            return jsonify({'success': False, 'message': message}), status
+        flash(message, 'error')
+        return redirect(url_for(return_endpoint))
+
+    name = sanitize_input(request.form.get('name', ''))[:100]
+    username = sanitize_input(request.form.get('username', '')).strip()[:50]
+    email = sanitize_input(request.form.get('email', '')).strip().lower()[:120]
+    if not name:
+        return validation_error('Informe seu nome.')
+    if not re.fullmatch(r'[A-Za-z0-9_]{3,20}', username):
+        return validation_error('O usuário deve ter de 3 a 20 caracteres: letras, números ou _.')
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
+        return validation_error('Informe um email válido.')
+    if User.query.filter(db.func.lower(User.username) == username.lower(), User.id != current_user.id).first():
+        return validation_error('Este nome de usuário já está em uso.', 409)
+    if User.query.filter(db.func.lower(User.email) == email, User.id != current_user.id).first():
+        return validation_error('Este email já está em uso.', 409)
+
+    try:
+        current_user.name = name
+        current_user.username = username
+        current_user.email = email
+        if 'bio' in request.form:
+            current_user.bio = sanitize_input(request.form.get('bio', ''))[:300]
+        if 'phone' in request.form:
+            current_user.phone = sanitize_input(request.form.get('phone', ''))[:20]
+        if 'location' in request.form:
+            current_user.location = sanitize_input(request.form.get('location', ''))[:100]
+
+        for field_name in ('website', 'facebook', 'twitter', 'instagram', 'linkedin', 'github'):
+            if field_name in request.form:
+                setattr(current_user, field_name, normalize_optional_external_url(request.form.get(field_name)))
 
         db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return validation_error(str(exc))
+    except IntegrityError:
+        db.session.rollback()
+        return validation_error('Usuário ou email já cadastrado.', 409)
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Erro ao atualizar perfil')
+        return validation_error('Não foi possível atualizar o perfil.', 500)
 
-        # Se for uma requisição AJAX, retorna JSON com todos os dados
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
+    # Se for uma requisição AJAX, retorna JSON com todos os dados
+    if is_ajax:
+        return jsonify({
                 'success': True,
                 'message': 'Perfil atualizado com sucesso!',
                 'user': {
@@ -11576,12 +12079,11 @@ def admin_update_profile():
                     'github_url': current_user.github,
                     'profile_image': current_user.profile_image
                 }
-            })
+        })
 
-        flash('Perfil atualizado com sucesso!', 'success')
+    flash('Perfil atualizado com sucesso!', 'success')
 
-    # Redirecionar para a página de perfil
-    return redirect(url_for('profile'))
+    return redirect(url_for(return_endpoint))
 
 @app.route('/update-password', methods=['POST'])
 @login_required
@@ -11773,22 +12275,19 @@ def check_device_limit(user):
 
 
 def can_request_specific_content(user):
-    """Verifica se o usuário pode solicitar conteúdo específico"""
+    """Verifica se o usuário pode abrir uma busca prioritária de conteúdo."""
     if user.role == 'admin' or user.role == 'editor':
         return True
 
-    return bool(get_plan_entitlements(user)['request_content'])
+    return can_request_priority_content(user)
 
 @app.route('/favorite/<int:post_id>', methods=['POST'])
 @login_required
 def add_favorite(post_id):
     """Adiciona um post aos favoritos do usuário"""
     try:
-        print(f"[FAVORITOS] Tentando adicionar post {post_id} para usuário {current_user.id}")
-
         # Verifica se o post existe
         post = Post.query.get_or_404(post_id)
-        print(f"[FAVORITOS] Post encontrado: {post.title}")
 
         # Limpa o cache da sessão
         db.session.expire_all()
@@ -11800,7 +12299,6 @@ def add_favorite(post_id):
         ).first()
 
         if existing:
-            print(f"[FAVORITOS] Post {post_id} já está nos favoritos")
             return jsonify({
                 'success': True,
                 'message': 'Post já está nos favoritos',
@@ -11808,12 +12306,9 @@ def add_favorite(post_id):
             })
 
         # Verificar limite de favoritos
-        print(f"[FAVORITOS] Verificando limites para usuário {current_user.username} (plano: {current_user.plan})")
         allowed, message = check_favorite_limit(current_user)
-        print(f"[FAVORITOS] Resultado verificação: allowed={allowed}, message={message}")
 
         if not allowed:
-            print(f"[FAVORITOS] Limite atingido: {message}")
             return jsonify({
                 'success': False,
                 'message': message,
@@ -11821,7 +12316,6 @@ def add_favorite(post_id):
             }), 403
 
         # Adiciona aos favoritos
-        print(f"[FAVORITOS] Adicionando ao banco de dados")
         favorite = Favorite(user_id=current_user.id, post_id=post_id)
         db.session.add(favorite)
         db.session.flush()
@@ -11833,21 +12327,18 @@ def add_favorite(post_id):
         _favorite_check_cache[cache_key] = True
         _favorite_check_timestamps[cache_key] = __import__('time').time()
 
-        print(f"[FAVORITOS] Favorito adicionado com sucesso: ID={favorite.id}")
         return jsonify({
             'success': True,
             'message': 'Post adicionado aos favoritos',
             'is_favorited': True
         })
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print(f"[ERRO] Ao adicionar favorito: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        app.logger.exception('Erro ao adicionar favorito')
         return jsonify({
             'success': False,
-            'message': f'Erro ao adicionar favorito: {str(e)}'
+            'message': 'Não foi possível adicionar o favorito.'
         }), 500
 
 @app.route('/unfavorite/<int:post_id>', methods=['POST'])
@@ -11894,12 +12385,12 @@ def remove_favorite(post_id):
             'is_favorited': False
         })
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print(f"[ERRO] Ao remover favorito: {str(e)}")
+        app.logger.exception('Erro ao remover favorito')
         return jsonify({
             'success': False,
-            'message': f'Erro ao remover favorito: {str(e)}'
+            'message': 'Não foi possível remover o favorito.'
         }), 500
 
 # Cache global para check-favorite com timestamp
@@ -11972,6 +12463,8 @@ def admin_update_preferences():
     return redirect(url_for('admin_profile'))
 
 @app.route('/test-password-toggle')
+@login_required
+@admin_required
 def test_password_toggle():
     """Página de teste para debug do botão password toggle"""
     return render_template('test_password_toggle.html')
@@ -12001,13 +12494,13 @@ def ensure_default_categories():
                     order=cat_data['order']
                 ))
                 added_count += 1
-                print(f"  ➕ Categoria '{cat_data['name']}' adicionada")
+                app.logger.info('Categoria padrao adicionada: %s', cat_data['name'])
         if added_count > 0:
             db.session.commit()
-            print(f"✅ {added_count} categoria(s) padrão adicionada(s)!")
+            app.logger.info('%s categoria(s) padrao adicionada(s)', added_count)
     except Exception as e:
         db.session.rollback()
-        print(f"⚠️ Erro ao verificar categorias padrão: {e}")
+        app.logger.error('Erro ao verificar categorias padrao: %s', e)
 
 with app.app_context():
     try:
@@ -12019,11 +12512,11 @@ with app.app_context():
                 if 'color' not in category_cols:
                     conn.execute(text("ALTER TABLE category ADD COLUMN color VARCHAR(20) DEFAULT '#4a90e2'"))
                     conn.commit()
-                    print("  ➕ Coluna 'color' adicionada à tabela category")
+                    app.logger.info("Coluna 'color' adicionada a category")
                 if 'show_in_menu' not in category_cols:
                     conn.execute(text("ALTER TABLE category ADD COLUMN show_in_menu BOOLEAN DEFAULT 1"))
                     conn.commit()
-                    print("  ➕ Coluna 'show_in_menu' adicionada à tabela category")
+                    app.logger.info("Coluna 'show_in_menu' adicionada a category")
         except Exception:
             pass
         ensure_default_categories()
@@ -12035,35 +12528,35 @@ with app.app_context():
                 if 'position' not in cols:
                     conn.execute(text("ALTER TABLE favorites ADD COLUMN position INTEGER DEFAULT 0"))
                     conn.commit()
-                    print("  ➕ Coluna 'position' adicionada à tabela favorites")
+                    app.logger.info("Coluna 'position' adicionada a favorites")
                 comment_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(comments)"))]
                 if 'parent_id' not in comment_cols:
                     conn.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
                     conn.commit()
-                    print("  ➕ Coluna 'parent_id' adicionada à tabela comments")
+                    app.logger.info("Coluna 'parent_id' adicionada a comments")
                 user_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(user)"))]
                 if 'preferences' not in user_cols:
                     conn.execute(text("ALTER TABLE user ADD COLUMN preferences TEXT"))
                     conn.commit()
-                    print("  ➕ Coluna 'preferences' adicionada à tabela user")
+                    app.logger.info("Coluna 'preferences' adicionada a user")
                 transaction_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(transactions)"))]
                 if transaction_cols and 'abacatepay_charge_id' not in transaction_cols:
                     conn.execute(text("ALTER TABLE transactions ADD COLUMN abacatepay_charge_id VARCHAR(255)"))
                     conn.commit()
-                    print("  ➕ Coluna 'abacatepay_charge_id' adicionada à tabela transactions")
+                    app.logger.info("Coluna 'abacatepay_charge_id' adicionada a transactions")
                 category_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(category)"))]
                 if 'color' not in category_cols:
                     conn.execute(text("ALTER TABLE category ADD COLUMN color VARCHAR(20) DEFAULT '#4a90e2'"))
                     conn.commit()
-                    print("  ➕ Coluna 'color' adicionada à tabela category")
+                    app.logger.info("Coluna 'color' adicionada a category")
                 if 'show_in_menu' not in category_cols:
                     conn.execute(text("ALTER TABLE category ADD COLUMN show_in_menu BOOLEAN DEFAULT 1"))
                     conn.commit()
-                    print("  ➕ Coluna 'show_in_menu' adicionada à tabela category")
+                    app.logger.info("Coluna 'show_in_menu' adicionada a category")
         except Exception:
             pass
-    except Exception as e:
-        print(f"⚠️ Erro na inicialização automática: {e}")
+    except Exception:
+        app.logger.exception('Erro na inicializacao automatica')
 
 # Criar o script de upgrade de banco de dados se ele não existir
 if __name__ == '__main__':

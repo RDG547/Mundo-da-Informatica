@@ -4,7 +4,6 @@
 
 // Verificar se já foi carregado
 if (typeof window.FavoriteManager !== 'undefined') {
-    console.log('favorites.js já carregado, ignorando redeclaração');
 } else {
 
 /**
@@ -76,7 +75,6 @@ window.FavoriteManager = class FavoriteManager {
                 modal = document.getElementById('favorite-confirm-modal');
             }
 
-            console.log('[FAVORITOS] 🔔 Abrindo modal de confirmação');
 
             const confirmBtn = modal.querySelector('.favorite-modal-btn-confirm');
             const cancelBtn = modal.querySelector('.favorite-modal-btn-cancel');
@@ -96,14 +94,12 @@ window.FavoriteManager = class FavoriteManager {
 
             // Adiciona novos listeners
             newConfirmBtn.addEventListener('click', () => {
-                console.log('[FAVORITOS] ✅ Modal: Confirmado');
                 this._modalResolve = null;
                 this.hideConfirmModal();
                 resolve(true);
             });
 
             newCancelBtn.addEventListener('click', () => {
-                console.log('[FAVORITOS] ❌ Modal: Cancelado');
                 this._modalResolve = null;
                 this.hideConfirmModal();
                 resolve(false);
@@ -117,11 +113,9 @@ window.FavoriteManager = class FavoriteManager {
     hideConfirmModal() {
         const modal = document.getElementById('favorite-confirm-modal');
         if (modal) {
-            console.log('[FAVORITOS] 🚪 Fechando modal');
             modal.classList.remove('active');
             setTimeout(() => {
                 modal.style.display = 'none';
-                console.log('[FAVORITOS] 🚪 Modal fechado completamente');
             }, 300);
         }
     }
@@ -138,7 +132,6 @@ window.FavoriteManager = class FavoriteManager {
             if (this._statusCache && this._statusCache[cacheKey]) {
                 const cached = this._statusCache[cacheKey];
                 if (now - cached.timestamp < 30000) { // 30 segundos
-                    console.log(`[FAVORITOS] Usando cache para post ${postId}`);
                     return cached.value;
                 }
             }
@@ -193,20 +186,11 @@ window.FavoriteManager = class FavoriteManager {
      * Sincroniza TODOS os botões de um post em TODAS as páginas abertas (usando BroadcastChannel)
      */
     broadcastFavoriteChange(postId, isFavorited) {
-        console.log(`[FAVORITOS] 🔄 Iniciando broadcast para post ${postId}: ${isFavorited ? 'FAVORITAR' : 'DESFAVORITAR'}`);
-
         // Atualiza todos os botões na página atual
         const buttons = this.getAllButtons(postId);
-        console.log(`[FAVORITOS] 📍 Encontrados ${buttons.length} botões para atualizar`);
-
-        buttons.forEach((btn, index) => {
-            const beforeClasses = Array.from(btn.classList);
+        buttons.forEach((btn) => {
             this.updateButtonUI(btn, isFavorited);
-            const afterClasses = Array.from(btn.classList);
-            console.log(`[FAVORITOS] 🔧 Botão ${index + 1}: ${beforeClasses.join(' ')} → ${afterClasses.join(' ')}`);
         });
-
-        console.log(`[FAVORITOS] ✅ Sincronização completa: ${buttons.length} botões atualizados`);
     }
 
     /**
@@ -214,7 +198,6 @@ window.FavoriteManager = class FavoriteManager {
      */
     getAllButtons(postId) {
         const buttons = document.querySelectorAll(`button[data-post-id="${postId}"]`);
-        console.log(`[FAVORITOS] 🔍 getAllButtons(${postId}): encontrados ${buttons.length} botões`);
         return buttons;
     }
 
@@ -230,7 +213,6 @@ window.FavoriteManager = class FavoriteManager {
                 const cached = this._statusCache[cacheKey];
                 const now = Date.now();
                 if (now - cached.timestamp < 30000) {
-                    console.log(`[FAVORITOS] syncButtons usando cache para post ${postId}`);
                     const buttons = this.getAllButtons(postId);
                     buttons.forEach(btn => this.updateButtonUI(btn, cached.value));
                     return cached.value;
@@ -281,7 +263,6 @@ window.FavoriteManager = class FavoriteManager {
             // Usa estado do botão ao invés de fazer requisição
             const firstButton = buttons[0];
             const currentStatus = firstButton?.classList.contains('favorited') || false;
-            console.log(`[FAVORITOS] Estado atual do post ${postId}: ${currentStatus} (botão: ${firstButton?.classList})`);
 
             // Se está nos favoritos, pede confirmação
             if (currentStatus) {
@@ -297,8 +278,6 @@ window.FavoriteManager = class FavoriteManager {
             const action = currentStatus ? 'unfavorite' : 'favorite';
             const url = `/${action}/${postId}`;
 
-            console.log(`[FAVORITOS] Enviando requisição: ${action} para post ${postId}`);
-
             // Envia requisição
             const response = await fetch(url, {
                 method: 'POST',
@@ -308,8 +287,6 @@ window.FavoriteManager = class FavoriteManager {
                 cache: 'no-cache'
             });
 
-            console.log(`[FAVORITOS] Resposta HTTP: ${response.status}`);
-
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`[FAVORITOS] Erro HTTP ${response.status}: ${errorText}`);
@@ -317,8 +294,6 @@ window.FavoriteManager = class FavoriteManager {
             }
 
             const data = await response.json();
-            console.log('[FAVORITOS] Dados recebidos:', data);
-
             if (!data.success) {
                 // Mostrar mensagem específica do servidor
                 console.error('[FAVORITOS] Falha ao favoritar:', data.message);
@@ -347,12 +322,10 @@ window.FavoriteManager = class FavoriteManager {
             );
 
             // Log final para confirmar estado
-            console.log(`[FAVORITOS] ✨ Toggle completo: Post ${postId} agora ${data.is_favorited ? 'ESTÁ' : 'NÃO ESTÁ'} nos favoritos`);
 
             // Se estamos na página de perfil e removemos um favorito, recarrega dinamicamente
             if (!data.is_favorited && window.location.pathname.includes('/profile')) {
                 if (typeof window.reloadFavoritesSection === 'function') {
-                    console.log('[FAVORITOS] Recarregando seção de favoritos');
                     await window.reloadFavoritesSection();
                 }
             }
@@ -374,7 +347,6 @@ window.FavoriteManager = class FavoriteManager {
         // Evita inicialização duplicada
         const now = Date.now();
         if (this.isInitialized && this._lastInit && (now - this._lastInit) < 1000) {
-            console.log('[FAVORITOS] Init ignorado (chamado há menos de 1s)');
             return;
         }
 
@@ -405,17 +377,13 @@ window.FavoriteManager = class FavoriteManager {
             }
         });
 
-        console.log(`[FAVORITOS] Inicializado com ${uniquePostIds.size} posts (sem requisições)`);
     }
 
     /**
      * Remove um favorito diretamente (usado na página de perfil)
      */
     async remove(postId, skipConfirmation = false) {
-        console.log(`[FAVORITOS] 🗑️ remove() chamado para post ${postId}, skipConfirmation: ${skipConfirmation}`);
-
         if (this.pendingRequests.has(postId)) {
-            console.log(`[FAVORITOS] ⏸️ Requisição pendente para post ${postId}, abortando`);
             return;
         }
 
@@ -424,18 +392,13 @@ window.FavoriteManager = class FavoriteManager {
 
             // Pede confirmação se não for skip
             if (!skipConfirmation) {
-                console.log(`[FAVORITOS] ❓ Abrindo modal de confirmação para post ${postId}`);
                 const confirmed = await this.showConfirmModal();
-                console.log(`[FAVORITOS] 💭 Resposta do modal: ${confirmed ? 'CONFIRMADO' : 'CANCELADO'}`);
 
                 if (!confirmed) {
-                    console.log(`[FAVORITOS] 🚫 Remoção cancelada pelo usuário para post ${postId}`);
                     this.pendingRequests.delete(postId);
                     return false;
                 }
             }
-
-            console.log(`[FAVORITOS] 🚀 Enviando requisição de remoção para post ${postId}`);
 
             // Envia requisição de remoção
             const response = await fetch(`/unfavorite/${postId}`, {
@@ -446,15 +409,11 @@ window.FavoriteManager = class FavoriteManager {
                 cache: 'no-cache'
             });
 
-            console.log(`[FAVORITOS] 📡 Resposta HTTP: ${response.status}`);
-
             if (!response.ok) {
                 throw new Error(`Erro HTTP ${response.status}`);
             }
 
             const data = await response.json();
-            console.log(`[FAVORITOS] 📦 Dados recebidos:`, data);
-
             if (!data.success) {
                 throw new Error(data.message || 'Erro ao remover favorito');
             }
@@ -466,14 +425,11 @@ window.FavoriteManager = class FavoriteManager {
                 value: false,
                 timestamp: Date.now()
             };
-            console.log(`[FAVORITOS] 💾 Cache atualizado para post ${postId}: false`);
-
             // Atualiza todos os botões
             this.broadcastFavoriteChange(postId, false);
 
             this.showToast('Removido dos favoritos!', 'success');
             this.pendingRequests.delete(postId);
-            console.log(`[FAVORITOS] ✅ Remoção completa para post ${postId}`);
             return true;
 
         } catch (error) {

@@ -5063,7 +5063,7 @@ def create_checkout_session():
             return jsonify({'error': 'Preço do plano inválido. Ajuste o valor no painel administrativo.'}), 400
 
         product_id = get_stripe_product_id_for_plan(plan_key)
-        price_data = {
+        price_data: stripe.checkout.Session.CreateParamsLineItemPriceData = {
             'currency': 'brl',
             'unit_amount': amount_cents,
             'recurring': {'interval': 'month'},

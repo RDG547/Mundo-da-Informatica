@@ -13,7 +13,7 @@
                 <i class="fas fa-crown"></i>
             </div>
 
-            <h1>Central VIP</h1>
+            <h1>Área VIP</h1>
             <p>
                 Seus limites ampliados já estão ativos. Use esta central para abrir uma busca prioritária e acessar o acervo com as regras do plano VIP.
             </p>
@@ -157,6 +157,8 @@
 
 .btn-outline-light:hover {
     color: #1f2d43;
+    -webkit-text-fill-color: #1f2d43;
+    background: #f8fbff;
     transform: translateY(-2px);
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
 }
@@ -181,6 +183,19 @@
     .vip-area-actions a {
         width: 100%;
         justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .vip-area-card {
+        padding: 1.5rem 1rem;
+        border-radius: 20px;
+    }
+
+    .vip-area-icon {
+        width: 72px;
+        height: 72px;
+        font-size: 2rem;
     }
 }
 </style>

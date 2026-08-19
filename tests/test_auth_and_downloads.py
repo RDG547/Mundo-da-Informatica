@@ -1,4 +1,7 @@
-from app import Post, User, app, db
+from types import SimpleNamespace
+
+import app as app_module
+from app import Category, Post, User, app, db
 
 
 def login_session(client, user_id):
@@ -30,11 +33,12 @@ def create_multi_file_post():
             title="Pacote BIOS e EC",
             content="Dois arquivos técnicos.",
             download_link="https://files.example.test/bios.bin",
+            category_str="Geral",
             is_active=True,
         )
         post.set_metadata("download_files", [
-            {"type": "BIOS", "url": "https://files.example.test/bios.bin", "name": "bios.bin"},
-            {"type": "BIOS", "url": "https://files.example.test/ec.bin", "name": "ec.bin"},
+            {"type": "BIOS", "url": "https://files.example.test/bios.bin", "name": "bios.bin", "size": "8 MB"},
+            {"type": "BIOS", "url": "https://files.example.test/ec.bin", "name": "ec.bin", "size": "4 MB"},
         ])
         db.session.add(post)
         db.session.commit()
@@ -110,6 +114,66 @@ def test_admin_requests_access_allowed(client):
     admin_id = create_user("admin_user", role="admin")
     login_session(client, admin_id)
     assert client.get("/admin/solicitacoes").status_code == 200
+
+
+def test_post_detail_places_each_file_size_inside_download_button(client):
+    post_id = create_multi_file_post()
+    body = client.get(f"/post/{post_id}").get_data(as_text=True)
+    assert '<span class="download-button-size">8 MB</span>' in body
+    assert '<span class="download-button-size">4 MB</span>' in body
+
+
+def test_admin_price_controls_card_checkout_and_public_api(client, monkeypatch):
+    user_id = create_user("checkout_price", role="admin", plan="free")
+    login_session(client, user_id)
+    captured = {}
+
+    settings_response = client.post("/admin/save_settings", json={
+        "plan_price_premium": {"value": "43.21", "type": "float"},
+    })
+    assert settings_response.status_code == 200
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(client_secret="secret-from-test")
+
+    monkeypatch.setattr(app_module.stripe.checkout.Session, "create", fake_create)
+    response = client.post("/create-checkout-session", json={"plan": "premium"})
+    assert response.status_code == 200
+    assert response.get_json()["clientSecret"] == "secret-from-test"
+    assert captured["line_items"][0]["price_data"]["unit_amount"] == 4321
+    assert captured["line_items"][0]["price_data"]["recurring"] == {"interval": "month"}
+
+    public_prices = client.get("/api/plan-prices").get_json()
+    assert public_prices["plans"]["premium"]["amount_cents"] == 4321
+
+
+def test_admin_category_bulk_actions_remain_functional(client):
+    admin_id = create_user("bulk_category_admin", role="admin")
+    login_session(client, admin_id)
+    with app.app_context():
+        category = Category(name="Categoria em lote", slug="categoria-em-lote", is_active=True)
+        db.session.add(category)
+        db.session.commit()
+        category_id = category.id
+
+    response = client.post("/admin/categories/bulk-action", json={
+        "action": "toggle-status",
+        "category_ids": [category_id],
+    })
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    with app.app_context():
+        assert db.session.get(Category, category_id).is_active is False
+
+
+def test_dashboard_refresh_returns_stable_database_values(client):
+    admin_id = create_user("dashboard_admin", role="admin")
+    login_session(client, admin_id)
+    first = client.get("/admin/dashboard/stats")
+    second = client.get("/admin/dashboard/stats")
+    assert first.status_code == second.status_code == 200
+    assert first.get_json()["stats"] == second.get_json()["stats"]
 
 
 def test_regular_user_can_update_own_profile_with_server_validation(client):

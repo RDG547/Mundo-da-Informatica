@@ -669,8 +669,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
             // Desativar todos os CSS específicos de página
             if (faqCSS) faqCSS.media = 'print';
             if (contactCSS) contactCSS.media = 'print';
+            if (aboutCSS) aboutCSS.media = 'print';
+            if (aboutPageCSS) aboutPageCSS.media = 'print';
             if (categoryCSS) categoryCSS.media = 'print';
             if (profileCSS) profileCSS.media = 'print';
+            if (plansCSS) plansCSS.media = 'print';
             if (postDetailCSS) postDetailCSS.media = 'print';
             if (adminCSS) adminCSS.media = 'print';
 
@@ -711,16 +714,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 if (adminCSS) adminCSS.media = 'all';
                 if (adminCSS) activatedStyles.push(adminCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 Admin CSS ativado');
-            }
-
-            if (aboutCSS && !activatedStyles.includes(aboutCSS)) {
-                activatedStyles.push(aboutCSS);
-            }
-            if (aboutPageCSS && !activatedStyles.includes(aboutPageCSS)) {
-                activatedStyles.push(aboutPageCSS);
-            }
-            if (plansCSS && !activatedStyles.includes(plansCSS)) {
-                activatedStyles.push(plansCSS);
             }
 
             await Promise.all(activatedStyles.map((styleLink) => this.ensureStylesheetReady(styleLink)));
@@ -821,12 +814,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         async syncDynamicStyles(styles) {
-            const desiredHrefs = new Set(
-                styles
-                    .map(style => style.href)
-                    .filter(Boolean)
-                    .map(href => new URL(href, window.location.origin).href)
-            );
+            const desiredStyles = new Map();
+            styles.forEach((style) => {
+                if (!style.href) return;
+                desiredStyles.set(new URL(style.href, window.location.origin).href, style);
+            });
+            const desiredHrefs = new Set(desiredStyles.keys());
 
             document.querySelectorAll('link[data-dynamic-page-style="true"]').forEach(link => {
                 if (!desiredHrefs.has(link.href)) {
@@ -846,9 +839,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
                 await new Promise((resolve) => {
                     const link = document.createElement('link');
+                    const sourceStyle = desiredStyles.get(href);
                     link.rel = 'stylesheet';
                     link.href = href;
                     link.setAttribute('data-dynamic-page-style', 'true');
+                    if (sourceStyle?.id) link.id = sourceStyle.id;
+                    if (sourceStyle?.media) link.media = sourceStyle.media;
                     link.onload = () => resolve();
                     link.onerror = () => resolve();
                     document.head.appendChild(link);
@@ -1233,11 +1229,14 @@ if (typeof window.DynamicLoader !== 'undefined') {
             style.textContent = `
             #dynamic-loader {
                 position: fixed;
+                inset: 0;
+                width: 100dvw;
+                height: 100dvh;
                 background: rgba(255, 255, 255, 0.9);
                 display: none;
                 justify-content: center;
                 align-items: center;
-                z-index: 900;
+                z-index: 1300;
                 backdrop-filter: blur(5px);
                 -webkit-backdrop-filter: blur(5px);
                 pointer-events: auto;
@@ -1302,6 +1301,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     document.body.appendChild(loader);
                 }
 
+                loader.style.inset = 'auto';
+
                 // O painel mantém a sidebar disponível e cobre uniformemente toda a
                 // viewport de conteúdo. A altura do documento ou a posição do scroll
                 // não podem mais fazer o blur começar no meio da tela.
@@ -1320,25 +1321,19 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 if (loader.parentNode !== document.body) {
                     document.body.appendChild(loader);
                 }
-                loader.style.top = '0';
-                loader.style.left = '0';
-                loader.style.width = '100vw';
-                loader.style.height = '100vh';
+                loader.style.inset = '0';
+                loader.style.width = '100dvw';
+                loader.style.height = '100dvh';
                 return;
             }
-
-            const header = document.querySelector('header');
-            const headerRect = header?.getBoundingClientRect();
-            const top = Math.max(headerRect ? headerRect.bottom : 0, 0);
 
             if (loader.parentNode !== document.body) {
                 document.body.appendChild(loader);
             }
 
-            loader.style.top = `${top}px`;
-            loader.style.left = '0';
-            loader.style.width = '100vw';
-            loader.style.height = `${Math.max(window.innerHeight - top, 0)}px`;
+            loader.style.inset = '0';
+            loader.style.width = '100dvw';
+            loader.style.height = '100dvh';
         }
 
         dispatchEvent(eventName, data = {}) {

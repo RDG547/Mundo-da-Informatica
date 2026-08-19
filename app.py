@@ -2747,6 +2747,7 @@ class ContentRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     request_type = db.Column(db.String(30), nullable=False, default='suggestion')
+    requester_plan = db.Column(db.String(20), nullable=False, default='guest')
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
     category = db.Column(db.String(100), nullable=True)
@@ -2998,8 +2999,8 @@ class SiteConfig(db.Model):
                 'site_description': 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
                 'footer_description': 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
-                'home_hero_title': 'Encontre o arquivo certo para o reparo.',
-                'home_hero_subtitle': 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
+                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
+                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
                 'enable_dark_mode': True,
                 'primary_color': '#3a86ff',
                 'secondary_color': '#8338ec',
@@ -3059,8 +3060,8 @@ class SiteConfig(db.Model):
                 'site_description': 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
                 'footer_description': 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
-                'home_hero_title': 'Encontre o arquivo certo para o reparo.',
-                'home_hero_subtitle': 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
+                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
+                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
                 'enable_dark_mode': True,
                 'primary_color': '#3a86ff',
                 'secondary_color': '#8338ec',
@@ -3449,10 +3450,8 @@ def get_stripe_subscription_price(plan: str | None) -> dict[str, Any] | None:
 
 
 def get_effective_plan_charge_cents(plan: str | None) -> int:
-    stripe_price = get_stripe_subscription_price(plan)
-    if stripe_price:
-        return int(stripe_price.get('unit_amount') or 0)
-    return DEFAULT_PLAN_PRICE_CENTS.get(normalize_plan_key(plan), 0)
+    """Valor canônico de cobrança, controlado pelas configurações do painel."""
+    return get_plan_price_cents(plan)
 
 # Modelo para tracking de atividades administrativas
 class AdminActivity(db.Model):
@@ -3609,7 +3608,11 @@ def inject_global_data():
         return get_image_url_for_response(image_path, folder=folder, default=default)
 
     # Categorias públicas, sempre vindas do banco para refletir o painel admin.
-    categories, _expanding_categories = get_public_categories_partition()
+    populated_categories, expanding_categories = get_public_categories_partition()
+    categories = sorted(
+        [*populated_categories, *expanding_categories],
+        key=lambda category_item: (category_item.order or 0, category_item.name.casefold()),
+    )
     for category_item in categories:
         apply_default_category_data(category_item)
     menu_categories = [category_item for category_item in categories if category_item.show_in_menu]
@@ -4102,16 +4105,16 @@ def setup():
 @app.route('/categorias')
 def all_categories():
     """Página exclusiva de todas as categorias"""
-    # Buscar todas as categorias do banco de dados
-    categories, expanding_categories = get_public_categories_partition()
-    if categories:
-        for cat in categories:
-            apply_default_category_data(cat)
-    for cat in expanding_categories:
+    populated_categories, empty_categories = get_public_categories_partition()
+    categories = sorted(
+        [*populated_categories, *empty_categories],
+        key=lambda item: (item.order or 0, item.name.casefold()),
+    )
+    for cat in categories:
         apply_default_category_data(cat)
 
     return render_template('categories.html', categories=categories,
-                           expanding_categories=expanding_categories,
+                           expanding_categories=[],
                            title='Todas as Categorias')
 
 @app.route('/categoria/<string:category>')
@@ -5055,15 +5058,29 @@ def create_checkout_session():
         if not is_plan_enabled(plan_key):
             return jsonify({'error': 'Este plano está temporariamente indisponível para novas assinaturas.'}), 409
 
-        stripe_price = get_stripe_subscription_price(plan_key)
-        if not stripe_price or not stripe_price.get('price_id'):
-            debug_log(f'Stripe Checkout - Preço Stripe não encontrado para plano: {plan_key}')
-            return jsonify({'error': 'Não foi possível localizar o preço oficial deste plano na Stripe.'}), 400
+        amount_cents = get_plan_price_cents(plan_key)
+        if amount_cents <= 0:
+            return jsonify({'error': 'Preço do plano inválido. Ajuste o valor no painel administrativo.'}), 400
+
+        product_id = get_stripe_product_id_for_plan(plan_key)
+        price_data = {
+            'currency': 'brl',
+            'unit_amount': amount_cents,
+            'recurring': {'interval': 'month'},
+        }
+        if product_id:
+            price_data['product'] = product_id
+        else:
+            metadata = get_plan_metadata(plan_key)
+            price_data['product_data'] = {
+                'name': f"Plano {metadata['label']} - Mundo da Informática",
+                'description': 'Assinatura mensal da plataforma Mundo da Informática.',
+            }
 
         checkout_session = stripe.checkout.Session.create(
             line_items=[
                 {
-                    'price': stripe_price['price_id'],
+                    'price_data': price_data,
                     'quantity': 1,
                 },
             ],
@@ -6323,6 +6340,7 @@ def content_requests():
         content_request = ContentRequest(
             user_id=user_id,
             request_type=request_type,
+            requester_plan=normalize_plan_key(current_user.plan) if current_user.is_authenticated else 'guest',
             title=title,
             description=description or None,
             category=category_name or None,
@@ -6354,7 +6372,11 @@ def content_requests():
         own_requests = ContentRequest.query.filter_by(user_id=current_user.id).order_by(
             ContentRequest.created_at.desc()
         ).all()
-    public_categories, _empty_categories = get_public_categories_partition()
+    public_categories, empty_categories = get_public_categories_partition()
+    public_categories = sorted(
+        [*public_categories, *empty_categories],
+        key=lambda category_item: (category_item.order or 0, category_item.name.casefold()),
+    )
     return render_template(
         'content_requests.html',
         title='Sugestões e solicitações',
@@ -6379,6 +6401,12 @@ def admin_content_requests():
         title='Solicitações de conteúdo',
         content_requests=requests_list,
         request_statuses=CONTENT_REQUEST_STATUSES,
+        request_summary={
+            'total': len(requests_list),
+            'pending': sum(item.status == 'pending' for item in requests_list),
+            'vip': sum((item.requester_plan or (item.user.plan if item.user else 'guest')) == 'vip' for item in requests_list),
+            'completed': sum(item.status == 'completed' for item in requests_list),
+        },
     )
 
 
@@ -8526,10 +8554,10 @@ def admin_dashboard():
         Subscriber.query.filter(Subscriber.subscribed_date < thirty_days_ago).filter_by(is_active=True).count()
     )
 
-    # Outras tendências (simplificadas por enquanto)
+    # Sem uma série histórica equivalente não exibimos percentuais artificiais.
     categories_trend = 0  # Categorias são mais estáveis
-    downloads_trend = 25 if total_downloads > 0 else 0
-    views_trend = 18 if page_views > 0 else 0
+    downloads_trend = 0
+    views_trend = 0
 
     # Dados para gráficos - últimos 7 dias de visualizações
     chart_data = {
@@ -8730,6 +8758,31 @@ def admin_dashboard():
     debug_log(f"- Context stats sendo enviado para o template: {context['stats']}")
 
     return render_template('admin/dashboard.html', **context)
+
+
+@app.route('/admin/dashboard/stats')
+@login_required
+@editor_required
+def admin_dashboard_stats():
+    """Snapshot real usado pela atualização periódica do dashboard."""
+    try:
+        page_views = VisitorLog.query.count()
+    except Exception:
+        page_views = 0
+
+    response = jsonify({
+        'success': True,
+        'stats': {
+            'posts': Post.query.filter_by(is_active=True).count(),
+            'categories': Category.query.filter_by(is_active=True).count(),
+            'users': User.query.filter_by(is_active=True).count(),
+            'subscribers': Subscriber.query.filter_by(is_active=True).count(),
+            'total_downloads': db.session.query(db.func.sum(Post.downloads)).filter_by(is_active=True).scalar() or 0,
+            'page_views': page_views,
+        },
+    })
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    return response
 
 # Rota para exportar posts
 @app.route("/admin/posts/export")
@@ -10087,6 +10140,7 @@ def admin_categories_bulk_action():
             return jsonify({'success': False, 'message': 'JSON inválido'}), 400
         if not data:
             return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
+
         action = data.get('action')
         category_ids = data.get('category_ids', [])
 
@@ -11318,6 +11372,21 @@ def admin_save_settings():
         if not data:
             return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
+        unsupported_keys = set(data) - set(LIVE_SITE_SETTING_KEYS)
+        if unsupported_keys:
+            return jsonify({'success': False, 'message': 'Uma ou mais configurações não são permitidas.'}), 400
+
+        for price_key in ('plan_price_premium', 'plan_price_vip'):
+            if price_key not in data:
+                continue
+            raw_price = data[price_key].get('value') if isinstance(data[price_key], dict) else None
+            try:
+                normalized_price = Decimal(str(raw_price).replace(',', '.'))
+            except (InvalidOperation, TypeError, ValueError):
+                return jsonify({'success': False, 'message': 'Informe preços válidos para os planos.'}), 400
+            if normalized_price <= 0 or normalized_price > Decimal('9999.99'):
+                return jsonify({'success': False, 'message': 'O preço do plano deve ficar entre R$ 0,01 e R$ 9.999,99.'}), 400
+
         # Salvar cada configuração
         for key, config in data.items():
             if not isinstance(config, dict):
@@ -11331,6 +11400,9 @@ def admin_save_settings():
                 value_type=value_type,
                 is_public=True
             )
+
+        if any(key.startswith('plan_price_') for key in data):
+            _stripe_plan_price_cache.clear()
 
         # Log da atividade
         try:
@@ -12544,6 +12616,16 @@ with app.app_context():
                     conn.execute(text("ALTER TABLE transactions ADD COLUMN abacatepay_charge_id VARCHAR(255)"))
                     conn.commit()
                     app.logger.info("Coluna 'abacatepay_charge_id' adicionada a transactions")
+                request_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(content_requests)"))]
+                if request_cols and 'requester_plan' not in request_cols:
+                    conn.execute(text("ALTER TABLE content_requests ADD COLUMN requester_plan VARCHAR(20) NOT NULL DEFAULT 'guest'"))
+                    conn.execute(text(
+                        "UPDATE content_requests "
+                        "SET requester_plan = COALESCE((SELECT plan FROM user WHERE user.id = content_requests.user_id), 'guest') "
+                        "WHERE user_id IS NOT NULL"
+                    ))
+                    conn.commit()
+                    app.logger.info("Coluna 'requester_plan' adicionada a content_requests")
                 category_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(category)"))]
                 if 'color' not in category_cols:
                     conn.execute(text("ALTER TABLE category ADD COLUMN color VARCHAR(20) DEFAULT '#4a90e2'"))

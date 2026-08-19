@@ -164,12 +164,14 @@
         const closeModal = function () {
             modal.classList.remove('active');
             modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('coverage-modal-open');
             document.body.style.overflow = '';
         };
 
         const openModal = function () {
             modal.classList.add('active');
             modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('coverage-modal-open');
             document.body.style.overflow = 'hidden';
         };
 

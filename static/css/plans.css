@@ -94,7 +94,7 @@
 
 /* Plans Section */
 .plans-section {
-    padding: 4rem 0;
+    padding: 4rem 0 1.5rem;
     background: #f8f9fa;
 }
 
@@ -422,7 +422,7 @@
 
 /* FAQ Section */
 .plans-faq-section {
-    padding: 6rem 0;
+    padding: 2.5rem 0 5rem;
     background: #f8f9fa;
     position: relative;
     overflow: hidden;
@@ -698,10 +698,13 @@
 .plans-comparison td { padding: 0.95rem 1rem; border-bottom: 1px solid rgba(148, 163, 184, 0.2); text-align: center; }
 .plans-comparison th:first-child { text-align: left; }
 .plans-comparison thead th { color: #fff; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
-.plans-comparison tbody th { color: var(--text-color); font-weight: 700; }
+.plans-comparison th i { width: 1.35rem; margin-right: 0.35rem; text-align: center; }
+.plans-comparison tbody th { color: var(--text-color); font-weight: 700; white-space: nowrap; }
 .comparison-note { max-width: 820px; margin: 1rem auto 0; color: var(--text-secondary, #64748b); text-align: center; line-height: 1.6; }
 
 @media (max-width: 600px) {
     .plan-audience { min-height: 0; }
     .comparison-scroll { border: 1px solid rgba(148, 163, 184, 0.2); box-shadow: none; }
+    .plans-section { padding-top: 2rem; }
+    .plans-faq-section { padding: 2rem 0 3rem; }
 }

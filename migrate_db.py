@@ -102,6 +102,7 @@ def create_auxiliary_tables(connection) -> int:
         Column("id", Integer, primary_key=True),
         user_id_column,
         Column("request_type", String(30), nullable=False, server_default="suggestion"),
+        Column("requester_plan", String(20), nullable=False, server_default="guest"),
         Column("title", String(200), nullable=False),
         Column("description", Text),
         Column("category", String(100)),
@@ -132,12 +133,12 @@ def update_legacy_public_copy(connection) -> int:
 
     replacements = {
         "home_hero_title": (
-            ("Bem-vindo ao Mundo da Informática",),
-            "Encontre o arquivo certo para o reparo.",
+            ("Encontre o arquivo certo para o reparo.",),
+            "Bem-vindo ao Mundo da Informática",
         ),
         "home_hero_subtitle": (
-            ("Seu portal completo de recursos para técnicos e entusiastas de informática",),
-            "BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.",
+            ("BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.",),
+            "Seu portal completo de recursos para técnicos e entusiastas de informática",
         ),
         "site_description": (
             (
@@ -204,6 +205,14 @@ def migrate() -> None:
             "show_in_menu": "BOOLEAN DEFAULT TRUE",
             "is_visible": "BOOLEAN NOT NULL DEFAULT TRUE",
         })
+        applied += add_missing_columns(connection, "content_requests", {
+            "requester_plan": "VARCHAR(20) NOT NULL DEFAULT 'guest'",
+        })
+        connection.execute(text(
+            'UPDATE content_requests '
+            'SET requester_plan = COALESCE((SELECT plan FROM "user" WHERE "user".id = content_requests.user_id), \'guest\') '
+            "WHERE user_id IS NOT NULL AND (requester_plan IS NULL OR requester_plan = 'guest')"
+        ))
         applied += add_missing_columns(connection, "posts", {
             "manufacturer": "VARCHAR(120)",
             "brand": "VARCHAR(120)",

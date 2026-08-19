@@ -81,7 +81,7 @@
             </div>
         </div>
         <div class="stat-info">
-            <h3 class="stat-number">{{ stats.posts }}</h3>
+            <h3 class="stat-number" data-dashboard-stat="posts">{{ stats.posts }}</h3>
             <p class="stat-label">Posts Publicados</p>
             <div class="stat-details">
                 <span class="detail-item">
@@ -107,7 +107,7 @@
             </div>
         </div>
         <div class="stat-info">
-            <h3 class="stat-number">{{ stats.categories }}</h3>
+            <h3 class="stat-number" data-dashboard-stat="categories">{{ stats.categories }}</h3>
             <p class="stat-label">Categorias Ativas</p>
             <div class="stat-details">
                 <span class="detail-item">
@@ -129,7 +129,7 @@
             </div>
         </div>
         <div class="stat-info">
-            <h3 class="stat-number">{{ stats.users }}</h3>
+            <h3 class="stat-number" data-dashboard-stat="users">{{ stats.users }}</h3>
             <p class="stat-label">Usuários Registrados</p>
             <div class="stat-details">
                 <span class="detail-item">
@@ -155,7 +155,7 @@
             </div>
         </div>
         <div class="stat-info">
-            <h3 class="stat-number">{{ stats.subscribers }}</h3>
+            <h3 class="stat-number" data-dashboard-stat="subscribers">{{ stats.subscribers }}</h3>
             <p class="stat-label">Newsletter</p>
             <div class="stat-details">
                 <span class="detail-item">
@@ -177,7 +177,7 @@
             </div>
         </div>
         <div class="stat-info">
-            <h3 class="stat-number">{{ stats.total_downloads or 0 }}</h3>
+            <h3 class="stat-number" data-dashboard-stat="total_downloads">{{ stats.total_downloads or 0 }}</h3>
             <p class="stat-label">Downloads Totais</p>
             <div class="stat-details">
                 <span class="detail-item">
@@ -199,7 +199,7 @@
             </div>
         </div>
         <div class="stat-info">
-            <h3 class="stat-number">{{ stats.page_views or 0 }}</h3>
+            <h3 class="stat-number" data-dashboard-stat="page_views">{{ stats.page_views or 0 }}</h3>
             <p class="stat-label">Visualizações</p>
             <div class="stat-details">
                 <span class="detail-item">
@@ -487,7 +487,8 @@
 
         // Formatar a data e hora atual
         updateDateTime();
-        setInterval(updateDateTime, 1000);
+        window.clearInterval(window.__dashboardClockTimer);
+        window.__dashboardClockTimer = window.setInterval(updateDateTime, 1000);
 
         // Inicializar gráficos
         initCharts();
@@ -513,10 +514,6 @@
             });
         }
     }
-
-    // Atualizar hora a cada segundo
-    updateDateTime();
-    setInterval(updateDateTime, 1000);
 
     // Configurar gráficos - aguardar Chart.js estar disponível
     function initCharts() {

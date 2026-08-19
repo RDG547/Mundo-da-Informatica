@@ -1,33 +1,71 @@
 {% extends 'admin/base.html' %}
 
 {% block content %}
-<div class="admin-page-header">
-    <div><h1>Solicitações de conteúdo</h1><p>Sugestões gerais e buscas prioritárias VIP, ordenadas por prioridade.</p></div>
+<div class="admin-page-header requests-admin-header">
+    <div>
+        <span class="requests-eyebrow"><i class="fas fa-inbox"></i> Atendimento do acervo</span>
+        <h1>Solicitações de conteúdo</h1>
+        <p>Analise sugestões gerais e buscas prioritárias VIP com contexto do plano e acompanhamento de status.</p>
+    </div>
 </div>
 
-<div class="admin-card">
-    <div style="overflow-x:auto">
-        <table class="admin-table enhanced">
-            <thead><tr><th>Tipo</th><th>Conteúdo</th><th>Solicitante</th><th>Status</th><th>Atualizar</th></tr></thead>
+<div class="requests-summary" aria-label="Resumo das solicitações">
+    <article><i class="fas fa-layer-group"></i><div><strong>{{ request_summary.total }}</strong><span>Total</span></div></article>
+    <article><i class="fas fa-clock"></i><div><strong>{{ request_summary.pending }}</strong><span>Recebidas</span></div></article>
+    <article class="is-vip"><i class="fas fa-crown"></i><div><strong>{{ request_summary.vip }}</strong><span>De usuários VIP</span></div></article>
+    <article class="is-complete"><i class="fas fa-circle-check"></i><div><strong>{{ request_summary.completed }}</strong><span>Concluídas</span></div></article>
+</div>
+
+<div class="admin-card requests-admin-card">
+    <div class="admin-card-header">
+        <div>
+            <h2 class="admin-card-title"><i class="fas fa-list-check"></i> Fila de solicitações</h2>
+            <p class="requests-card-subtitle">As buscas VIP aparecem primeiro; dentro da mesma prioridade, vale a ordem de chegada.</p>
+        </div>
+    </div>
+    <div class="requests-table-wrap">
+        <table class="admin-table enhanced requests-table">
+            <thead><tr><th>Prioridade</th><th>Solicitação</th><th>Solicitante</th><th>Situação</th><th>Atendimento</th></tr></thead>
             <tbody>
                 {% for item in content_requests %}
-                <tr>
-                    <td><span class="badge {{ 'badge-warning' if item.request_type == 'vip_priority' else 'badge-secondary' }}">{{ 'VIP prioritária' if item.request_type == 'vip_priority' else 'Sugestão' }}</span></td>
-                    <td><strong>{{ item.title }}</strong>{% if item.board_code %}<br><code>{{ item.board_code }}</code>{% endif %}{% if item.description %}<br><small>{{ item.description }}</small>{% endif %}</td>
-                    <td>{{ item.requester_name or (item.user.get_full_name() if item.user else 'Não informado') }}<br><small>{{ item.requester_email or (item.user.email if item.user else '') }}</small></td>
-                    <td>{{ request_statuses.get(item.status, item.status) }}</td>
+                {% set requester_plan = item.requester_plan or (item.user.plan if item.user else 'guest') %}
+                <tr class="request-row request-row-{{ requester_plan }}">
+                    <td><span class="request-kind {{ 'is-priority' if item.request_type == 'vip_priority' else 'is-suggestion' }}"><i class="fas {{ 'fa-bolt' if item.request_type == 'vip_priority' else 'fa-lightbulb' }}"></i>{{ 'Busca VIP' if item.request_type == 'vip_priority' else 'Sugestão' }}</span></td>
+                    <td class="request-copy">
+                        <strong>{{ item.title }}</strong>
+                        <div class="request-meta">
+                            {% if item.category %}<span><i class="fas fa-folder"></i> {{ item.category }}</span>{% endif %}
+                            {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
+                            <span><i class="far fa-calendar"></i> {{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                        </div>
+                        {% if item.description %}<p>{{ item.description }}</p>{% endif %}
+                    </td>
                     <td>
-                        <form method="post" action="{{ url_for('admin_update_content_request', request_id=item.id) }}" style="display:grid;gap:.45rem;min-width:240px">
+                        <div class="requester-cell">
+                            <strong>{{ item.requester_name or (item.user.get_full_name() if item.user else 'Não informado') }}</strong>
+                            <small>{{ item.requester_email or (item.user.email if item.user else '') }}</small>
+                            <span class="plan-indicator plan-{{ requester_plan }}"><i class="fas {% if requester_plan == 'vip' %}fa-crown{% elif requester_plan == 'premium' %}fa-star{% elif requester_plan == 'free' %}fa-user{% else %}fa-user-clock{% endif %}"></i>{% if requester_plan == 'vip' %}VIP{% elif requester_plan == 'premium' %}Premium{% elif requester_plan == 'free' %}Grátis{% else %}Visitante{% endif %}</span>
+                        </div>
+                    </td>
+                    <td><span class="request-status-pill status-{{ item.status }}">{{ request_statuses.get(item.status, item.status) }}</span></td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin_update_content_request', request_id=item.id) }}" class="request-update-form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <select name="status" class="form-control">{% for value,label in request_statuses.items() %}<option value="{{ value }}"{% if item.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-                            <textarea name="admin_notes" class="form-control" rows="2" maxlength="4000" placeholder="Observações internas">{{ item.admin_notes or '' }}</textarea>
-                            <button class="btn-admin btn-admin-primary" type="submit">Salvar</button>
+                            <label for="status-{{ item.id }}">Status</label>
+                            <select id="status-{{ item.id }}" name="status" class="form-control">{% for value,label in request_statuses.items() %}<option value="{{ value }}"{% if item.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                            <label for="notes-{{ item.id }}">Observações internas</label>
+                            <textarea id="notes-{{ item.id }}" name="admin_notes" class="form-control" rows="2" maxlength="4000" placeholder="Registre o andamento para a equipe">{{ item.admin_notes or '' }}</textarea>
+                            <button class="btn-admin btn-admin-primary" type="submit"><i class="fas fa-save"></i> Salvar atualização</button>
                         </form>
                     </td>
                 </tr>
-                {% else %}<tr><td colspan="5">Nenhuma solicitação recebida.</td></tr>{% endfor %}
+                {% else %}<tr><td colspan="5"><div class="requests-empty"><i class="fas fa-inbox"></i><strong>Nenhuma solicitação recebida</strong><span>Novos pedidos aparecerão aqui.</span></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<style>
+.requests-admin-header{margin-bottom:1.25rem}.requests-eyebrow{display:inline-flex;align-items:center;gap:.45rem;margin-bottom:.45rem;color:var(--admin-primary);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.requests-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-bottom:1.4rem}.requests-summary article{display:flex;align-items:center;gap:1rem;padding:1.15rem;border:1px solid var(--admin-border-color);border-radius:14px;background:var(--admin-card-bg);box-shadow:var(--admin-shadow-sm)}.requests-summary article>i{display:grid;width:44px;height:44px;place-items:center;border-radius:12px;color:#fff;background:linear-gradient(135deg,#3a86ff,#667eea)}.requests-summary article.is-vip>i{background:linear-gradient(135deg,#d4a017,#f0c040)}.requests-summary article.is-complete>i{background:linear-gradient(135deg,#16a34a,#22c55e)}.requests-summary strong,.requests-summary span{display:block}.requests-summary strong{font-size:1.4rem;color:var(--admin-text-primary)}.requests-summary span{color:var(--admin-text-light);font-size:.8rem}.requests-card-subtitle{margin:.3rem 0 0;color:var(--admin-text-light)}.requests-table-wrap{overflow-x:auto}.requests-table{min-width:1080px}.requests-table td{vertical-align:top}.request-row-vip{box-shadow:inset 4px 0 #d4a017}.request-row-premium{box-shadow:inset 4px 0 #667eea}.request-kind,.plan-indicator,.request-status-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .65rem;border-radius:999px;font-size:.72rem;font-weight:800;white-space:nowrap}.request-kind.is-priority{color:#8a5a00;background:#fff4c2}.request-kind.is-suggestion{color:#315eae;background:#eaf2ff}.request-copy{min-width:280px}.request-copy>strong{display:block;color:var(--admin-text-primary);font-size:.95rem}.request-copy p{max-width:440px;margin:.55rem 0 0;color:var(--admin-text-light);line-height:1.5}.request-meta{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.5rem;color:var(--admin-text-light);font-size:.75rem}.request-meta span,.request-meta code{padding:.2rem .4rem;border-radius:6px;background:var(--admin-bg-light)}.requester-cell{display:flex;min-width:180px;flex-direction:column;align-items:flex-start;gap:.35rem}.requester-cell small{max-width:220px;overflow-wrap:anywhere;color:var(--admin-text-light)}.plan-vip{color:#8a5a00;background:#fff4c2}.plan-premium{color:#4338ca;background:#eef2ff}.plan-free{color:#475569;background:#eef2f7}.plan-guest{color:#6b7280;background:#f3f4f6}.request-status-pill{color:#315eae;background:#eaf2ff}.request-status-pill.status-completed,.request-status-pill.status-found{color:#166534;background:#dcfce7}.request-status-pill.status-unavailable,.request-status-pill.status-rejected{color:#991b1b;background:#fee2e2}.request-update-form{display:grid;gap:.45rem;min-width:250px}.request-update-form label{font-size:.72rem;font-weight:800;color:var(--admin-text-light)}.request-update-form .btn-admin{justify-content:center}.requests-empty{display:flex;min-height:220px;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;color:var(--admin-text-light)}.requests-empty>i{font-size:2rem;color:var(--admin-primary)}@media(max-width:1100px){.requests-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.requests-summary{grid-template-columns:1fr}.requests-summary article{padding:1rem}.requests-admin-header h1{font-size:1.65rem}}
+</style>
 {% endblock %}

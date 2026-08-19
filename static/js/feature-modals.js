@@ -189,6 +189,8 @@ function initFeatureModals() {
 
     // Adiciona event listeners aos itens de feature
     featureItems.forEach(item => {
+        if (item.dataset.featureModalBound === 'true') return;
+        item.dataset.featureModalBound = 'true';
         item.addEventListener('click', function() {
             const feature = this.dataset.feature;
             const data = window.featureData[feature];
@@ -211,6 +213,8 @@ function initFeatureModals() {
 
     // Fecha o modal ao clicar no botão de fechar
     if (closeBtn) {
+        if (closeBtn.dataset.featureModalBound === 'true') return;
+        closeBtn.dataset.featureModalBound = 'true';
         closeBtn.addEventListener('click', function() {
             modal.style.display = 'none';
             document.body.style.overflow = 'auto';

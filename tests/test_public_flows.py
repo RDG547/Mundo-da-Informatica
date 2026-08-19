@@ -45,7 +45,7 @@ def test_homepage_and_post_expose_technical_seo(client):
 
     home = client.get("/")
     assert home.status_code == 200
-    assert "Encontre o arquivo certo para o reparo" in home.get_data(as_text=True)
+    assert "Bem-vindo ao Mundo da Informática" in home.get_data(as_text=True)
     assert "application/ld+json" in home.get_data(as_text=True)
 
     detail = client.get(f"/bios/{post_slug}")
@@ -111,3 +111,50 @@ def test_hidden_category_is_not_publicly_addressable(client):
         db.session.commit()
 
     assert client.get("/categoria/interna").status_code == 404
+
+
+def test_empty_active_category_obeys_public_and_menu_controls(client):
+    with app.app_context():
+        db.session.add_all([
+            Category(
+                name="Sem posts pública",
+                slug="sem-posts-publica",
+                is_active=True,
+                is_visible=True,
+                show_in_menu=True,
+            ),
+            Category(
+                name="Sem posts interna",
+                slug="sem-posts-interna",
+                is_active=True,
+                is_visible=False,
+                show_in_menu=True,
+            ),
+        ])
+        db.session.commit()
+
+    body = client.get("/").get_data(as_text=True)
+    assert "Sem posts pública" in body
+    assert "/categoria/sem-posts-publica" in body
+    assert "Sem posts interna" not in body
+
+    categories_body = client.get("/categorias").get_data(as_text=True)
+    assert "Sem posts pública" in categories_body
+    assert "/categoria/sem-posts-publica" in categories_body
+    assert "Sem posts interna" not in categories_body
+
+
+def test_platform_stats_render_even_when_all_values_are_zero(client):
+    body = client.get("/sobre").get_data(as_text=True)
+    assert "Dados da plataforma" in body
+    assert "Downloads Realizados" in body
+    assert "Usuários<br>Ativos" in body
+    assert "Posts<br>Disponíveis" in body
+    assert "Inscritos Newsletter" in body
+
+
+def test_non_vip_priority_option_is_locked_in_ui(client):
+    body = client.get("/solicitacoes").get_data(as_text=True)
+    assert 'id="vipRequestLocked"' in body
+    assert "Somente VIP" in body
+    assert 'name="request_type" value="suggestion"' in body

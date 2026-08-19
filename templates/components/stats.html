@@ -6,57 +6,57 @@
         </div>
 
         <div class="stats-container">
-            {% if stats.total_downloads %}<div class="stat-item" data-aos="fade-up" data-aos-delay="100">
+            <div class="stat-item">
                 <div class="stat-icon">
                     <i class="fas fa-download"></i>
                 </div>
                 <div class="stat-number-wrapper">
                     <div class="stat-number">
-                        <span class="count" data-count="{{ stats.total_downloads }}">0</span>
+                        <span class="count" data-count="{{ stats.total_downloads|default(0, true) }}">0</span>
                     </div>
                 </div>
                 <h3 class="stat-title">Downloads Realizados</h3>
                 <p class="stat-description">Downloads registrados pela plataforma.</p>
-            </div>{% endif %}
+            </div>
 
-            {% if stats.total_users %}<div class="stat-item" data-aos="fade-up" data-aos-delay="200">
+            <div class="stat-item">
                 <div class="stat-icon">
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-number-wrapper">
                     <div class="stat-number">
-                        <span class="count" data-count="{{ stats.total_users }}">0</span>
+                        <span class="count" data-count="{{ stats.total_users|default(0, true) }}">0</span>
                     </div>
                 </div>
                 <h3 class="stat-title">Usuários<br>Ativos</h3>
                 <p class="stat-description">Contas ativas cadastradas na plataforma.</p>
-            </div>{% endif %}
+            </div>
 
-            {% if stats.total_posts %}<div class="stat-item" data-aos="fade-up" data-aos-delay="300">
+            <div class="stat-item">
                 <div class="stat-icon">
                     <i class="fas fa-file-alt"></i>
                 </div>
                 <div class="stat-number-wrapper">
                     <div class="stat-number">
-                        <span class="count" data-count="{{ stats.total_posts }}">0</span>
+                        <span class="count" data-count="{{ stats.total_posts|default(0, true) }}">0</span>
                     </div>
                 </div>
                 <h3 class="stat-title">Posts<br>Disponíveis</h3>
                 <p class="stat-description">Recursos técnicos, BIOS, esquemas e softwares disponíveis em nossa biblioteca.</p>
-            </div>{% endif %}
+            </div>
 
-            {% if stats.total_subscribers %}<div class="stat-item" data-aos="fade-up" data-aos-delay="400">
+            <div class="stat-item">
                 <div class="stat-icon">
                     <i class="fas fa-envelope"></i>
                 </div>
                 <div class="stat-number-wrapper">
                     <div class="stat-number">
-                        <span class="count" data-count="{{ stats.total_subscribers }}">0</span>
+                        <span class="count" data-count="{{ stats.total_subscribers|default(0, true) }}">0</span>
                     </div>
                 </div>
                 <h3 class="stat-title">Inscritos Newsletter</h3>
                 <p class="stat-description">Usuários inscritos em nossa newsletter para receber as últimas atualizações e recursos.</p>
-            </div>{% endif %}
+            </div>
         </div>
     </div>
 </section>

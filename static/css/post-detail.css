@@ -1081,6 +1081,17 @@ body.dark-mode .firmware-warning { color: #fde68a; background: rgba(202, 138, 4,
 .multi-file-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .multi-file-item { display: grid; gap: 0.45rem; padding: 0.75rem; border: 1px solid rgba(var(--primary-rgb), 0.18); border-radius: 12px; background: rgba(var(--primary-rgb), 0.04); }
 .multi-file-item .btn-download-primary { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.multi-file-item .btn-download-primary { margin-bottom: 0; min-height: 64px; flex-wrap: wrap; }
+.download-button-size {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
 .file-hash-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .file-hash-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .multi-file-security-note { margin: 0.25rem 0 0; font-size: 0.82rem; opacity: 0.78; }

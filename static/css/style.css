@@ -2451,10 +2451,9 @@ footer {
 /* Preloader */
 .preloader {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
     background-color: white;
     display: flex;
     justify-content: center;
@@ -4430,8 +4429,8 @@ a.download-card-category:hover {
 
 .most-used-card {
     display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
+    align-items: center;
+    gap: 0.9rem;
     min-width: 0;
     padding: 1.2rem;
     border: 1px solid rgba(var(--primary-rgb), 0.16);
@@ -4441,6 +4440,28 @@ a.download-card-category:hover {
     text-decoration: none;
     box-shadow: var(--shadow-sm);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.most-used-thumbnail {
+    width: 68px;
+    height: 68px;
+    flex: 0 0 68px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: #eef2f7;
+}
+
+.most-used-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.most-used-content strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .most-used-card:hover {
@@ -4469,6 +4490,51 @@ a.download-card-category:hover {
     .most-used-grid { grid-template-columns: 1fr; }
     .hero-value-points { align-items: stretch; flex-direction: column; }
     .hero-value-points span { justify-content: center; }
+}
+
+/* Dimensões previsíveis impedem que conteúdo ou regras de páginas distintas
+   alterem a altura dos CTAs de download. */
+.post-card .download-btn {
+    min-height: 52px;
+    height: 52px;
+    padding: 0.75rem 1rem;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+}
+
+/* Proteções responsivas compartilhadas por todas as páginas públicas. */
+html,
+body {
+    max-width: 100%;
+    overflow-x: clip;
+}
+
+img,
+video,
+iframe,
+canvas {
+    max-width: 100%;
+}
+
+@media (max-width: 768px) {
+    .container {
+        width: min(100% - 1.5rem, var(--container-width, 1200px));
+    }
+
+    .section-header h2,
+    .page-title,
+    .hero-title {
+        overflow-wrap: anywhere;
+    }
+
+    .btn,
+    button,
+    input,
+    select,
+    textarea {
+        max-width: 100%;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

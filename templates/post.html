@@ -249,8 +249,9 @@
                                 <a href="{{ url_for('download_post', post_id=post.id, file=loop.index0) }}" class="btn-download-primary download-btn" data-action="download">
                                     <i class="fas fa-download" aria-hidden="true"></i>
                                     <span>Download {{ df.name or df.type or ('Arquivo ' ~ loop.index) }}</span>
+                                    {% if df.size %}<span class="download-button-size">{{ df.size }}</span>{% endif %}
                                 </a>
-                                {% if df.format or df.size %}<small>{{ [df.format, df.size]|select|join(' · ') }}</small>{% endif %}
+                                {% if df.format %}<small>{{ df.format }}</small>{% endif %}
                                 {% if df.sha256 %}
                                 <div class="file-hash-row">
                                     <code>{{ df.sha256 }}</code>

@@ -248,8 +248,8 @@ window.initializePlansPage = function () {
                         successMessage: `Pagamento confirmado. O ${planDetails.label} sera ativado automaticamente.`,
                         successRedirectUrl: data.success_redirect_url || `/pix-checkout-success?billing_id=${encodeURIComponent(data.billing_id)}&next=${encodeURIComponent('/planos')}`
                     });
-                } else if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
+                } else if (data.billing_id) {
+                    alert('O modal PIX não pôde ser carregado. Atualize a página e tente novamente.');
                 } else if (data.error && typeof data.error === 'string') {
                     alert(data.error);
                 } else {

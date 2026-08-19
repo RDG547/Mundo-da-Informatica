@@ -115,8 +115,8 @@
     {% set animated_listing_page = request.endpoint in ['home', 'all_categories', 'category', 'subcategory', 'posts'] %}
     {% if animated_listing_page %}
     <!-- Animações usadas apenas nas páginas de descoberta -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" data-static-base-style="true">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css" data-static-base-style="true">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css">
     {% endif %}
 
     <!-- Custom CSS -->
@@ -128,16 +128,16 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/project-dropdowns.css') }}" data-static-base-style="true">
 
     <!-- CSS específico é transferido somente quando a página usa o componente. -->
-    {% if request.endpoint == 'faq' %}<link rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}">{% endif %}
-    {% if request.endpoint == 'contact' %}<link rel="stylesheet" href="{{ url_for('static', filename='css/contact.css') }}">{% endif %}
+    {% if request.endpoint == 'faq' %}<link id="faq-css" rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}">{% endif %}
+    {% if request.endpoint == 'contact' %}<link id="contact-css" rel="stylesheet" href="{{ url_for('static', filename='css/contact.css') }}">{% endif %}
     {% if request.endpoint == 'about' %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/about-page.css') }}">
+    <link id="about-css" rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}">
+    <link id="about-page-css" rel="stylesheet" href="{{ url_for('static', filename='css/about-page.css') }}">
     {% endif %}
-    {% if request.endpoint in ['category', 'subcategory', 'all_categories'] %}<link rel="stylesheet" href="{{ url_for('static', filename='css/category.css') }}">{% endif %}
-    {% if request.endpoint == 'profile' %}<link rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}">{% endif %}
-    {% if request.endpoint in ['post', 'post_by_slug'] %}<link rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}">{% endif %}
-    {% if request.endpoint == 'plans' %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}">{% endif %}
+    {% if request.endpoint in ['category', 'subcategory', 'all_categories', 'posts'] %}<link id="category-css" rel="stylesheet" href="{{ url_for('static', filename='css/category.css') }}">{% endif %}
+    {% if request.endpoint == 'profile' %}<link id="profile-css" rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}">{% endif %}
+    {% if request.endpoint in ['post', 'post_by_slug'] %}<link id="post-detail-css" rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}">{% endif %}
+    {% if request.endpoint == 'plans' %}<link id="plans-css" rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}">{% endif %}
 
     {% block extra_css %}{% endblock %}
 
@@ -436,11 +436,11 @@
 
     <!-- JavaScript Libraries -->
     {% if animated_listing_page %}
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js" data-static-base-script="true"></script>
-    <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js" data-static-base-script="true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
     {% endif %}
     {% if request.endpoint == 'home' %}
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js" data-static-base-script="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
     {% endif %}
     {% set needs_firebase = request.endpoint in ['login', 'register'] or (has_chat_access and chat_backend_available) %}
     {% if needs_firebase %}
@@ -458,13 +458,13 @@
     <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/csrf.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" data-static-base-script="true"></script>
-    {% if request.endpoint in ['home', 'about'] %}<script src="{{ url_for('static', filename='js/stats-counter.js') }}" data-static-base-script="true"></script>{% endif %}
-    {% if request.endpoint == 'profile' %}<script src="{{ url_for('static', filename='js/profile-images.js') }}" data-static-base-script="true"></script>{% endif %}
-    {% if request.endpoint == 'faq' %}<script src="{{ url_for('static', filename='js/faq.js') }}" data-static-base-script="true"></script>{% endif %}
-    {% if request.endpoint in ['category', 'subcategory'] %}<script src="{{ url_for('static', filename='js/feature-modals.js') }}" data-static-base-script="true"></script>{% endif %}
+    {% if request.endpoint in ['home', 'about'] %}<script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>{% endif %}
+    {% if request.endpoint == 'profile' %}<script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>{% endif %}
+    {% if request.endpoint == 'faq' %}<script src="{{ url_for('static', filename='js/faq.js') }}"></script>{% endif %}
+    {% if request.endpoint in ['category', 'subcategory'] %}<script src="{{ url_for('static', filename='js/feature-modals.js') }}"></script>{% endif %}
     <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
-    {% if request.endpoint in ['plans', 'pix_checkout_page'] %}<script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>{% endif %}
-    {% if request.endpoint == 'plans' %}<script src="{{ url_for('static', filename='js/plan-prices.js') }}" data-static-base-script="true"></script>{% endif %}
+    <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
+    {% if request.endpoint == 'plans' %}<script src="{{ url_for('static', filename='js/plan-prices.js') }}"></script>{% endif %}
     <script src="{{ url_for('static', filename='js/site-settings-live.js') }}" data-static-base-script="true"></script>
     {% if has_chat_access %}<script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>{% endif %}
     <script src="{{ url_for('static', filename='js/project-dropdowns.js') }}" data-static-base-script="true"></script>
@@ -710,7 +710,7 @@
         }
 
         /* Responsividade */
-        @media (max-width: 992px) {
+        @media (max-width: 1100px) {
             .auth-buttons {
                 margin-top: 1rem;
                 margin-left: 0;
@@ -744,7 +744,7 @@
     <script src="{{ url_for('static', filename='js/dynamic-loading.js') }}" data-static-base-script="true"></script>
 
     <!-- Particles Animation -->
-    {% if request.endpoint == 'home' %}<script src="{{ url_for('static', filename='js/particles.js') }}" data-static-base-script="true"></script>{% endif %}
+    {% if request.endpoint == 'home' %}<script src="{{ url_for('static', filename='js/particles.js') }}"></script>{% endif %}
 
     <style data-static-base-style="true">
         /* Search Input Wrapper */
@@ -934,7 +934,40 @@
             }
         }
 
-        @media (max-width: 992px) {
+        @media (min-width: 1101px) and (max-width: 1500px) {
+            .navbar .logo a {
+                font-size: 1.15rem;
+                white-space: nowrap;
+            }
+
+            .navbar .nav-menu {
+                gap: 0.25rem;
+            }
+
+            .navbar .nav-menu > li > a {
+                gap: 0.35rem;
+                padding: 0.55rem 0.4rem;
+                font-size: 0.82rem;
+                white-space: nowrap;
+            }
+
+            .navbar .dropdown-arrow {
+                margin-left: 0.15rem;
+            }
+
+            .auth-section .auth-buttons {
+                gap: 0.35rem;
+                margin-left: 0.4rem;
+            }
+
+            .auth-section .auth-buttons .btn {
+                padding: 0.45rem 0.65rem;
+                font-size: 0.78rem;
+                white-space: nowrap;
+            }
+        }
+
+        @media (max-width: 1100px) {
             .navbar {
                 padding: 0.75rem 0;
             }
@@ -1020,7 +1053,7 @@
             }
         }
 
-        @media (min-width: 993px) {
+        @media (min-width: 1101px) {
             .mobile-menu-toggle {
                 display: none;
             }

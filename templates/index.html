@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% set home_hero_title = site_configs.get('home_hero_title', 'Encontre o arquivo certo para o reparo.') %}
+{% set home_hero_title = site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') %}
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
         <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}" data-live-setting="home_hero_title">{{ home_hero_title }}</h1>
-        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.') }}</p>
+        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
                 <label for="home-search-input" class="sr-only">Pesquisar por modelo ou código da placa</label>
@@ -64,7 +64,7 @@
     }
 
     function getHeroTitleLines(titleEl) {
-        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Encontre o arquivo certo para o reparo.').trim();
+        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Bem-vindo ao Mundo da Informática').trim();
         var explicitLines = rawTitle.split('|').map(function (line) { return line.trim(); }).filter(Boolean);
         if (explicitLines.length > 1) return explicitLines;
 
@@ -345,16 +345,19 @@
 <section class="most-used-section" aria-labelledby="most-used-title">
     <div class="container">
         <div class="section-header">
-            <h2 id="most-used-title">Mais utilizados</h2>
+            <h2 id="most-used-title">Mais Baixados</h2>
             <p>Recursos com mais downloads registrados na plataforma</p>
         </div>
         <div class="most-used-grid">
             {% for item in most_used %}
             <a class="most-used-card" href="{{ post_url(item) }}">
-                <span class="most-used-type">{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}</span>
-                <strong>{{ item.model or item.title }}</strong>
-                {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
-                <span><i class="fas fa-download" aria-hidden="true"></i> {{ item.downloads }} downloads</span>
+                <img class="most-used-thumbnail" src="{{ get_image_url(item.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ item.title }}" loading="lazy">
+                <span class="most-used-content">
+                    <span class="most-used-type">{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}</span>
+                    <strong>{{ item.model or item.title }}</strong>
+                    {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
+                    <span><i class="fas fa-download" aria-hidden="true"></i> {{ item.downloads }} downloads</span>
+                </span>
             </a>
             {% endfor %}
         </div>

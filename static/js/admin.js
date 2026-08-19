@@ -567,9 +567,10 @@ function initPageSpecificFunctions() {
     const currentPath = window.location.pathname;
 
     // Dashboard - Atualiza estatísticas em tempo real
-    if (currentPath.includes('/admin/dashboard')) {
+    if (currentPath === '/admin' || currentPath.includes('/admin/dashboard')) {
         console.log('Dashboard inicializado');
-        setInterval(updateDashboardStats, 60000);
+        window.clearInterval(window.__dashboardStatsRefreshTimer);
+        window.__dashboardStatsRefreshTimer = window.setInterval(updateDashboardStats, 60000);
     }
 
     // As demais páginas (Settings, Profile, Posts, etc.) têm suas
@@ -592,22 +593,32 @@ function reinitializeAdminShell() {
     initPageSpecificFunctions();
 }
 
-function updateDashboardStats() {
-    // Simulação de atualização de estatísticas em tempo real
-    const statsElements = document.querySelectorAll('.stat-info h3');
-    if (statsElements.length > 0) {
-        statsElements.forEach(statEl => {
-            const currentValue = parseInt(statEl.textContent);
-            if (!isNaN(currentValue)) {
-                // Pequena variação para simulação
-                const newValue = currentValue + Math.floor(Math.random() * 3);
-                statEl.textContent = newValue;
+async function updateDashboardStats() {
+    const statsElements = document.querySelectorAll('[data-dashboard-stat]');
+    if (!statsElements.length) return;
 
-                // Animar com um efeito
+    try {
+        const response = await fetch('/admin/dashboard/stats', {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store'
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.success || !payload.stats) return;
+
+        statsElements.forEach((statEl) => {
+            const key = statEl.dataset.dashboardStat;
+            if (!(key in payload.stats)) return;
+            const nextValue = Number(payload.stats[key]) || 0;
+            const currentValue = Number(String(statEl.textContent).replace(/\D/g, '')) || 0;
+            statEl.textContent = nextValue.toLocaleString('pt-BR');
+            if (nextValue !== currentValue) {
                 statEl.classList.add('bounce');
-                setTimeout(() => statEl.classList.remove('bounce'), 1000);
+                window.setTimeout(() => statEl.classList.remove('bounce'), 1000);
             }
         });
+    } catch (error) {
+        console.warn('Não foi possível atualizar os números reais do dashboard.', error);
     }
 }
 

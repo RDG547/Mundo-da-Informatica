@@ -794,6 +794,40 @@
     flex-wrap: wrap;
 }
 
+.category-cta .cta-buttons .btn-gradient {
+    min-height: 50px;
+    padding: 0.8rem 1.35rem;
+    border: 2px solid transparent;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.category-cta .cta-buttons .cta-search-button {
+    color: #1f2937;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.category-cta .cta-buttons .cta-search-button:hover,
+.category-cta .cta-buttons .cta-search-button:focus-visible {
+    color: #111827 !important;
+    background: linear-gradient(135deg, #fcd34d, #f59e0b);
+}
+
+.category-cta .cta-buttons .cta-suggestion-button {
+    color: #fff;
+    background: linear-gradient(135deg, #1769c2, #2563eb);
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.category-cta .cta-buttons .cta-suggestion-button:hover,
+.category-cta .cta-buttons .cta-suggestion-button:focus-visible {
+    color: #fff !important;
+    background: linear-gradient(135deg, #0f56a3, #1d4ed8);
+}
+
 
 
 .pulse-animation {

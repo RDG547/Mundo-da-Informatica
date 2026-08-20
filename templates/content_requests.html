@@ -16,17 +16,20 @@
 <section class="request-page">
     <div class="container request-layout">
         <div class="request-form-card">
-            <div class="request-type-grid" role="tablist" aria-label="Tipo de pedido">
-                <a href="{{ url_for('content_requests', type='suggestion') }}" class="request-type-option{% if selected_type == 'suggestion' %} active{% endif %}">
+            <div class="request-type-grid" id="requestTypeTabs" role="tablist" aria-label="Tipo de pedido">
+                <button type="button" class="request-type-option{% if selected_type == 'suggestion' %} active{% endif %}"
+                    data-request-type="suggestion" role="tab" aria-selected="{{ 'true' if selected_type == 'suggestion' else 'false' }}" aria-controls="contentRequestForm">
                     <i class="fas fa-lightbulb" aria-hidden="true"></i>
                     <strong>Sugestão de conteúdo</strong>
                     <span>Disponível para todos, sem SLA ou prioridade.</span>
-                </a>
-                {% if current_user.is_authenticated and current_user.plan == 'vip' %}<a href="{{ url_for('content_requests', type='vip_priority') }}" class="request-type-option{% if selected_type == 'vip_priority' %} active{% endif %}">
+                </button>
+                {% if current_user.is_authenticated and current_user.plan == 'vip' %}<button type="button" class="request-type-option{% if selected_type == 'vip_priority' %} active{% endif %}"
+                    data-request-type="vip_priority" role="tab" aria-selected="{{ 'true' if selected_type == 'vip_priority' else 'false' }}" aria-controls="contentRequestForm">
                     <i class="fas fa-crown" aria-hidden="true"></i>
                     <strong>Busca prioritária VIP</strong>
                     <span>Prioridade na pesquisa; a obtenção do arquivo não é garantida.</span>
-                </a>{% else %}<button type="button" class="request-type-option locked" id="vipRequestLocked" aria-describedby="requestAccessNote">
+                </button>{% else %}<button type="button" class="request-type-option locked" id="vipRequestLocked"
+                    data-request-type="vip_priority" data-request-locked="true" role="tab" aria-selected="false" aria-disabled="true" aria-describedby="requestAccessNote">
                     <i class="fas fa-lock" aria-hidden="true"></i>
                     <strong>Busca prioritária VIP <small>Somente VIP</small></strong>
                     <span>Faça upgrade para solicitar prioridade na pesquisa.</span>
@@ -40,9 +43,9 @@
             </div>
             {% endif %}
 
-            <form method="post" class="request-form">
+            <form method="post" class="request-form" id="contentRequestForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="request_type" value="{{ selected_type }}">
+                <input type="hidden" name="request_type" id="requestTypeInput" value="{{ selected_type }}">
                 {% if not current_user.is_authenticated %}
                 <div class="request-field-row">
                     <div><label for="requester_name">Nome</label><input id="requester_name" name="requester_name" required maxlength="120"></div>
@@ -59,17 +62,15 @@
                     <div>
                         <label for="request_category">Categoria</label>
                         <select id="request_category" name="category">
-                            <option value="">Selecione, se souber</option>
-                            {% for category in request_categories %}<option value="{{ category.name }}">{{ category.name }}</option>{% endfor %}
+                            <option value="" data-icon="fas fa-folder-open">Selecione, se souber</option>
+                            {% for category in request_categories %}<option value="{{ category.name }}" data-icon="{{ category.icon or 'fas fa-folder' }}">{{ category.name }}</option>{% endfor %}
                         </select>
                     </div>
                 </div>
                 <label for="request_description">Detalhes de compatibilidade</label>
                 <textarea id="request_description" name="description" rows="5" maxlength="4000" placeholder="Modelo, revisão, chips e outras informações úteis."></textarea>
-                {% if selected_type == 'vip_priority' %}
-                <p class="request-disclaimer"><i class="fas fa-circle-info"></i> Faremos uma busca prioritária, porém a disponibilidade depende da possibilidade de obtenção do arquivo.</p>
-                {% endif %}
-                <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> {{ 'Enviar busca prioritária' if selected_type == 'vip_priority' else 'Enviar sugestão' }}</button>
+                <p class="request-disclaimer" id="priorityRequestDisclaimer"{% if selected_type != 'vip_priority' %} hidden{% endif %}><i class="fas fa-circle-info"></i> Faremos uma busca prioritária, porém a disponibilidade depende da possibilidade de obtenção do arquivo.</p>
+                <button type="submit" class="btn" id="contentRequestSubmit"><i class="fas fa-paper-plane"></i> <span>{{ 'Enviar busca prioritária' if selected_type == 'vip_priority' else 'Enviar sugestão' }}</span></button>
             </form>
         </div>
 
@@ -91,16 +92,39 @@
 </section>
 
 <style>
-.request-page{padding:3rem 0;background:var(--light-color,#f8fafc)}.request-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:1.5rem;align-items:start}.request-form-card,.request-history{padding:1.4rem;border:1px solid rgba(var(--primary-rgb),.16);border-radius:16px;background:var(--card-bg,#fff);box-shadow:var(--shadow-sm)}.request-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.4rem}.request-type-option{display:flex;flex-direction:column;gap:.35rem;padding:1rem;border:2px solid transparent;border-radius:12px;color:var(--text-color);background:rgba(var(--primary-rgb),.05);text-decoration:none;text-align:left;font:inherit}.request-type-option.active{border-color:var(--primary-color)}.request-type-option.locked{opacity:.8;cursor:pointer;border-color:rgba(245,158,11,.35)}.request-type-option.locked:hover,.request-type-option.locked:focus{opacity:1;border-color:#f59e0b}.request-type-option strong small{padding:.18rem .4rem;border-radius:999px;color:#92400e;background:#fef3c7;font-size:.65rem}.request-type-option span{font-size:.82rem;color:var(--text-secondary,#64748b)}.request-access-note{display:flex;gap:.65rem;margin:-.45rem 0 1.2rem;padding:.8rem;border-radius:9px;color:var(--text-color);background:rgba(245,158,11,.13)}.request-access-note[hidden]{display:none}.request-access-note a{font-weight:700;color:var(--primary-color)}.request-form{display:flex;flex-direction:column;gap:.7rem}.request-form label{font-weight:700}.request-form input,.request-form select,.request-form textarea{width:100%;padding:.8rem;border:1px solid rgba(148,163,184,.45);border-radius:9px;color:var(--text-color);background:var(--card-bg,#fff)}.request-field-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.request-disclaimer{padding:.8rem;border-radius:9px;background:rgba(245,158,11,.12);line-height:1.5}.request-history h2{margin-top:0}.request-history-item{padding:1rem 0;border-bottom:1px solid rgba(148,163,184,.22)}.request-history-item:last-child{border-bottom:0}.request-history-item h3{margin:.55rem 0 .25rem;font-size:1rem}.request-history-item p{margin:0 0 .45rem;color:var(--text-secondary,#64748b);font-size:.8rem}.request-status,.request-history-plan{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .55rem;border-radius:999px;color:var(--primary-color);background:rgba(var(--primary-rgb),.1);font-size:.72rem;font-weight:800}.request-history-plan{color:#475569;background:#eef2f7}[data-theme="dark"] .request-page,body.dark-mode .request-page{background:#0f172a}[data-theme="dark"] .request-form-card,[data-theme="dark"] .request-history,body.dark-mode .request-form-card,body.dark-mode .request-history{background:#172033;color:#e5e7eb}[data-theme="dark"] .request-form input,[data-theme="dark"] .request-form select,[data-theme="dark"] .request-form textarea,body.dark-mode .request-form input,body.dark-mode .request-form select,body.dark-mode .request-form textarea{background:#0f172a;color:#f8fafc}@media(max-width:800px){.request-layout{grid-template-columns:1fr}.request-type-grid,.request-field-row{grid-template-columns:1fr}.request-form-card,.request-history{padding:1rem}}
+.request-page{padding:3rem 0;background:var(--light-color,#f8fafc)}.request-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:1.5rem;align-items:start}.request-form-card,.request-history{padding:1.4rem;border:1px solid rgba(var(--primary-rgb),.16);border-radius:16px;background:var(--card-bg,#fff);box-shadow:var(--shadow-sm)}.request-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.4rem}.request-type-option{display:flex;flex-direction:column;gap:.35rem;padding:1rem;border:2px solid transparent;border-radius:12px;color:var(--text-color);background:rgba(var(--primary-rgb),.05);text-decoration:none;text-align:left;font:inherit;cursor:pointer}.request-type-option.active{border-color:var(--primary-color)}.request-type-option.locked{opacity:.5;cursor:not-allowed;border-color:rgba(245,158,11,.35)}.request-type-option.locked:hover,.request-type-option.locked:focus{opacity:.62;border-color:#f59e0b}.request-type-option strong small{padding:.18rem .4rem;border-radius:999px;color:#92400e;background:#fef3c7;font-size:.65rem}.request-type-option span{font-size:.82rem;color:var(--text-secondary,#64748b)}.request-access-note{display:flex;gap:.65rem;margin:-.45rem 0 1.2rem;padding:.8rem;border-radius:9px;color:var(--text-color);background:rgba(245,158,11,.13)}.request-access-note[hidden],.request-disclaimer[hidden]{display:none}.request-access-note a{font-weight:700;color:var(--primary-color)}.request-form{display:flex;flex-direction:column;gap:.7rem}.request-form label{font-weight:700}.request-form input,.request-form select,.request-form textarea{width:100%;padding:.8rem;border:1px solid rgba(148,163,184,.45);border-radius:9px;color:var(--text-color);background:var(--card-bg,#fff)}.request-field-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.request-disclaimer{padding:.8rem;border-radius:9px;background:rgba(245,158,11,.12);line-height:1.5}.request-history h2{margin-top:0}.request-history-item{padding:1rem 0;border-bottom:1px solid rgba(148,163,184,.22)}.request-history-item:last-child{border-bottom:0}.request-history-item h3{margin:.55rem 0 .25rem;font-size:1rem}.request-history-item p{margin:0 0 .45rem;color:var(--text-secondary,#64748b);font-size:.8rem}.request-status,.request-history-plan{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .55rem;border-radius:999px;color:var(--primary-color);background:rgba(var(--primary-rgb),.1);font-size:.72rem;font-weight:800}.request-history-plan{color:#475569;background:#eef2f7}[data-theme="dark"] .request-page,body.dark-mode .request-page{background:#0f172a}[data-theme="dark"] .request-form-card,[data-theme="dark"] .request-history,body.dark-mode .request-form-card,body.dark-mode .request-history{background:#172033;color:#e5e7eb}[data-theme="dark"] .request-form input,[data-theme="dark"] .request-form select,[data-theme="dark"] .request-form textarea,body.dark-mode .request-form input,body.dark-mode .request-form select,body.dark-mode .request-form textarea{background:#0f172a;color:#f8fafc}@media(max-width:800px){.request-layout{grid-template-columns:1fr}.request-type-grid,.request-field-row{grid-template-columns:1fr}.request-form-card,.request-history{padding:1rem}}
 </style>
 <script>
 (() => {
-    const locked = document.getElementById('vipRequestLocked');
+    const tabs = document.getElementById('requestTypeTabs');
+    const input = document.getElementById('requestTypeInput');
+    const disclaimer = document.getElementById('priorityRequestDisclaimer');
+    const submitLabel = document.querySelector('#contentRequestSubmit span');
     const note = document.getElementById('requestAccessNote');
-    if (!locked || !note) return;
-    locked.addEventListener('click', () => {
-        note.hidden = false;
-        note.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!tabs || !input || tabs.dataset.bound === 'true') return;
+    tabs.dataset.bound = 'true';
+
+    tabs.addEventListener('click', (event) => {
+        const tab = event.target.closest('[data-request-type]');
+        if (!tab || !tabs.contains(tab)) return;
+
+        if (tab.dataset.requestLocked === 'true') {
+            if (note) {
+                note.hidden = false;
+                note.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            return;
+        }
+
+        const requestType = tab.dataset.requestType;
+        tabs.querySelectorAll('[data-request-type]').forEach((item) => {
+            const active = item === tab;
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        input.value = requestType;
+        if (disclaimer) disclaimer.hidden = requestType !== 'vip_priority';
+        if (submitLabel) submitLabel.textContent = requestType === 'vip_priority' ? 'Enviar busca prioritária' : 'Enviar sugestão';
     });
 })();
 </script>

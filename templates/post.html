@@ -372,25 +372,30 @@
                         {% endif %}
                     {% endfor %}
                 {% endif %}
-                <a href="{{ post_url(related) }}" class="related-post-item">
-                    <div class="related-post-image">
-                        <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ related.title }}" loading="lazy" width="420" height="236">
-                    </div>
-                    <div class="related-post-content">
-                        <span class="related-post-category">
-                            {% if related_download_types.items %}
-                                {{ related_download_types.items|join('/') }}
-                            {% else %}
-                                {{ related.category_rel.name if related.category_rel else related.category_str }}
-                            {% endif %}
-                        </span>
-                        <h4>{{ related.title }}</h4>
-                        <div class="related-post-meta">
-                            <span><i class="far fa-eye"></i> {{ related.views }}</span>
-                            <span><i class="fas fa-download"></i> {{ related.downloads }}</span>
+                <article class="related-post-item">
+                    <a href="{{ post_url(related) }}" class="related-post-link">
+                        <div class="related-post-image">
+                            <img src="{{ get_image_url(related.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ related.title }}" loading="lazy" width="420" height="236">
                         </div>
-                    </div>
-                </a>
+                        <div class="related-post-content">
+                            <span class="related-post-category">
+                                {% if related_download_types.items %}
+                                    {{ related_download_types.items|join('/') }}
+                                {% else %}
+                                    {{ related.category_rel.name if related.category_rel else related.category_str }}
+                                {% endif %}
+                            </span>
+                            <h4>{{ related.title }}</h4>
+                            <div class="related-post-meta">
+                                <span><i class="far fa-eye"></i> {{ related.views }}</span>
+                                <span><i class="fas fa-download"></i> {{ related.downloads }}</span>
+                            </div>
+                        </div>
+                    </a>
+                    {% with download_post=related, download_button_class='related-post-download-btn' %}
+                        {% include 'components/card_download_button.html' %}
+                    {% endwith %}
+                </article>
                 {% endfor %}
             </div>
         </section>

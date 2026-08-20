@@ -4450,17 +4450,36 @@ a.download-card-category:hover {
 
 .most-used-card {
     display: flex;
-    align-items: center;
+    align-items: stretch;
+    flex-direction: column;
     gap: 0.9rem;
     min-width: 0;
     padding: 1.2rem;
     border: 1px solid rgba(var(--primary-rgb), 0.16);
     border-radius: 14px;
-    color: var(--text-color);
     background: var(--white-color, #fff);
-    text-decoration: none;
     box-shadow: var(--shadow-sm);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.most-used-link {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 0.9rem;
+    min-width: 0;
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.most-used-link:hover {
+    color: var(--text-color);
+}
+
+.most-used-download-btn {
+    width: 100%;
+    min-height: 52px;
+    font-family: inherit;
 }
 
 .most-used-thumbnail {

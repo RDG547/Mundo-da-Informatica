@@ -255,15 +255,20 @@
         </div>
         <div class="most-used-grid">
             {% for item in most_used %}
-            <a class="most-used-card" href="{{ post_url(item) }}">
-                <img class="most-used-thumbnail" src="{{ get_image_url(item.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ item.title }}" loading="lazy">
-                <span class="most-used-content">
-                    <span class="most-used-type">{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}</span>
-                    <strong>{{ item.model or item.title }}</strong>
-                    {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
-                    <span><i class="fas fa-download" aria-hidden="true"></i> {{ item.downloads }} downloads</span>
-                </span>
-            </a>
+            <article class="most-used-card">
+                <a class="most-used-link" href="{{ post_url(item) }}">
+                    <img class="most-used-thumbnail" src="{{ get_image_url(item.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ item.title }}" loading="lazy">
+                    <span class="most-used-content">
+                        <span class="most-used-type">{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}</span>
+                        <strong>{{ item.model or item.title }}</strong>
+                        {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
+                        <span><i class="fas fa-download" aria-hidden="true"></i> {{ item.downloads }} downloads</span>
+                    </span>
+                </a>
+                {% with download_post=item, download_button_class='most-used-download-btn' %}
+                    {% include 'components/card_download_button.html' %}
+                {% endwith %}
+            </article>
             {% endfor %}
         </div>
     </div>

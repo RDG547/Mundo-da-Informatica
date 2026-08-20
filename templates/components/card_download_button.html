@@ -1,0 +1,23 @@
+{% if download_post.download_link %}
+{% set card_download_files = get_public_download_files(download_post) %}
+{% if card_download_files and card_download_files|length > 1 %}
+<button
+    type="button"
+    class="btn btn-download download-btn multi-download-trigger {{ download_button_class|default('') }}"
+    data-post-id="{{ download_post.id }}"
+    data-post-title="{{ download_post.title }}"
+    data-post-image="{{ get_image_url(download_post.image_url, folder='posts', default='default.jpg') }}"
+    data-download-files='{{ card_download_files|tojson }}'
+    aria-label="Baixar {{ download_post.title }}">
+    <i class="fas fa-download" aria-hidden="true"></i> Download
+</button>
+{% else %}
+<a
+    href="{{ url_for('download_post', post_id=download_post.id) }}"
+    class="btn btn-download download-btn {{ download_button_class|default('') }}"
+    data-action="download"
+    aria-label="Baixar {{ download_post.title }}">
+    <i class="fas fa-download" aria-hidden="true"></i> Download
+</a>
+{% endif %}
+{% endif %}

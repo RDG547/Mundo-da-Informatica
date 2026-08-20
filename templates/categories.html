@@ -136,11 +136,11 @@
                         <h4>Não encontrou o que procura?</h4>
                         <p>Pesquise pelo modelo ou pelo código da placa. Se o arquivo ainda não estiver disponível, envie uma sugestão; usuários VIP também podem solicitar busca prioritária.</p>
                         <div class="cta-buttons" id="ctaButtonsContainer" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-                            <button type="button" class="btn btn-gradient primary" id="toggleSearchBtnCategories"
+                            <button type="button" class="btn btn-gradient primary cta-search-button" id="toggleSearchBtnCategories"
                                 onclick="transformToSearchBarCategories()" style="flex: 0 0 auto;">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary" style="flex: 0 0 auto;">
+                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary cta-suggestion-button" style="flex: 0 0 auto;">
                                 <i class="fas fa-lightbulb"></i> Sugerir conteúdo
                             </a>
                         </div>

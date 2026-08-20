@@ -189,10 +189,10 @@
                         <h4>Não encontrou o que procura?</h4>
                         <p>Busque pelo modelo, fabricante ou código da placa. Se o item ainda não estiver no acervo, envie uma sugestão; no VIP, a mesma página permite abrir uma busca prioritária.</p>
                         <div class="cta-buttons">
-                            <button type="button" class="btn btn-gradient primary" id="toggleSearchBtn" onclick="toggleInlineSearch()">
+                            <button type="button" class="btn btn-gradient primary cta-search-button" id="toggleSearchBtn" onclick="toggleInlineSearch()">
                                 <i class="fas fa-search"></i> Fazer uma Busca
                             </button>
-                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary">
+                            <a href="{{ url_for('content_requests') }}" class="btn btn-gradient secondary cta-suggestion-button">
                                 <i class="fas fa-lightbulb"></i> Sugerir Conteúdo
                             </a>
                         </div>

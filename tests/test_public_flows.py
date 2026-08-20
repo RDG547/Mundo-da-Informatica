@@ -189,5 +189,82 @@ def test_platform_stats_render_even_when_all_values_are_zero(client):
 def test_non_vip_priority_option_is_locked_in_ui(client):
     body = client.get("/solicitacoes").get_data(as_text=True)
     assert 'id="vipRequestLocked"' in body
+    assert 'data-request-locked="true"' in body
+    assert 'aria-disabled="true"' in body
     assert "Somente VIP" in body
-    assert 'name="request_type" value="suggestion"' in body
+    assert 'name="request_type" id="requestTypeInput" value="suggestion"' in body
+
+
+def test_vip_request_types_are_dynamic_tabs(client):
+    vip_user = create_user(username="vip-tabs", plan="vip")
+    login(client, vip_user)
+
+    body = client.get("/solicitacoes").get_data(as_text=True)
+    assert 'data-request-type="suggestion" role="tab"' in body
+    assert 'data-request-type="vip_priority" role="tab"' in body
+    assert 'href="/solicitacoes?type=vip_priority"' not in body
+    assert "input.value = requestType" in body
+    assert "disclaimer.hidden = requestType !== 'vip_priority'" in body
+
+
+def test_request_category_dropdown_uses_configured_category_icons(client):
+    with app.app_context():
+        db.session.add(Category(
+            name="BIOS",
+            slug="bios",
+            icon="fas fa-microchip",
+            is_active=True,
+            is_visible=True,
+        ))
+        db.session.commit()
+
+    body = client.get("/solicitacoes").get_data(as_text=True)
+    assert '<option value="BIOS" data-icon="fas fa-microchip">BIOS</option>' in body
+    assert '<option value="" data-icon="fas fa-folder-open">' in body
+
+
+def test_download_actions_are_available_on_most_downloaded_and_related_cards(client):
+    with app.app_context():
+        category = Category(name="BIOS", slug="bios", icon="fas fa-microchip")
+        primary = Post(
+            title="BIOS principal",
+            content="Arquivo principal.",
+            download_link="https://files.example.test/principal.bin",
+            category_rel=category,
+            category_str="BIOS",
+            downloads=12,
+            is_active=True,
+        )
+        related = Post(
+            title="BIOS relacionado",
+            content="Arquivo relacionado.",
+            download_link="https://files.example.test/relacionado.bin",
+            category_rel=category,
+            category_str="BIOS",
+            downloads=8,
+            is_active=True,
+        )
+        db.session.add_all([category, primary, related])
+        db.session.commit()
+        primary_id = primary.id
+        related_id = related.id
+
+    home_body = client.get("/").get_data(as_text=True)
+    assert 'class="btn btn-download download-btn most-used-download-btn"' in home_body
+    assert f'href="/download/{primary_id}"' in home_body
+
+    detail_body = client.get(f"/post/{primary_id}").get_data(as_text=True)
+    assert 'class="btn btn-download download-btn related-post-download-btn"' in detail_body
+    assert f'href="/download/{related_id}"' in detail_body
+
+
+def test_category_cta_search_and_suggestion_buttons_have_distinct_shared_sizing(client):
+    body = client.get("/categorias").get_data(as_text=True)
+    assert "cta-search-button" in body
+    assert "cta-suggestion-button" in body
+
+    css = client.get("/static/css/category.css").get_data(as_text=True)
+    assert ".category-cta .cta-buttons .btn-gradient" in css
+    assert "font-size: 0.95rem" in css
+    assert ".category-cta .cta-buttons .cta-search-button" in css
+    assert ".category-cta .cta-buttons .cta-suggestion-button" in css

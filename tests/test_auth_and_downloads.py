@@ -167,6 +167,7 @@ def test_admin_controls_plan_name_and_payment_methods(client):
     plans_body = client.get("/planos").get_data(as_text=True)
     assert 'data-plan-name="premium">Profissional</' in plans_body
     assert 'data-plan-card-enabled="false"' in plans_body
+    assert ".payment-unavailable[hidden]" in plans_body
     assert '<div class="faq-item active"' not in plans_body
 
     card_response = client.post("/create-checkout-session", json={"plan": "premium"})

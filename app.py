@@ -5090,7 +5090,7 @@ def get_user_permissions():
         'vip_area': entitlements['vip_area'],
         'live_chat': {
             'community': _can_user_write_public_chat(user),
-            'support': _can_user_write_public_chat(user)
+            'support': True
         }
     }
 
@@ -6786,6 +6786,12 @@ def search_suggestions():
 
     for post in posts:
         category_name = post.category_str or (post.category_rel.name if post.category_rel else 'Sem categoria')
+        download_types = []
+        for download_file in get_public_download_files(post):
+            file_type = str(download_file.get('type') or '').strip()
+            if file_type and file_type.casefold() not in {item.casefold() for item in download_types}:
+                download_types.append(file_type)
+        file_type_label = '/'.join(download_types) or post.file_type or category_name
 
         # Determinar o ícone baseado na categoria
         category_icon = 'fas fa-file-alt'
@@ -6805,8 +6811,9 @@ def search_suggestions():
         suggestions.append({
             'type': 'post',
             'title': post.title,
-            'description': ' · '.join(filter(None, [post.model, post.board_code, post.file_type or category_name])),
+            'description': ' · '.join(filter(None, [post.model, post.board_code, file_type_label])),
             'category': category_name,
+            'file_types': download_types or [file_type_label],
             'url': url_for('post_by_slug', category=generate_slug(post.category_str), slug=post.slug) if post.slug else url_for('post', post_id=post.id),
             'icon': category_icon,
             'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg')
@@ -7613,8 +7620,6 @@ def chat_firebase_token():
     """
     if not current_user.is_active:
         return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
-    if not _can_user_write_public_chat(current_user):
-        return jsonify({'success': False, 'message': 'O chat está disponível no plano VIP.'}), 403
 
     if firebase_auth is None:
         return jsonify({'success': False, 'message': 'Firebase Admin indisponível no servidor.'}), 503
@@ -7802,16 +7807,19 @@ def _chat_actor_role(user) -> str:
 
 
 def _can_user_write_public_chat(user) -> bool:
-    return bool(getattr(user, 'role', '') in {'admin', 'editor'} or can_use_public_chat(user))
+    # O cargo administrativo não altera benefícios comerciais do plano.
+    return bool(can_use_public_chat(user))
 
 
 def _get_chat_permissions_for_user(user) -> dict[str, Any]:
-    has_chat_access = _can_user_write_public_chat(user)
+    has_public_chat_access = _can_user_write_public_chat(user)
     return {
-        'public_read': has_chat_access,
-        'public_write': has_chat_access,
-        'support_read': has_chat_access,
-        'support_write': has_chat_access,
+        'public_read': has_public_chat_access,
+        'public_write': has_public_chat_access,
+        # O atendimento individual existe em todos os planos; prioridade e SLA
+        # continuam sendo definidos pela matriz comercial do plano.
+        'support_read': True,
+        'support_write': True,
         'vip_area': bool(get_plan_entitlements(user)['vip_area'])
     }
 
@@ -7850,17 +7858,17 @@ def _chat_backend_unavailable_response(user):
 
 
 def _validate_chat_room_access(user, room_id: str, *, write: bool = False) -> tuple[bool, str, int]:
-    if not _can_user_write_public_chat(user):
-        return False, 'O chat está disponível no plano VIP.', 403
     normalized_room_id = str(room_id or '').strip()
     if not normalized_room_id:
         return False, 'Sala de chat inválida.', 400
 
     if normalized_room_id == CHAT_PUBLIC_ROOM_ID:
-        if write and not _can_user_write_public_chat(user):
+        permissions = _get_chat_permissions_for_user(user)
+        permission_key = 'public_write' if write else 'public_read'
+        if not permissions[permission_key]:
             return (
                 False,
-                'A sala Todos e exclusiva para assinantes VIP. Use a aba Suporte ou assine o plano VIP para participar.',
+                'A sala Todos é exclusiva para assinantes VIP. Use a aba Suporte ou assine o plano VIP para participar.',
                 403
             )
         return True, '', 200
@@ -8116,8 +8124,6 @@ def chat_bootstrap():
     """
     if not current_user.is_active:
         return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
-    if not _can_user_write_public_chat(current_user):
-        return jsonify({'success': False, 'message': 'O chat está disponível no plano VIP.'}), 403
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
@@ -8145,8 +8151,6 @@ def chat_bootstrap():
 def chat_state():
     if not current_user.is_active:
         return jsonify({'success': False, 'message': 'Conta desativada.'}), 403
-    if not _can_user_write_public_chat(current_user):
-        return jsonify({'success': False, 'message': 'O chat está disponível no plano VIP.'}), 403
 
     db_firestore = _get_firestore_client()
     if db_firestore is None:
@@ -11183,6 +11187,11 @@ def admin_newsletter():
     total_subscribers = total_subscribers_count
     active_subscribers = len([s for s in subscribers if s.is_active])
     recent_subscribers = len([s for s in subscribers if s.subscribed_date >= (datetime.utcnow() - timedelta(days=30))])
+    newsletter_groups = NewsletterGroup.query.order_by(NewsletterGroup.name.asc()).all()
+    newsletter_group_counts = {
+        group.id: sum(1 for subscriber in group.subscribers if subscriber.is_active)
+        for group in newsletter_groups
+    }
 
     # Obter estatísticas para a sidebar
     sidebar_stats = get_admin_sidebar_stats()
@@ -11194,6 +11203,8 @@ def admin_newsletter():
                          total_subscribers=total_subscribers,
                          active_subscribers=active_subscribers,
                          recent_subscribers=recent_subscribers,
+                         newsletter_groups=newsletter_groups,
+                         newsletter_group_counts=newsletter_group_counts,
                          **sidebar_stats)
 
 @app.route('/downgrade_plan', methods=['POST'])
@@ -12277,8 +12288,6 @@ def update_password():
 
 def check_favorite_limit(user):
     """Verifica se o usuário pode adicionar favoritos baseado no plano"""
-    if user.role == 'admin' or user.role == 'editor':
-        return True, "Acesso administrativo."
     limit = get_plan_entitlements(user)['favorites_limit']
     if limit is None:
         return True, "Favoritos ilimitados."
@@ -12291,9 +12300,6 @@ def check_favorite_limit(user):
 
 def check_comment_limit(user):
     """Verifica se o usuário pode comentar baseado no plano"""
-    if user.role == 'admin' or user.role == 'editor':
-        return True, "Acesso administrativo."
-
     limit = get_plan_entitlements(user)['comments_limit']
     if limit is None:
         return True, "Comentários ilimitados no plano VIP."
@@ -12314,9 +12320,6 @@ def check_comment_limit(user):
 
 def check_download_history_access(user):
     """Verifica se o usuário pode acessar o histórico de downloads"""
-    if user.role == 'admin' or user.role == 'editor':
-        return True, None  # Acesso total
-
     entitlements = get_plan_entitlements(user)
     return (
         bool(entitlements['download_history_access']),
@@ -12330,9 +12333,6 @@ def check_user_download_limit(user):
     # Verificar se o usuário tem permissão para fazer downloads
     if hasattr(user, 'can_download') and not user.can_download:
         return False, 0, 0, None, 'blocked'
-
-    if user.role == 'admin' or user.role == 'editor':
-        return True, float('inf'), float('inf'), None, 'unlimited'  # Sem limites
 
     brasilia_tz = pytz.timezone('America/Sao_Paulo')
     now = datetime.utcnow()
@@ -12407,17 +12407,11 @@ def check_user_download_limit(user):
 
 def check_support_priority(user):
     """Retorna o tempo de resposta do suporte baseado no plano"""
-    if user.role == 'admin' or user.role == 'editor':
-        return "Suporte prioritário"
-
     return str(get_plan_entitlements(user)['support'])
 
 
 def check_device_limit(user):
     """Verifica se o usuário pode acessar de mais dispositivos"""
-    if user.role == 'admin' or user.role == 'editor':
-        return True, "Acesso administrativo."
-
     limit = int(get_plan_entitlements(user)['device_limit'])
 
     if user.active_sessions >= limit:
@@ -12428,9 +12422,6 @@ def check_device_limit(user):
 
 def can_request_specific_content(user):
     """Verifica se o usuário pode abrir uma busca prioritária de conteúdo."""
-    if user.role == 'admin' or user.role == 'editor':
-        return True
-
     return can_request_priority_content(user)
 
 @app.route('/favorite/<int:post_id>', methods=['POST'])

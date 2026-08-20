@@ -132,10 +132,6 @@
                         Status
                         <i class="fas fa-sort sort-icon"></i>
                     </th>
-                    <th data-sort="tracking">
-                        <i class="fas fa-chart-line"></i> Rastreamento
-                        <i class="fas fa-sort sort-icon"></i>
-                    </th>
                     <th data-sort="actions" style="text-align: right; padding-right: 1.5rem;">
                         Ações
                         <i class="fas fa-sort sort-icon"></i>
@@ -285,59 +281,8 @@
                             {% endif %}
                         </div>
                     </td>
-                    <td>
-                        <div class="tracking-cell">
-                            {% set user_display_name = user.name or ((user.first_name ~ ' ' ~ user.last_name) if user.first_name else user.username) %}
-                            <div class="tracking-info">
-                                {% if user.ip_address %}
-                                <small class="tracking-item">
-                                    <i class="fas fa-network-wired"></i> IP: {{ user.ip_address }}
-                                </small>
-                                {% endif %}
-                                {% if user.browser %}
-                                <small class="tracking-item">
-                                    <i class="fas fa-globe"></i> {{ user.browser }}
-                                </small>
-                                {% endif %}
-                                {% if user.operating_system %}
-                                <small class="tracking-item">
-                                    <i class="fas fa-desktop"></i> {{ user.operating_system }}
-                                </small>
-                                {% endif %}
-                                {% if user.referrer %}
-                                <small class="tracking-item">
-                                    <i class="fas fa-external-link-alt"></i> De: {{ user.referrer[:30] }}{% if
-                                    user.referrer|length > 30 %}...{% endif %}
-                                </small>
-                                {% endif %}
-                                {% if not user.ip_address and not user.browser and not user.operating_system %}
-                                <small class="text-muted">Sem dados</small>
-                                {% endif %}
-                            </div>
-                            <button type="button"
-                                class="tracking-info-btn"
-                                title="Informações do usuário"
-                                aria-label="Ver informações de {{ user.username }}"
-                                data-user-info="true"
-                                data-user-id="{{ user.id }}"
-                                data-username="{{ user.username|e }}"
-                                data-name="{{ user_display_name|trim|e }}"
-                                data-email="{{ user.email|e }}"
-                                data-role="{{ user.role|e }}"
-                                data-plan="{{ user.plan|e }}"
-                                data-status="{% if user.is_active %}Ativo{% else %}Inativo{% endif %}"
-                                data-joined="{% if user.date_joined %}{{ user.date_joined.strftime('%d/%m/%Y %H:%M') }}{% else %}N/A{% endif %}"
-                                data-last-login="{% if user.last_login %}{{ user.last_login.strftime('%d/%m/%Y %H:%M') }}{% else %}N/A{% endif %}"
-                                data-ip="{{ (user.ip_address or '')|e }}"
-                                data-browser="{{ (user.browser or '')|e }}"
-                                data-os="{{ (user.operating_system or '')|e }}"
-                                data-referrer="{{ (user.referrer or '')|e }}"
-                                onclick="openUserInfoModal(this)">
-                                <i class="fas fa-info"></i>
-                            </button>
-                        </div>
-                    </td>
                     <td class="actions-cell">
+                        {% set user_display_name = user.name or ((user.first_name ~ ' ' ~ user.last_name) if user.first_name else user.username) %}
                         <div class="action-buttons">
                             <a href="{{ url_for('profile', user_id=user.id) }}" class="btn-action btn-view"
                                 title="Ver Perfil" target="_blank">
@@ -347,6 +292,17 @@
                                 onclick="editUser({{ user.id }})">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            <button type="button" class="btn-action tracking-info-btn" title="Informações"
+                                aria-label="Ver informações de {{ user.username }}" data-user-info="true"
+                                data-user-id="{{ user.id }}" data-username="{{ user.username|e }}"
+                                data-name="{{ user_display_name|trim|e }}" data-email="{{ user.email|e }}"
+                                data-joined="{% if user.date_joined %}{{ user.date_joined.strftime('%d/%m/%Y %H:%M') }}{% else %}N/A{% endif %}"
+                                data-last-login="{% if user.last_login %}{{ user.last_login.strftime('%d/%m/%Y %H:%M') }}{% else %}N/A{% endif %}"
+                                data-ip="{{ (user.ip_address or '')|e }}" data-browser="{{ (user.browser or '')|e }}"
+                                data-os="{{ (user.operating_system or '')|e }}" data-referrer="{{ (user.referrer or '')|e }}"
+                                onclick="openUserInfoModal(this)">
+                                <i class="fas fa-info"></i>
+                            </button>
                             {% if user.role != 'admin' or (users | selectattr('role', 'equalto', 'admin') | list |
                             length) > 1 %}
                             <a href="#" class="btn-action btn-delete" title="Excluir" data-user-id="{{ user.id }}"
@@ -359,12 +315,6 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <div class="dropdown-menu">
-                                    <button type="button" class="dropdown-item"
-                                        data-admin-action="reset-password"
-                                        data-user-id="{{ user.id }}"
-                                        data-username="{{ user.username|e }}">
-                                        <i class="fas fa-key"></i> Redefinir Senha
-                                    </button>
                                     <button type="button" class="dropdown-item"
                                         data-admin-action="send-welcome"
                                         data-user-id="{{ user.id }}"
@@ -379,7 +329,7 @@
                 {% else %}
                 <!-- Estado vazio -->
                 <tr class="empty-state">
-                    <td colspan="9" style="text-align: center; padding: 3rem;">
+                    <td colspan="8" style="text-align: center; padding: 3rem;">
                         <div class="empty-state-content">
                             <i class="fas fa-users fa-3x text-muted mb-3"></i>
                             <h4 class="text-muted">Nenhum usuário encontrado</h4>
@@ -983,91 +933,16 @@
         </div>
         <div class="modal-body">
             <div class="user-info-modal-header">
-                <div class="user-info-avatar-wrap">
-                    <img id="infoUserPhoto" src="" alt="Foto do usuário" class="user-info-avatar-img">
-                    <div class="user-info-avatar-actions">
-                        <label for="adminPhotoInput" class="avatar-action-btn" title="Alterar foto">
-                            <i class="fas fa-camera"></i>
-                        </label>
-                        <button type="button" id="adminPhotoRemoveBtn" class="avatar-action-btn danger" title="Remover foto">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <input type="file" id="adminPhotoInput" accept="image/jpeg,image/png,image/gif" hidden>
-                    </div>
-                </div>
+                <img id="infoUserPhoto" src="" alt="Foto do usuário" class="user-info-avatar-img">
                 <div>
                     <h4 id="userInfoName">Usuário</h4>
                     <p id="userInfoEmail">email@exemplo.com</p>
                 </div>
             </div>
-            <form id="userInfoForm" class="user-info-edit-form">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" id="infoUserId" name="user_id">
-                <div class="user-info-edit-grid">
-                    <div class="form-group">
-                        <label for="infoUsername"><i class="fas fa-at"></i> Usuário</label>
-                        <input type="text" id="infoUsername" name="username" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="infoName"><i class="fas fa-signature"></i> Nome</label>
-                        <input type="text" id="infoName" name="name" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="infoEmail"><i class="fas fa-envelope"></i> Email</label>
-                        <input type="email" id="infoEmail" name="email" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="infoRole"><i class="fas fa-user-shield"></i> Papel</label>
-                        <select id="infoRole" name="role" class="form-select">
-                            <option value="user">Usuário</option>
-                            <option value="editor">Editor</option>
-                            <option value="admin">Administrador</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="infoPlan"><i class="fas fa-gem"></i> Plano</label>
-                        <select id="infoPlan" name="plan" class="form-select">
-                            <option value="free">Grátis</option>
-                            <option value="premium">Premium</option>
-                            <option value="vip">VIP</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="infoStatus"><i class="fas fa-toggle-on"></i> Status</label>
-                        <select id="infoStatus" name="is_active" class="form-select">
-                            <option value="true">Ativo</option>
-                            <option value="false">Inativo</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="infoVerified"><i class="fas fa-check-circle"></i> Verificação</label>
-                        <select id="infoVerified" name="is_verified" class="form-select">
-                            <option value="true">Email verificado</option>
-                            <option value="false">Email não verificado</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="infoPhone"><i class="fas fa-phone"></i> Telefone</label>
-                        <input type="text" id="infoPhone" name="phone" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="infoLocation"><i class="fas fa-map-marker-alt"></i> Localização</label>
-                        <input type="text" id="infoLocation" name="location" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="infoWebsite"><i class="fas fa-globe"></i> Website</label>
-                        <input type="url" id="infoWebsite" name="website" class="form-control">
-                    </div>
-                    <div class="form-group full-width">
-                        <label for="infoBio"><i class="fas fa-quote-left"></i> Biografia</label>
-                        <textarea id="infoBio" name="bio" class="form-control" rows="2"></textarea>
-                    </div>
-                </div>
-                <div class="user-info-readonly-grid">
-                    <div><span>Cadastro</span><strong id="infoJoined">N/A</strong></div>
-                    <div><span>Último acesso</span><strong id="infoLastLogin">N/A</strong></div>
-                </div>
-            </form>
+            <div class="user-info-readonly-grid">
+                <div><span>Cadastro</span><strong id="infoJoined">N/A</strong></div>
+                <div><span>Último acesso</span><strong id="infoLastLogin">N/A</strong></div>
+            </div>
 
             <!-- Seção de Rastreamento -->
             <div class="tracking-info-section">
@@ -1097,11 +972,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
-                <i class="fas fa-times"></i> Cancelar
-            </button>
-            <button type="button" class="btn-admin btn-admin-primary" id="saveUserInfo">
-                <i class="fas fa-save"></i> Salvar Informações
+            <button type="button" class="btn-admin btn-admin-primary" data-dismiss="modal">
+                <i class="fas fa-check"></i> Fechar
             </button>
         </div>
     </div>
@@ -1972,7 +1844,31 @@
     }
 
     .user-edit-modal .modal-content {
-        max-width: 520px;
+        max-width: 720px;
+        max-height: calc(100dvh - 3rem);
+    }
+
+    .user-edit-modal .modal-body {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .admin-edit-password-action {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--admin-border-color, #d9e0ea);
+        border-radius: 12px;
+        background: var(--admin-bg-light, #f8fafc);
+    }
+
+    @media (max-width: 640px) {
+        .admin-edit-password-action {
+            align-items: stretch;
+            flex-direction: column;
+        }
     }
 </style>
 
@@ -2460,11 +2356,6 @@
         }, 0);
     }
 
-    function setFieldValue(id, value) {
-        const field = document.getElementById(id);
-        if (field) field.value = value ?? '';
-    }
-
     function setTrackingText(id, value) {
         const el = document.getElementById(id);
         if (el) el.textContent = value || '—';
@@ -2479,19 +2370,6 @@
 
         const photo = document.getElementById('infoUserPhoto');
         if (photo) photo.src = user.profile_image_url || '/static/images/profiles/default_profile.jpg';
-
-        setFieldValue('infoUserId', user.id);
-        setFieldValue('infoUsername', user.username);
-        setFieldValue('infoName', user.name || user.display_name || '');
-        setFieldValue('infoEmail', user.email);
-        setFieldValue('infoRole', user.role || 'user');
-        setFieldValue('infoPlan', user.plan || 'free');
-        setFieldValue('infoStatus', user.is_active ? 'true' : 'false');
-        setFieldValue('infoVerified', user.is_verified ? 'true' : 'false');
-        setFieldValue('infoPhone', user.phone || '');
-        setFieldValue('infoLocation', user.location || '');
-        setFieldValue('infoWebsite', user.website || '');
-        setFieldValue('infoBio', user.bio || '');
 
         setTrackingText('infoIp', user.ip_address || '');
         setTrackingText('infoBrowser', user.browser || '');
@@ -2540,67 +2418,6 @@
             showNotification(error.message || 'Erro ao carregar informações do usuário.', 'error');
         }
     };
-
-    // Photo management in user info modal
-    (function initAdminUserPhoto() {
-        const photoInput = document.getElementById('adminPhotoInput');
-        const removeBtn = document.getElementById('adminPhotoRemoveBtn');
-
-        function getCurrentUserId() {
-            return document.getElementById('infoUserId')?.value || null;
-        }
-
-        if (photoInput) {
-            photoInput.addEventListener('change', async function () {
-                const userId = getCurrentUserId();
-                if (!this.files || !this.files[0] || !userId) return;
-                const formData = new FormData();
-                formData.append('profile_image', this.files[0]);
-                const csrf = window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
-                if (csrf) formData.append('csrf_token', csrf);
-                try {
-                    const resp = await fetch(`/admin/users/${userId}/update-photo`, { method: 'POST', body: formData });
-                    const data = await resp.json();
-                    if (data.success) {
-                        const photoEl = document.getElementById('infoUserPhoto');
-                        if (photoEl) photoEl.src = data.photo_url;
-                        showNotification('Foto atualizada com sucesso!', 'success');
-                    } else {
-                        showNotification(data.message || 'Erro ao atualizar foto.', 'error');
-                    }
-                } catch (e) {
-                    showNotification('Erro ao enviar foto.', 'error');
-                }
-                this.value = '';
-            });
-        }
-
-        if (removeBtn) {
-            removeBtn.addEventListener('click', async function () {
-                const userId = getCurrentUserId();
-                if (!userId) return;
-                if (!confirm('Remover a foto deste usuário?')) return;
-                const csrf = window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
-                try {
-                    const resp = await fetch(`/admin/users/${userId}/remove-photo`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-                        body: JSON.stringify({})
-                    });
-                    const data = await resp.json();
-                    if (data.success) {
-                        const photoEl = document.getElementById('infoUserPhoto');
-                        if (photoEl) photoEl.src = '/static/images/profiles/default_profile.jpg';
-                        showNotification('Foto removida com sucesso!', 'success');
-                    } else {
-                        showNotification(data.message || 'Erro ao remover foto.', 'error');
-                    }
-                } catch (e) {
-                    showNotification('Erro ao remover foto.', 'error');
-                }
-            });
-        }
-    })();
 
     // Toggle dropdown de cargo - Portal approach
     window.toggleRoleDropdown = function (badgeElement, event) {
@@ -3018,46 +2835,6 @@
             }
         });
 
-        document.getElementById('saveUserInfo')?.addEventListener('click', async function () {
-            const form = document.getElementById('userInfoForm');
-            const userId = document.getElementById('infoUserId')?.value;
-            if (!form || !userId) {
-                showNotification('Usuário não encontrado para salvar.', 'error');
-                return;
-            }
-
-            if (!form.checkValidity()) {
-                form.reportValidity();
-                return;
-            }
-
-            this.disabled = true;
-            const originalHtml = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
-
-            try {
-                const response = await fetch(`/admin/users/${userId}/update`, {
-                    method: 'POST',
-                    body: new FormData(form)
-                });
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    throw new Error(data.message || 'Erro ao salvar informações.');
-                }
-
-                showNotification(data.message || 'Informações salvas com sucesso!', 'success');
-                closeAdminModal('userInfoModal');
-                await window.refreshCurrentUsersList?.();
-            } catch (error) {
-                console.error('Erro ao salvar informações:', error);
-                showNotification(error.message || 'Erro ao salvar informações.', 'error');
-            } finally {
-                this.disabled = false;
-                this.innerHTML = originalHtml;
-            }
-        });
-
         // Função para editar usuário
         window.editUser = function (userId) {
             console.log('Editando usuário (Enhanced):', userId);
@@ -3175,6 +2952,11 @@
                 document.getElementById('editRole').value = user.role;
                 document.getElementById('editPlan').value = user.plan || 'free';
                 document.getElementById('editIsActive').checked = user.is_active;
+                document.getElementById('editIsVerified').checked = user.is_verified;
+                document.getElementById('editPhone').value = user.phone || '';
+                document.getElementById('editLocation').value = user.location || '';
+                document.getElementById('editWebsite').value = user.website || '';
+                document.getElementById('editBio').value = user.bio || '';
 
                 // Preencher novos campos de permissões de download
                 const canDownloadField = document.getElementById('canDownload');
@@ -3265,6 +3047,43 @@
                                         <label for="editIsActive" class="form-check-label"><i class="fas fa-toggle-on"></i> Usuário Ativo</label>
                                     </div>
                                 </div>
+
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="editIsVerified" name="is_verified" class="form-check-input">
+                                        <label for="editIsVerified" class="form-check-label"><i class="fas fa-check-circle"></i> Email Verificado</label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editPhone" class="form-label"><i class="fas fa-phone"></i> Telefone</label>
+                                    <input type="text" id="editPhone" name="phone" class="form-control">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editLocation" class="form-label"><i class="fas fa-map-marker-alt"></i> Localização</label>
+                                    <input type="text" id="editLocation" name="location" class="form-control">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editWebsite" class="form-label"><i class="fas fa-globe"></i> Website</label>
+                                    <input type="url" id="editWebsite" name="website" class="form-control">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="editBio" class="form-label"><i class="fas fa-quote-left"></i> Biografia</label>
+                                    <textarea id="editBio" name="bio" class="form-control" rows="3"></textarea>
+                                </div>
+
+                                <div class="form-group admin-edit-password-action">
+                                    <div>
+                                        <strong><i class="fas fa-key"></i> Senha do usuário</strong>
+                                        <small class="form-text">Defina uma nova senha sem sair da edição.</small>
+                                    </div>
+                                    <button type="button" class="btn-admin btn-admin-outline" onclick="openResetPasswordFromEdit()">
+                                        <i class="fas fa-key"></i> Redefinir Senha
+                                    </button>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn-admin btn-admin-outline" data-dismiss="modal">
@@ -3286,6 +3105,14 @@
             closeUserModal('editUserModal');
         };
 
+        window.openResetPasswordFromEdit = function () {
+            const userId = document.getElementById('editUserId')?.value;
+            const username = document.getElementById('editUsername')?.value || 'usuário';
+            if (!userId) return;
+            closeEditUserModal();
+            window.resetUserPassword?.(userId, username);
+        };
+
         // Função para salvar usuário
         window.saveUser = function (event) {
             event.preventDefault();
@@ -3295,6 +3122,7 @@
 
             // Converter checkbox para boolean
             formData.set('is_active', document.getElementById('editIsActive').checked);
+            formData.set('is_verified', document.getElementById('editIsVerified').checked);
 
             fetch(`/admin/users/${userId}/update`, {
                 method: 'POST',

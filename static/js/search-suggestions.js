@@ -121,11 +121,15 @@ window.SearchSuggestions = class SearchSuggestions {
         let html = '';
         suggestions.forEach((suggestion, index) => {
             const typeClass = suggestion.type === 'category' ? 'suggestion-category' : 'suggestion-post';
+            const fileTypes = Array.isArray(suggestion.file_types)
+                ? suggestion.file_types.filter(Boolean).join('/')
+                : '';
             html += `
                 <div class="suggestion-item ${typeClass}" data-index="${index}" data-url="${suggestion.url}">
                     ${this.renderSuggestionLeading(suggestion)}
                     <div class="suggestion-content">
                         <div class="suggestion-title">${this.highlightQuery(suggestion.title, this.input.value)}</div>
+                        ${fileTypes ? `<span class="suggestion-file-types">${this.escapeHtml(fileTypes)}</span>` : ''}
                         <div class="suggestion-description">${suggestion.description}</div>
                     </div>
                     <div class="suggestion-type">

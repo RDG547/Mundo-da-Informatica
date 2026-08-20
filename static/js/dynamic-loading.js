@@ -1558,7 +1558,11 @@ if (typeof window.DynamicLoader !== 'undefined') {
                             return;
                         }
 
-                        const html = suggestions.map(suggestion => `
+                        const html = suggestions.map(suggestion => {
+                            const fileTypes = Array.isArray(suggestion.file_types)
+                                ? suggestion.file_types.filter(Boolean).join('/')
+                                : '';
+                            return `
                         <div class="suggestion-item" data-url="${suggestion.url}">
                             ${suggestion.type === 'post' && suggestion.image_url ? `
                                 <div class="suggestion-thumb">
@@ -1571,10 +1575,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
                             `}
                             <div class="suggestion-content">
                                 <div class="suggestion-title">${suggestion.title}</div>
+                                ${fileTypes ? `<span class="suggestion-file-types">${escapeHtmlSuggestion(fileTypes)}</span>` : ''}
                                 <div class="suggestion-description">${suggestion.description}</div>
                             </div>
                         </div>
-                    `).join('');
+                    `;
+                        }).join('');
 
                         suggestionsDropdown.innerHTML = html;
 

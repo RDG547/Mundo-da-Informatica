@@ -144,9 +144,11 @@
                     </div>
                 </article>
 
-                <div class="thumbnail-inline-notice" role="note">
-                    <i class="fas fa-circle-info" aria-hidden="true"></i>
-                    <span><strong>Miniatura ilustrativa</strong> — confirme sempre o modelo e o código da placa antes da gravação ou utilização do arquivo.</span>
+                {% set post_notice_files = get_public_download_files(post) %}
+                {% set resource_kind = ((post.file_type or '') ~ ' ' ~ (post.category_str or '') ~ ' ' ~ (post_notice_files|map(attribute='type')|join(' ')))|lower %}
+                <div class="thumbnail-inline-notice{% if 'bios' in resource_kind or 'ec' in resource_kind %} firmware-warning{% endif %}" role="note">
+                    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                    <span><strong>Miniatura ilustrativa</strong> — confirme sempre o modelo e o código da placa antes da gravação ou utilização do arquivo.{% if 'bios' in resource_kind or 'ec' in resource_kind %} <strong>Atenção:</strong> confirme sempre o modelo, código e revisão da placa antes de gravar qualquer firmware. O uso de arquivo incompatível pode impedir o funcionamento do equipamento.{% endif %}</span>
                 </div>
 
                 {% if post.technical_details or post.sha256 or post.last_verified_at %}
@@ -177,14 +179,6 @@
                     </div>
                     {% endif %}
                 </section>
-                {% endif %}
-
-                {% set resource_kind = ((post.file_type or '') ~ ' ' ~ (post.category_str or ''))|lower %}
-                {% if 'bios' in resource_kind or 'ec' in resource_kind %}
-                <div class="firmware-warning" role="note">
-                    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                    <span><strong>Atenção:</strong> confirme sempre o modelo, código e revisão da placa antes de gravar qualquer firmware. O uso de arquivo incompatível pode impedir o funcionamento do equipamento.</span>
-                </div>
                 {% endif %}
 
                 <!-- Post Description -->
@@ -228,19 +222,6 @@
                         <h3>Baixar Recurso</h3>
                     </div>
                     <div class="download-card-body">
-                        <div class="download-info">
-                            {% if post.is_verified_file %}
-                            <div class="info-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Arquivo verificado</span>
-                            </div>
-                            {% else %}
-                            <div class="info-item">
-                                <i class="fas fa-circle-info"></i>
-                                <span>{{ 'Revisão necessária' if post.verification_status == 'needs_review' else 'Arquivo não verificado' }}</span>
-                            </div>
-                            {% endif %}
-                        </div>
                         {% set dl_files_detail = get_public_download_files(post) %}
                         {% if dl_files_detail and dl_files_detail|length > 1 %}
                         <div class="multi-file-list">

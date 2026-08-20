@@ -4476,6 +4476,15 @@ a.download-card-category:hover {
     color: var(--text-color);
 }
 
+.most-used-content strong {
+    transition: color 0.2s ease;
+}
+
+.most-used-link:hover .most-used-content strong,
+.most-used-link:focus-visible .most-used-content strong {
+    color: var(--primary-color);
+}
+
 .most-used-download-btn {
     width: 100%;
     min-height: 52px;

@@ -256,10 +256,11 @@
         <div class="most-used-grid">
             {% for item in most_used %}
             <article class="most-used-card">
+                {% set most_used_files = get_public_download_files(item) %}
                 <a class="most-used-link" href="{{ post_url(item) }}">
                     <img class="most-used-thumbnail" src="{{ get_image_url(item.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ item.title }}" loading="lazy">
                     <span class="most-used-content">
-                        <span class="most-used-type">{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}</span>
+                        <span class="most-used-type">{% if most_used_files %}{{ most_used_files|map(attribute='type')|unique|join('/') }}{% else %}{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}{% endif %}</span>
                         <strong>{{ item.model or item.title }}</strong>
                         {% if item.board_code %}<code>{{ item.board_code }}</code>{% endif %}
                         <span><i class="fas fa-download" aria-hidden="true"></i> {{ item.downloads }} downloads</span>

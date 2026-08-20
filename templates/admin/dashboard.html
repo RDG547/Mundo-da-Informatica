@@ -246,16 +246,16 @@
     </div>
 
     <div class="table-responsive">
-        <table class="admin-table">
+        <table class="admin-table dashboard-recent-posts-table">
             <thead>
                 <tr>
-                    <th>Título</th>
-                    <th>Categoria</th>
-                    <th>Data</th>
-                    <th>Visualizações</th>
-                    <th>Downloads</th>
-                    <th>Status</th>
-                    <th>Ações</th>
+                    <th><span class="table-heading"><i class="fas fa-heading"></i> Título</span></th>
+                    <th><span class="table-heading"><i class="fas fa-folder"></i> Categoria</span></th>
+                    <th><span class="table-heading"><i class="fas fa-calendar-alt"></i> Data</span></th>
+                    <th><span class="table-heading"><i class="fas fa-eye"></i> Visualizações</span></th>
+                    <th><span class="table-heading"><i class="fas fa-download"></i> Downloads</span></th>
+                    <th><span class="table-heading"><i class="fas fa-toggle-on"></i> Status</span></th>
+                    <th><span class="table-heading"><i class="fas fa-sliders-h"></i> Ações</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -281,18 +281,20 @@
                         {% endif %}
                     </td>
                     <td class="actions">
-                        <form style="display: inline-block;" action="/admin/posts/{{ post.id }}/toggle-featured" method="post">
+                        <div class="table-row-actions">
+                        <form action="/admin/posts/{{ post.id }}/toggle-featured" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn-action btn-star" title="{{ 'Remover destaque' if post.featured else 'Destacar' }}">
-                                <i class="fas fa-star{{ '' if post.featured else '-o' }}"></i>
+                                <i class="{{ 'fas' if post.featured else 'far' }} fa-star"></i>
                             </button>
                         </form>
-                        <form style="display: inline-block;" action="/admin/posts/{{ post.id }}/delete" method="post" onsubmit="return confirm('Tem certeza que deseja excluir este post?')">
+                        <form action="/admin/posts/{{ post.id }}/delete" method="post" onsubmit="return confirm('Tem certeza que deseja excluir este post?')">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn-action btn-delete" title="Excluir">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -302,6 +304,33 @@
 </div>
 
 <style>
+    .dashboard-recent-posts-table .table-heading {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        white-space: nowrap;
+    }
+
+    .dashboard-recent-posts-table .table-heading i {
+        color: var(--admin-primary, #3a86ff);
+    }
+
+    .dashboard-recent-posts-table td.actions {
+        display: table-cell;
+    }
+
+    .dashboard-recent-posts-table .table-row-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .dashboard-recent-posts-table .table-row-actions form {
+        display: inline-flex;
+        margin: 0;
+    }
+
     .activity-panel .activity-list {
         display: grid;
         gap: 0.85rem;
@@ -464,7 +493,7 @@
 <script>
     function bootDashboard() {
         console.log('Dashboard: página pronta');
-        if (!window.location.pathname.startsWith('/admin/dashboard')) return;
+        if (!/^\/admin(?:\/dashboard)?\/?$/.test(window.location.pathname)) return;
         initializeDashboard();
     }
 

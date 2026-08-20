@@ -704,30 +704,16 @@
                                 <tr>
                                     <td>Geral</td>
                                     <td>Todos os assinantes</td>
-                                    <td>450</td>
+                                    <td>{{ active_subscribers or 0 }}</td>
                                     <td class="actions">
-                                        <a href="#" class="btn-action btn-edit" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
+                                        <span class="text-muted" title="Grupo padrão"><i class="fas fa-lock"></i></span>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td>Técnicos</td>
-                                    <td>Técnicos de informática</td>
-                                    <td>280</td>
-                                    <td class="actions">
-                                        <a href="#" class="btn-action btn-edit" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a href="#" class="btn-action btn-delete" title="Excluir">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Entusiastas</td>
-                                    <td>Entusiastas de tecnologia</td>
-                                    <td>170</td>
+                                {% for group in newsletter_groups %}
+                                <tr data-group-id="{{ group.id }}">
+                                    <td>{{ group.name }}</td>
+                                    <td>{{ group.description or 'Sem descrição' }}</td>
+                                    <td>{{ newsletter_group_counts.get(group.id, 0) }}</td>
                                     <td class="actions">
                                         <a href="#" class="btn-action btn-edit" title="Editar">
                                             <i class="fas fa-edit"></i>
@@ -737,6 +723,7 @@
                                         </a>
                                     </td>
                                 </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -897,7 +884,7 @@
                         <div class="sidebar-card">
                             <h5><i class="fas fa-users"></i> Destinatários</h5>
                             <div class="recipient-groups">
-                                <div class="recipient-group" data-group="all">
+                                <div class="recipient-group selected" data-group="all" data-count="{{ active_subscribers or 0 }}">
                                     <div class="group-info">
                                         <div class="group-icon">
                                             <i class="fas fa-globe"></i>
@@ -907,40 +894,28 @@
                                             <p>Lista completa de newsletter</p>
                                         </div>
                                     </div>
-                                    <div class="subscriber-count">450</div>
+                                    <div class="subscriber-count">{{ active_subscribers or 0 }}</div>
                                     <input type="checkbox" name="recipients[]" value="all" checked style="display: none;">
                                 </div>
 
-                                <div class="recipient-group" data-group="technicians">
+                                {% for group in newsletter_groups %}
+                                <div class="recipient-group" data-group="{{ group.id }}" data-count="{{ newsletter_group_counts.get(group.id, 0) }}">
                                     <div class="group-info">
                                         <div class="group-icon">
-                                            <i class="fas fa-wrench"></i>
+                                            <i class="fas fa-users"></i>
                                         </div>
                                         <div class="group-details">
-                                            <h4>Técnicos</h4>
-                                            <p>Profissionais de TI</p>
+                                            <h4>{{ group.name }}</h4>
+                                            <p>{{ group.description or 'Grupo personalizado' }}</p>
                                         </div>
                                     </div>
-                                    <div class="subscriber-count">280</div>
-                                    <input type="checkbox" name="recipients[]" value="technicians" style="display: none;">
+                                    <div class="subscriber-count">{{ newsletter_group_counts.get(group.id, 0) }}</div>
+                                    <input type="checkbox" name="recipients[]" value="group:{{ group.id }}" style="display: none;">
                                 </div>
-
-                                <div class="recipient-group" data-group="enthusiasts">
-                                    <div class="group-info">
-                                        <div class="group-icon">
-                                            <i class="fas fa-heart"></i>
-                                        </div>
-                                        <div class="group-details">
-                                            <h4>Entusiastas</h4>
-                                            <p>Usuários avançados</p>
-                                        </div>
-                                    </div>
-                                    <div class="subscriber-count">170</div>
-                                    <input type="checkbox" name="recipients[]" value="enthusiasts" style="display: none;">
-                                </div>
+                                {% endfor %}
                             </div>
                             <div class="selected-recipients">
-                                <strong>Total: <span id="totalRecipients">450</span> destinatários</strong>
+                                <strong>Total: <span id="totalRecipients">{{ active_subscribers or 0 }}</span> destinatários</strong>
                             </div>
                         </div>
 
@@ -1025,7 +1000,7 @@
                                     Conteúdo aparecerá aqui...
                                 </div>
                                 <div class="preview-footer">
-                                    <small>👥 <span id="previewRecipients">450</span> destinatários</small>
+                                    <small>👥 <span id="previewRecipients">{{ active_subscribers or 0 }}</span> destinatários</small>
                                 </div>
                             </div>
                         </div>
@@ -1361,6 +1336,42 @@
             });
         }
 
+        const recipientGroups = Array.from(document.querySelectorAll('.recipient-group'));
+        const updateRecipientTotal = () => {
+            const selected = recipientGroups.filter((group) => group.querySelector('input')?.checked);
+            const allGroup = selected.find((group) => group.dataset.group === 'all');
+            const total = allGroup
+                ? Number(allGroup.dataset.count || 0)
+                : selected.reduce((sum, group) => sum + Number(group.dataset.count || 0), 0);
+            const totalElement = document.getElementById('totalRecipients');
+            const previewElement = document.getElementById('previewRecipients');
+            if (totalElement) totalElement.textContent = String(total);
+            if (previewElement) previewElement.textContent = String(total);
+        };
+
+        recipientGroups.forEach((group) => {
+            group.addEventListener('click', () => {
+                const input = group.querySelector('input');
+                if (!input) return;
+                if (group.dataset.group === 'all') {
+                    recipientGroups.forEach((item) => {
+                        const itemInput = item.querySelector('input');
+                        if (itemInput) itemInput.checked = item === group;
+                        item.classList.toggle('selected', item === group);
+                    });
+                } else {
+                    input.checked = !input.checked;
+                    group.classList.toggle('selected', input.checked);
+                    const all = recipientGroups.find((item) => item.dataset.group === 'all');
+                    const allInput = all?.querySelector('input');
+                    if (allInput) allInput.checked = false;
+                    all?.classList.remove('selected');
+                }
+                updateRecipientTotal();
+            });
+        });
+        updateRecipientTotal();
+
         // Definir data e hora padrão para agendamento
         const scheduleDate = document.getElementById('scheduleDate');
         const scheduleTime = document.getElementById('scheduleTime');
@@ -1431,14 +1442,9 @@
                 }
 
                 // Obter destinatários
-                const recipients = [];
-
-                if (document.getElementById('groupAll').checked) {
-                    recipients.push('all');
-                } else {
-                    if (document.getElementById('groupTechnicians').checked) recipients.push('technicians');
-                    if (document.getElementById('groupEnthusiasts').checked) recipients.push('enthusiasts');
-                }
+                const recipients = Array.from(
+                    document.querySelectorAll('.recipient-group input[name="recipients[]"]:checked')
+                ).map((input) => input.value);
 
                 if (recipients.length === 0) {
                     showNotification('Por favor, selecione pelo menos um grupo de destinatários.', 'warning');

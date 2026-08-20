@@ -229,6 +229,9 @@ function initializeHomeSearch() {
             const itemType = item.type === 'category' ? 'Categoria' : 'Post';
             const description = item.description || '';
             const typeClass = item.type === 'category' ? 'suggestion-category' : 'suggestion-post';
+            const fileTypes = Array.isArray(item.file_types)
+                ? item.file_types.filter(Boolean).join('/')
+                : '';
 
             html += `
                 <div class="suggestion-item ${typeClass}" data-index="${index}" data-url="${item.url}">
@@ -237,6 +240,7 @@ function initializeHomeSearch() {
                         <div class="suggestion-title">${highlightMatch(item.title, searchInput.value)}</div>
                         <div class="suggestion-meta">
                             <span class="suggestion-type">${itemType}</span>
+                            ${fileTypes ? `<span class="suggestion-file-types">${escapeHtml(fileTypes)}</span>` : ''}
                             ${description ? `<span class="suggestion-description">${description}</span>` : ''}
                         </div>
                     </div>

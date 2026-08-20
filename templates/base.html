@@ -123,7 +123,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" data-static-base-style="true">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}" data-static-base-style="true">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/click-effects.css') }}" data-static-base-style="true">
-    {% set has_chat_access = current_user.is_authenticated and (current_user.plan == 'vip' or current_user.role in ['admin', 'editor']) %}
+    {% set has_chat_access = current_user.is_authenticated %}
     {% if has_chat_access %}<link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-chat.css') }}" data-static-base-style="true">{% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/project-dropdowns.css') }}" data-static-base-style="true">
 

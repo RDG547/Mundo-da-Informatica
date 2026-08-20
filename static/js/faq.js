@@ -303,9 +303,18 @@ function showNoResultsMessage(show) {
     }
 }
 
-// Open live chat (placeholder function)
-function openLiveChat() {
-    alert('O chat online estará disponível em breve! Por enquanto, use nosso formulário de contato.');
+// Abre diretamente a sala individual de suporte do chat da plataforma.
+function openFaqSupportChat(event) {
+    if (event) event.preventDefault();
+    if (typeof window.openSupportChat === 'function') {
+        window.openSupportChat();
+        return;
+    }
+    if (typeof window.openLiveChat === 'function') {
+        window.openLiveChat();
+        return;
+    }
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
 }
 
 // Initialize FAQ functionality when page loads
@@ -344,7 +353,7 @@ window.addEventListener('popstate', function() {
 // Export functions for global access
 window.toggleFAQ = toggleFAQ;
 window.markHelpful = markHelpful;
-window.openLiveChat = openLiveChat;
+window.openFaqSupportChat = openFaqSupportChat;
 window.initializeFAQ = initializeFAQ;
 
 // Initialize immediately if DOM is already ready

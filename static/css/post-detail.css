@@ -730,7 +730,9 @@
 
 .related-post-download-btn {
     width: 100%;
-    min-height: 52px;
+    min-height: 40px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.85rem;
     font-family: inherit;
 }
 

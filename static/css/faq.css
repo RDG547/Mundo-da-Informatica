@@ -779,12 +779,49 @@
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     text-align: center;
-    padding: 4rem 3rem;
-    border-radius: 25px;
+    padding: 3rem;
+    border-radius: 20px;
     margin-top: 4rem;
     position: relative;
     overflow: hidden;
     box-shadow: 0 15px 35px rgba(102, 126, 234, 0.2);
+}
+
+.faq-support-cta .cta-icon {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    font-size: 2rem;
+    color: #fff;
+}
+
+.faq-support-cta .cta-content h4,
+.faq-support-cta .cta-content p {
+    color: #fff;
+}
+
+.faq-support-cta .cta-buttons .btn-gradient {
+    min-height: 50px;
+    padding: 0.8rem 1.35rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+}
+
+.faq-support-cta .cta-buttons .primary {
+    color: #1f2937;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+
+.faq-support-cta .cta-buttons .secondary {
+    color: #fff;
+    background: linear-gradient(135deg, #1769c2, #2563eb);
 }
 
 .cta-background-pattern {

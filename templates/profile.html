@@ -117,22 +117,15 @@
             <div class="nav-section">
                 <h5 class="nav-section-title">GERENCIAMENTO</h5>
 
-                <a href="{{ url_for('posts') }}" class="admin-nav-item">
-                    <i class="fas fa-file-alt admin-icon"></i>
-                    <span class="admin-nav-text">Posts</span>
-                    <span class="nav-badge">{{ user_posts }}</span>
-                </a>
-
-                <a href="{{ url_for('all_categories') }}" class="admin-nav-item">
-                    <i class="fas fa-folder admin-icon"></i>
-                    <span class="admin-nav-text">Categorias</span>
-                    <span class="nav-badge">{{ category_count }}</span>
-                </a>
-
                 {% if current_user.id == user.id %}
                 <a href="#" class="admin-nav-item" onclick="openEditModal(); return false;">
                     <i class="fas fa-user-edit admin-icon"></i>
                     <span class="admin-nav-text">Editar Perfil</span>
+                </a>
+
+                <a href="#" class="admin-nav-item" onclick="openPasswordModal(); return false;">
+                    <i class="fas fa-key admin-icon"></i>
+                    <span class="admin-nav-text">Alterar Senha</span>
                 </a>
                 {% endif %}
             </div>
@@ -140,11 +133,6 @@
             {% if current_user.id == user.id %}
             <div class="nav-section">
                 <h5 class="nav-section-title">CONFIGURAÇÕES</h5>
-
-                <a href="#" class="admin-nav-item" onclick="openPasswordModal(); return false;">
-                    <i class="fas fa-key admin-icon"></i>
-                    <span class="admin-nav-text">Alterar Senha</span>
-                </a>
 
                 <a href="#" class="admin-nav-item" onclick="toggleThumbnailDisclaimer(); return false;">
                     <i class="fas fa-image admin-icon"></i>
@@ -888,18 +876,72 @@
 </div>
 {% endif %}
 
+{% if current_user.id == user.id %}
+<div class="modal-overlay" id="thumbnailPreferenceModal" role="dialog" aria-modal="true" aria-labelledby="thumbnailPreferenceTitle" onclick="closeThumbnailPreferenceModal(event)">
+    <div class="modal-container thumbnail-preference-modal">
+        <div class="modal-header">
+            <h3 id="thumbnailPreferenceTitle"><i class="fas fa-image"></i> Aviso de Miniaturas</h3>
+            <button type="button" class="modal-close" onclick="closeThumbnailPreferenceModal(event)" aria-label="Fechar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="thumbnail-preference-state" id="thumbnailPreferenceState">
+                <span class="thumbnail-preference-icon"><i id="thumbnailPreferenceIcon" class="fas fa-eye"></i></span>
+                <div>
+                    <h4 id="thumbnailPreferenceStateTitle">Aviso ativo</h4>
+                    <p id="thumbnailPreferenceStateMessage">O aviso sobre miniaturas será exibido novamente a cada 1 hora.</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-gradient primary" onclick="closeThumbnailPreferenceModal(event)">
+                <i class="fas fa-check"></i> Entendi
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 // Aviso de miniaturas ilustrativas - toggle
 function toggleThumbnailDisclaimer() {
     var disabled = localStorage.getItem('thumbnailDisclaimerDisabled') === 'true';
     if (disabled) {
         localStorage.removeItem('thumbnailDisclaimerDisabled');
-        alert('O aviso sobre miniaturas será exibido novamente (a cada 1 hora).');
+        disabled = false;
     } else {
         localStorage.setItem('thumbnailDisclaimerDisabled', 'true');
-        alert('O aviso sobre miniaturas não será mais exibido.');
+        disabled = true;
     }
     updateDisclaimerBadge();
+    openThumbnailPreferenceModal(disabled);
+}
+
+function openThumbnailPreferenceModal(disabled) {
+    var modal = document.getElementById('thumbnailPreferenceModal');
+    var state = document.getElementById('thumbnailPreferenceState');
+    var icon = document.getElementById('thumbnailPreferenceIcon');
+    var title = document.getElementById('thumbnailPreferenceStateTitle');
+    var message = document.getElementById('thumbnailPreferenceStateMessage');
+    if (!modal || !state || !icon || !title || !message) return;
+    state.classList.toggle('is-disabled', disabled);
+    state.classList.toggle('is-enabled', !disabled);
+    icon.className = disabled ? 'fas fa-eye-slash' : 'fas fa-eye';
+    title.textContent = disabled ? 'Aviso ocultado' : 'Aviso ativado';
+    message.textContent = disabled
+        ? 'O aviso sobre miniaturas não será mais exibido neste navegador.'
+        : 'O aviso sobre miniaturas será exibido novamente a cada 1 hora.';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeThumbnailPreferenceModal(event) {
+    var modal = document.getElementById('thumbnailPreferenceModal');
+    if (!modal) return;
+    if (event && event.target !== modal && !event.target.closest('.modal-close') && !event.target.closest('.modal-footer')) return;
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
 }
 
 function updateDisclaimerBadge() {
@@ -912,6 +954,9 @@ function updateDisclaimerBadge() {
 }
 
 document.addEventListener('DOMContentLoaded', updateDisclaimerBadge);
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') closeThumbnailPreferenceModal();
+});
 </script>
 
 {% endblock %}

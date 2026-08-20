@@ -1,7 +1,23 @@
 from types import SimpleNamespace
 
 import app as app_module
-from app import Category, Post, User, app, db
+from app import (
+    Category,
+    Favorite,
+    NewsletterGroup,
+    Post,
+    Subscriber,
+    User,
+    _get_chat_permissions_for_user,
+    app,
+    can_request_specific_content,
+    check_device_limit,
+    check_download_history_access,
+    check_favorite_limit,
+    check_support_priority,
+    check_user_download_limit,
+    db,
+)
 
 
 def login_session(client, user_id):
@@ -38,7 +54,7 @@ def create_multi_file_post():
         )
         post.set_metadata("download_files", [
             {"type": "BIOS", "url": "https://files.example.test/bios.bin", "name": "bios.bin", "size": "8 MB"},
-            {"type": "BIOS", "url": "https://files.example.test/ec.bin", "name": "ec.bin", "size": "4 MB"},
+            {"type": "EC", "url": "https://files.example.test/ec.bin", "name": "ec.bin", "size": "4 MB"},
         ])
         db.session.add(post)
         db.session.commit()
@@ -116,11 +132,174 @@ def test_admin_requests_access_allowed(client):
     assert client.get("/admin/solicitacoes").status_code == 200
 
 
+def test_admin_role_does_not_bypass_free_plan_entitlements(client, monkeypatch):
+    post_id = create_multi_file_post()
+    admin_id = create_user("admin_free_limits", role="admin", plan="free")
+    login_session(client, admin_id)
+
+    first = client.get(f"/download/{post_id}?file=0")
+    limited = client.get(
+        f"/download/{post_id}?file=1",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert first.status_code == 302
+    assert limited.status_code == 403
+
+    for index in range(3):
+        response = client.post(
+            f"/post/{post_id}/comments",
+            json={"content": f"Comentário administrativo {index}"},
+        )
+        assert response.status_code == 201
+    fourth_comment = client.post(
+        f"/post/{post_id}/comments",
+        json={"content": "Comentário administrativo acima do limite"},
+    )
+    assert fourth_comment.status_code == 403
+
+    monkeypatch.setattr(app_module, "_get_firestore_client", lambda: None)
+    monkeypatch.setattr(app_module, "is_firebase_admin_configured", lambda: False)
+    bootstrap = client.get("/api/chat/bootstrap")
+    assert bootstrap.status_code == 200
+    assert bootstrap.get_json()["permissions"] == {
+        "public_read": False,
+        "public_write": False,
+        "support_read": True,
+        "support_write": True,
+        "vip_area": False,
+    }
+
+    with app.app_context():
+        user = db.session.get(User, admin_id)
+        user.active_sessions = 1
+        db.session.commit()
+        assert check_user_download_limit(user)[0] is False
+        assert check_download_history_access(user) == (False, 0)
+        assert check_device_limit(user)[0] is False
+        assert check_support_priority(user) == "Suporte em até 48h"
+        assert can_request_specific_content(user) is False
+        permissions = _get_chat_permissions_for_user(user)
+        assert permissions["public_write"] is False
+        assert permissions["support_write"] is True
+
+
+def test_admin_role_does_not_bypass_premium_plan_limits():
+    admin_id = create_user("admin_premium_limits", role="admin", plan="premium")
+    with app.app_context():
+        user = db.session.get(User, admin_id)
+        user.weekly_downloads = 15
+        user.active_sessions = 2
+        db.session.commit()
+        assert check_user_download_limit(user)[0] is False
+        assert check_download_history_access(user) == (True, 5)
+        assert check_device_limit(user)[0] is False
+        assert check_support_priority(user) == "Suporte em até 24h"
+        assert can_request_specific_content(user) is False
+        assert _get_chat_permissions_for_user(user)["public_write"] is False
+
+
+def test_admin_role_respects_free_favorite_limit():
+    admin_id = create_user("admin_favorite_limits", role="admin", plan="free")
+    with app.app_context():
+        for index in range(10):
+            post = Post(
+                title=f"Post {index}",
+                content="Conteúdo",
+                download_link=f"https://files.example.test/{index}.bin",
+                is_active=True,
+            )
+            db.session.add(post)
+            db.session.flush()
+            db.session.add(Favorite(user_id=admin_id, post_id=post.id))
+        db.session.commit()
+        allowed, message = check_favorite_limit(db.session.get(User, admin_id))
+        assert allowed is False
+        assert "10 favoritos" in message
+
+
 def test_post_detail_places_each_file_size_inside_download_button(client):
     post_id = create_multi_file_post()
     body = client.get(f"/post/{post_id}").get_data(as_text=True)
     assert '<span class="download-button-size">8 MB</span>' in body
     assert '<span class="download-button-size">4 MB</span>' in body
+    assert body.count("Miniatura ilustrativa") == 1
+    assert body.count("<strong>Atenção:</strong>") == 1
+
+
+def test_search_suggestions_expose_all_download_file_types(client):
+    create_multi_file_post()
+    payload = client.get("/api/search/suggestions?q=Pacote").get_json()
+    suggestion = next(item for item in payload if item["type"] == "post")
+    assert suggestion["file_types"] == ["BIOS", "EC"]
+    assert "BIOS/EC" in suggestion["description"]
+
+
+def test_newsletter_group_counts_use_real_active_subscribers(client):
+    admin_id = create_user("newsletter_admin", role="admin")
+    login_session(client, admin_id)
+    with app.app_context():
+        active = Subscriber(email="active@example.test", is_active=True)
+        inactive = Subscriber(email="inactive@example.test", is_active=False)
+        group = NewsletterGroup(name="Técnicos", description="Grupo real")
+        group.subscribers.extend([active, inactive])
+        db.session.add_all([active, inactive, group])
+        db.session.commit()
+
+    body = client.get("/admin/newsletter").get_data(as_text=True)
+    assert "450" not in body
+    assert "280" not in body
+    assert "170" not in body
+    assert "Técnicos" in body
+    assert "Grupo real" in body
+
+
+def test_profile_sidebar_and_thumbnail_preference_use_platform_layout(client):
+    user_id = create_user("profile_navigation", role="admin")
+    login_session(client, user_id)
+    body = client.get("/profile").get_data(as_text=True)
+    sidebar = body.split('<aside class="profile-admin-sidebar">', 1)[1].split("</aside>", 1)[0]
+    management = sidebar.split("GERENCIAMENTO", 1)[1].split("CONFIGURAÇÕES", 1)[0]
+    assert ">Posts<" not in sidebar
+    assert ">Categorias<" not in sidebar
+    assert "Editar Perfil" in management
+    assert "Alterar Senha" in management
+    assert 'id="thumbnailPreferenceModal"' in body
+    assert "alert('O aviso sobre miniaturas" not in body
+
+
+def test_admin_recent_posts_table_has_header_icons_and_valid_action_icon(client):
+    admin_id = create_user("recent_posts_admin", role="admin")
+    login_session(client, admin_id)
+    create_multi_file_post()
+    body = client.get("/admin").get_data(as_text=True)
+    assert 'dashboard-recent-posts-table' in body
+    for icon in ("fa-heading", "fa-folder", "fa-calendar-alt", "fa-eye", "fa-download", "fa-toggle-on", "fa-sliders-h"):
+        assert icon in body
+    assert "fa-star-o" not in body
+
+
+def test_admin_user_information_is_read_only_and_reset_is_inside_edit(client):
+    admin_id = create_user("users_layout_admin", role="admin")
+    create_user("managed_user")
+    login_session(client, admin_id)
+    body = client.get("/admin/users").get_data(as_text=True)
+    info_modal = body.split('id="userInfoModal"', 1)[1].split("{% endblock %}", 1)[0]
+    assert "Cadastro" in info_modal
+    assert "Último acesso" in info_modal
+    assert "Dados de Rastreamento" in info_modal
+    assert 'id="infoUsername"' not in info_modal
+    assert 'id="saveUserInfo"' not in info_modal
+    assert 'onclick="openResetPasswordFromEdit()"' in body
+    assert 'data-admin-action="reset-password"' not in body
+
+
+def test_faq_chat_uses_support_widget_instead_of_placeholder_alert(client):
+    user_id = create_user("faq_support_user", plan="free")
+    login_session(client, user_id)
+    body = client.get("/faq").get_data(as_text=True)
+    assert "openFaqSupportChat(event)" in body
+    assert "chat online estará disponível em breve" not in body.lower()
+    assert "faq-support-cta" in body
 
 
 def test_admin_price_controls_card_checkout_and_public_api(client, monkeypatch):

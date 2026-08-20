@@ -1742,6 +1742,7 @@
         if (!userMeta.isAuthenticated || !userMeta.userId) {
             elements.panel.style.display = 'none';
             window.openLiveChat = redirectToLogin;
+            window.openSupportChat = redirectToLogin;
             return true;
         }
 
@@ -1754,6 +1755,7 @@
             if (elements.input) elements.input.disabled = true;
             if (elements.send) elements.send.disabled = true;
             window.openLiveChat = openPanel;
+            window.openSupportChat = openPanel;
             return true;
         }
 
@@ -1917,6 +1919,7 @@
         if (userMeta.isAuthenticated && userMeta.userId && userMeta.chatBackendEnabled) {
             initializeChatConnection();
             window.openLiveChat = openPanel;
+            window.openSupportChat = goToSupportTab;
         }
     }
 

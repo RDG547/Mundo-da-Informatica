@@ -203,6 +203,7 @@
     border-radius: 14px !important;
     scrollbar-width: thin;
     scrollbar-color: #94a3b8 transparent;
+    overscroll-behavior: contain;
 }
 
 .dropdown-menu,
@@ -212,6 +213,13 @@
 .icon-select-menu {
     max-height: min(360px, 65vh);
     overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.project-select-menu,
+.search-suggestions,
+[role="listbox"] {
+    overscroll-behavior: contain;
 }
 
 /* Os menus da appbar devem crescer com o conteúdo; a página cuida da rolagem. */
@@ -367,6 +375,23 @@ html[data-theme="dark"] .project-select-option.is-selected,
 @keyframes projectDropdownIn {
     from { opacity: 0; transform: translateY(-5px) scale(0.985); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Mantém os tipos de arquivo sempre visíveis, mesmo quando os metadados
+   longos da sugestão precisam ser truncados. */
+.suggestion-file-types {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    flex: 0 0 auto;
+    padding: 0.16rem 0.42rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
 }
 
 @media (max-width: 640px) {

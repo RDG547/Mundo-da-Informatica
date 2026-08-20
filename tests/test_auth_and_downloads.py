@@ -148,6 +148,41 @@ def test_admin_price_controls_card_checkout_and_public_api(client, monkeypatch):
     assert public_prices["plans"]["premium"]["amount_cents"] == 4321
 
 
+def test_admin_controls_plan_name_and_payment_methods(client):
+    user_id = create_user("plan_configuration", role="admin", plan="free")
+    login_session(client, user_id)
+
+    response = client.post("/admin/save_settings", json={
+        "plan_name_premium": {"value": "Profissional", "type": "string"},
+        "plan_card_enabled_premium": {"value": False, "type": "bool"},
+        "plan_pix_enabled_premium": {"value": True, "type": "bool"},
+    })
+    assert response.status_code == 200
+
+    public_config = client.get("/api/plan-prices").get_json()["plans"]["premium"]
+    assert public_config["label"] == "Profissional"
+    assert public_config["card_enabled"] is False
+    assert public_config["pix_enabled"] is True
+
+    plans_body = client.get("/planos").get_data(as_text=True)
+    assert 'data-plan-name="premium">Profissional</' in plans_body
+    assert 'data-plan-card-enabled="false"' in plans_body
+    assert '<div class="faq-item active"' not in plans_body
+
+    card_response = client.post("/create-checkout-session", json={"plan": "premium"})
+    assert card_response.status_code == 409
+    assert "cartão" in card_response.get_json()["error"]
+
+    response = client.post("/admin/save_settings", json={
+        "plan_card_enabled_premium": {"value": True, "type": "bool"},
+        "plan_pix_enabled_premium": {"value": False, "type": "bool"},
+    })
+    assert response.status_code == 200
+    pix_response = client.post("/create-pix-checkout", json={"plan": "premium"})
+    assert pix_response.status_code == 409
+    assert "PIX" in pix_response.get_json()["error"]
+
+
 def test_admin_category_bulk_actions_remain_functional(client):
     admin_id = create_user("bulk_category_admin", role="admin")
     login_session(client, admin_id)

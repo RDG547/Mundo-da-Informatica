@@ -2999,8 +2999,8 @@ class SiteConfig(db.Model):
                 'site_description': 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
                 'footer_description': 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
-                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
-                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+                'home_hero_title': 'Encontre o arquivo certo para o reparo!',
+                'home_hero_subtitle': 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
                 'enable_dark_mode': True,
                 'primary_color': '#3a86ff',
                 'secondary_color': '#8338ec',
@@ -3026,8 +3026,15 @@ class SiteConfig(db.Model):
                 'plan_enabled_free': True,
                 'plan_enabled_premium': True,
                 'plan_enabled_vip': True,
+                'plan_name_free': 'Grátis',
+                'plan_name_premium': 'Premium',
+                'plan_name_vip': 'VIP',
                 'plan_price_premium': 29.90,
-                'plan_price_vip': 49.90
+                'plan_price_vip': 49.90,
+                'plan_card_enabled_premium': True,
+                'plan_card_enabled_vip': True,
+                'plan_pix_enabled_premium': True,
+                'plan_pix_enabled_vip': True
             }
 
             # Mesclar com valores padrão
@@ -3060,8 +3067,8 @@ class SiteConfig(db.Model):
                 'site_description': 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
                 'footer_text': 'Mundo da Informática - Todos os direitos reservados',
                 'footer_description': 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
-                'home_hero_title': 'Bem-vindo ao Mundo da Informática',
-                'home_hero_subtitle': 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+                'home_hero_title': 'Encontre o arquivo certo para o reparo!',
+                'home_hero_subtitle': 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
                 'enable_dark_mode': True,
                 'primary_color': '#3a86ff',
                 'secondary_color': '#8338ec',
@@ -3087,8 +3094,15 @@ class SiteConfig(db.Model):
                 'plan_enabled_free': True,
                 'plan_enabled_premium': True,
                 'plan_enabled_vip': True,
+                'plan_name_free': 'Grátis',
+                'plan_name_premium': 'Premium',
+                'plan_name_vip': 'VIP',
                 'plan_price_premium': 29.90,
-                'plan_price_vip': 49.90
+                'plan_price_vip': 49.90,
+                'plan_card_enabled_premium': True,
+                'plan_card_enabled_vip': True,
+                'plan_pix_enabled_premium': True,
+                'plan_pix_enabled_vip': True
             }
 
     @staticmethod
@@ -3160,8 +3174,15 @@ LIVE_SITE_SETTING_KEYS = (
     'plan_enabled_free',
     'plan_enabled_premium',
     'plan_enabled_vip',
+    'plan_name_free',
+    'plan_name_premium',
+    'plan_name_vip',
     'plan_price_premium',
     'plan_price_vip',
+    'plan_card_enabled_premium',
+    'plan_card_enabled_vip',
+    'plan_pix_enabled_premium',
+    'plan_pix_enabled_vip',
     'google_analytics',
     'maintenance_mode',
 )
@@ -3176,6 +3197,7 @@ def get_live_site_settings():
     settings['primary_rgb'] = hex_to_rgb_string(settings['primary_color'])
     settings['secondary_rgb'] = hex_to_rgb_string(settings['secondary_color'], '131, 56, 236')
     settings['contact_whatsapp_url'] = whatsapp_link_from_phone(settings.get('contact_phone'))
+    settings['current_year'] = datetime.now(BRAZIL_TZ).year
     return settings
 
 
@@ -3294,14 +3316,48 @@ def normalize_plan_key(plan: str | None) -> str:
     return normalized if normalized in PLAN_METADATA else 'free'
 
 
-def get_plan_metadata(plan: str | None) -> dict[str, str]:
-    return PLAN_METADATA.get(normalize_plan_key(plan), PLAN_METADATA['free'])
+def get_plan_metadata(
+    plan: str | None,
+    config_values: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
+    """Metadados visuais do plano, incluindo o nome configurado pelo admin."""
+    plan_key = normalize_plan_key(plan)
+    metadata = dict(PLAN_METADATA.get(plan_key, PLAN_METADATA['free']))
+    config_key = f'plan_name_{plan_key}'
+    configured_label = (
+        config_values.get(config_key)
+        if config_values is not None and config_key in config_values
+        else SiteConfig.get_value(config_key, metadata['label'])
+    )
+    normalized_label = ' '.join(str(configured_label or '').split()).strip()
+    metadata['label'] = normalized_label or metadata['label']
+    return metadata
 
 
 def is_plan_enabled(plan: str | None, config_values: Mapping[str, Any] | None = None) -> bool:
     """Indica se um plano pode receber novas adesoes ou alteracoes."""
     plan_key = normalize_plan_key(plan)
     config_key = f'plan_enabled_{plan_key}'
+    raw_value = (
+        config_values.get(config_key)
+        if config_values is not None and config_key in config_values
+        else SiteConfig.get_value(config_key, True)
+    )
+    return coerce_bool(raw_value, default=True)
+
+
+def is_plan_payment_method_enabled(
+    plan: str | None,
+    method: str,
+    config_values: Mapping[str, Any] | None = None,
+) -> bool:
+    """Indica se o método pode iniciar novas assinaturas para o plano."""
+    plan_key = normalize_plan_key(plan)
+    method_key = str(method or '').strip().lower()
+    if plan_key not in DEFAULT_PLAN_PRICE_CENTS or method_key not in {'card', 'pix'}:
+        return False
+
+    config_key = f'plan_{method_key}_enabled_{plan_key}'
     raw_value = (
         config_values.get(config_key)
         if config_values is not None and config_key in config_values
@@ -3343,20 +3399,24 @@ def get_plan_price_cents(plan: str | None, config_values: Mapping[str, Any] | No
 def get_plan_pricing_config(config_values: Mapping[str, Any] | None = None) -> dict[str, dict[str, Any]]:
     pricing: dict[str, dict[str, Any]] = {
         'free': {
-            **get_plan_metadata('free'),
+            **get_plan_metadata('free', config_values=config_values),
             'amount_cents': 0,
             'display_amount': '0',
-            'enabled': is_plan_enabled('free', config_values=config_values)
+            'enabled': is_plan_enabled('free', config_values=config_values),
+            'card_enabled': False,
+            'pix_enabled': False,
         }
     }
 
     for plan_key in DEFAULT_PLAN_PRICE_CENTS:
         amount_cents = get_plan_price_cents(plan_key, config_values=config_values)
         pricing[plan_key] = {
-            **get_plan_metadata(plan_key),
+            **get_plan_metadata(plan_key, config_values=config_values),
             'amount_cents': amount_cents,
             'display_amount': format_brl_from_cents(amount_cents),
-            'enabled': is_plan_enabled(plan_key, config_values=config_values)
+            'enabled': is_plan_enabled(plan_key, config_values=config_values),
+            'card_enabled': is_plan_payment_method_enabled(plan_key, 'card', config_values=config_values),
+            'pix_enabled': is_plan_payment_method_enabled(plan_key, 'pix', config_values=config_values),
         }
 
     return pricing
@@ -3689,7 +3749,7 @@ def inject_global_data():
         meta_pixel_id=app.config.get('META_PIXEL_ID', ''),
         chat_backend_available=is_firebase_admin_configured(),
         analytics_event=analytics_event,
-        current_year=datetime.now().year,
+        current_year=datetime.now(BRAZIL_TZ).year,
         datetime=datetime,  # Adicionar datetime para uso em templates
         **admin_data
     )
@@ -4913,10 +4973,13 @@ def api_plan_prices():
         'success': True,
         'plans': {
             plan_key: {
+                'label': plan_data['label'],
                 'amount_cents': plan_data['amount_cents'],
                 'display_amount': plan_data['display_amount'],
                 'display_full': f"R$ {plan_data['display_amount']}",
-                'enabled': bool(plan_data['enabled'])
+                'enabled': bool(plan_data['enabled']),
+                'card_enabled': bool(plan_data['card_enabled']),
+                'pix_enabled': bool(plan_data['pix_enabled']),
             }
             for plan_key, plan_data in pricing.items()
         }
@@ -5010,7 +5073,7 @@ def get_user_permissions():
 
     permissions = {
         'plan': user.plan,
-        'plan_name': {'free': 'Grátis', 'premium': 'Premium', 'vip': 'VIP'}.get(user.plan, 'Grátis'),
+        'plan_name': get_plan_metadata(user.plan)['label'],
         'downloads': downloads_info,
         'comments': comments_info,
         'favorites': favorites_info,
@@ -5057,6 +5120,9 @@ def create_checkout_session():
 
         if not is_plan_enabled(plan_key):
             return jsonify({'error': 'Este plano está temporariamente indisponível para novas assinaturas.'}), 409
+
+        if not is_plan_payment_method_enabled(plan_key, 'card'):
+            return jsonify({'error': 'A assinatura por cartão está temporariamente indisponível para este plano.'}), 409
 
         amount_cents = get_plan_price_cents(plan_key)
         if amount_cents <= 0:
@@ -5294,6 +5360,9 @@ def create_pix_checkout():
 
         if not is_plan_enabled(plan_key):
             return jsonify({'error': 'Este plano está temporariamente indisponível para novas assinaturas.'}), 409
+
+        if not is_plan_payment_method_enabled(plan_key, 'pix'):
+            return jsonify({'error': 'O pagamento via PIX está temporariamente indisponível para este plano.'}), 409
 
         amount = get_plan_price_cents(plan_key)
         if amount <= 0:
@@ -11159,8 +11228,8 @@ def downgrade_plan():
         db.session.commit()
 
         # Mensagem personalizada
-        plan_names = {'free': 'Grátis', 'premium': 'Premium', 'vip': 'VIP'}
-        message = f'Seu plano foi alterado para {plan_names[target_plan]} com sucesso.'
+        plan_name = get_plan_metadata(target_plan)['label']
+        message = f'Seu plano foi alterado para {plan_name} com sucesso.'
 
         return jsonify({'success': True, 'message': message})
     except Exception as e:
@@ -11386,6 +11455,17 @@ def admin_save_settings():
                 return jsonify({'success': False, 'message': 'Informe preços válidos para os planos.'}), 400
             if normalized_price <= 0 or normalized_price > Decimal('9999.99'):
                 return jsonify({'success': False, 'message': 'O preço do plano deve ficar entre R$ 0,01 e R$ 9.999,99.'}), 400
+
+        for name_key in ('plan_name_free', 'plan_name_premium', 'plan_name_vip'):
+            if name_key not in data:
+                continue
+            name_config = data[name_key]
+            raw_name = name_config.get('value') if isinstance(name_config, dict) else ''
+            normalized_name = ' '.join(str(raw_name or '').split()).strip()
+            if len(normalized_name) < 2 or len(normalized_name) > 40:
+                return jsonify({'success': False, 'message': 'O nome de cada plano deve ter entre 2 e 40 caracteres.'}), 400
+            name_config['value'] = normalized_name
+            name_config['type'] = 'string'
 
         # Salvar cada configuração
         for key, config in data.items():

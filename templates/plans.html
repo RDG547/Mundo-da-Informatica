@@ -30,7 +30,7 @@
                     <div class="plan-icon">
                         <i class="fas fa-user"></i>
                     </div>
-                    <h3 class="plan-name">Grátis</h3>
+                    <h3 class="plan-name" data-plan-name="free">{{ plan_pricing.free.label }}</h3>
                     <div class="plan-price">
                         <span class="currency">R$</span>
                         <span class="amount">0</span>
@@ -91,7 +91,7 @@
             </div>
 
             <!-- Premium Plan -->
-            <div class="plan-card premium{% if not plan_pricing.premium.enabled %} is-plan-disabled{% endif %}" data-plan-card="premium" data-plan-enabled="{{ 'true' if plan_pricing.premium.enabled else 'false' }}">
+            <div class="plan-card premium{% if not plan_pricing.premium.enabled %} is-plan-disabled{% endif %}" data-plan-card="premium" data-plan-enabled="{{ 'true' if plan_pricing.premium.enabled else 'false' }}" data-plan-card-enabled="{{ 'true' if plan_pricing.premium.card_enabled else 'false' }}" data-plan-pix-enabled="{{ 'true' if plan_pricing.premium.pix_enabled else 'false' }}">
                 <div class="plan-unavailable-label" data-plan-unavailable-label {% if plan_pricing.premium.enabled %}hidden{% endif %}>
                     <i class="fas fa-pause-circle"></i> Indisponível
                 </div>
@@ -100,7 +100,7 @@
                     <div class="plan-icon">
                         <i class="fas fa-star"></i>
                     </div>
-                    <h3 class="plan-name">Premium</h3>
+                    <h3 class="plan-name" data-plan-name="premium">{{ plan_pricing.premium.label }}</h3>
                     <div class="plan-price">
                         <span class="currency">R$</span>
                         <span class="amount" data-plan-price-amount="premium">{{ plan_pricing.premium.display_amount }}</span>
@@ -150,20 +150,20 @@
 
                 <div class="plan-cta" data-plan-cta="premium">
                     {% if not current_user.is_authenticated %}
-                    <a href="{{ url_for('register', plan='premium') }}" class="plan-btn">Assinar Premium</a>
+                    <a href="{{ url_for('register', plan='premium') }}" class="plan-btn">Assinar <span data-plan-name="premium">{{ plan_pricing.premium.label }}</span></a>
                     {% elif current_user.plan == 'premium' %}
                     <div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% elif current_user.plan == 'vip' %}
                     <button class="plan-btn downgrade-btn" onclick="openDowngradeModal('premium')">Fazer
                         Downgrade</button>
                     {% else %}
-                    <button class="plan-btn" onclick="showPaymentMethodModal('premium')">Assinar Premium</button>
+                    <button class="plan-btn" onclick="showPaymentMethodModal('premium')">Assinar <span data-plan-name="premium">{{ plan_pricing.premium.label }}</span></button>
                     {% endif %}
                 </div>
             </div>
 
             <!-- VIP Plan -->
-            <div class="plan-card vip{% if not plan_pricing.vip.enabled %} is-plan-disabled{% endif %}" data-plan-card="vip" data-plan-enabled="{{ 'true' if plan_pricing.vip.enabled else 'false' }}">
+            <div class="plan-card vip{% if not plan_pricing.vip.enabled %} is-plan-disabled{% endif %}" data-plan-card="vip" data-plan-enabled="{{ 'true' if plan_pricing.vip.enabled else 'false' }}" data-plan-card-enabled="{{ 'true' if plan_pricing.vip.card_enabled else 'false' }}" data-plan-pix-enabled="{{ 'true' if plan_pricing.vip.pix_enabled else 'false' }}">
                 <div class="plan-unavailable-label" data-plan-unavailable-label {% if plan_pricing.vip.enabled %}hidden{% endif %}>
                     <i class="fas fa-pause-circle"></i> Indisponível
                 </div>
@@ -171,7 +171,7 @@
                     <div class="plan-icon">
                         <i class="fas fa-crown"></i>
                     </div>
-                    <h3 class="plan-name">VIP</h3>
+                    <h3 class="plan-name" data-plan-name="vip">{{ plan_pricing.vip.label }}</h3>
                     <div class="plan-price">
                         <span class="currency">R$</span>
                         <span class="amount" data-plan-price-amount="vip">{{ plan_pricing.vip.display_amount }}</span>
@@ -221,11 +221,11 @@
 
                 <div class="plan-cta" data-plan-cta="vip">
                     {% if not current_user.is_authenticated %}
-                    <a href="{{ url_for('register', plan='vip') }}" class="plan-btn">Assinar VIP</a>
+                    <a href="{{ url_for('register', plan='vip') }}" class="plan-btn">Assinar <span data-plan-name="vip">{{ plan_pricing.vip.label }}</span></a>
                     {% elif current_user.plan == 'vip' %}
                     <div class="plan-badge current-plan-vip"><i class="fas fa-check-circle"></i> Plano Atual</div>
                     {% else %}
-                    <button class="plan-btn" onclick="showPaymentMethodModal('vip')">Assinar VIP</button>
+                    <button class="plan-btn" onclick="showPaymentMethodModal('vip')">Assinar <span data-plan-name="vip">{{ plan_pricing.vip.label }}</span></button>
                     {% endif %}
                 </div>
             </div>
@@ -235,7 +235,7 @@
             <h2 id="plans-comparison-title">Compare os planos</h2>
             <div class="comparison-scroll" tabindex="0" aria-label="Tabela comparativa dos planos">
                 <table>
-                    <thead><tr><th scope="col"><i class="fas fa-list-check" aria-hidden="true"></i> Recurso</th><th scope="col"><i class="fas fa-user" aria-hidden="true"></i> Grátis</th><th scope="col"><i class="fas fa-star" aria-hidden="true"></i> Premium</th><th scope="col"><i class="fas fa-crown" aria-hidden="true"></i> VIP</th></tr></thead>
+                    <thead><tr><th scope="col"><i class="fas fa-list-check" aria-hidden="true"></i> Recurso</th><th scope="col"><i class="fas fa-user" aria-hidden="true"></i> <span data-plan-name="free">{{ plan_pricing.free.label }}</span></th><th scope="col"><i class="fas fa-star" aria-hidden="true"></i> <span data-plan-name="premium">{{ plan_pricing.premium.label }}</span></th><th scope="col"><i class="fas fa-crown" aria-hidden="true"></i> <span data-plan-name="vip">{{ plan_pricing.vip.label }}</span></th></tr></thead>
                     <tbody>
                         <tr><th scope="row"><i class="fas fa-download" aria-hidden="true"></i> Downloads</th><td>{{ plan_entitlements.free.download_limit }}/semana</td><td>{{ plan_entitlements.premium.download_limit }}/semana</td><td>Ilimitados</td></tr>
                         <tr><th scope="row"><i class="fas fa-laptop" aria-hidden="true"></i> Dispositivos</th><td>{{ plan_entitlements.free.device_limit }}</td><td>{{ plan_entitlements.premium.device_limit }}</td><td>{{ plan_entitlements.vip.device_limit }}</td></tr>
@@ -261,7 +261,7 @@
     <div class="container">
         <h2 class="section-title"><i class="fas fa-question-circle"></i> Perguntas Frequentes</h2>
         <div class="faq-container">
-            <div class="faq-item active" data-initial-open="true">
+            <div class="faq-item">
                 <div class="faq-question" onclick="toggleFAQ(this)">
                     <div class="faq-question-heading">
                         <span class="faq-topic-icon"><i class="fas fa-calendar-times"></i></span>
@@ -287,8 +287,9 @@
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        No plano Grátis, você pode fazer 1 download por semana. No Premium, são 15 downloads por semana. No
-                        VIP, os downloads são totalmente ilimitados sem restrições.
+                        No plano <span data-plan-name="free">{{ plan_pricing.free.label }}</span>, você pode fazer 1 download por semana. No
+                        <span data-plan-name="premium">{{ plan_pricing.premium.label }}</span>, são 15 downloads por semana. No
+                        <span data-plan-name="vip">{{ plan_pricing.vip.label }}</span>, os downloads são totalmente ilimitados sem restrições.
                     </div>
                 </div>
             </div>
@@ -348,26 +349,28 @@
     <div class="modal-content">
         <span class="close-modal" onclick="closePaymentMethodModal()">&times;</span>
         <h2>Escolha o Método de Pagamento</h2>
-        <p>Como você gostaria de pagar sua assinatura?</p>
+        <p>Como você gostaria de pagar sua assinatura do plano <strong data-selected-plan-name>selecionado</strong>?</p>
 
         <div class="payment-methods-grid">
-            <div class="payment-method-card" onclick="selectPaymentMethod('credit_card')">
-                <div class="payment-icon">
+            <button type="button" class="payment-method-card" data-payment-method="card" onclick="selectPaymentMethod('credit_card')">
+                <span class="payment-icon">
                     <i class="fas fa-credit-card"></i>
-                </div>
-                <h4>Cartão de Crédito</h4>
-                <p>Pagamento via Stripe</p>
-                <div class="payment-badge">Recorrente</div>
-            </div>
+                </span>
+                <span class="payment-method-title">Cartão de Crédito</span>
+                <span class="payment-method-description">Pagamento via Stripe</span>
+                <span class="payment-badge">Recorrente</span>
+                <span class="payment-unavailable" hidden>Temporariamente indisponível</span>
+            </button>
 
-            <div class="payment-method-card" onclick="selectPaymentMethod('pix')">
-                <div class="payment-icon pix-icon">
+            <button type="button" class="payment-method-card" data-payment-method="pix" onclick="selectPaymentMethod('pix')">
+                <span class="payment-icon pix-icon">
                     <i class="fas fa-qrcode"></i>
-                </div>
-                <h4>PIX</h4>
-                <p>Pagamento instantâneo</p>
-                <div class="payment-badge pix-badge">À Vista</div>
-            </div>
+                </span>
+                <span class="payment-method-title">PIX</span>
+                <span class="payment-method-description">Pagamento instantâneo</span>
+                <span class="payment-badge pix-badge">À Vista</span>
+                <span class="payment-unavailable" hidden>Temporariamente indisponível</span>
+            </button>
         </div>
     </div>
 </div>
@@ -426,6 +429,9 @@
     }
 
     .payment-method-card {
+        position: relative;
+        width: 100%;
+        font: inherit;
         padding: 2rem;
         border: 2px solid #e0e0e0;
         border-radius: 12px;
@@ -435,13 +441,14 @@
         background: white;
     }
 
-    .payment-method-card:hover {
+    .payment-method-card:hover:not(:disabled) {
         border-color: var(--primary-color, #4CAF50);
         transform: translateY(-5px);
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
     }
 
     .payment-icon {
+        display: block;
         font-size: 3rem;
         color: var(--primary-color, #4CAF50);
         margin-bottom: 1rem;
@@ -451,13 +458,16 @@
         color: #32BCAD;
     }
 
-    .payment-method-card h4 {
+    .payment-method-title {
+        display: block;
         font-size: 1.3rem;
         margin-bottom: 0.5rem;
         color: #333;
+        font-weight: 700;
     }
 
-    .payment-method-card p {
+    .payment-method-description {
+        display: block;
         color: #666;
         font-size: 0.9rem;
         margin-bottom: 1rem;
@@ -475,6 +485,21 @@
 
     .pix-badge {
         background: #32BCAD;
+    }
+
+    .payment-method-card:disabled,
+    .payment-method-card.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+        filter: grayscale(0.5);
+    }
+
+    .payment-unavailable {
+        display: block;
+        margin-top: 0.85rem;
+        color: #b42318;
+        font-size: 0.78rem;
+        font-weight: 700;
     }
 
     @media (max-width: 768px) {

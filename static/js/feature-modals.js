@@ -179,74 +179,120 @@ window.featureData = {
     }
 };
 
-// Função para inicializar os event listeners dos modals
-function initFeatureModals() {
-    const modal = document.getElementById('feature-modal');
-    if (!modal) return; // Se não há modal na página, não faz nada
+let lastFeatureTrigger = null;
 
-    const closeBtn = document.querySelector('.feature-modal-close');
-    const featureItems = document.querySelectorAll('.feature-item[data-feature]');
+function getCurrentFeatureModal() {
+    return document.getElementById('feature-modal');
+}
 
-    // Adiciona event listeners aos itens de feature
-    featureItems.forEach(item => {
-        if (item.dataset.featureModalBound === 'true') return;
-        item.dataset.featureModalBound = 'true';
-        item.addEventListener('click', function() {
-            const feature = this.dataset.feature;
-            const data = window.featureData[feature];
+function closeFeatureModal() {
+    const modal = getCurrentFeatureModal();
+    if (!modal) return;
 
-            if (data) {
-                const iconElement = modal.querySelector('.feature-modal-icon');
-                const titleElement = modal.querySelector('.feature-modal-title');
-                const textElement = modal.querySelector('.feature-modal-text');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
 
-                if (iconElement && titleElement && textElement) {
-                    iconElement.className = 'feature-modal-icon ' + data.icon;
-                    titleElement.textContent = data.title;
-                    textElement.textContent = data.text;
-                    modal.style.display = 'block';
-                    document.body.style.overflow = 'hidden';
-                }
-            }
-        });
+    if (lastFeatureTrigger && document.contains(lastFeatureTrigger)) {
+        lastFeatureTrigger.focus({ preventScroll: true });
+    }
+    lastFeatureTrigger = null;
+}
+
+function openFeatureModal(item) {
+    const modal = getCurrentFeatureModal();
+    const data = window.featureData[item?.dataset.feature];
+    if (!modal || !data) return;
+
+    const iconElement = modal.querySelector('.feature-modal-icon');
+    const titleElement = modal.querySelector('.feature-modal-title');
+    const textElement = modal.querySelector('.feature-modal-text');
+    if (!iconElement || !titleElement || !textElement) return;
+
+    iconElement.className = 'feature-modal-icon ' + data.icon;
+    titleElement.textContent = data.title;
+    textElement.textContent = data.text;
+    modal.style.display = 'block';
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    lastFeatureTrigger = item;
+
+    const closeButton = modal.querySelector('.feature-modal-close');
+    if (closeButton) closeButton.focus({ preventScroll: true });
+}
+
+function installFeatureModalListeners() {
+    if (window.__featureModalListenersInstalled) return;
+    window.__featureModalListenersInstalled = true;
+
+    // A delegação consulta o modal atual e continua válida quando o corpo da
+    // página é substituído pelo carregamento dinâmico.
+    document.addEventListener('click', function(event) {
+        const featureItem = event.target.closest('.feature-item[data-feature]');
+        if (featureItem) {
+            openFeatureModal(featureItem);
+            return;
+        }
+
+        const modal = getCurrentFeatureModal();
+        if (!modal) return;
+        if (event.target.closest('.feature-modal-close') || event.target === modal) {
+            closeFeatureModal();
+        }
     });
 
-    // Fecha o modal ao clicar no botão de fechar
-    if (closeBtn) {
-        if (closeBtn.dataset.featureModalBound === 'true') return;
-        closeBtn.dataset.featureModalBound = 'true';
-        closeBtn.addEventListener('click', function() {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        });
+    document.addEventListener('keydown', function(event) {
+        const featureItem = event.target.closest?.('.feature-item[data-feature]');
+        if (featureItem && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            openFeatureModal(featureItem);
+            return;
+        }
+
+        const modal = getCurrentFeatureModal();
+        if (event.key === 'Escape' && modal?.style.display === 'block') {
+            closeFeatureModal();
+        }
+    });
+}
+
+function initFeatureModals() {
+    installFeatureModalListeners();
+
+    document.querySelectorAll('.feature-item[data-feature]').forEach(item => {
+        item.setAttribute('role', 'button');
+        item.setAttribute('tabindex', '0');
+        item.dataset.featureModalBound = 'true';
+    });
+
+    const modal = getCurrentFeatureModal();
+    if (!modal) return;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-hidden', modal.style.display === 'block' ? 'false' : 'true');
+
+    const title = modal.querySelector('.feature-modal-title');
+    if (title) {
+        if (!title.id) title.id = 'feature-modal-title';
+        modal.setAttribute('aria-labelledby', title.id);
     }
 
-    // Fecha o modal ao clicar fora dele
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-    });
-
-    // Fecha o modal com a tecla ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.style.display === 'block') {
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-    });
+    const closeButton = modal.querySelector('.feature-modal-close');
+    if (closeButton) {
+        closeButton.setAttribute('role', 'button');
+        closeButton.setAttribute('tabindex', '0');
+        closeButton.setAttribute('aria-label', 'Fechar informações');
+    }
 }
 
-// Inicializa quando o DOM estiver pronto
+window.initFeatureModals = initFeatureModals;
+window.openFeatureModal = openFeatureModal;
+window.closeFeatureModal = closeFeatureModal;
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFeatureModals);
+    document.addEventListener('DOMContentLoaded', initFeatureModals, { once: true });
 } else {
-    // DOM já está carregado (navegação entre páginas)
     initFeatureModals();
 }
-
-// Expõe a função globalmente para ser chamada pelo dynamic-loading
-window.initFeatureModals = initFeatureModals;
 
 } // Fim da verificação de carregamento

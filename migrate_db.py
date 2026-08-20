@@ -133,12 +133,18 @@ def update_legacy_public_copy(connection) -> int:
 
     replacements = {
         "home_hero_title": (
-            ("Encontre o arquivo certo para o reparo.",),
-            "Bem-vindo ao Mundo da Informática",
+            (
+                "Encontre o arquivo certo para o reparo.",
+                "Bem-vindo ao Mundo da Informática",
+            ),
+            "Encontre o arquivo certo para o reparo!",
         ),
         "home_hero_subtitle": (
-            ("BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.",),
-            "Seu portal completo de recursos para técnicos e entusiastas de informática",
+            (
+                "Seu portal completo de recursos para técnicos e entusiastas de informática",
+                "Recursos essenciais para técnicos",
+            ),
+            "BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.",
         ),
         "site_description": (
             (

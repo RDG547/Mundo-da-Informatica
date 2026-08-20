@@ -1,5 +1,5 @@
 /**
- * Atualiza os preços dos planos em tempo real em qualquer página que os exiba.
+ * Atualiza nomes, preços, disponibilidade e formas de pagamento dos planos.
  *
  * Elementos rastreados:
  *   [data-plan-price-amount="premium|vip"] -> apenas o valor ("29,90")
@@ -15,6 +15,7 @@
 
     const POLL_INTERVAL_MS = 3000;
     window.planAvailability = window.planAvailability || {};
+    window.planPaymentAvailability = window.planPaymentAvailability || {};
 
     function flashElement(el) {
         if (typeof el.animate !== 'function') {
@@ -69,15 +70,35 @@
             if (priceInput && document.activeElement !== priceInput && priceInput.dataset.dirty !== 'true') {
                 priceInput.value = plan.display_amount;
             }
+
+            const nameInput = document.getElementById(`plan_name_${planKey}`);
+            if (nameInput && document.activeElement !== nameInput && nameInput.dataset.dirty !== 'true') {
+                nameInput.value = plan.label;
+            }
+
+            document.querySelectorAll(`[data-plan-name="${planKey}"]`).forEach((element) => {
+                setPriceText(element, plan.label);
+            });
+            document.querySelectorAll(`[data-plan-admin-label="${planKey}"]`).forEach((element) => {
+                setPriceText(element, plan.label);
+            });
         });
 
         Object.entries(plans).forEach(([planKey, plan]) => {
             const isEnabled = plan.enabled !== false;
+            const cardEnabled = plan.card_enabled !== false;
+            const pixEnabled = plan.pix_enabled !== false;
             window.planAvailability[planKey] = isEnabled;
+            window.planPaymentAvailability[planKey] = {
+                card: cardEnabled,
+                pix: pixEnabled
+            };
 
             document.querySelectorAll(`[data-plan-card="${planKey}"]`).forEach((card) => {
                 const wasEnabled = card.dataset.planEnabled !== 'false';
                 card.dataset.planEnabled = isEnabled ? 'true' : 'false';
+                card.dataset.planCardEnabled = cardEnabled ? 'true' : 'false';
+                card.dataset.planPixEnabled = pixEnabled ? 'true' : 'false';
                 card.classList.toggle('is-plan-disabled', !isEnabled);
 
                 const label = card.querySelector('[data-plan-unavailable-label]');
@@ -94,6 +115,14 @@
             document.querySelectorAll(`[data-plan-enabled-toggle="${planKey}"]`).forEach((toggle) => {
                 if (document.activeElement !== toggle && !toggle.disabled) {
                     toggle.checked = isEnabled;
+                }
+            });
+
+            document.querySelectorAll(`[data-plan-payment-toggle="${planKey}"]`).forEach((toggle) => {
+                const method = toggle.dataset.paymentMethod;
+                const methodEnabled = method === 'card' ? cardEnabled : pixEnabled;
+                if (document.activeElement !== toggle && !toggle.disabled) {
+                    toggle.checked = methodEnabled;
                 }
             });
 
@@ -128,7 +157,7 @@
     }
 
     function hasPlanElements() {
-        return Boolean(document.querySelector('[data-plan-price-amount], [data-plan-price-full], [data-plan-card], [data-plan-enabled-toggle]'));
+        return Boolean(document.querySelector('[data-plan-price-amount], [data-plan-price-full], [data-plan-name], [data-plan-card], [data-plan-enabled-toggle], [data-plan-payment-toggle]'));
     }
 
     window.refreshPlanPrices = fetchPlanPrices;

@@ -174,6 +174,10 @@
         setText('[data-live-setting="site_description"]', settings.site_description);
         setText('[data-live-setting="footer_description"]', settings.footer_description || settings.site_description);
         setText('[data-live-setting="footer_text"]', settings.footer_text);
+        setText('[data-current-year]', settings.current_year || new Date().getFullYear());
+        setText('[data-plan-name="free"]', settings.plan_name_free);
+        setText('[data-plan-name="premium"]', settings.plan_name_premium);
+        setText('[data-plan-name="vip"]', settings.plan_name_vip);
         setText('[data-live-setting="home_hero_subtitle"]', settings.home_hero_subtitle);
 
         const heroTitle = document.querySelector('[data-live-setting="home_hero_title"]');

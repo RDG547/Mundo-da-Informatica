@@ -31,6 +31,25 @@ window.initializePlansPage = function () {
         return false;
     };
 
+    const normalizePaymentMethod = (method) => method === 'credit_card' ? 'card' : String(method || '');
+
+    const isPaymentMethodAvailable = (plan, method) => {
+        const normalizedPlan = String(plan || '').trim().toLowerCase();
+        const normalizedMethod = normalizePaymentMethod(method);
+        const card = document.querySelector(`[data-plan-card="${normalizedPlan}"]`);
+        const datasetKey = normalizedMethod === 'card' ? 'planCardEnabled' : 'planPixEnabled';
+        if (card && card.dataset[datasetKey]) {
+            return card.dataset[datasetKey] !== 'false';
+        }
+        return window.planPaymentAvailability?.[normalizedPlan]?.[normalizedMethod] !== false;
+    };
+
+    const getPlanDisplayName = (plan) => {
+        const normalizedPlan = String(plan || '').trim().toLowerCase();
+        return document.querySelector(`[data-plan-card="${normalizedPlan}"] [data-plan-name="${normalizedPlan}"]`)
+            ?.textContent.trim() || normalizedPlan.toUpperCase();
+    };
+
     // Function to initialize Stripe when ready
     const initializeStripe = () => {
         // Evitar múltiplas inicializações
@@ -93,6 +112,10 @@ window.initializePlansPage = function () {
     // Checkout Function
     window.checkout = function (plan) {
         if (!ensurePlanAvailable(plan)) return;
+        if (!isPaymentMethodAvailable(plan, 'card')) {
+            alert('A assinatura por cartão está temporariamente indisponível para este plano.');
+            return;
+        }
         if (!stripe) {
             alert('Erro: Configuração de pagamento não encontrada. Por favor, contate o suporte.');
             console.error('Stripe public key is missing');
@@ -160,6 +183,28 @@ window.initializePlansPage = function () {
     let paymentMethodModal = null;
     let selectedPlan = null;
 
+    function syncPaymentMethodModal(plan) {
+        if (!paymentMethodModal) return false;
+        const normalizedPlan = String(plan || '').trim().toLowerCase();
+        const planName = getPlanDisplayName(normalizedPlan);
+        const selectedPlanName = paymentMethodModal.querySelector('[data-selected-plan-name]');
+        if (selectedPlanName) selectedPlanName.textContent = planName;
+
+        let availableCount = 0;
+        paymentMethodModal.querySelectorAll('[data-payment-method]').forEach((methodCard) => {
+            const method = methodCard.dataset.paymentMethod;
+            const isAvailable = isPaymentMethodAvailable(normalizedPlan, method);
+            methodCard.disabled = !isAvailable;
+            methodCard.classList.toggle('is-disabled', !isAvailable);
+            methodCard.setAttribute('aria-disabled', isAvailable ? 'false' : 'true');
+            const unavailableLabel = methodCard.querySelector('.payment-unavailable');
+            if (unavailableLabel) unavailableLabel.hidden = isAvailable;
+            if (isAvailable) availableCount += 1;
+        });
+        return availableCount > 0;
+    }
+    window.syncPlanPaymentMethodModal = syncPaymentMethodModal;
+
     window.showPaymentMethodModal = function (plan) {
         if (!ensurePlanAvailable(plan)) return;
         selectedPlan = plan;
@@ -167,6 +212,11 @@ window.initializePlansPage = function () {
             paymentMethodModal = document.getElementById('paymentMethodModal');
         }
         if (paymentMethodModal) {
+            if (!syncPaymentMethodModal(plan)) {
+                selectedPlan = null;
+                alert('As formas de pagamento deste plano estão temporariamente indisponíveis.');
+                return;
+            }
             paymentMethodModal.style.display = "flex";
             document.body.style.overflow = "hidden";
         }
@@ -184,6 +234,12 @@ window.initializePlansPage = function () {
         if (!selectedPlan) {
             console.error('Nenhum plano selecionado');
             alert('Erro: Nenhum plano selecionado. Por favor, tente novamente.');
+            return;
+        }
+
+        if (!isPaymentMethodAvailable(selectedPlan, method)) {
+            alert('Esta forma de pagamento está temporariamente indisponível para o plano selecionado.');
+            syncPaymentMethodModal(selectedPlan);
             return;
         }
 
@@ -224,6 +280,10 @@ window.initializePlansPage = function () {
 
     function checkoutPix(plan) {
         if (!ensurePlanAvailable(plan)) return;
+        if (!isPaymentMethodAvailable(plan, 'pix')) {
+            alert('O pagamento via PIX está temporariamente indisponível para este plano.');
+            return;
+        }
         const payload = { plan: plan };
 
         fetch('/create-pix-checkout', {
@@ -267,15 +327,19 @@ window.initializePlansPage = function () {
         const amountElement = document.querySelector(`.plan-card.${normalizedPlan} .plan-price .amount`);
         const amountText = amountElement ? `R$ ${amountElement.textContent.trim()}` : '';
 
-        if (normalizedPlan === 'vip') {
-            return { label: 'Plano VIP', amountText };
-        }
+        return { label: `Plano ${getPlanDisplayName(normalizedPlan)}`, amountText };
+    }
 
-        if (normalizedPlan === 'premium') {
-            return { label: 'Plano Premium', amountText };
-        }
-
-        return { label: 'Plano', amountText };
+    window.currentPlanPaymentSelection = () => selectedPlan;
+    if (!window.__planPaymentAvailabilityListenerBound) {
+        window.__planPaymentAvailabilityListenerBound = true;
+        window.addEventListener('planAvailabilityChanged', () => {
+            const activePlan = window.currentPlanPaymentSelection?.();
+            const activeModal = document.getElementById('paymentMethodModal');
+            if (activePlan && activeModal?.style.display === 'flex') {
+                if (!window.syncPlanPaymentMethodModal?.(activePlan)) window.closePaymentMethodModal?.();
+            }
+        });
     }
 
     // Retoma a escolha feita antes do cadastro/login sem pular a seleção
@@ -324,10 +388,10 @@ window.initializePlansPage = function () {
         const warningEl = document.getElementById('downgradeWarning');
 
         if (plan === 'free') {
-            if (messageEl) messageEl.textContent = 'Tem certeza que deseja voltar para o plano grátis?';
+            if (messageEl) messageEl.textContent = `Tem certeza que deseja voltar para o plano ${getPlanDisplayName('free')}?`;
             if (warningEl) warningEl.textContent = 'Você perderá acesso imediato aos benefícios exclusivos do seu plano atual, como downloads ilimitados, suporte prioritário e área VIP.';
         } else if (plan === 'premium') {
-            if (messageEl) messageEl.textContent = 'Tem certeza que deseja fazer downgrade para o plano Premium?';
+            if (messageEl) messageEl.textContent = `Tem certeza que deseja fazer downgrade para o plano ${getPlanDisplayName('premium')}?`;
             if (warningEl) warningEl.textContent = 'Você perderá acesso aos benefícios exclusivos do plano VIP, como downloads ilimitados e área VIP exclusiva.';
         }
 
@@ -372,10 +436,10 @@ window.initializePlansPage = function () {
                             freeCta.innerHTML = '<div class="plan-badge current-plan-free"><i class="fas fa-check-circle"></i> Plano Atual</div>';
                         }
                         if (premiumCta) {
-                            premiumCta.innerHTML = '<button class="plan-btn" onclick="showPaymentMethodModal(\'premium\')">Assinar Premium</button>';
+                            premiumCta.innerHTML = `<button class="plan-btn" onclick="showPaymentMethodModal('premium')">Assinar <span data-plan-name="premium">${getPlanDisplayName('premium')}</span></button>`;
                         }
                         if (vipCta) {
-                            vipCta.innerHTML = '<button class="plan-btn" onclick="showPaymentMethodModal(\'vip\')">Assinar VIP</button>';
+                            vipCta.innerHTML = `<button class="plan-btn" onclick="showPaymentMethodModal('vip')">Assinar <span data-plan-name="vip">${getPlanDisplayName('vip')}</span></button>`;
                         }
                     } else if (targetPlan === 'premium') {
                         // Downgrade para Premium (vindo do VIP)
@@ -386,7 +450,7 @@ window.initializePlansPage = function () {
                             premiumCta.innerHTML = '<div class="plan-badge current-plan-premium"><i class="fas fa-check-circle"></i> Plano Atual</div>';
                         }
                         if (vipCta) {
-                            vipCta.innerHTML = '<button class="plan-btn" onclick="showPaymentMethodModal(\'vip\')">Assinar VIP</button>';
+                            vipCta.innerHTML = `<button class="plan-btn" onclick="showPaymentMethodModal('vip')">Assinar <span data-plan-name="vip">${getPlanDisplayName('vip')}</span></button>`;
                         }
                     }
 

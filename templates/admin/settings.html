@@ -104,14 +104,14 @@
                         <div class="settings-field">
                             <label for="home_hero_title">Título Principal da Home</label>
                             <input type="text" id="home_hero_title" class="form-control"
-                                value="{{ site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') }}"
-                                data-key="home_hero_title" data-type="string" data-default-value="Bem-vindo ao Mundo da Informática">
+                                value="{{ site_configs.get('home_hero_title', 'Encontre o arquivo certo para o reparo!') }}"
+                                data-key="home_hero_title" data-type="string" data-default-value="Encontre o arquivo certo para o reparo!">
                         </div>
                         <div class="settings-field">
                             <label for="home_hero_subtitle">Subtítulo da Home</label>
                             <input type="text" id="home_hero_subtitle" class="form-control"
-                                value="{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}"
-                                data-key="home_hero_subtitle" data-type="string" data-default-value="Seu portal completo de recursos para técnicos e entusiastas de informática">
+                                value="{{ site_configs.get('home_hero_subtitle', 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.') }}"
+                                data-key="home_hero_subtitle" data-type="string" data-default-value="BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.">
                         </div>
                     </div>
                 </div>
@@ -214,7 +214,7 @@
                 <div class="admin-card-header">
                     <div>
                         <h2 class="admin-card-title"><i class="fas fa-crown"></i> Planos e Cobrança</h2>
-                        <p class="settings-panel-subtitle">Ajuste os precos exibidos nos cards e usados no PIX. No cartao, a cobranca oficial continua sendo lida a partir dos produtos Stripe fixos.</p>
+                        <p class="settings-panel-subtitle">Ajuste nomes, preços, disponibilidade e formas de pagamento. As alterações são sincronizadas com o site sem recarregar a página.</p>
                     </div>
                 </div>
                 <div class="admin-card-body">
@@ -236,11 +236,22 @@
                                 </div>
                             </div>
                             <div class="settings-field">
-                                <label>Plano Grátis</label>
-                                <div class="settings-plan-free-price">R$ 0,00 <small>/mês</small></div>
+                                <label for="plan_name_free">Plano <span data-plan-admin-label="free">{{ site_configs.get('plan_name_free', 'Grátis') }}</span></label>
+                                <input type="text" id="plan_name_free" class="form-control"
+                                    value="{{ site_configs.get('plan_name_free', 'Grátis') }}" maxlength="40"
+                                    data-key="plan_name_free" data-type="string" data-default-value="Grátis"
+                                    data-plan-name-input="free">
+                            </div>
+                            <div class="settings-field">
+                                <label for="plan_price_free">Valor mensal</label>
+                                <div class="settings-money-input is-readonly">
+                                    <span class="settings-money-prefix">R$</span>
+                                    <input type="text" id="plan_price_free" class="form-control" value="0,00" disabled>
+                                    <span class="settings-money-suffix">/mês</span>
+                                </div>
                             </div>
                             <div class="settings-plan-meta">
-                                <span><i class="fas fa-user-plus"></i> Cadastro / downgrade</span>
+                                <span><i class="fas fa-user-plus"></i> Sem cobrança</span>
                             </div>
                             <p>Desative para impedir novas adesões e mudanças para o plano grátis. Usuários atuais não perdem o acesso.</p>
                         </article>
@@ -262,14 +273,44 @@
                                 </div>
                             </div>
                             <div class="settings-field">
-                                <label for="plan_price_premium">Preço do Plano Premium</label>
+                                <label for="plan_name_premium">Plano <span data-plan-admin-label="premium">{{ site_configs.get('plan_name_premium', 'Premium') }}</span></label>
+                                <input type="text" id="plan_name_premium" class="form-control"
+                                    value="{{ site_configs.get('plan_name_premium', 'Premium') }}" maxlength="40"
+                                    data-key="plan_name_premium" data-type="string" data-default-value="Premium"
+                                    data-plan-name-input="premium">
+                            </div>
+                            <div class="settings-field">
+                                <label for="plan_price_premium">Valor mensal</label>
                                 <div class="settings-money-input">
-                                    <span>R$</span>
+                                    <span class="settings-money-prefix">R$</span>
                                     <input type="text" id="plan_price_premium" class="form-control"
                                         value="{{ site_configs.get('plan_price_premium', 29.90) }}"
                                         inputmode="numeric" autocomplete="off"
                                         data-currency-input="true"
                                         data-key="plan_price_premium" data-type="float" data-default-value="29.90">
+                                    <span class="settings-money-suffix">/mês</span>
+                                </div>
+                            </div>
+                            <div class="settings-plan-payment-options" aria-label="Formas de pagamento do plano Premium">
+                                <div class="settings-plan-payment-row">
+                                    <span><i class="fas fa-credit-card"></i> Assinatura por cartão</span>
+                                    <label class="settings-switch" title="Ativar ou desativar cartão para este plano">
+                                        <input type="checkbox" id="plan_card_enabled_premium"
+                                            {{ 'checked' if site_configs.get('plan_card_enabled_premium', True) else '' }}
+                                            data-key="plan_card_enabled_premium" data-type="bool" data-default-value="true"
+                                            data-plan-payment-toggle="premium" data-payment-method="card">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-plan-payment-row">
+                                    <span><i class="fas fa-qrcode"></i> Pagamento via PIX</span>
+                                    <label class="settings-switch" title="Ativar ou desativar PIX para este plano">
+                                        <input type="checkbox" id="plan_pix_enabled_premium"
+                                            {{ 'checked' if site_configs.get('plan_pix_enabled_premium', True) else '' }}
+                                            data-key="plan_pix_enabled_premium" data-type="bool" data-default-value="true"
+                                            data-plan-payment-toggle="premium" data-payment-method="pix">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
                                 </div>
                             </div>
                             <div class="settings-plan-meta">
@@ -296,14 +337,44 @@
                                 </div>
                             </div>
                             <div class="settings-field">
-                                <label for="plan_price_vip">Preço do Plano VIP</label>
+                                <label for="plan_name_vip">Plano <span data-plan-admin-label="vip">{{ site_configs.get('plan_name_vip', 'VIP') }}</span></label>
+                                <input type="text" id="plan_name_vip" class="form-control"
+                                    value="{{ site_configs.get('plan_name_vip', 'VIP') }}" maxlength="40"
+                                    data-key="plan_name_vip" data-type="string" data-default-value="VIP"
+                                    data-plan-name-input="vip">
+                            </div>
+                            <div class="settings-field">
+                                <label for="plan_price_vip">Valor mensal</label>
                                 <div class="settings-money-input">
-                                    <span>R$</span>
+                                    <span class="settings-money-prefix">R$</span>
                                     <input type="text" id="plan_price_vip" class="form-control"
                                         value="{{ site_configs.get('plan_price_vip', 49.90) }}"
                                         inputmode="numeric" autocomplete="off"
                                         data-currency-input="true"
                                         data-key="plan_price_vip" data-type="float" data-default-value="49.90">
+                                    <span class="settings-money-suffix">/mês</span>
+                                </div>
+                            </div>
+                            <div class="settings-plan-payment-options" aria-label="Formas de pagamento do plano VIP">
+                                <div class="settings-plan-payment-row">
+                                    <span><i class="fas fa-credit-card"></i> Assinatura por cartão</span>
+                                    <label class="settings-switch" title="Ativar ou desativar cartão para este plano">
+                                        <input type="checkbox" id="plan_card_enabled_vip"
+                                            {{ 'checked' if site_configs.get('plan_card_enabled_vip', True) else '' }}
+                                            data-key="plan_card_enabled_vip" data-type="bool" data-default-value="true"
+                                            data-plan-payment-toggle="vip" data-payment-method="card">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-plan-payment-row">
+                                    <span><i class="fas fa-qrcode"></i> Pagamento via PIX</span>
+                                    <label class="settings-switch" title="Ativar ou desativar PIX para este plano">
+                                        <input type="checkbox" id="plan_pix_enabled_vip"
+                                            {{ 'checked' if site_configs.get('plan_pix_enabled_vip', True) else '' }}
+                                            data-key="plan_pix_enabled_vip" data-type="bool" data-default-value="true"
+                                            data-plan-payment-toggle="vip" data-payment-method="pix">
+                                        <span class="settings-switch-slider"></span>
+                                    </label>
                                 </div>
                             </div>
                             <div class="settings-plan-meta">
@@ -407,8 +478,8 @@
         site_description: 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.',
         footer_text: 'Mundo da Informática - Todos os direitos reservados',
         footer_description: 'Recursos técnicos organizados por modelo e placa para profissionais de manutenção.',
-        home_hero_title: 'Bem-vindo ao Mundo da Informática',
-        home_hero_subtitle: 'Seu portal completo de recursos para técnicos e entusiastas de informática',
+        home_hero_title: 'Encontre o arquivo certo para o reparo!',
+        home_hero_subtitle: 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.',
         enable_dark_mode: true,
         primary_color: '#3a86ff',
         secondary_color: '#8338ec',
@@ -418,8 +489,15 @@
         plan_enabled_free: true,
         plan_enabled_premium: true,
         plan_enabled_vip: true,
+        plan_name_free: 'Grátis',
+        plan_name_premium: 'Premium',
+        plan_name_vip: 'VIP',
         plan_price_premium: '29.90',
         plan_price_vip: '49.90',
+        plan_card_enabled_premium: true,
+        plan_card_enabled_vip: true,
+        plan_pix_enabled_premium: true,
+        plan_pix_enabled_vip: true,
         google_analytics: '',
         maintenance_mode: false,
         social_links: {
@@ -525,6 +603,51 @@
             toggle.checked = previousValue;
             updatePlanToggleUi(toggle);
             showSettingsNotification(error.message || 'Erro ao atualizar o plano.', 'error');
+        } finally {
+            toggle.disabled = false;
+        }
+    }
+
+    async function savePlanPaymentAvailability(toggle) {
+        const plan = toggle.dataset.planPaymentToggle;
+        const method = toggle.dataset.paymentMethod;
+        const previousValue = !toggle.checked;
+        toggle.disabled = true;
+
+        try {
+            const response = await fetch('/admin/save_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    [toggle.dataset.key]: { value: toggle.checked, type: 'bool' }
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível atualizar a forma de pagamento.');
+            }
+
+            const planLabel = document.getElementById(`plan_name_${plan}`)?.value || plan.toUpperCase();
+            const methodLabel = method === 'card' ? 'Cartão' : 'PIX';
+            showSettingsNotification(
+                `${methodLabel} ${toggle.checked ? 'ativado' : 'desativado'} para o plano ${planLabel}.`,
+                'success'
+            );
+            if (typeof window.publishSiteSettings === 'function' && data.settings) {
+                window.publishSiteSettings(data.settings);
+            }
+            window.dispatchEvent(new CustomEvent('planConfigurationUpdated'));
+            try {
+                localStorage.setItem('plan_configuration_updated_at', String(Date.now()));
+            } catch (_storageError) {
+                // O polling mantém outras abas sincronizadas mesmo sem localStorage.
+            }
+            if (typeof window.refreshPlanPrices === 'function') {
+                window.refreshPlanPrices();
+            }
+        } catch (error) {
+            toggle.checked = previousValue;
+            showSettingsNotification(error.message || 'Erro ao atualizar a forma de pagamento.', 'error');
         } finally {
             toggle.disabled = false;
         }
@@ -665,6 +788,16 @@
             updatePlanToggleUi(toggle);
             toggle.addEventListener('change', () => savePlanAvailability(toggle));
         });
+        page.querySelectorAll('[data-plan-payment-toggle]').forEach((toggle) => {
+            toggle.addEventListener('change', () => savePlanPaymentAvailability(toggle));
+        });
+        page.querySelectorAll('[data-plan-name-input]').forEach((input) => {
+            input.addEventListener('input', () => {
+                input.dataset.dirty = 'true';
+                const label = page.querySelector(`[data-plan-admin-label="${input.dataset.planNameInput}"]`);
+                if (label && input.value.trim()) label.textContent = input.value.trim();
+            });
+        });
         updateThemePreview();
         bindScrollSpy(page);
 
@@ -728,7 +861,7 @@
                 }
 
                 showSettingsNotification(data.message || 'Configurações salvas com sucesso!', 'success');
-                page.querySelectorAll('[data-currency-input]').forEach((input) => delete input.dataset.dirty);
+                page.querySelectorAll('[data-currency-input], [data-plan-name-input]').forEach((input) => delete input.dataset.dirty);
 
                 if (typeof window.publishSiteSettings === 'function' && data.settings) {
                     window.publishSiteSettings(data.settings);

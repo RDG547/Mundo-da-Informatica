@@ -21,10 +21,23 @@ if (typeof window.DynamicLoader !== 'undefined') {
             this.installReadyEventFallbacks();
             this.bindEvents();
             this.createLoadingIndicator();
+            this.bindLoadingIndicatorBounds();
             this.handleBrowserNavigation();
 
             // Initialize page styles for current page
             this.initializeCurrentPageStyles();
+        }
+
+        bindLoadingIndicatorBounds() {
+            if (window.__dynamicLoaderBoundsHandler) return;
+            window.__dynamicLoaderBoundsHandler = () => {
+                const loader = document.getElementById('dynamic-loader');
+                if (loader && getComputedStyle(loader).display !== 'none') {
+                    this.attachLoaderToMain(loader);
+                }
+            };
+            window.addEventListener('scroll', window.__dynamicLoaderBoundsHandler, { passive: true });
+            window.addEventListener('resize', window.__dynamicLoaderBoundsHandler, { passive: true });
         }
 
         installReadyEventFallbacks() {
@@ -678,7 +691,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (adminCSS) adminCSS.media = 'print';
 
             // Determine which page-specific CSS to activate based on URL
-            if (path === '/faq' && faqCSS) {
+            if ((path === '/faq' || path === '/solicitacoes') && faqCSS) {
                 faqCSS.media = 'all';
                 activatedStyles.push(faqCSS);
                 console.log('[DYNAMIC-LOADING] 🎨 FAQ CSS ativado');
@@ -1088,6 +1101,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 '/faq',
                 '/contact',
                 '/contato',
+                '/solicitacoes',
                 '/termos-de-uso',
                 '/politica-de-privacidade'
             ]);
@@ -1229,14 +1243,14 @@ if (typeof window.DynamicLoader !== 'undefined') {
             style.textContent = `
             #dynamic-loader {
                 position: fixed;
-                inset: 0;
-                width: 100dvw;
-                height: 100dvh;
+                inset: 70px 0 0;
+                width: auto;
+                height: auto;
                 background: rgba(255, 255, 255, 0.9);
                 display: none;
                 justify-content: center;
                 align-items: center;
-                z-index: 1300;
+                z-index: 900;
                 backdrop-filter: blur(5px);
                 -webkit-backdrop-filter: blur(5px);
                 pointer-events: auto;
@@ -1278,6 +1292,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             if (loader) {
                 this.attachLoaderToMain(loader);
                 loader.style.display = 'flex';
+                window.requestAnimationFrame(() => this.attachLoaderToMain(loader));
             }
         }
 
@@ -1331,9 +1346,20 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 document.body.appendChild(loader);
             }
 
-            loader.style.inset = '0';
+            const header = document.querySelector('body > header');
+            const footer = document.querySelector('body > footer, .modern-footer');
+            const viewportHeight = window.innerHeight;
+            const headerBottom = header
+                ? Math.max(0, Math.min(viewportHeight, header.getBoundingClientRect().bottom))
+                : 0;
+            const footerTop = footer ? footer.getBoundingClientRect().top : viewportHeight;
+            const visibleFooterTop = Math.max(headerBottom, Math.min(viewportHeight, footerTop));
+            loader.style.inset = 'auto';
+            loader.style.top = `${headerBottom}px`;
+            loader.style.left = '0';
             loader.style.width = '100dvw';
-            loader.style.height = '100dvh';
+            loader.style.height = `${Math.max(visibleFooterTop - headerBottom, 0)}px`;
+            loader.style.bottom = 'auto';
         }
 
         dispatchEvent(eventName, data = {}) {

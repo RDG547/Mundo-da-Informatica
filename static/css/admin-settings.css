@@ -726,26 +726,6 @@
     transform-origin: right top;
 }
 
-.settings-plan-free-price {
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    padding: 0.8rem 0.95rem;
-    border-radius: 12px;
-    border: 1px solid rgba(15, 23, 42, 0.1);
-    background: #f8fafc;
-    color: var(--admin-text);
-    font-size: 1.05rem;
-    font-weight: 800;
-}
-
-.settings-plan-free-price small {
-    margin-left: 0.35rem;
-    color: var(--admin-text-light);
-    font-size: 0.78rem;
-    font-weight: 600;
-}
-
 .settings-plan-card.free .settings-plan-icon {
     background: linear-gradient(135deg, #64748b, #94a3b8);
 }
@@ -759,20 +739,94 @@
 }
 
 .settings-money-input {
+    min-height: 48px;
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr);
-    gap: 0.8rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 12px;
+    background: #ffffff;
 }
 
-.settings-money-input span {
+.settings-money-input .settings-money-prefix,
+.settings-money-input .settings-money-suffix {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
     background: #f3f6fb;
-    border: 1px solid rgba(15, 23, 42, 0.08);
     color: var(--admin-text);
     font-weight: 700;
+    white-space: nowrap;
+}
+
+.settings-money-input .settings-money-prefix {
+    padding: 0 0.8rem;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.settings-money-input .settings-money-suffix {
+    padding: 0 0.75rem;
+    border-left: 1px solid rgba(15, 23, 42, 0.08);
+    color: var(--admin-text-light);
+    font-size: 0.8rem;
+}
+
+.settings-money-input .form-control {
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    font-weight: 800;
+}
+
+.settings-money-input:focus-within {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px rgba(58, 134, 255, 0.12);
+}
+
+.settings-money-input.is-readonly,
+.settings-money-input.is-readonly .form-control {
+    background: #f8fafc;
+}
+
+.settings-plan-payment-options {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.9rem;
+    padding: 0.75rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: rgba(248, 250, 252, 0.82);
+}
+
+.settings-plan-payment-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--admin-text);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.settings-plan-payment-row > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.settings-plan-payment-row > span i {
+    width: 1rem;
+    color: var(--admin-primary);
+    text-align: center;
+}
+
+.settings-plan-payment-row .settings-switch {
+    flex: 0 0 auto;
+    transform: scale(0.78);
+    transform-origin: right center;
 }
 
 .settings-plan-card p {
@@ -847,8 +901,7 @@
         flex-direction: column;
     }
 
-    .settings-color-row,
-    .settings-money-input {
+    .settings-color-row {
         grid-template-columns: 1fr;
     }
 }

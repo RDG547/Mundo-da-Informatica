@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% set home_hero_title = site_configs.get('home_hero_title', 'Bem-vindo ao Mundo da Informática') %}
+{% set home_hero_title = site_configs.get('home_hero_title', 'Encontre o arquivo certo para o reparo!') %}
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
         <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}" data-live-setting="home_hero_title">{{ home_hero_title }}</h1>
-        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'Seu portal completo de recursos para técnicos e entusiastas de informática') }}</p>
+        <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
                 <label for="home-search-input" class="sr-only">Pesquisar por modelo ou código da placa</label>
@@ -15,11 +15,6 @@
             </div>
             <button type="submit"><i class="fas fa-search"></i> Buscar</button>
         </form>
-        <div class="hero-value-points" role="list" aria-label="Benefícios da biblioteca">
-            <span role="listitem"><i class="fas fa-search" aria-hidden="true"></i> Busca por modelo e placa</span>
-            <span role="listitem"><i class="fas fa-layer-group" aria-hidden="true"></i> Recursos técnicos centralizados</span>
-            <span role="listitem"><i class="fas fa-history" aria-hidden="true"></i> Histórico conforme seu plano</span>
-        </div>
     </div>
 </section>
 
@@ -28,43 +23,44 @@
     function splitIntoChars(el, lines) {
         var chars = [];
         el.innerHTML = '';
-        for (var l = 0; l < lines.length; l++) {
-            var container = lines.length > 1 ? document.createElement('div') : el;
+
+        for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+            var line = lines[lineIndex].trim();
+            var container = lines.length > 1 ? document.createElement('span') : el;
+
             if (lines.length > 1) {
                 container.className = 'hero-line hero-line-3d';
-                container.setAttribute('data-text', lines[l].trim());
-                container.style.display = 'block';
+                container.setAttribute('data-text', line);
                 el.appendChild(container);
             }
-            var words = lines[l].trim().split(/\s+/);
-            for (var w = 0; w < words.length; w++) {
-                if (w > 0) {
-                    var sp = document.createElement('span');
-                    sp.style.display = 'inline-block';
-                    sp.innerHTML = '&nbsp;';
-                    container.appendChild(sp);
-                    chars.push(sp);
+
+            var words = line.split(/\s+/);
+            for (var wordIndex = 0; wordIndex < words.length; wordIndex++) {
+                if (wordIndex > 0) {
+                    var space = document.createElement('span');
+                    space.className = 'hero-space-3d';
+                    space.innerHTML = '&nbsp;';
+                    container.appendChild(space);
                 }
-                var wordWrap = document.createElement('span');
-                wordWrap.className = 'hero-word-3d';
-                wordWrap.style.display = 'inline-block';
-                wordWrap.style.whiteSpace = 'nowrap';
-                for (var c = 0; c < words[w].length; c++) {
-                    var cs = document.createElement('span');
-                    cs.className = 'hero-char-3d';
-                    cs.style.display = 'inline-block';
-                    cs.textContent = words[w][c];
-                    wordWrap.appendChild(cs);
-                    chars.push(cs);
+
+                var word = document.createElement('span');
+                word.className = 'hero-word-3d';
+                for (var charIndex = 0; charIndex < words[wordIndex].length; charIndex++) {
+                    var char = document.createElement('span');
+                    char.className = 'hero-char-3d';
+                    char.textContent = words[wordIndex][charIndex];
+                    word.appendChild(char);
+                    chars.push(char);
                 }
-                container.appendChild(wordWrap);
+                container.appendChild(word);
             }
         }
+
         return chars;
     }
 
     function getHeroTitleLines(titleEl) {
-        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Bem-vindo ao Mundo da Informática').trim();
+        var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Encontre o arquivo certo para o reparo!').trim();
         var explicitLines = rawTitle.split('|').map(function (line) { return line.trim(); }).filter(Boolean);
         if (explicitLines.length > 1) return explicitLines;
 
@@ -97,103 +93,12 @@
             gsap.killTweensOf(titleEl.querySelectorAll('*'));
         }
 
-        var titleChars = splitIntoChars(titleEl, getHeroTitleLines(titleEl));
-        var titleLines = Array.prototype.slice.call(titleEl.querySelectorAll('.hero-line, .hero-line-3d'));
-
-        if (typeof gsap === 'undefined') return;
-
-        gsap.killTweensOf(titleLines);
-        gsap.killTweensOf(titleChars);
-
-        gsap.fromTo(titleLines, {
-            x: 72,
-            y: 14,
-            z: -70,
-            rotationY: -20,
-            rotationX: 10,
-            opacity: 0,
-            '--hero-shadow-opacity': 0
-        }, {
-            x: 0,
-            y: 0,
-            z: 0,
-            rotationY: -7,
-            rotationX: 7,
-            opacity: 1,
-            '--hero-shadow-opacity': 1,
-            duration: 0.92,
-            ease: 'power3.out',
-            stagger: 0.08
-        });
-
-        gsap.from(titleChars, {
-            x: 118,
-            z: -96,
-            rotationY: -55,
-            rotationX: 16,
-            opacity: 0,
-            transformOrigin: "50% 50% -40px",
-            duration: 0.85,
-            ease: "power4.out",
-            stagger: 0.04,
-            delay: 0.04
-        });
-
-        gsap.to(titleEl, {
-            y: -5,
-            rotationY: 2.5,
-            rotationX: -1.5,
-            duration: 4.2,
-            ease: "sine.inOut",
-            repeat: -1,
-            yoyo: true,
-            delay: 1.1
-        });
-
-        // Subtitle: single line, word-grouped
-        if (subtitleEl) {
-            var subText = subtitleEl.textContent || subtitleEl.innerText;
-            var subtitleChars = splitIntoChars(subtitleEl, [subText]);
-            gsap.from(subtitleChars, {
-                x: 150,
-                opacity: 0,
-                duration: 0.7,
-                ease: "power4",
-                stagger: 0.02,
-                delay: 0.4
-            });
-        }
-
-        // Animate search bar
-        if (searchForm) {
-            gsap.fromTo(searchForm, { opacity: 0 }, {
-                opacity: 1,
-                duration: 0.6,
-                ease: "power2.out",
-                delay: 1.0
-            });
-        }
+        splitIntoChars(titleEl, getHeroTitleLines(titleEl));
     }
 
     function startHeroSplitText() {
         if (!document.querySelector('.hero-split-text')) return;
-
-        if (typeof gsap !== 'undefined') {
-            initHeroSplitText();
-            return;
-        }
-
-        var retryCount = 0;
-        var retryInterval = setInterval(function () {
-            retryCount++;
-            if (typeof gsap !== 'undefined') {
-                clearInterval(retryInterval);
-                initHeroSplitText();
-            } else if (retryCount > 50) {
-                clearInterval(retryInterval);
-                initHeroSplitText(); // fallback sem animação, mas com conteúdo visível
-            }
-        }, 100);
+        initHeroSplitText();
     }
 
     window.initHeroSplitText = initHeroSplitText;

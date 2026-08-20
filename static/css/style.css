@@ -684,7 +684,7 @@ section {
     animation: fadeUp 1s forwards 0.3s;
 }
 
-/* Título 3D da home */
+/* Título 3D frontal da home: profundidade sem inclinação lateral. */
 .hero-title-3d {
     position: relative;
     isolation: isolate;
@@ -697,6 +697,7 @@ section {
     perspective: 900px;
     transform-style: preserve-3d;
     letter-spacing: 0;
+    text-wrap: balance;
     text-shadow:
         0 1px 0 #dbe7ff,
         0 2px 0 #b8cbff,
@@ -706,6 +707,9 @@ section {
         0 22px 46px rgba(16, 185, 129, 0.18);
     filter: drop-shadow(0 18px 28px rgba(15, 23, 42, 0.28));
     will-change: transform;
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
 }
 
 .hero-title-3d .hero-line,
@@ -713,7 +717,7 @@ section {
     --hero-shadow-opacity: 1;
     display: block;
     position: relative;
-    transform: rotateX(7deg) rotateY(-7deg) translateZ(0);
+    transform: none;
     transform-style: preserve-3d;
 }
 
@@ -746,7 +750,13 @@ section {
 
 .hero-title-3d .hero-word-3d,
 .hero-title-3d .hero-char-3d {
+    display: inline-block;
+    white-space: nowrap;
     transform-style: preserve-3d;
+}
+
+.hero-title-3d .hero-space-3d {
+    display: inline-block;
 }
 
 .hero-title-3d .hero-char-3d {
@@ -757,6 +767,15 @@ section {
 .hero-subtitle-split {
     color: rgba(255, 255, 255, 0.9);
     perspective: 500px;
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+.hero #home-search-form {
+    opacity: 1;
+    transform: none;
+    animation: none;
 }
 
 .welcome-text {
@@ -938,6 +957,11 @@ section {
     font-size: 1rem;
     box-shadow: var(--shadow-lg);
     width: 100%;
+}
+
+.hero .search-bar input {
+    padding-right: 8.75rem;
+    text-overflow: ellipsis;
 }
 
 .search-bar button {
@@ -2320,11 +2344,7 @@ footer {
     .hero-title-3d {
         font-size: clamp(2rem, 6vw, 3rem) !important;
         margin-bottom: 1.5rem !important;
-        transform: translateY(30px) rotateX(10deg);
-    }
-
-    .hero-title-3d:hover {
-        transform: translateY(-5px) rotateX(-2deg) scale(1.02);
+        transform: translateY(30px);
     }
 
     .welcome-text,
@@ -2394,6 +2414,7 @@ footer {
     .search-bar input {
         border-radius: var(--radius-full);
         margin-bottom: 1rem;
+        padding-right: 1.5rem;
     }
 
     .search-input-wrapper {

@@ -128,7 +128,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/project-dropdowns.css') }}" data-static-base-style="true">
 
     <!-- CSS específico é transferido somente quando a página usa o componente. -->
-    {% if request.endpoint == 'faq' %}<link id="faq-css" rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}">{% endif %}
+    {% if request.endpoint in ['faq', 'content_requests'] %}<link id="faq-css" rel="stylesheet" href="{{ url_for('static', filename='css/faq.css') }}">{% endif %}
     {% if request.endpoint == 'contact' %}<link id="contact-css" rel="stylesheet" href="{{ url_for('static', filename='css/contact.css') }}">{% endif %}
     {% if request.endpoint == 'about' %}
     <link id="about-css" rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}">
@@ -264,7 +264,7 @@
                     </li>
                     <li class="dropdown">
                         <a href="#"
-                            class="dropdown-toggle {% if request.endpoint in ['about', 'faq', 'contact', 'terms_of_service', 'privacy_policy'] or request.path in ['/about', '/sobre', '/faq', '/contact', '/contato', '/termos-de-uso', '/politica-de-privacidade'] %}active{% endif %}"
+                            class="dropdown-toggle {% if request.endpoint in ['about', 'faq', 'contact', 'content_requests', 'terms_of_service', 'privacy_policy'] or request.path in ['/about', '/sobre', '/faq', '/contact', '/contato', '/solicitacoes', '/termos-de-uso', '/politica-de-privacidade'] %}active{% endif %}"
                             data-nav-group="support">
                             <i class="fas fa-question-circle"></i> Ajuda & Suporte <i
                                 class="fas fa-chevron-down dropdown-arrow"></i>
@@ -461,7 +461,8 @@
     {% if request.endpoint in ['home', 'about'] %}<script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>{% endif %}
     {% if request.endpoint == 'profile' %}<script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>{% endif %}
     {% if request.endpoint == 'faq' %}<script src="{{ url_for('static', filename='js/faq.js') }}"></script>{% endif %}
-    {% if request.endpoint in ['category', 'subcategory'] %}<script src="{{ url_for('static', filename='js/feature-modals.js') }}"></script>{% endif %}
+    <!-- Disponível desde a primeira carga para funcionar também apó navegação dinâmica. -->
+    <script src="{{ url_for('static', filename='js/feature-modals.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
     {% if request.endpoint == 'plans' %}<script src="{{ url_for('static', filename='js/plan-prices.js') }}"></script>{% endif %}

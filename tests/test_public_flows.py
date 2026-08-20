@@ -1,3 +1,4 @@
+import app as app_module
 from app import Category, ContentRequest, Post, User, app, db
 
 
@@ -45,7 +46,7 @@ def test_homepage_and_post_expose_technical_seo(client):
 
     home = client.get("/")
     assert home.status_code == 200
-    assert "Bem-vindo ao Mundo da Informática" in home.get_data(as_text=True)
+    assert "Encontre o arquivo certo para o reparo!" in home.get_data(as_text=True)
     assert "application/ld+json" in home.get_data(as_text=True)
 
     detail = client.get(f"/bios/{post_slug}")
@@ -55,6 +56,38 @@ def test_homepage_and_post_expose_technical_seo(client):
     assert "a" * 64 in body
     assert 'rel="canonical"' in body
     assert "TechArticle" in body
+
+
+def test_home_search_copy_and_footer_year(client):
+    body = client.get("/").get_data(as_text=True)
+    current_year = app_module.datetime.now(app_module.BRAZIL_TZ).year
+
+    assert "Encontre o arquivo certo para o reparo!" in body
+    assert "BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa." in body
+    assert "Busca por modelo e placa" not in body
+    assert "Recursos técnicos centralizados" not in body
+    assert "Histórico conforme seu plano" not in body
+    assert f'data-current-year>{current_year}</span>' in body
+
+
+def test_content_requests_reuses_faq_visual_standard(client):
+    faq_body = client.get("/faq").get_data(as_text=True)
+    requests_body = client.get("/solicitacoes").get_data(as_text=True)
+
+    assert 'class="faq-hero"' in faq_body
+    assert 'class="faq-hero request-hero"' in requests_body
+    assert 'id="faq-css"' in requests_body
+
+
+def test_feature_modal_controller_is_available_from_first_page_load(client):
+    home_body = client.get("/").get_data(as_text=True)
+    categories_body = client.get("/categorias").get_data(as_text=True)
+
+    expected_script = 'static/js/feature-modals.js'
+    assert expected_script in home_body
+    assert 'data-static-base-script="true"' in home_body
+    assert 'class="feature-item" data-feature="verified"' in categories_body
+    assert 'id="feature-modal"' in categories_body
 
 
 def test_anonymous_suggestion_is_stored(client):

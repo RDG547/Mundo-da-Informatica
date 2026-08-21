@@ -2124,6 +2124,16 @@ def coerce_int(value, default=0):
     except (TypeError, ValueError):
         return default
 
+
+def parse_float(value: object) -> float:
+    """Converte entrada numérica validada sem aceitar ``None`` silenciosamente."""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        raise TypeError('Valor numérico inválido.')
+    if isinstance(value, str) and not value.strip():
+        raise ValueError('Valor numérico vazio.')
+    return float(value)
+
+
 def category_public_url_value(category):
     return category.slug or generate_slug(category.name)
 
@@ -14010,9 +14020,9 @@ def admin_datasheet_provider_update(provider_id):
     config.html_discovery_enabled = html_enabled
     config.priority = max(1, min(999, coerce_int(payload.get('priority'), config.priority)))
     try:
-        threshold_value = float(payload.get('auto_publish_threshold', config.auto_publish_threshold))
-        interval_value = float(payload.get('interval_seconds', config.interval_seconds))
-        timeout_value = float(payload.get('timeout_seconds', config.timeout_seconds))
+        threshold_value = parse_float(payload.get('auto_publish_threshold', config.auto_publish_threshold))
+        interval_value = parse_float(payload.get('interval_seconds', config.interval_seconds))
+        timeout_value = parse_float(payload.get('timeout_seconds', config.timeout_seconds))
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Threshold, intervalo ou timeout inválido.'}), 400
     config.auto_publish_threshold = max(0.5, min(1.0, threshold_value))

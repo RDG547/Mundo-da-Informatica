@@ -11,6 +11,7 @@ from typing import Callable, Iterator
 from urllib.parse import urljoin, urlparse
 
 import requests
+from werkzeug.http import parse_options_header
 
 
 class StorageError(RuntimeError):
@@ -51,8 +52,27 @@ def _validate_public_http_url(url: str, allowed_hosts: set[str] | None = None) -
 
 def sanitize_download_name(value: str, fallback: str = "arquivo-tecnico") -> str:
     basename = os.path.basename(str(value or "").replace("\\", "/"))
-    safe = "".join(char for char in basename if char.isalnum() or char in "._- ()")
+    # Mantém o nome original do provider (incluindo espaços, colchetes e
+    # identificadores U3/U6), removendo apenas controles e caracteres
+    # incompatíveis com nomes de arquivo nos principais sistemas.
+    forbidden = set('/\\:*?"<>|')
+    safe = "".join(
+        char for char in basename
+        if char not in forbidden and ord(char) >= 32 and ord(char) != 127
+    )
     return safe.strip(". ")[:180] or fallback
+
+
+def filename_from_content_disposition(value: str | None) -> str | None:
+    """Extrai com segurança o nome original informado pelo storage."""
+    if not value:
+        return None
+    try:
+        _disposition, options = parse_options_header(value)
+    except (TypeError, ValueError):
+        return None
+    filename = options.get("filename")
+    return sanitize_download_name(filename) if filename else None
 
 
 class HttpStorageProvider:
@@ -123,7 +143,10 @@ class HttpStorageProvider:
             )
 
         forwarded = {}
-        for key in ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified"):
+        for key in (
+            "Content-Type", "Content-Length", "Content-Range", "Content-Disposition",
+            "Accept-Ranges", "ETag", "Last-Modified",
+        ):
             if response.headers.get(key):
                 forwarded[key] = response.headers[key]
         forwarded.setdefault("Content-Type", "application/octet-stream")

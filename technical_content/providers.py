@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 from typing import Any
-from urllib.parse import quote
 
 import requests
 
@@ -59,112 +58,6 @@ class BaseProvider:
         if response is None:
             raise ProviderError("O provedor oficial não retornou uma resposta.")
         return response
-
-
-class MouserProvider(BaseProvider):
-    name = "mouser"
-    endpoint = "https://api.mouser.com/api/v1/search/partnumber"
-
-    def __init__(self, api_key: str, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.api_key = api_key
-
-    def lookup(self, part_number: str) -> list[ProviderRecord]:
-        if not self.api_key:
-            raise ProviderError("Mouser API não configurada.")
-        response = self._request(
-            "POST",
-            f"{self.endpoint}?apiKey={quote(self.api_key)}",
-            json={"SearchByPartRequest": {"mouserPartNumber": part_number, "partSearchOptions": "None"}},
-            timeout=self.timeout,
-        )
-        if response.status_code == 429:
-            raise ProviderError("Limite da Mouser API atingido.")
-        try:
-            response.raise_for_status()
-            parts = response.json().get("SearchResults", {}).get("Parts", [])
-        except (requests.RequestException, ValueError, AttributeError) as exc:
-            raise ProviderError("Resposta inválida da Mouser API.") from exc
-        return [ProviderRecord(
-            source=self.name,
-            part_number=str(item.get("ManufacturerPartNumber") or part_number),
-            manufacturer=item.get("Manufacturer"),
-            title=str(item.get("Description") or item.get("ManufacturerPartNumber") or part_number),
-            description=item.get("Description"),
-            datasheet_url=item.get("DataSheetUrl"),
-            product_url=item.get("ProductDetailUrl"),
-            raw=item,
-        ) for item in parts[:20]]
-
-
-class DigiKeyProvider(BaseProvider):
-    name = "digikey"
-    token_endpoint = "https://api.digikey.com/v1/oauth2/token"
-    product_endpoint = "https://api.digikey.com/products/v4/search/{part}/productdetails"
-
-    def __init__(self, client_id: str, client_secret: str, account_id: str | None = None, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.account_id = account_id
-        self._token: str | None = None
-        self._expires_at = 0.0
-
-    def _access_token(self) -> str:
-        if self._token and self._expires_at > time.time() + 30:
-            return self._token
-        if not self.client_id or not self.client_secret:
-            raise ProviderError("DigiKey API não configurada.")
-        response = self._request(
-            "POST",
-            self.token_endpoint,
-            data={"client_id": self.client_id, "client_secret": self.client_secret, "grant_type": "client_credentials"},
-            timeout=self.timeout,
-        )
-        try:
-            response.raise_for_status()
-            payload = response.json()
-            self._token = payload["access_token"]
-            self._expires_at = time.time() + int(payload.get("expires_in", 600))
-        except (requests.RequestException, ValueError, KeyError) as exc:
-            raise ProviderError("Falha na autenticação da DigiKey API.") from exc
-        return self._token
-
-    def lookup(self, part_number: str) -> list[ProviderRecord]:
-        headers = {
-            "Authorization": f"Bearer {self._access_token()}",
-            "X-DIGIKEY-Client-Id": self.client_id,
-            "X-DIGIKEY-Locale-Site": "BR",
-            "X-DIGIKEY-Locale-Language": "en",
-        }
-        if self.account_id:
-            headers["X-DIGIKEY-Account-Id"] = self.account_id
-        response = self._request(
-            "GET",
-            self.product_endpoint.format(part=quote(part_number, safe="")),
-            headers=headers,
-            timeout=self.timeout,
-        )
-        if response.status_code == 429:
-            raise ProviderError("Limite da DigiKey API atingido.")
-        try:
-            response.raise_for_status()
-            data = response.json().get("Product", response.json())
-        except (requests.RequestException, ValueError, AttributeError) as exc:
-            raise ProviderError("Resposta inválida da DigiKey API.") from exc
-        manufacturer = data.get("Manufacturer", {})
-        description = data.get("Description", {})
-        record = ProviderRecord(
-            source=self.name,
-            part_number=str(data.get("ManufacturerProductNumber") or part_number),
-            manufacturer=manufacturer.get("Name") if isinstance(manufacturer, dict) else str(manufacturer or "") or None,
-            title=str(description.get("ProductDescription") if isinstance(description, dict) else description or part_number),
-            description=description.get("DetailedDescription") if isinstance(description, dict) else None,
-            datasheet_url=data.get("DatasheetUrl"),
-            product_url=data.get("ProductUrl"),
-            raw=data,
-        )
-        return [record]
 
 
 class LicensedJsonFeedProvider(BaseProvider):

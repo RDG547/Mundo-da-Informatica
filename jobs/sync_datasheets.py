@@ -4,4 +4,4 @@ from jobs.sync_configured_sources import run
 
 
 if __name__ == "__main__":
-    print(run({"Mouser", "DigiKey", "Feed licenciado"}))
+    print(run({"Feed licenciado"}))

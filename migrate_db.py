@@ -454,6 +454,12 @@ def migrate() -> None:
             "plan_snapshot": "VARCHAR(20)",
         })
         applied += update_legacy_public_copy(connection)
+        if inspect(connection).has_table("content_sources"):
+            removed_api_sources = connection.execute(text(
+                "DELETE FROM content_sources WHERE provider_type = 'api'"
+            ))
+            if removed_api_sources.rowcount and removed_api_sources.rowcount > 0:
+                applied += removed_api_sources.rowcount
 
         if inspect(connection).has_table("posts"):
             connection.execute(text("CREATE INDEX IF NOT EXISTS ix_posts_board_code ON posts (board_code)"))

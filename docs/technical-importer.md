@@ -16,8 +16,8 @@ estruturam o acervo sem transformar o `Post` legado em um objeto incompatível:
 ## Central administrativa
 
 Acesse **Painel Admin → Conteúdo Técnico** (`/admin/tools/import`). A Central
-aceita arquivos individuais, múltiplos arquivos, ZIP, CSV, lista de part
-numbers e links diretos de storage.
+aceita arquivos individuais, múltiplos arquivos, ZIP, CSV e links diretos de
+storage.
 
 Cada entrada gera preview com título, categoria, fabricante, modelo, placa,
 revisão, tipo, chip, SHA-256, fonte, storage e confiança. O admin pode editar,
@@ -41,34 +41,37 @@ O percentual é determinístico pelo SHA-256/ID. Um mesmo item não alterna de
 grupo entre execuções. Fontes nível D (usuários) nunca são autopublicadas.
 Mesmo no modo completo, a fonte precisa autorizar separadamente metadados e
 distribuição. O admin pode ligar/desligar cada fonte, ajustar a confiança,
-definir os part numbers monitorados e disparar uma sincronização pela Central.
+definir os termos ou códigos monitorados e disparar uma sincronização pela
+Central.
 
 ## Fontes
 
-Mouser e DigiKey usam APIs oficiais e são opcionais. Dell, HP, Lenovo e feeds
-licenciados ficam preparados como fontes opt-in; não há scraping nem browser
-automation.
+Dell, HP, Lenovo e feeds licenciados ficam preparados como fontes opt-in; não
+há scraping nem automação de navegador.
 
-- Mouser: crie uma conta, solicite a Search API e configure
-  `MOUSER_API_KEY`. A API oficial documenta até 30 chamadas/minuto e 1.000/dia.
-- DigiKey: crie uma Organization App no Developer Portal e configure
-  `DIGIKEY_CLIENT_ID`, `DIGIKEY_CLIENT_SECRET` e, se aplicável,
-  `DIGIKEY_ACCOUNT_ID`.
 - Dell: os catálogos oficiais são CABs assinados. A ingestão em lote requer um
   extrator CAB no worker ou conversão autorizada para feed JSON.
 - HP: use HPIA/CMSL ou um feed oficialmente licenciado.
 - Lenovo: use Update Retriever/repositório oficialmente gerenciado ou feed
   licenciado.
 
+Um **feed licenciado** não é um site público raspado. É um endpoint fornecido
+por fabricante, distribuidor ou parceiro com autorização contratual para
+consultar metadados e, separadamente, distribuir arquivos. O endpoint deve
+entregar JSON no formato normalizado do motor e pode exigir um Bearer token.
+Configure a URL em `LICENSED_FEED_URL` e o token em
+`LICENSED_FEED_TOKEN`. A existência do feed não concede automaticamente
+permissão de espelhamento: o admin ainda controla metadados, distribuição,
+atribuição e publicação em cada fonte.
+
 Credenciais ficam somente em secrets do ambiente. O painel grava apenas a
-lista de part numbers e as políticas da fonte. Para Dell/HP/Lenovo, os jobs
-aceitam um feed JSON normalizado autorizado; o CAB oficial da Dell é detectado
-e recusado pelo conector JSON até existir um worker com extrator CAB.
+lista de termos/códigos monitorados e as políticas da fonte. Para
+Dell/HP/Lenovo, os jobs aceitam um feed JSON normalizado autorizado; o CAB
+oficial da Dell é detectado e recusado pelo conector JSON até existir um
+worker com extrator CAB.
 
 Referências oficiais:
 
-- https://www.mouser.com/api-search/
-- https://developer.digikey.com/products/product-information-v4/productsearch/productdetails
 - https://www.dell.com/support/kbdoc/en-us/000122176/driver-pack-catalog
 - https://support.hp.com/gb-en/document/ish_7636709-7636753-16
 

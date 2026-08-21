@@ -363,7 +363,13 @@
         if (event.key === 'Escape' && activeState) closeState(activeState);
     });
     window.addEventListener('resize', () => activeState && positionMenu(activeState), { passive: true });
-    document.addEventListener('scroll', () => activeState && closeState(activeState), true);
+    document.addEventListener('scroll', (event) => {
+        if (!activeState) return;
+        // Rolar a própria lista não pode fechá-la. Apenas uma rolagem do
+        // documento ou de outro contêiner encerra o dropdown.
+        if (event.target === activeState.menu || activeState.menu.contains(event.target)) return;
+        closeState(activeState);
+    }, true);
 
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {

@@ -1,9 +1,9 @@
 """Sincroniza fontes oficiais/licenciadas configuradas, sem scraping.
 
-Mouser e DigiKey usam suas APIs oficiais. Dell, HP, Lenovo e a fonte
-licenciada exigem um feed JSON normalizado autorizado; catálogos CAB ou
-páginas HTML não são tratados como API. Cada registro vira um preview e
-somente a política central decide se pode ser autopublicado.
+Dell, HP, Lenovo e a fonte licenciada exigem um feed JSON normalizado e
+autorizado; catálogos CAB ou páginas HTML não são tratados como API. Cada
+registro vira um preview e somente a política central decide se pode ser
+autopublicado.
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ from app import (
     TechnicalResource,
     _append_import_item,
     _merge_parsed_metadata,
-    _provider_records,
     app,
     db,
     get_technical_automation_settings,
@@ -66,9 +65,6 @@ def _part_numbers(source: ContentSource) -> list[str]:
 
 
 def _records_for_source(source: ContentSource, part_number: str):
-    if source.name.lower() in {"mouser", "digikey"}:
-        return _provider_records(source.name.lower(), part_number)
-
     env_names = SOURCE_FEED_ENV.get(source.name)
     if not env_names:
         raise ProviderError("Esta fonte não possui conector oficial configurado.")

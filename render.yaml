@@ -34,8 +34,6 @@ services:
         value: /opt/render/project/src/data/technical-imports
       - key: TECHNICAL_LOCAL_STORAGE_DIR
         value: /opt/render/project/src/data/technical-files
-      # APIs técnicas (Mouser/DigiKey) são opcionais e devem ser cadastradas
-      # como secrets no Dashboard, nunca neste arquivo.
       # IDs de produto são identificadores públicos; chaves e webhooks devem
       # ser configurados como secrets no painel do Render.
       - key: STRIPE_PRODUCT_PREMIUM

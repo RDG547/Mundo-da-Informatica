@@ -27,8 +27,13 @@ from app import (
 )
 from migrate_db import migrate
 from technical_content.parsers import ArchiveSafetyError, inspect_zip_archive, normalize_board_code, parse_technical_filename
-from technical_content.providers import DigiKeyProvider, MouserProvider, ProviderRecord
-from technical_content.storage import HttpStorageProvider, UnsafeStorageUrl, UpstreamDownload
+from technical_content.providers import LicensedJsonFeedProvider, ProviderRecord
+from technical_content.storage import (
+    HttpStorageProvider,
+    UnsafeStorageUrl,
+    UpstreamDownload,
+    sanitize_download_name,
+)
 
 
 def _login(client, user_id):
@@ -170,6 +175,7 @@ def test_proxy_streams_range_without_exposing_provider_and_records_plan(client, 
                 'Content-Length': '4',
                 'Content-Range': 'bytes 2-5/8',
                 'Accept-Ranges': 'bytes',
+                'Content-Disposition': 'attachment; filename="Lenovo Z460 [U3] BIOS.bin"',
             },
             iterator=iter([b'2345']),
             close=lambda: None,
@@ -182,11 +188,19 @@ def test_proxy_streams_range_without_exposing_provider_and_records_plan(client, 
     assert response.headers['Content-Range'] == 'bytes 2-5/8'
     assert 'Location' not in response.headers
     assert 'mediafire' not in response.get_data(as_text=True).lower()
+    assert "Lenovo%20Z460%20%5BU3%5D%20BIOS.bin" in response.headers['Content-Disposition']
     assert seen['range'] == 'bytes=2-5'
     with app.app_context():
         record = Download.query.one()
+        stored_file = db.session.get(TechnicalFile, file_id)
         assert record.technical_file_id == file_id
         assert record.plan_snapshot == 'vip'
+        assert stored_file.display_filename == 'Lenovo Z460 [U3] BIOS.bin'
+        assert stored_file.original_filename == 'Lenovo Z460 [U3] BIOS.bin'
+
+
+def test_download_name_preserves_provider_identifiers():
+    assert sanitize_download_name('Lenovo Z460 [U3] BIOS + EC.bin') == 'Lenovo Z460 [U3] BIOS + EC.bin'
 
 
 def test_full_automation_requires_trusted_enabled_source_and_threshold(tmp_path):
@@ -287,38 +301,27 @@ class _FakeProviderSession:
         return self.post(url, **kwargs) if method.upper() == 'POST' else self.get(url, **kwargs)
 
 
-def test_official_part_number_providers_are_parsed_with_mocked_http():
-    mouser_session = _FakeProviderSession(post_payload={
-        'SearchResults': {'Parts': [{
-            'ManufacturerPartNumber': 'TPS51225',
-            'Manufacturer': 'Texas Instruments',
-            'Description': 'Power controller',
-            'DataSheetUrl': 'https://example.test/tps51225.pdf',
-            'ProductDetailUrl': 'https://example.test/product/tps51225',
-        }]},
-    })
-    mouser = MouserProvider('secret', session=mouser_session)
-    mouser_record = mouser.lookup('TPS51225')[0]
-    assert mouser_record.part_number == 'TPS51225'
-    assert mouser_record.datasheet_url.endswith('.pdf')
-    assert mouser_session.calls[0][2]['json']['SearchByPartRequest']['mouserPartNumber'] == 'TPS51225'
-
-    digikey_session = _FakeProviderSession(
-        post_payload={'access_token': 'token', 'expires_in': 600},
-        get_payload={'Product': {
-            'ManufacturerProductNumber': 'RT8206A',
-            'Manufacturer': {'Name': 'Richtek'},
-            'Description': {'ProductDescription': 'PWM controller', 'DetailedDescription': 'Controller detail'},
-            'DatasheetUrl': 'https://example.test/rt8206a.pdf',
-            'ProductUrl': 'https://example.test/product/rt8206a',
-        }},
+def test_licensed_feed_provider_is_parsed_with_mocked_http():
+    session = _FakeProviderSession(get_payload={'items': [{
+        'part_number': 'LA-8131P',
+        'manufacturer': 'Parceiro autorizado',
+        'title': 'BIOS E430C',
+        'description': 'Metadados licenciados',
+        'datasheet_url': 'https://storage.example.test/la-8131p.pdf',
+        'product_url': 'https://catalog.example.test/la-8131p',
+    }]})
+    provider = LicensedJsonFeedProvider(
+        'Feed licenciado',
+        'https://catalog.example.test/api',
+        'secret',
+        session=session,
     )
-    digikey = DigiKeyProvider('client', 'secret', session=digikey_session)
-    digikey_record = digikey.lookup('RT8206A')[0]
-    assert digikey_record.manufacturer == 'Richtek'
-    get_call = digikey_session.calls[1]
-    assert get_call[2]['headers']['Authorization'] == 'Bearer token'
-    assert get_call[2]['headers']['X-DIGIKEY-Locale-Site'] == 'BR'
+    record = provider.lookup('LA-8131P')[0]
+    assert record.part_number == 'LA-8131P'
+    assert record.manufacturer == 'Parceiro autorizado'
+    call = session.calls[0]
+    assert call[2]['params']['q'] == 'LA-8131P'
+    assert call[2]['headers']['Authorization'] == 'Bearer secret'
 
 
 def test_storage_proxy_rejects_private_dns_resolution(monkeypatch):
@@ -376,33 +379,33 @@ def test_configured_source_sync_creates_admin_preview_without_real_network(monke
 
     with app.app_context():
         ensure_default_content_sources()
-        source = ContentSource.query.filter_by(name='Mouser').one()
+        source = ContentSource.query.filter_by(name='Feed licenciado').one()
         source.config_json = json.dumps({'part_numbers': ['TPS51225']})
         db.session.commit()
         SiteConfig.set_value('technical_import_enabled', True, 'bool', is_public=False)
         SiteConfig.set_value('technical_automation_mode', 'semi', is_public=False)
 
     record = ProviderRecord(
-        source='mouser',
+        source='Feed licenciado',
         part_number='TPS51225',
         manufacturer='Texas Instruments',
         title='Power controller',
         description='Official metadata',
         datasheet_url='https://example.test/tps51225.pdf',
         product_url='https://example.test/product/tps51225',
-        raw={'external_id': 'mouser-TPS51225', 'version': '1'},
+        raw={'external_id': 'licensed-TPS51225', 'version': '1'},
     )
     monkeypatch.setattr(sync_configured_sources, '_records_for_source', lambda _source, _part: [record])
-    result = sync_configured_sources.run({'Mouser'})
+    result = sync_configured_sources.run({'Feed licenciado'})
     assert result['items'] == 1
     assert result['published'] == 0
     with app.app_context():
         job = ImportJob.query.one()
         item = ImportItem.query.one()
-        source = ContentSource.query.filter_by(name='Mouser').one()
+        source = ContentSource.query.filter_by(name='Feed licenciado').one()
         assert job.job_type == 'source_sync' and job.status == 'reviewing'
         assert item.status == 'pending_review'
-        assert item.normalized_data()['external_id'] == 'mouser-TPS51225'
+        assert item.normalized_data()['external_id'] == 'licensed-TPS51225'
         assert source.last_sync_at is not None
 
 

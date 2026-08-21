@@ -35,9 +35,9 @@
             <label>
                 <span>Modo de publicação</span>
                 <select name="technical_automation_mode" class="form-control">
-                    <option value="off" {% if automation.mode == 'off' %}selected{% endif %}>Desativada</option>
-                    <option value="semi" {% if automation.mode == 'semi' %}selected{% endif %}>Semiautomática — exige aprovação</option>
-                    <option value="full" {% if automation.mode == 'full' %}selected{% endif %}>Automática — conforme percentual e elegibilidade</option>
+                    <option value="off" data-icon="fas fa-ban" {% if automation.mode == 'off' %}selected{% endif %}>Desativada</option>
+                    <option value="semi" data-icon="fas fa-user-check" {% if automation.mode == 'semi' %}selected{% endif %}>Semiautomática — exige aprovação</option>
+                    <option value="full" data-icon="fas fa-robot" {% if automation.mode == 'full' %}selected{% endif %}>Automática — conforme percentual e elegibilidade</option>
                 </select>
             </label>
             <label>
@@ -156,11 +156,14 @@
                 <label><input type="checkbox" data-source-field="attribution_required" {% if source.attribution_required %}checked{% endif %}> Exige atribuição da fonte</label>
                 <label>Nível
                     <select data-source-field="trust_level" class="form-control">
-                        {% for level in ['A', 'B', 'C', 'D'] %}<option value="{{ level }}" {% if source.trust_level == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+                        <option value="A" data-icon="fas fa-certificate" {% if source.trust_level == 'A' %}selected{% endif %}>A — fonte oficial</option>
+                        <option value="B" data-icon="fas fa-file-contract" {% if source.trust_level == 'B' %}selected{% endif %}>B — fonte licenciada</option>
+                        <option value="C" data-icon="fas fa-user-shield" {% if source.trust_level == 'C' %}selected{% endif %}>C — revisão administrativa</option>
+                        <option value="D" data-icon="fas fa-users" {% if source.trust_level == 'D' %}selected{% endif %}>D — contribuição da comunidade</option>
                     </select>
                 </label>
                 {% if source.provider_type not in ['manual', 'contribution'] %}
-                <label>Part numbers monitorados
+                <label>Termos ou códigos monitorados
                     <textarea rows="3" data-source-field="part_numbers" placeholder="Um por linha">{{ source.configuration().get('part_numbers', [])|join('\n') }}</textarea>
                 </label>
                 {% endif %}
@@ -217,7 +220,6 @@
         <form id="technicalImportForm" enctype="multipart/form-data">
             <div class="import-kind-grid">
                 <label><input type="radio" name="type" value="files" checked><span><i class="fas fa-file-upload"></i><strong>Arquivos / ZIP / CSV</strong><small>Até 50 uploads por job</small></span></label>
-                <label><input type="radio" name="type" value="part_numbers"><span><i class="fas fa-barcode"></i><strong>Part Numbers</strong><small>Mouser ou DigiKey</small></span></label>
                 <label><input type="radio" name="type" value="link"><span><i class="fas fa-link"></i><strong>Link de storage</strong><small>URL direta privada</small></span></label>
             </div>
             <div data-import-fields="files">
@@ -225,15 +227,11 @@
                     <input type="file" name="files" multiple accept=".bin,.rom,.fd,.cap,.hex,.efi,.bio,.pdf,.brd,.bdv,.fz,.sch,.zip,.rar,.7z,.cab,.exe,.msi,.inf,.txt,.csv,.json">
                 </label>
             </div>
-            <div data-import-fields="part_numbers" hidden>
-                <label>Provedor<select name="provider" class="form-control"><option value="mouser">Mouser</option><option value="digikey">DigiKey</option></select></label>
-                <label>Part numbers<textarea name="part_numbers" rows="5" placeholder="RT8206A&#10;TPS51225"></textarea></label>
-            </div>
             <div data-import-fields="link" hidden>
                 <label>Link direto do arquivo<input type="url" name="provider_url" placeholder="https://storage.exemplo/arquivo.bin"></label>
                 <label>Nome do arquivo<input type="text" name="filename" placeholder="Lenovo-LA-5751P-U3.bin"></label>
             </div>
-            <label>Origem técnica<select name="source" class="form-control">{% for source in sources if source.enabled %}<option value="{{ source.name }}">{{ source.name }} (nível {{ source.trust_level }})</option>{% endfor %}</select></label>
+            <label>Origem técnica<select name="source" class="form-control">{% for source in sources if source.enabled %}<option value="{{ source.name }}" data-icon="{{ 'fas fa-user-edit' if source.provider_type == 'manual' else ('fas fa-hands-helping' if source.provider_type == 'contribution' else ('fas fa-certificate' if source.provider_type == 'official' else 'fas fa-file-contract')) }}">{{ source.name }} (nível {{ source.trust_level }})</option>{% endfor %}</select></label>
             <div class="modal-actions"><button type="button" class="btn-admin btn-admin-outline" data-close-modal>Cancelar</button><button type="submit" class="btn-admin btn-admin-primary"><i class="fas fa-search"></i> Analisar e gerar previews</button></div>
         </form>
     </div>
@@ -247,7 +245,7 @@
             <label>Código da placa<input name="board_code"></label><label>Revisão<input name="board_revision"></label>
             <label>Tipo<input name="file_type"></label><label>Chip/posição<input name="chip_position"></label>
             <label class="wide">Link direto privado<input type="url" name="provider_url"></label>
-            <label>Política<select name="distribution_policy"><option value="local_allowed">local_allowed</option><option value="external_storage_allowed">external_storage_allowed</option><option value="remote_only">remote_only</option><option value="metadata_only">metadata_only</option><option value="manual_review">manual_review</option><option value="unknown">unknown</option></select></label>
+            <label>Política<select name="distribution_policy"><option value="local_allowed" data-icon="fas fa-hdd">Arquivo local autorizado</option><option value="external_storage_allowed" data-icon="fas fa-cloud">Storage externo autorizado</option><option value="remote_only" data-icon="fas fa-link">Somente origem remota</option><option value="metadata_only" data-icon="fas fa-tags">Somente metadados</option><option value="manual_review" data-icon="fas fa-user-check">Revisão manual</option><option value="unknown" data-icon="fas fa-question-circle">Política não definida</option></select></label>
             <label>Confiança<input type="number" min="0" max="100" name="confidence"></label>
         </div><div class="modal-actions"><button type="button" class="btn-admin btn-admin-outline" data-close-edit>Cancelar</button><button class="btn-admin btn-admin-success" type="submit">Salvar preview</button></div></form>
     </div>

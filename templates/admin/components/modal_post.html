@@ -310,6 +310,18 @@
         display: block;
     }
 
+    /* A categoria fica junto ao rodapé do primeiro passo. Abrir para cima
+       mantém todas as opções dentro do modal e acima dos botões de ação. */
+    #addPostModal .icon-select[data-source-select="postCategory"] .icon-select-menu {
+        top: auto !important;
+        bottom: calc(100% + 8px) !important;
+    }
+
+    #addPostModal .form-group:has(.icon-select.open) {
+        position: relative;
+        z-index: 10030;
+    }
+
     .icon-select-option {
         align-items: center;
         background: transparent;

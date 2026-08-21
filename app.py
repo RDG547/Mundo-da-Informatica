@@ -78,8 +78,12 @@ from technical_content.parsers import (
     parse_technical_filename,
     sha256_file,
 )
-from technical_content.providers import DigiKeyProvider, MouserProvider, ProviderError
-from technical_content.storage import HttpStorageProvider, StorageError, sanitize_download_name
+from technical_content.storage import (
+    HttpStorageProvider,
+    StorageError,
+    filename_from_content_disposition,
+    sanitize_download_name,
+)
 from sqlalchemy.exc import IntegrityError
 try:
     import firebase_admin
@@ -675,16 +679,17 @@ def get_download_file_type_labels() -> list[str]:
 
 
 def get_category_icon(category_or_name: Any) -> str:
-    if hasattr(category_or_name, 'icon') and getattr(category_or_name, 'icon', None):
-        return getattr(category_or_name, 'icon')
-
     if hasattr(category_or_name, 'name'):
         category_name = getattr(category_or_name, 'name', '')
     else:
         category_name = str(category_or_name or '')
 
     slug = generate_slug(category_name)
-    return CATEGORY_ICON_FALLBACKS.get(slug, 'fas fa-folder')
+    if slug in CATEGORY_ICON_FALLBACKS:
+        return CATEGORY_ICON_FALLBACKS[slug]
+    if hasattr(category_or_name, 'icon') and getattr(category_or_name, 'icon', None):
+        return getattr(category_or_name, 'icon')
+    return 'fas fa-folder'
 
 
 def get_default_category_subcategories() -> dict[str, list[str]]:
@@ -3427,14 +3432,13 @@ def ensure_default_content_sources():
     defaults = (
         ('Admin', 'manual', 'C', False, True, True, True, False),
         ('Contribuição de usuário', 'contribution', 'D', False, True, False, False, True),
-        ('Mouser', 'api', 'B', False, True, False, False, True),
-        ('DigiKey', 'api', 'B', False, True, False, False, True),
         ('Dell', 'official', 'A', True, True, False, False, True),
         ('HP', 'official', 'A', True, True, False, False, True),
         ('Lenovo', 'official', 'A', True, True, False, False, True),
         ('Feed licenciado', 'licensed', 'B', False, True, False, False, True),
     )
-    changed = False
+    removed = ContentSource.query.filter_by(provider_type='api').delete(synchronize_session=False)
+    changed = bool(removed)
     for name, provider_type, trust, auto, metadata, distribution, mirror, attribution in defaults:
         if ContentSource.query.filter_by(name=name).first():
             continue
@@ -3652,21 +3656,6 @@ def _analyze_uploaded_file(job, upload):
         job, parsed, source_name=original_name, temp_path=path,
         file_hash=sha256_file(path), raw={'filename': original_name},
     )]
-
-
-def _provider_records(provider_name, part_number):
-    provider_name = str(provider_name or '').lower()
-    if provider_name == 'mouser':
-        provider = MouserProvider(os.environ.get('MOUSER_API_KEY', ''))
-    elif provider_name == 'digikey':
-        provider = DigiKeyProvider(
-            os.environ.get('DIGIKEY_CLIENT_ID', ''),
-            os.environ.get('DIGIKEY_CLIENT_SECRET', ''),
-            os.environ.get('DIGIKEY_ACCOUNT_ID') or None,
-        )
-    else:
-        raise ValueError('Provedor não suportado. Use Mouser ou DigiKey.')
-    return provider.lookup(part_number)
 
 
 def _create_board_from_metadata(metadata):
@@ -5296,9 +5285,17 @@ def _deliver_technical_file(technical_file):
         flash(message, 'error')
         return redirect(url_for('post', post_id=technical_file.post_id))
 
-    _record_successful_download(technical_file, period, http_status=upstream.status_code)
     headers = dict(upstream.headers)
-    headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    upstream_filename = filename_from_content_disposition(headers.pop('Content-Disposition', None))
+    if upstream_filename:
+        filename = upstream_filename
+        technical_file.display_filename = upstream_filename
+        technical_file.original_filename = upstream_filename
+    _record_successful_download(technical_file, period, http_status=upstream.status_code)
+    ascii_filename = filename.encode('ascii', 'ignore').decode('ascii') or 'arquivo-tecnico'
+    headers['Content-Disposition'] = (
+        f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{quote(filename, safe="")}'
+    )
     headers['X-Content-Type-Options'] = 'nosniff'
     headers['Cache-Control'] = 'private, no-store'
     response = Response(upstream.iterator, status=upstream.status_code, headers=headers, direct_passthrough=True)
@@ -12571,36 +12568,6 @@ def admin_technical_import_analyze():
                 job.error_count += 1
 
         payload = request.get_json(silent=True) or request.form.to_dict()
-        if job_type in {'part_number', 'part_numbers', 'provider'}:
-            part_numbers = payload.get('part_numbers') or payload.get('part_number') or ''
-            if isinstance(part_numbers, str):
-                part_numbers = [part.strip() for part in re.split(r'[,;\n]+', part_numbers) if part.strip()]
-            provider_name = str(payload.get('provider') or 'mouser').lower()
-            for part_number in list(part_numbers)[:100]:
-                try:
-                    records = _provider_records(provider_name, sanitize_input(str(part_number))[:160])
-                    for record in records:
-                        metadata = _merge_parsed_metadata(record.part_number, {
-                            'manufacturer': record.manufacturer,
-                            'model': record.part_number,
-                            'part_number': record.part_number,
-                            'file_type': 'Datasheet',
-                            'source_provider': record.source,
-                            'source_url': record.product_url,
-                            'provider_url': record.datasheet_url,
-                            'distribution_policy': 'remote_only' if record.datasheet_url else 'metadata_only',
-                            'license_status': 'official_metadata',
-                            'title': record.title,
-                            'description': record.description,
-                            'confidence': 90,
-                        })
-                        created_items.append(_append_import_item(
-                            job, metadata, source_name=record.part_number, raw={'provider': record.source},
-                        ))
-                except (ProviderError, ValueError) as exc:
-                    errors.append(f'{part_number}: {exc}')
-                    job.error_count += 1
-
         if job_type in {'link', 'links'}:
             link_items = payload.get('items') or []
             if isinstance(link_items, str):

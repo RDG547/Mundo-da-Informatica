@@ -34,6 +34,46 @@ services:
         value: /opt/render/project/src/data/technical-imports
       - key: TECHNICAL_LOCAL_STORAGE_DIR
         value: /opt/render/project/src/data/technical-files
+      - key: ENABLE_DATASHEET_ENGINE
+        value: "true"
+      - key: ENABLE_DATASHEET_AUTO_PUBLISH
+        value: "false"
+      - key: DISABLE_ALL_DATASHEET_AUTOMATION
+        value: "false"
+      - key: ENABLE_SOURCE_PARTS
+        value: "true"
+      - key: ENABLE_ALLDATASHEET_API
+        value: "false"
+      - key: ENABLE_ALLDATASHEET_HTML
+        value: "false"
+      - key: ENABLE_DATASHEETS_COM_API
+        value: "false"
+      - key: ENABLE_DATASHEETS_COM_HTML
+        value: "false"
+      - key: SOURCE_PARTS_API_URL
+        value: https://api.source.parts/v1
+      - key: SOURCE_PARTS_USER_AGENT
+        value: MundoDaInformatica/1.0 (contato: suporte@mundodainformatica.com)
+      - key: SOURCE_PARTS_API_KEY
+        sync: false
+      - key: ALLDATASHEET_API_KEY
+        sync: false
+      - key: ALLDATASHEET_API_URL
+        sync: false
+      - key: ALLDATASHEET_API_AUTH_HEADER
+        sync: false
+      - key: ALLDATASHEET_API_QUERY_PARAMETER
+        sync: false
+      - key: DATASHEETS_COM_API_KEY
+        sync: false
+      - key: MANUFACTURER_DATASHEET_FEED_URL
+        sync: false
+      - key: MANUFACTURER_DATASHEET_FEED_TOKEN
+        sync: false
+      - key: LICENSED_DATASHEET_FEED_URL
+        sync: false
+      - key: LICENSED_DATASHEET_FEED_TOKEN
+        sync: false
       # IDs de produto são identificadores públicos; chaves e webhooks devem
       # ser configurados como secrets no painel do Render.
       - key: STRIPE_PRODUCT_PREMIUM

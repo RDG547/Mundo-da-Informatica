@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="datasheet-page datasheet-detail-page">
+    <section class="datasheet-hero datasheet-detail-hero">
+        <div class="datasheet-hero-icon"><i class="fas fa-microchip"></i></div>
+        <p class="datasheet-kicker">{{ component.category or 'Componente eletrônico' }}</p>
+        <h1>{{ component.part_number }}</h1>
+        <p>{{ component.manufacturer or 'Fabricante não informado' }}{% if component.package %} · {{ component.package }}{% endif %}</p>
+    </section>
+
+    <div class="datasheet-container datasheet-detail-layout">
+        <article class="datasheet-main-card">
+            <header class="datasheet-component-header">
+                <div>
+                    <span class="datasheet-verified"><i class="fas fa-shield-halved"></i> Dados consolidados e revisados</span>
+                    <h2>{{ component.title_ptbr }}</h2>
+                    <p>{{ component.description_ptbr or 'Ficha técnica estruturada a partir de fontes autorizadas.' }}</p>
+                </div>
+                <div class="datasheet-score"><strong>{{ (component.confidence * 100)|round|int }}%</strong><span>confiança</span></div>
+            </header>
+
+            <section class="datasheet-spec-section">
+                <h2><i class="fas fa-list-check"></i> Especificações</h2>
+                <dl class="datasheet-spec-grid">
+                    <div><dt>Part number</dt><dd>{{ component.part_number }}</dd></div>
+                    <div><dt>Fabricante</dt><dd>{{ component.manufacturer or 'Não informado' }}</dd></div>
+                    <div><dt>Categoria</dt><dd>{{ component.category or 'Não informada' }}</dd></div>
+                    <div><dt>Subcategoria</dt><dd>{{ component.subcategory or 'Não informada' }}</dd></div>
+                    <div><dt>Encapsulamento</dt><dd>{{ component.package or 'Não informado' }}</dd></div>
+                    <div><dt>Ciclo de vida</dt><dd>{{ component.lifecycle_status or 'Não informado' }}</dd></div>
+                    {% for name, value in component.specifications().items() %}<div><dt>{{ name }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+                </dl>
+            </section>
+
+            {% if documents %}
+            <section class="datasheet-document-section">
+                <h2><i class="fas fa-file-pdf"></i> Documentos</h2>
+                <div class="datasheet-document-list">
+                    {% for document, source_config in documents %}
+                    <div class="datasheet-document-row">
+                        <div><strong>{{ document.document_title }}</strong><span>{{ [document.revision, document.document_date, document.language, (document.pages|string ~ ' páginas') if document.pages else none]|select|join(' · ') or 'Documento técnico' }}</span><small>Fonte: {{ source_config.display_name }}</small></div>
+                        {% if source_config.pdf_stream_allowed and source_config.written_permission_confirmed and document.distribution_policy in ['stream_allowed', 'mirror_allowed'] %}
+                        <a href="{{ url_for('download_datasheet_document', document_id=document.id) }}" data-action="download"><i class="fas fa-download"></i> Baixar PDF</a>
+                        {% else %}<span class="datasheet-reference-only"><i class="fas fa-lock"></i> Documento ainda não disponível para download interno</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% else %}
+            <section class="datasheet-document-section">
+                <h2><i class="fas fa-file-pdf"></i> Documentos</h2>
+                <p class="datasheet-reference-only"><i class="fas fa-lock"></i> Documento ainda não disponível para download interno.</p>
+            </section>
+            {% endif %}
+        </article>
+
+        <aside class="datasheet-side-column">
+            <section>
+                <h2><i class="fas fa-code-branch"></i> Identificadores</h2>
+                <p class="datasheet-part-copy"><code>{{ component.part_number }}</code></p>
+                {% if component.aliases %}<div class="datasheet-aliases">{% for alias in component.aliases %}<span>{{ alias.alias }}</span>{% endfor %}</div>{% else %}<p>Nenhum alias confirmado.</p>{% endif %}
+            </section>
+            <section>
+                <h2><i class="fas fa-laptop-medical"></i> Placas relacionadas</h2>
+                {% for link in board_links %}<a class="datasheet-board-link" href="{{ url_for('hardware_board_detail', slug=link.board.slug) }}"><strong>{{ link.board.board_code }}</strong><span>{{ [link.reference_designator, link.board.device_model]|select|join(' · ') or 'Ver placa' }}</span></a>{% else %}<p>Nenhuma placa relacionada foi confirmada.</p>{% endfor %}
+            </section>
+            {% if attribution_names %}<section><h2><i class="fas fa-certificate"></i> Atribuição</h2><p>Metadados consolidados com contribuição de {{ attribution_names|join(', ') }}.</p></section>{% endif %}
+        </aside>
+    </div>
+
+    {% if related_components %}
+    <section class="datasheet-related datasheet-container">
+        <header class="datasheet-section-title"><div><i class="fas fa-layer-group"></i><span><strong>Componentes relacionados</strong><small>Itens da mesma categoria</small></span></div></header>
+        <div class="datasheet-grid compact">{% for item in related_components %}<article class="datasheet-card"><span class="datasheet-category">{{ item.category }}</span><h2><a href="{{ url_for('datasheet_component_detail', slug=item.slug) }}">{{ item.part_number }}</a></h2><p>{{ item.manufacturer or 'Fabricante não informado' }}</p><a class="datasheet-card-action" href="{{ url_for('datasheet_component_detail', slug=item.slug) }}">Ver datasheet</a></article>{% endfor %}</div>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

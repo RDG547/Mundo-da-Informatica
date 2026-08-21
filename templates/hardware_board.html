@@ -39,6 +39,22 @@
                 {% else %}<div class="technical-empty"><i class="fas fa-folder-open"></i><h3>Nenhum recurso publicado</h3><p>Esta placa já está catalogada e aguarda recursos revisados.</p></div>{% endfor %}
             </div>
         </section>
+        {% if component_links %}
+        <section class="board-resources board-components">
+            <div class="section-title"><i class="fas fa-microchip"></i><div><h2>Componentes e datasheets</h2><p>{{ component_links|length }} componente(s) relacionado(s)</p></div></div>
+            <div class="board-resource-grid">
+                {% for link in component_links %}
+                <article>
+                    <span class="resource-type"><i class="fas fa-file-pdf"></i> Datasheet{% if link.verified %} verificado{% endif %}</span>
+                    <h3><a href="{{ url_for('datasheet_component_detail', slug=link.component.slug) }}">{{ link.component.part_number }}</a></h3>
+                    <p>{{ [link.component.manufacturer, link.component.category, link.component.package]|select|join(' · ') or 'Componente catalogado.' }}</p>
+                    {% if link.reference_designator %}<div class="resource-meta"><span><i class="fas fa-location-crosshairs"></i> {{ link.reference_designator }}</span></div>{% endif %}
+                    <div class="resource-files"><a href="{{ url_for('datasheet_component_detail', slug=link.component.slug) }}" class="resource-download"><i class="fas fa-book-open"></i><span>Ver ficha técnica</span></a></div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
     </div>
 </main>
 {% endblock %}

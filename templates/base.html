@@ -5,7 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% set site_name = site_configs.get('site_name', 'Mundo da Informática') %}
-    {% if post is defined and post %}
+    {% if component is defined and component %}
+        {% set page_title = component.part_number ~ ' Datasheet' ~ (' — ' ~ component.manufacturer if component.manufacturer else '') ~ ' | ' ~ site_name %}
+        {% set page_description = component.description_ptbr or ('Consulte especificações, encapsulamento, fabricante e documentos técnicos revisados do componente ' ~ component.part_number ~ '.') %}
+    {% elif post is defined and post %}
         {% set post_kind = post.file_type or (post.category_rel.name if post.category_rel else post.category_str) or 'recurso técnico' %}
         {% set post_target = post.model or post.title %}
         {% set page_title = post.seo_title or (post_kind ~ ' ' ~ post_target ~ (' ' ~ post.board_code if post.board_code else '') ~ ' | ' ~ site_name) %}
@@ -22,7 +25,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="canonical" href="{{ canonical_url }}">
     <meta property="og:site_name" content="{{ site_name }}">
-    {% if post is defined and post %}
+    {% if component is defined and component %}
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:title" content="{{ page_title }}">
+    <meta property="og:description" content="{{ page_description|striptags|truncate(180, True) }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ page_title }}">
+    <meta name="twitter:description" content="{{ page_description|striptags|truncate(180, True) }}">
+    {% elif post is defined and post %}
     {% set social_category = post.category_rel.name if post.category_rel else (post.category_str or 'Geral') %}
     {% set social_title = '[' ~ social_category ~ '] ' ~ post.title %}
     {% set social_image = get_image_url(post.image_url, folder='posts', default='default.jpg') %}
@@ -53,6 +64,23 @@
             {'@type': 'WebSite', '@id': public_base_url ~ '/#website', 'name': site_name, 'url': public_base_url,
              'publisher': {'@id': public_base_url ~ '/#organization'},
              'potentialAction': {'@type': 'SearchAction', 'target': public_base_url ~ '/pesquisa?q={search_term_string}', 'query-input': 'required name=search_term_string'}}
+        ]
+    } | tojson }}</script>
+    {% elif component is defined and component %}
+    <script type="application/ld+json">{{ {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {'@type': 'TechArticle', 'headline': component.title_ptbr, 'description': page_description|striptags,
+             'datePublished': component.published_at.isoformat() if component.published_at else none,
+             'dateModified': component.updated_at.isoformat() if component.updated_at else none,
+             'mainEntityOfPage': canonical_url, 'about': {'@type': 'Product', 'name': component.part_number,
+             'manufacturer': {'@type': 'Organization', 'name': component.manufacturer} if component.manufacturer else none},
+             'publisher': {'@type': 'Organization', 'name': site_name, 'url': public_base_url}},
+            {'@type': 'BreadcrumbList', 'itemListElement': [
+                {'@type': 'ListItem', 'position': 1, 'name': 'Início', 'item': public_base_url ~ '/'},
+                {'@type': 'ListItem', 'position': 2, 'name': 'Datasheets', 'item': public_base_url ~ url_for('datasheet_library')},
+                {'@type': 'ListItem', 'position': 3, 'name': component.part_number, 'item': canonical_url}
+            ]}
         ]
     } | tojson }}</script>
     {% elif post is defined and post %}
@@ -137,6 +165,7 @@
     {% if request.endpoint in ['category', 'subcategory', 'all_categories', 'posts'] %}<link id="category-css" rel="stylesheet" href="{{ url_for('static', filename='css/category.css') }}">{% endif %}
     {% if request.endpoint == 'profile' %}<link id="profile-css" rel="stylesheet" href="{{ url_for('static', filename='css/profile-page.css') }}">{% endif %}
     {% if request.endpoint in ['post', 'post_by_slug'] %}<link id="post-detail-css" rel="stylesheet" href="{{ url_for('static', filename='css/post-detail.css') }}">{% endif %}
+    {% if request.endpoint in ['datasheet_library', 'datasheet_component_detail'] %}<link id="datasheet-css" rel="stylesheet" href="{{ url_for('static', filename='css/datasheet-public.css') }}">{% endif %}
     {% if request.endpoint == 'plans' %}<link id="plans-css" rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}">{% endif %}
 
     {% block extra_css %}{% endblock %}

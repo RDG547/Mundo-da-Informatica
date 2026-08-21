@@ -84,6 +84,14 @@ from technical_content.storage import (
     filename_from_content_disposition,
     sanitize_download_name,
 )
+from technical_content.datasheets.normalization import (
+    looks_like_part_number,
+    normalize_manufacturer as normalize_component_manufacturer,
+    normalize_part_number as normalize_component_part_number,
+    safe_slug as datasheet_safe_slug,
+)
+from technical_content.datasheets.policy import persistence_policy, publication_policy
+from technical_content.datasheets.services.translation import generate_component_summary, translate_specifications
 from sqlalchemy.exc import IntegrityError
 try:
     import firebase_admin
@@ -399,6 +407,14 @@ app.config['TECHNICAL_IMPORT_TEMP_DIR'] = os.environ.get(
 app.config['TECHNICAL_LOCAL_STORAGE_DIR'] = os.environ.get(
     'TECHNICAL_LOCAL_STORAGE_DIR', os.path.join(app.instance_path, 'technical-files')
 )
+app.config['ENABLE_DATASHEET_ENGINE'] = os.environ.get('ENABLE_DATASHEET_ENGINE', 'true').lower() in ('true', '1', 'yes', 'on')
+app.config['ENABLE_SOURCE_PARTS'] = os.environ.get('ENABLE_SOURCE_PARTS', 'true').lower() in ('true', '1', 'yes', 'on')
+app.config['ENABLE_ALLDATASHEET_API'] = os.environ.get('ENABLE_ALLDATASHEET_API', 'false').lower() in ('true', '1', 'yes', 'on')
+app.config['ENABLE_ALLDATASHEET_HTML'] = os.environ.get('ENABLE_ALLDATASHEET_HTML', 'false').lower() in ('true', '1', 'yes', 'on')
+app.config['ENABLE_DATASHEETS_COM_API'] = os.environ.get('ENABLE_DATASHEETS_COM_API', 'false').lower() in ('true', '1', 'yes', 'on')
+app.config['ENABLE_DATASHEETS_COM_HTML'] = os.environ.get('ENABLE_DATASHEETS_COM_HTML', 'false').lower() in ('true', '1', 'yes', 'on')
+app.config['ENABLE_DATASHEET_AUTO_PUBLISH'] = os.environ.get('ENABLE_DATASHEET_AUTO_PUBLISH', 'false').lower() in ('true', '1', 'yes', 'on')
+app.config['DISABLE_ALL_DATASHEET_AUTOMATION'] = os.environ.get('DISABLE_ALL_DATASHEET_AUTOMATION', 'false').lower() in ('true', '1', 'yes', 'on')
 
 # Inicializar as extensões
 db = SQLAlchemy(app)
@@ -2922,6 +2938,233 @@ class FileContribution(db.Model):
     contributor = db.relationship('User', foreign_keys=[user_id], backref=db.backref('file_contributions', lazy=True))
     import_item = db.relationship('ImportItem', foreign_keys=[import_item_id], backref=db.backref('contribution', uselist=False))
 
+
+class DatasheetProviderConfig(db.Model):
+    """Política persistente de um provider, sem armazenar credenciais."""
+    __tablename__ = 'datasheet_provider_configs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider_name = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    display_name = db.Column(db.String(120), nullable=False)
+    provider_kind = db.Column(db.String(30), nullable=False, default='api')
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    mode = db.Column(db.String(30), nullable=False, default='semi_automatic')
+    priority = db.Column(db.Integer, nullable=False, default=100)
+    api_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    html_discovery_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    search_strategy = db.Column(db.String(30), nullable=False, default='priority_fallback')
+    auto_publish_threshold = db.Column(db.Float, nullable=False, default=0.95)
+    max_items_per_job = db.Column(db.Integer, nullable=False, default=25)
+    interval_seconds = db.Column(db.Float, nullable=False, default=1.0)
+    fallback_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    retention_days = db.Column(db.Integer, nullable=False, default=30)
+    metadata_persistence_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    public_republish_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    pdf_reference_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    pdf_stream_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    pdf_mirror_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    attribution_required = db.Column(db.Boolean, nullable=False, default=True)
+    written_permission_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    source_policy_allows_html_discovery = db.Column(db.Boolean, nullable=False, default=False)
+    permission_reference = db.Column(db.String(500), nullable=True)
+    permission_notes = db.Column(db.Text, nullable=True)
+    robots_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    robots_last_checked_at = db.Column(db.DateTime, nullable=True)
+    terms_last_checked_at = db.Column(db.DateTime, nullable=True)
+    terms_version_or_date = db.Column(db.String(120), nullable=True)
+    requests_per_minute = db.Column(db.Integer, nullable=False, default=30)
+    requests_per_hour = db.Column(db.Integer, nullable=False, default=500)
+    requests_per_day = db.Column(db.Integer, nullable=False, default=5000)
+    requests_per_month = db.Column(db.Integer, nullable=False, default=0)
+    timeout_seconds = db.Column(db.Float, nullable=False, default=15.0)
+    retry_limit = db.Column(db.Integer, nullable=False, default=2)
+    provider_status = db.Column(db.String(40), nullable=False, default='not_configured')
+    consecutive_failures = db.Column(db.Integer, nullable=False, default=0)
+    circuit_open_until = db.Column(db.DateTime, nullable=True)
+    credits_remaining = db.Column(db.Integer, nullable=True)
+    last_credit_check_at = db.Column(db.DateTime, nullable=True)
+    last_success_at = db.Column(db.DateTime, nullable=True)
+    last_error_at = db.Column(db.DateTime, nullable=True)
+    last_error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ElectronicComponent(db.Model):
+    __tablename__ = 'electronic_components'
+
+    id = db.Column(db.Integer, primary_key=True)
+    manufacturer = db.Column(db.String(160), nullable=True, index=True)
+    normalized_manufacturer = db.Column(db.String(160), nullable=False, default='', index=True)
+    part_number = db.Column(db.String(160), nullable=False, index=True)
+    normalized_part_number = db.Column(db.String(160), nullable=False, index=True)
+    title_ptbr = db.Column(db.String(300), nullable=False)
+    description_ptbr = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(120), nullable=True)
+    subcategory = db.Column(db.String(120), nullable=True)
+    package = db.Column(db.String(120), nullable=True)
+    lifecycle_status = db.Column(db.String(80), nullable=True)
+    confidence = db.Column(db.Float, nullable=False, default=0.0)
+    verification_status = db.Column(db.String(30), nullable=False, default='needs_review')
+    specifications_json = db.Column(db.Text, nullable=True)
+    slug = db.Column(db.String(200), nullable=False, unique=True, index=True)
+    is_published = db.Column(db.Boolean, nullable=False, default=False)
+    publication_mode = db.Column(db.String(20), nullable=False, default='manual')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    published_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('normalized_manufacturer', 'normalized_part_number', name='uq_component_identity'),
+    )
+
+    def specifications(self):
+        try:
+            value = json.loads(self.specifications_json or '{}')
+            return value if isinstance(value, dict) else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+
+class ComponentAlias(db.Model):
+    __tablename__ = 'component_aliases'
+
+    id = db.Column(db.Integer, primary_key=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('electronic_components.id'), nullable=False, index=True)
+    alias = db.Column(db.String(160), nullable=False)
+    normalized_alias = db.Column(db.String(160), nullable=False, unique=True, index=True)
+    confirmed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    component = db.relationship('ElectronicComponent', backref=db.backref('aliases', lazy=True, cascade='all, delete-orphan'))
+
+
+class ComponentSourceRecord(db.Model):
+    __tablename__ = 'component_source_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('electronic_components.id'), nullable=False, index=True)
+    provider = db.Column(db.String(80), nullable=False, index=True)
+    external_id = db.Column(db.String(255), nullable=True)
+    field_name = db.Column(db.String(120), nullable=False)
+    field_value_hash = db.Column(db.String(64), nullable=False)
+    license_policy = db.Column(db.String(80), nullable=False, default='metadata_only')
+    first_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    confidence = db.Column(db.Float, nullable=False, default=0.0)
+    persisted_value_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    component = db.relationship('ElectronicComponent', backref=db.backref('source_records', lazy=True, cascade='all, delete-orphan'))
+
+
+class DatasheetDocument(db.Model):
+    __tablename__ = 'datasheet_documents'
+
+    id = db.Column(db.Integer, primary_key=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('electronic_components.id'), nullable=False, index=True)
+    document_title = db.Column(db.String(300), nullable=False)
+    revision = db.Column(db.String(80), nullable=True)
+    document_date = db.Column(db.String(40), nullable=True)
+    language = db.Column(db.String(20), nullable=True)
+    pages = db.Column(db.Integer, nullable=True)
+    source_provider = db.Column(db.String(80), nullable=False)
+    source_reference = db.Column(db.Text, nullable=True)
+    distribution_policy = db.Column(db.String(50), nullable=False, default='metadata_only')
+    pdf_storage_provider = db.Column(db.String(40), nullable=True)
+    pdf_internal_reference = db.Column(db.Text, nullable=True)
+    sha256 = db.Column(db.String(64), nullable=True, index=True)
+    file_size = db.Column(db.BigInteger, nullable=True)
+    verification_status = db.Column(db.String(30), nullable=False, default='needs_review')
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    component = db.relationship('ElectronicComponent', backref=db.backref('documents', lazy=True, cascade='all, delete-orphan'))
+
+
+class BoardComponent(db.Model):
+    __tablename__ = 'board_components'
+
+    id = db.Column(db.Integer, primary_key=True)
+    board_id = db.Column(db.Integer, db.ForeignKey('hardware_boards.id'), nullable=False, index=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('electronic_components.id'), nullable=False, index=True)
+    reference_designator = db.Column(db.String(50), nullable=True)
+    source_resource_id = db.Column(db.Integer, db.ForeignKey('technical_resources.id'), nullable=True)
+    verified = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    board = db.relationship('HardwareBoard', backref=db.backref('component_links', lazy=True, cascade='all, delete-orphan'))
+    component = db.relationship('ElectronicComponent', backref=db.backref('board_links', lazy=True, cascade='all, delete-orphan'))
+    __table_args__ = (db.UniqueConstraint('board_id', 'component_id', 'reference_designator', name='uq_board_component_ref'),)
+
+
+class DatasheetImportQueue(db.Model):
+    __tablename__ = 'datasheet_import_queue'
+
+    id = db.Column(db.Integer, primary_key=True)
+    part_number = db.Column(db.String(160), nullable=False)
+    normalized_part_number = db.Column(db.String(160), nullable=False, index=True)
+    manufacturer_hint = db.Column(db.String(160), nullable=True)
+    source_board_id = db.Column(db.Integer, db.ForeignKey('hardware_boards.id'), nullable=True, index=True)
+    source_resource_id = db.Column(db.Integer, db.ForeignKey('technical_resources.id'), nullable=True, index=True)
+    priority = db.Column(db.Integer, nullable=False, default=0, index=True)
+    status = db.Column(db.String(40), nullable=False, default='queued', index=True)
+    requested_strategy = db.Column(db.String(30), nullable=False, default='priority_fallback')
+    attempt_count = db.Column(db.Integer, nullable=False, default=0)
+    best_confidence = db.Column(db.Float, nullable=False, default=0.0)
+    selected_provider = db.Column(db.String(80), nullable=True)
+    candidate_count = db.Column(db.Integer, nullable=False, default=0)
+    result_json = db.Column(db.Text, nullable=True)
+    conflict_json = db.Column(db.Text, nullable=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('electronic_components.id'), nullable=True, index=True)
+    requested_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    admin_decision = db.Column(db.String(40), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+
+    component = db.relationship('ElectronicComponent', foreign_keys=[component_id])
+    source_board = db.relationship('HardwareBoard', foreign_keys=[source_board_id])
+
+    def result(self):
+        try:
+            value = json.loads(self.result_json or '{}')
+            return value if isinstance(value, dict) else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+    def conflicts(self):
+        try:
+            value = json.loads(self.conflict_json or '{}')
+            return value if isinstance(value, dict) else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+
+class DatasheetDemand(db.Model):
+    __tablename__ = 'datasheet_demands'
+
+    id = db.Column(db.Integer, primary_key=True)
+    normalized_query = db.Column(db.String(160), nullable=False, unique=True, index=True)
+    display_query = db.Column(db.String(160), nullable=False)
+    request_count = db.Column(db.Integer, nullable=False, default=1)
+    last_requested_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class DatasheetProviderEvent(db.Model):
+    __tablename__ = 'datasheet_provider_events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(80), nullable=False, index=True)
+    normalized_query = db.Column(db.String(160), nullable=False, index=True)
+    status = db.Column(db.String(40), nullable=False, index=True)
+    result_count = db.Column(db.Integer, nullable=False, default=0)
+    selected = db.Column(db.Boolean, nullable=False, default=False)
+    exact_match = db.Column(db.Boolean, nullable=False, default=False)
+    confidence = db.Column(db.Float, nullable=True)
+    conflict = db.Column(db.Boolean, nullable=False, default=False)
+    duration_ms = db.Column(db.Integer, nullable=False, default=0)
+    message = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
 # Modelo de Favoritos
 class Favorite(db.Model):
     __tablename__ = 'favorites'
@@ -3456,6 +3699,532 @@ def ensure_default_content_sources():
         changed = True
     if changed:
         db.session.commit()
+
+
+DATASHEET_SETTING_KEYS = {
+    'datasheet_engine_enabled',
+    'datasheet_auto_publish_enabled',
+    'datasheet_automation_paused',
+    'datasheet_search_strategy',
+    'datasheet_max_providers',
+}
+
+DATASHEET_PROVIDER_ENV_FLAGS = {
+    'source_parts': 'ENABLE_SOURCE_PARTS',
+    'alldatasheet_api': 'ENABLE_ALLDATASHEET_API',
+    'alldatasheet_html': 'ENABLE_ALLDATASHEET_HTML',
+    'datasheets_com_api': 'ENABLE_DATASHEETS_COM_API',
+    'datasheets_com_html': 'ENABLE_DATASHEETS_COM_HTML',
+    'manufacturer_official': 'ENABLE_DATASHEET_ENGINE',
+    'licensed_provider': 'ENABLE_DATASHEET_ENGINE',
+}
+
+DATASHEET_CREDENTIAL_ENV = {
+    'source_parts': ('SOURCE_PARTS_API_KEY', 'SOURCE_PARTS_USER_AGENT'),
+    'alldatasheet_api': (
+        'ALLDATASHEET_API_KEY', 'ALLDATASHEET_API_URL',
+        'ALLDATASHEET_API_AUTH_HEADER', 'ALLDATASHEET_API_QUERY_PARAMETER',
+    ),
+    'alldatasheet_html': ('ALLDATASHEET_HTML_SEARCH_URL', 'DATASHEET_DISCOVERY_USER_AGENT'),
+    'datasheets_com_api': ('DATASHEETS_COM_API_KEY',),
+    'datasheets_com_html': ('DATASHEETS_COM_HTML_SEARCH_URL', 'DATASHEET_DISCOVERY_USER_AGENT'),
+    'manufacturer_official': ('MANUFACTURER_DATASHEET_FEED_URL',),
+    'licensed_provider': ('LICENSED_DATASHEET_FEED_URL',),
+}
+
+
+def get_datasheet_settings():
+    strategy = str(SiteConfig.get_value('datasheet_search_strategy', 'priority_fallback') or 'priority_fallback')
+    if strategy not in {'priority_fallback', 'parallel_compare', 'maximum_precision'}:
+        strategy = 'priority_fallback'
+    environment_kill_switch = bool(app.config.get('DISABLE_ALL_DATASHEET_AUTOMATION'))
+    configured_paused = bool(SiteConfig.get_value('datasheet_automation_paused', False))
+    return {
+        'feature_enabled': bool(app.config.get('ENABLE_DATASHEET_ENGINE')),
+        'configured_enabled': bool(SiteConfig.get_value('datasheet_engine_enabled', True)),
+        'auto_publish_environment': bool(app.config.get('ENABLE_DATASHEET_AUTO_PUBLISH')),
+        'auto_publish_configured': bool(SiteConfig.get_value('datasheet_auto_publish_enabled', False)),
+        'auto_publish_enabled': bool(
+            app.config.get('ENABLE_DATASHEET_AUTO_PUBLISH')
+            and SiteConfig.get_value('datasheet_auto_publish_enabled', False)
+            and not environment_kill_switch
+            and not configured_paused
+        ),
+        'paused': environment_kill_switch or configured_paused,
+        'environment_kill_switch': environment_kill_switch,
+        'strategy': strategy,
+        'max_providers': max(1, min(10, coerce_int(SiteConfig.get_value('datasheet_max_providers', 2), 2))),
+    }
+
+
+def ensure_default_datasheet_providers():
+    """Cria providers conservadores; nunca ativa HTML nem direitos por suposição."""
+    defaults = (
+        ('source_parts', 'Source Parts', 'api', 1, True, True, 0.95, 60, 1000, 5000, 0),
+        ('manufacturer_official', 'Fabricantes oficiais', 'official', 2, True, True, 0.97, 30, 500, 2000, 0),
+        ('alldatasheet_api', 'AllDatasheet API', 'api', 3, False, True, 0.97, 20, 200, 1000, 0),
+        ('alldatasheet_html', 'AllDatasheet HTML Discovery', 'html', 4, False, False, 0.98, 6, 60, 200, 0),
+        ('datasheets_com_api', 'Datasheets.com API', 'api', 5, False, True, 0.95, 60, 500, 5000, 5000),
+        ('datasheets_com_html', 'Datasheets.com HTML Discovery', 'html', 6, False, False, 0.98, 6, 60, 200, 0),
+        ('licensed_provider', 'Provider licenciado', 'licensed', 7, False, True, 0.95, 30, 500, 2000, 0),
+    )
+    changed = False
+    for name, display, kind, priority, enabled, api_enabled, threshold, per_minute, per_hour, per_day, per_month in defaults:
+        if DatasheetProviderConfig.query.filter_by(provider_name=name).first():
+            continue
+        db.session.add(DatasheetProviderConfig(
+            provider_name=name,
+            display_name=display,
+            provider_kind=kind,
+            enabled=enabled,
+            mode='semi_automatic',
+            priority=priority,
+            api_enabled=api_enabled,
+            html_discovery_enabled=False,
+            auto_publish_threshold=threshold,
+            metadata_persistence_allowed=False,
+            public_republish_allowed=False,
+            pdf_reference_allowed=False,
+            pdf_stream_allowed=False,
+            pdf_mirror_allowed=False,
+            attribution_required=True,
+            requests_per_minute=per_minute,
+            requests_per_hour=per_hour,
+            requests_per_day=per_day,
+            requests_per_month=per_month,
+            provider_status='not_configured',
+        ))
+        changed = True
+    if changed:
+        db.session.commit()
+
+
+def datasheet_provider_credentials_status(config):
+    required = DATASHEET_CREDENTIAL_ENV.get(config.provider_name, ())
+    configured = all((os.environ.get(key) or '').strip() for key in required)
+    # Feeds normalizados podem ser públicos e, portanto, não exigem token.
+    return {
+        'configured': configured,
+        'required_env': list(required),
+    }
+
+
+def _provider_environment_enabled(config):
+    flag = DATASHEET_PROVIDER_ENV_FLAGS.get(config.provider_name, 'ENABLE_DATASHEET_ENGINE')
+    return bool(app.config.get(flag))
+
+
+def build_configured_datasheet_providers(configs=None):
+    from technical_content.datasheets.providers import (
+        AllDatasheetApiProvider,
+        AllDatasheetHtmlProvider,
+        DatasheetsComApiProvider,
+        DatasheetsComHtmlProvider,
+        LicensedDatasheetProvider,
+        ManufacturerProvider,
+        SourcePartsProvider,
+    )
+    from technical_content.datasheets.services.resolver import ConfiguredProvider
+
+    configs = configs or DatasheetProviderConfig.query.order_by(DatasheetProviderConfig.priority.asc()).all()
+    result = []
+    for config in configs:
+        if not _provider_environment_enabled(config):
+            continue
+        common = {
+            'timeout': config.timeout_seconds,
+            'retry_limit': config.retry_limit,
+            'requests_per_minute': config.requests_per_minute,
+            'requests_per_hour': config.requests_per_hour,
+            'requests_per_day': config.requests_per_day,
+            'requests_per_month': config.requests_per_month,
+            'minimum_interval': config.interval_seconds,
+        }
+        if config.provider_name == 'source_parts':
+            provider = SourcePartsProvider(
+                os.environ.get('SOURCE_PARTS_API_KEY', ''),
+                os.environ.get('SOURCE_PARTS_USER_AGENT', ''),
+                base_url=os.environ.get('SOURCE_PARTS_API_URL', 'https://api.source.parts/v1'),
+                **common,
+            )
+        elif config.provider_name == 'alldatasheet_api':
+            provider = AllDatasheetApiProvider(
+                os.environ.get('ALLDATASHEET_API_KEY', ''),
+                os.environ.get('ALLDATASHEET_API_URL', ''),
+                os.environ.get('ALLDATASHEET_API_AUTH_HEADER', ''),
+                query_parameter=os.environ.get('ALLDATASHEET_API_QUERY_PARAMETER', ''),
+                **common,
+            )
+        elif config.provider_name == 'alldatasheet_html':
+            provider = AllDatasheetHtmlProvider(
+                os.environ.get('ALLDATASHEET_HTML_SEARCH_URL', ''),
+                os.environ.get('DATASHEET_DISCOVERY_USER_AGENT', ''),
+                robots_confirmed=config.robots_allowed,
+                **common,
+            )
+        elif config.provider_name == 'datasheets_com_api':
+            provider = DatasheetsComApiProvider(
+                os.environ.get('DATASHEETS_COM_API_KEY', ''),
+                endpoint=os.environ.get('DATASHEETS_COM_API_URL', 'https://www.datasheets.com/api/v1/search'),
+                **common,
+            )
+        elif config.provider_name == 'datasheets_com_html':
+            provider = DatasheetsComHtmlProvider(
+                os.environ.get('DATASHEETS_COM_HTML_SEARCH_URL', ''),
+                os.environ.get('DATASHEET_DISCOVERY_USER_AGENT', ''),
+                robots_confirmed=config.robots_allowed,
+                **common,
+            )
+        elif config.provider_name == 'manufacturer_official':
+            provider = ManufacturerProvider(
+                os.environ.get('MANUFACTURER_DATASHEET_FEED_URL', ''),
+                os.environ.get('MANUFACTURER_DATASHEET_FEED_TOKEN', ''),
+                provider_name='manufacturer_official',
+                **common,
+            )
+        else:
+            provider = LicensedDatasheetProvider(
+                os.environ.get('LICENSED_DATASHEET_FEED_URL', ''),
+                os.environ.get('LICENSED_DATASHEET_FEED_TOKEN', ''),
+                provider_name=config.provider_name,
+                **common,
+            )
+        result.append(ConfiguredProvider(provider=provider, config=config))
+    return result
+
+
+def find_component_by_identity(manufacturer, part_number):
+    normalized_part = normalize_component_part_number(part_number)
+    normalized_manufacturer = normalize_component_manufacturer(manufacturer).casefold()
+    query = ElectronicComponent.query.filter_by(normalized_part_number=normalized_part)
+    if normalized_manufacturer:
+        match = query.filter(db.func.lower(ElectronicComponent.normalized_manufacturer) == normalized_manufacturer).first()
+        if match:
+            return match
+    alias = ComponentAlias.query.filter_by(normalized_alias=normalized_part).first()
+    return alias.component if alias else query.first()
+
+
+def enqueue_datasheet(part_number, manufacturer_hint=None, *, priority=0, strategy=None, requested_by=None, board_id=None, resource_id=None):
+    normalized = normalize_component_part_number(part_number)
+    if not normalized:
+        raise ValueError('Informe um part number válido.')
+    existing = DatasheetImportQueue.query.filter(
+        DatasheetImportQueue.normalized_part_number == normalized,
+        DatasheetImportQueue.status.in_(['queued', 'processing', 'found', 'needs_review', 'approved']),
+    ).first()
+    if existing:
+        existing.priority = max(existing.priority, int(priority or 0))
+        db.session.commit()
+        return existing, False
+    settings = get_datasheet_settings()
+    queue_item = DatasheetImportQueue(
+        part_number=str(part_number).strip()[:160],
+        normalized_part_number=normalized,
+        manufacturer_hint=sanitize_input(str(manufacturer_hint or ''))[:160] or None,
+        priority=max(0, min(10000, int(priority or 0))),
+        requested_strategy=strategy if strategy in {'priority_fallback', 'parallel_compare', 'maximum_precision'} else settings['strategy'],
+        requested_by=requested_by,
+        source_board_id=board_id,
+        source_resource_id=resource_id,
+        status='queued',
+    )
+    db.session.add(queue_item)
+    db.session.commit()
+    return queue_item, True
+
+
+def _record_datasheet_resolution(resolution, provider_configs):
+    config_map = {config.provider_name: config for config in provider_configs}
+    selected_provider = resolution.selected.provider if resolution.selected else None
+    for trace in resolution.traces:
+        selected_candidate = next(
+            (candidate for candidate in resolution.candidates if candidate.provider == trace.provider and candidate.provider == selected_provider),
+            None,
+        )
+        db.session.add(DatasheetProviderEvent(
+            provider=trace.provider,
+            normalized_query=resolution.normalized_query,
+            status=trace.status,
+            result_count=trace.result_count,
+            selected=bool(selected_candidate),
+            exact_match=bool(selected_candidate and selected_candidate.exact_match),
+            confidence=selected_candidate.confidence if selected_candidate else None,
+            conflict=bool(resolution.conflicts),
+            duration_ms=trace.duration_ms,
+            message=sanitize_input(str(trace.message or ''))[:500] or None,
+        ))
+        config = config_map.get(trace.provider)
+        if not config:
+            continue
+        if trace.status in {'success', 'not_found'}:
+            config.provider_status = 'online'
+            config.consecutive_failures = 0
+            config.circuit_open_until = None
+            config.last_success_at = datetime.utcnow()
+            config.last_error_message = None
+            if config.provider_kind == 'html':
+                config.robots_last_checked_at = datetime.utcnow()
+        elif trace.status not in {'disabled'}:
+            config.provider_status = trace.status
+            config.consecutive_failures = (config.consecutive_failures or 0) + 1
+            config.last_error_at = datetime.utcnow()
+            config.last_error_message = sanitize_input(str(trace.message or trace.status))[:2000]
+            if config.consecutive_failures >= 3:
+                config.provider_status = 'temporarily_unhealthy'
+                config.circuit_open_until = datetime.utcnow() + timedelta(minutes=15)
+
+
+def process_datasheet_queue_item(queue_item, *, configured_providers=None, provider_configs=None):
+    from technical_content.datasheets.services.resolver import DatasheetResolver
+
+    settings = get_datasheet_settings()
+    if not settings['feature_enabled'] or not settings['configured_enabled']:
+        queue_item.status = 'blocked_by_policy'
+        queue_item.error_message = 'O motor de datasheets está desativado.'
+        queue_item.finished_at = datetime.utcnow()
+        db.session.commit()
+        return queue_item
+    if settings['paused']:
+        queue_item.status = 'blocked_by_policy'
+        queue_item.error_message = 'A automação de datasheets está pausada pelo kill switch.'
+        queue_item.finished_at = datetime.utcnow()
+        db.session.commit()
+        return queue_item
+
+    ensure_default_datasheet_providers()
+    configs = (
+        provider_configs
+        if provider_configs is not None
+        else DatasheetProviderConfig.query.order_by(DatasheetProviderConfig.priority.asc()).all()
+    )
+    configured = (
+        configured_providers
+        if configured_providers is not None
+        else build_configured_datasheet_providers(configs)
+    )
+    if not configured:
+        queue_item.status = 'blocked_by_policy'
+        queue_item.error_message = 'Nenhum provider de datasheet está ativo no ambiente e no painel.'
+        queue_item.finished_at = datetime.utcnow()
+        db.session.commit()
+        return queue_item
+    queue_item.status = 'processing'
+    queue_item.started_at = datetime.utcnow()
+    queue_item.attempt_count = (queue_item.attempt_count or 0) + 1
+    queue_item.error_message = None
+    db.session.commit()
+
+    resolver = DatasheetResolver(configured, global_disabled=False)
+    max_providers = settings['max_providers'] if queue_item.requested_strategy == 'parallel_compare' else None
+    resolution = resolver.resolve(
+        queue_item.part_number,
+        strategy=queue_item.requested_strategy,
+        max_providers=max_providers,
+    )
+    _record_datasheet_resolution(resolution, configs)
+    queue_item.candidate_count = len(resolution.candidates)
+    queue_item.best_confidence = resolution.confidence
+    queue_item.conflict_json = json.dumps(resolution.conflicts, ensure_ascii=False)
+    queue_item.finished_at = datetime.utcnow()
+
+    if not resolution.selected:
+        statuses = {trace.status for trace in resolution.traces}
+        if statuses and statuses <= {'disabled', 'blocked_by_policy', 'not_configured', 'temporarily_unhealthy'}:
+            queue_item.status = 'blocked_by_policy'
+        elif statuses & {'failed', 'rate_limited'}:
+            queue_item.status = 'failed'
+        else:
+            queue_item.status = 'not_found'
+        queue_item.error_message = '; '.join(
+            f'{trace.provider}: {trace.message or trace.status}' for trace in resolution.traces if trace.status not in {'success', 'not_found'}
+        )[:4000] or None
+        db.session.commit()
+        return queue_item
+
+    config_map = {config.provider_name: config for config in configs}
+    selected_config = config_map.get(resolution.selected.provider)
+    if not selected_config:
+        queue_item.status = 'failed'
+        queue_item.error_message = 'A configuração da fonte selecionada não foi encontrada.'
+        db.session.commit()
+        return queue_item
+
+    persistence = persistence_policy(selected_config)
+    candidate_summaries = []
+    for candidate in resolution.candidates:
+        candidate_config = config_map.get(candidate.provider)
+        include_values = bool(candidate_config and persistence_policy(candidate_config).allowed)
+        candidate_summaries.append(candidate.public_summary(include_values=include_values))
+
+    if not persistence.allowed:
+        queue_item.status = 'blocked_by_policy'
+        queue_item.selected_provider = resolution.selected.provider
+        queue_item.result_json = json.dumps({
+            'query': resolution.query,
+            'confidence': resolution.confidence,
+            'provider_candidates': candidate_summaries,
+            'policy_message': persistence.reason,
+        }, ensure_ascii=False)
+        queue_item.error_message = persistence.reason
+        db.session.commit()
+        return queue_item
+
+    selected = resolution.selected.public_summary(include_values=True)
+    selected['specifications'] = translate_specifications(resolution.selected.specifications)
+    queue_item.selected_provider = resolution.selected.provider
+    queue_item.result_json = json.dumps({
+        'query': resolution.query,
+        'confidence': resolution.confidence,
+        'selected': selected,
+        'provider_candidates': candidate_summaries,
+        'traces': [
+            {
+                'provider': trace.provider,
+                'status': trace.status,
+                'result_count': trace.result_count,
+                'duration_ms': trace.duration_ms,
+                'message': trace.message,
+            }
+            for trace in resolution.traces
+        ],
+    }, ensure_ascii=False)
+
+    duplicate = find_component_by_identity(resolution.selected.manufacturer, resolution.selected.part_number)
+    if duplicate:
+        queue_item.component_id = duplicate.id
+        queue_item.status = 'duplicate'
+        queue_item.admin_decision = 'duplicate_detected'
+        db.session.commit()
+        return queue_item
+
+    decision = publication_policy(
+        selected_config,
+        confidence=resolution.confidence,
+        has_conflicts=resolution.has_conflicts,
+        duplicate=False,
+        required_fields_present=bool(resolution.selected.part_number and resolution.selected.manufacturer),
+        global_auto_publish=settings['auto_publish_enabled'],
+    )
+    queue_item.status = decision.status if decision.status in {
+        'needs_review', 'blocked_by_policy', 'duplicate', 'approved'
+    } else 'needs_review'
+    queue_item.error_message = None if queue_item.status == 'needs_review' else decision.reason
+    db.session.commit()
+    if decision.allowed:
+        materialize_datasheet_component(queue_item, reviewer_id=None, publish=True, automatic=True)
+    return queue_item
+
+
+def _unique_component_slug(part_number, manufacturer=None):
+    base = datasheet_safe_slug(part_number)
+    candidate = base
+    counter = 2
+    while ElectronicComponent.query.filter_by(slug=candidate).first():
+        suffix = datasheet_safe_slug(manufacturer) if manufacturer and counter == 2 else str(counter)
+        candidate = f'{base}-{suffix}'[:200]
+        counter += 1
+    return candidate
+
+
+def materialize_datasheet_component(queue_item, *, reviewer_id, publish, automatic=False):
+    payload = queue_item.result()
+    selected = payload.get('selected') if isinstance(payload.get('selected'), dict) else {}
+    if not selected:
+        raise ValueError('O item não possui metadados persistíveis para publicação.')
+    config = DatasheetProviderConfig.query.filter_by(provider_name=queue_item.selected_provider).first()
+    if not config or not config.metadata_persistence_allowed:
+        raise ValueError('A fonte não autoriza persistência dos metadados.')
+    if publish and (not config.public_republish_allowed or not config.written_permission_confirmed):
+        raise ValueError('Registre autorização de republicação pública antes de publicar.')
+
+    part_number = sanitize_input(str(selected.get('part_number') or queue_item.part_number))[:160]
+    manufacturer = sanitize_input(str(selected.get('manufacturer') or queue_item.manufacturer_hint or ''))[:160] or None
+    duplicate = find_component_by_identity(manufacturer, part_number)
+    if duplicate:
+        queue_item.component_id = duplicate.id
+        queue_item.status = 'duplicate'
+        queue_item.admin_decision = 'marked_duplicate'
+        queue_item.reviewed_by = reviewer_id
+        db.session.commit()
+        return duplicate
+
+    specifications = selected.get('specifications') if isinstance(selected.get('specifications'), dict) else {}
+    component = ElectronicComponent(
+        manufacturer=manufacturer,
+        normalized_manufacturer=normalize_component_manufacturer(manufacturer),
+        part_number=part_number,
+        normalized_part_number=normalize_component_part_number(part_number),
+        title_ptbr=f'{part_number} Datasheet' + (f' — {manufacturer}' if manufacturer else ''),
+        description_ptbr=generate_component_summary(part_number, manufacturer, selected.get('category')),
+        category=sanitize_input(str(selected.get('category') or ''))[:120] or None,
+        subcategory=sanitize_input(str(selected.get('subcategory') or ''))[:120] or None,
+        package=sanitize_input(str(selected.get('package') or ''))[:120] or None,
+        lifecycle_status=sanitize_input(str(selected.get('lifecycle_status') or ''))[:80] or None,
+        confidence=max(0.0, min(1.0, float(queue_item.best_confidence or 0))),
+        verification_status='verified_consensus' if not queue_item.conflicts() else 'admin_reviewed',
+        specifications_json=json.dumps(specifications, ensure_ascii=False),
+        slug=_unique_component_slug(part_number, manufacturer),
+        is_published=bool(publish),
+        publication_mode='automatic' if automatic else 'manual',
+        published_at=datetime.utcnow() if publish else None,
+    )
+    db.session.add(component)
+    db.session.flush()
+
+    for candidate in payload.get('provider_candidates', []):
+        if not isinstance(candidate, dict):
+            continue
+        candidate_provider = str(candidate.get('provider') or '')[:80]
+        candidate_config = DatasheetProviderConfig.query.filter_by(provider_name=candidate_provider).first()
+        allowed = bool(candidate_config and candidate_config.metadata_persistence_allowed)
+        for field_name in ('part_number', 'manufacturer', 'category', 'package', 'lifecycle_status', 'datasheet_reference'):
+            value = candidate.get(field_name)
+            if value in (None, ''):
+                continue
+            db.session.add(ComponentSourceRecord(
+                component_id=component.id,
+                provider=candidate_provider,
+                external_id=sanitize_input(str(candidate.get('external_id') or ''))[:255] or None,
+                field_name=field_name,
+                field_value_hash=hashlib.sha256(str(value).encode('utf-8')).hexdigest(),
+                license_policy='public_republish' if candidate_config and candidate_config.public_republish_allowed else 'metadata_only',
+                confidence=max(0.0, min(1.0, float(candidate.get('confidence') or 0))),
+                persisted_value_allowed=allowed,
+            ))
+
+    reference = sanitize_input(str(selected.get('datasheet_reference') or ''))[:2000] or None
+    if reference and config.pdf_reference_allowed:
+        distribution_policy = 'stream_allowed' if config.pdf_stream_allowed else 'reference_only'
+        if config.pdf_mirror_allowed:
+            distribution_policy = 'mirror_allowed'
+        db.session.add(DatasheetDocument(
+            component_id=component.id,
+            document_title=sanitize_input(str(selected.get('document_title') or f'Datasheet {part_number}'))[:300],
+            revision=sanitize_input(str(selected.get('document_revision') or ''))[:80] or None,
+            document_date=sanitize_input(str(selected.get('document_date') or ''))[:40] or None,
+            language=sanitize_input(str(selected.get('document_language') or ''))[:20] or None,
+            pages=coerce_int(selected.get('pages'), 0) or None,
+            source_provider=config.provider_name,
+            source_reference=reference,
+            distribution_policy=distribution_policy,
+            verification_status='policy_reviewed',
+        ))
+
+    if queue_item.source_board_id:
+        db.session.add(BoardComponent(
+            board_id=queue_item.source_board_id,
+            component_id=component.id,
+            source_resource_id=queue_item.source_resource_id,
+            verified=bool(reviewer_id),
+        ))
+    queue_item.component_id = component.id
+    queue_item.reviewed_by = reviewer_id
+    queue_item.admin_decision = 'published' if publish else 'draft'
+    queue_item.status = 'published' if publish else 'approved'
+    queue_item.finished_at = datetime.utcnow()
+    db.session.commit()
+    return component
 
 
 def technical_auto_publish_decision(item, source=None):
@@ -4601,6 +5370,7 @@ SEO_PUBLIC_STATIC_PAGES = (
     ('/', 'daily', '1.0'),
     ('/categorias', 'daily', '0.9'),
     ('/posts', 'daily', '0.9'),
+    ('/datasheets', 'daily', '0.8'),
     ('/sobre', 'monthly', '0.6'),
     ('/faq', 'monthly', '0.6'),
     ('/contato', 'monthly', '0.5'),
@@ -4837,6 +5607,19 @@ def _build_sitemap_entries() -> list[dict[str, str]]:
             lastmod=board_item.updated_at,
             changefreq='weekly',
             priority='0.7',
+        )
+
+    published_components = ElectronicComponent.query.filter_by(is_published=True).order_by(
+        ElectronicComponent.updated_at.desc()
+    ).all()
+    for component_item in published_components:
+        _add_sitemap_entry(
+            entries,
+            seen_urls,
+            url_for('datasheet_component_detail', slug=component_item.slug),
+            lastmod=component_item.updated_at,
+            changefreq='monthly',
+            priority='0.6',
         )
 
     return entries
@@ -5767,7 +6550,9 @@ def edit_comment(post_id, comment_id):
 def search():
     query = request.args.get('q', '').strip()
     category = request.args.get('category', '').strip()
-    filter_type = request.args.get('filter', 'all').strip()  # all, posts, categories
+    filter_type = request.args.get('filter', 'all').strip()  # all, posts, categories, datasheets
+    if filter_type not in {'all', 'posts', 'categories', 'datasheets'}:
+        filter_type = 'all'
 
     if not query:
         # Se for requisição AJAX, retornar JSON
@@ -5787,7 +6572,14 @@ def search():
     category_names = [cat.name.lower() for cat in all_categories]
     all_posts = Post.query.filter_by(is_active=True).all()
     post_titles = [post.title.lower() for post in all_posts]
-    known_terms = category_names + post_titles
+    all_components = ElectronicComponent.query.filter_by(is_published=True).all()
+    component_terms = [
+        term.lower()
+        for component in all_components
+        for term in (component.part_number, component.manufacturer, component.title_ptbr)
+        if term
+    ]
+    known_terms = category_names + post_titles + component_terms
 
     # Buscar sugestão se não houver resultados exatos
     suggestion = None
@@ -5824,9 +6616,49 @@ def search():
 
         debug_log(f"SEARCH Query: '{query}', Posts found: {len(posts)}")  # DEBUG
 
+    components = []
+    if filter_type in {'all', 'datasheets'}:
+        scored_components = []
+        for component in all_components:
+            alias_values = ' '.join(alias.alias for alias in component.aliases)
+            score = get_search_match_score(
+                query,
+                component.part_number,
+                component.normalized_part_number,
+                component.manufacturer,
+                component.title_ptbr,
+                component.category,
+                component.package,
+                alias_values,
+            )
+            if score is not None:
+                scored_components.append((score, component.part_number.casefold(), component))
+        components = [
+            component
+            for _score, _part, component in sorted(scored_components, key=lambda item: (item[0], item[1]))
+        ]
+
+    if not posts and not categories and not components and looks_like_part_number(query):
+        normalized_query = normalize_component_part_number(query)
+        demand = DatasheetDemand.query.filter_by(normalized_query=normalized_query).first()
+        if demand:
+            demand.request_count = (demand.request_count or 0) + 1
+            demand.last_requested_at = datetime.utcnow()
+        else:
+            db.session.add(DatasheetDemand(
+                normalized_query=normalized_query,
+                display_query=query[:160],
+                request_count=1,
+            ))
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+
     return render_template('search.html',
                          posts=posts,
                          categories=categories,
+                         components=components,
                          query=query,
                          category=category,
                          filter_type=filter_type,
@@ -7673,6 +8505,24 @@ def search_suggestions():
                 'icon': 'fas fa-microchip',
             })
 
+        scored_components = []
+        for component in ElectronicComponent.query.filter_by(is_published=True).all():
+            aliases = ' '.join(alias.alias for alias in component.aliases)
+            score = get_search_match_score(
+                query, component.part_number, component.normalized_part_number,
+                component.manufacturer, component.title_ptbr, aliases,
+            )
+            if score is not None:
+                scored_components.append((score, component.part_number.casefold(), component))
+        for _score, _part, component in sorted(scored_components, key=lambda entry: (entry[0], entry[1]))[:3]:
+            suggestions.append({
+                'type': 'datasheet',
+                'title': component.part_number,
+                'description': ' · '.join(filter(None, [component.manufacturer, component.category, component.package, 'Datasheet'])),
+                'url': url_for('datasheet_component_detail', slug=component.slug),
+                'icon': 'fas fa-file-pdf',
+            })
+
     posts_query = Post.query.filter_by(is_active=True)
     if category:
         posts_query = posts_query.filter(Post.category_str == category)
@@ -7751,10 +8601,15 @@ def hardware_board_detail(slug):
     board = HardwareBoard.query.filter_by(slug=slug).first_or_404()
     resources = TechnicalResource.query.filter_by(board_id=board.id).order_by(TechnicalResource.created_at.desc()).all()
     public_resources = [resource for resource in resources if resource.post and resource.post.is_active]
+    component_links = BoardComponent.query.join(ElectronicComponent).filter(
+        BoardComponent.board_id == board.id,
+        ElectronicComponent.is_published.is_(True),
+    ).order_by(ElectronicComponent.part_number.asc()).all()
     return render_template(
         'hardware_board.html',
         board=board,
         resources=public_resources,
+        component_links=component_links,
         title=f'{board.board_code} - Placa técnica',
     )
 
@@ -7786,7 +8641,156 @@ def hardware_board_api(slug):
         'platform': board.platform,
         'chipset': board.chipset,
         'resources': resources,
+        'components': [
+            {
+                'part_number': link.component.part_number,
+                'manufacturer': link.component.manufacturer,
+                'reference_designator': link.reference_designator,
+                'verified': link.verified,
+                'url': url_for('datasheet_component_detail', slug=link.component.slug),
+            }
+            for link in BoardComponent.query.join(ElectronicComponent).filter(
+                BoardComponent.board_id == board.id,
+                ElectronicComponent.is_published.is_(True),
+            ).all()
+        ],
     })
+
+
+@app.route('/datasheets')
+def datasheet_library():
+    query = sanitize_input(str(request.args.get('q') or ''))[:160]
+    category = sanitize_input(str(request.args.get('category') or ''))[:120]
+    manufacturer = sanitize_input(str(request.args.get('manufacturer') or ''))[:160]
+    components_query = ElectronicComponent.query.filter_by(is_published=True)
+    if category:
+        components_query = components_query.filter(ElectronicComponent.category == category)
+    if manufacturer:
+        components_query = components_query.filter(ElectronicComponent.manufacturer == manufacturer)
+    components = components_query.order_by(ElectronicComponent.part_number.asc()).all()
+    if query:
+        components = [
+            component for component in components
+            if get_search_match_score(
+                query, component.part_number, component.normalized_part_number,
+                component.manufacturer, component.title_ptbr, component.category,
+                ' '.join(alias.alias for alias in component.aliases),
+            ) is not None
+        ]
+        if not components and looks_like_part_number(query):
+            normalized_query = normalize_component_part_number(query)
+            demand = DatasheetDemand.query.filter_by(normalized_query=normalized_query).first()
+            if demand:
+                demand.request_count = (demand.request_count or 0) + 1
+                demand.last_requested_at = datetime.utcnow()
+            else:
+                db.session.add(DatasheetDemand(
+                    normalized_query=normalized_query, display_query=query, request_count=1,
+                ))
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+    categories = [
+        row[0] for row in db.session.query(ElectronicComponent.category).filter(
+            ElectronicComponent.is_published.is_(True),
+            ElectronicComponent.category.isnot(None),
+        ).distinct().order_by(ElectronicComponent.category.asc()).all() if row[0]
+    ]
+    manufacturers = [
+        row[0] for row in db.session.query(ElectronicComponent.manufacturer).filter(
+            ElectronicComponent.is_published.is_(True),
+            ElectronicComponent.manufacturer.isnot(None),
+        ).distinct().order_by(ElectronicComponent.manufacturer.asc()).all() if row[0]
+    ]
+    return render_template(
+        'datasheets.html', components=components, query=query, category=category,
+        manufacturer=manufacturer, component_categories=categories,
+        component_manufacturers=manufacturers, title='Datasheets de componentes',
+    )
+
+
+@app.route('/datasheet/<string:slug>')
+def datasheet_component_detail(slug):
+    component = ElectronicComponent.query.filter_by(slug=slug, is_published=True).first_or_404()
+    attribution_names = []
+    for source_record in component.source_records:
+        source_config = DatasheetProviderConfig.query.filter_by(provider_name=source_record.provider).first()
+        if source_config and source_config.attribution_required and source_config.display_name not in attribution_names:
+            attribution_names.append(source_config.display_name)
+    documents = []
+    for document in component.documents:
+        if not document.is_active:
+            continue
+        config = DatasheetProviderConfig.query.filter_by(provider_name=document.source_provider).first()
+        if not config or not config.public_republish_allowed:
+            continue
+        documents.append((document, config))
+    board_links = BoardComponent.query.join(HardwareBoard).filter(
+        BoardComponent.component_id == component.id
+    ).order_by(HardwareBoard.board_code.asc()).all()
+    related = ElectronicComponent.query.filter(
+        ElectronicComponent.is_published.is_(True),
+        ElectronicComponent.id != component.id,
+        ElectronicComponent.category == component.category,
+    ).order_by(ElectronicComponent.confidence.desc()).limit(6).all() if component.category else []
+    return render_template(
+        'datasheet_detail.html', component=component, documents=documents,
+        board_links=board_links, related_components=related,
+        attribution_names=attribution_names,
+        title=f'{component.part_number} Datasheet',
+    )
+
+
+@app.route('/datasheet/documento/<int:document_id>/download')
+@login_required
+@limiter.limit('30 per hour')
+def download_datasheet_document(document_id):
+    document = DatasheetDocument.query.get_or_404(document_id)
+    if not document.is_active or not document.component or not document.component.is_published:
+        abort(404)
+    config = DatasheetProviderConfig.query.filter_by(provider_name=document.source_provider).first()
+    if not config or not (
+        config.enabled and config.written_permission_confirmed and config.public_republish_allowed
+        and config.pdf_stream_allowed and document.distribution_policy in {'stream_allowed', 'mirror_allowed'}
+    ):
+        abort(403)
+
+    filename = sanitize_download_name(f'{document.component.part_number}-datasheet.pdf')
+    if document.pdf_storage_provider == 'local' and document.pdf_internal_reference:
+        storage_root = os.path.abspath(app.config['TECHNICAL_LOCAL_STORAGE_DIR'])
+        local_path = os.path.abspath(os.path.join(storage_root, document.pdf_internal_reference))
+        if os.path.commonpath([storage_root, local_path]) != storage_root or not os.path.isfile(local_path):
+            abort(404)
+        return send_file(local_path, as_attachment=True, download_name=filename, conditional=True)
+
+    if not document.source_reference:
+        abort(404)
+    allowed_hosts = {
+        host.strip().lower()
+        for host in os.environ.get('DATASHEET_STORAGE_ALLOWED_HOSTS', '').split(',')
+        if host.strip()
+    }
+    storage = HttpStorageProvider(
+        allowed_hosts=allowed_hosts,
+        connect_timeout=float(os.environ.get('STORAGE_CONNECT_TIMEOUT', '5')),
+        read_timeout=float(os.environ.get('STORAGE_READ_TIMEOUT', '45')),
+    )
+    try:
+        upstream = storage.open(document.source_reference, request.headers.get('Range'))
+    except StorageError as exc:
+        app.logger.warning('Falha ao entregar datasheet %s: %s', document.id, exc)
+        return jsonify({'success': False, 'message': 'Documento indisponível no momento.'}), 502
+    headers = dict(upstream.headers)
+    upstream_filename = filename_from_content_disposition(headers.pop('Content-Disposition', None))
+    filename = upstream_filename or filename
+    ascii_filename = filename.encode('ascii', 'ignore').decode('ascii') or 'datasheet.pdf'
+    headers['Content-Disposition'] = f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{quote(filename, safe="")}'
+    headers['X-Content-Type-Options'] = 'nosniff'
+    headers['Cache-Control'] = 'private, no-store'
+    response = Response(upstream.iterator, status=upstream.status_code, headers=headers, direct_passthrough=True)
+    response.call_on_close(upstream.close)
+    return response
 
 
 @app.route('/contribuir-arquivo', methods=['GET', 'POST'])
@@ -12837,6 +13841,451 @@ def admin_technical_file_health(file_id):
         'message': message,
         'http_status': status_code,
     })
+
+
+def _datasheet_provider_admin_dict(config):
+    credential = datasheet_provider_credentials_status(config)
+    return {
+        'id': config.id,
+        'provider_name': config.provider_name,
+        'display_name': config.display_name,
+        'provider_kind': config.provider_kind,
+        'enabled': config.enabled,
+        'mode': config.mode,
+        'priority': config.priority,
+        'api_enabled': config.api_enabled,
+        'html_discovery_enabled': config.html_discovery_enabled,
+        'auto_publish_threshold': config.auto_publish_threshold,
+        'max_items_per_job': config.max_items_per_job,
+        'interval_seconds': config.interval_seconds,
+        'retention_days': config.retention_days,
+        'fallback_enabled': config.fallback_enabled,
+        'metadata_persistence_allowed': config.metadata_persistence_allowed,
+        'public_republish_allowed': config.public_republish_allowed,
+        'pdf_reference_allowed': config.pdf_reference_allowed,
+        'pdf_stream_allowed': config.pdf_stream_allowed,
+        'pdf_mirror_allowed': config.pdf_mirror_allowed,
+        'attribution_required': config.attribution_required,
+        'written_permission_confirmed': config.written_permission_confirmed,
+        'source_policy_allows_html_discovery': config.source_policy_allows_html_discovery,
+        'permission_reference': config.permission_reference or '',
+        'permission_notes': config.permission_notes or '',
+        'robots_allowed': config.robots_allowed,
+        'robots_last_checked_at': config.robots_last_checked_at.isoformat() if config.robots_last_checked_at else None,
+        'terms_last_checked_at': config.terms_last_checked_at.isoformat() if config.terms_last_checked_at else None,
+        'terms_version_or_date': config.terms_version_or_date or '',
+        'requests_per_minute': config.requests_per_minute,
+        'requests_per_hour': config.requests_per_hour,
+        'requests_per_day': config.requests_per_day,
+        'requests_per_month': config.requests_per_month,
+        'timeout_seconds': config.timeout_seconds,
+        'retry_limit': config.retry_limit,
+        'provider_status': config.provider_status,
+        'circuit_open_until': config.circuit_open_until.isoformat() if config.circuit_open_until else None,
+        'credits_remaining': config.credits_remaining,
+        'last_success_at': config.last_success_at.isoformat() if config.last_success_at else None,
+        'last_error_at': config.last_error_at.isoformat() if config.last_error_at else None,
+        'last_error_message': config.last_error_message or '',
+        'credentials_configured': credential['configured'],
+        'required_env': credential['required_env'],
+        'environment_enabled': _provider_environment_enabled(config),
+    }
+
+
+@app.route('/admin/datasheets')
+@login_required
+@admin_required
+def admin_datasheets():
+    ensure_default_datasheet_providers()
+    providers = DatasheetProviderConfig.query.order_by(DatasheetProviderConfig.priority.asc()).all()
+    status_filter = sanitize_input(str(request.args.get('status') or ''))[:40]
+    queue_query = DatasheetImportQueue.query
+    if status_filter:
+        queue_query = queue_query.filter_by(status=status_filter)
+    queue_items = queue_query.order_by(DatasheetImportQueue.priority.desc(), DatasheetImportQueue.created_at.asc()).limit(200).all()
+    events = DatasheetProviderEvent.query.order_by(DatasheetProviderEvent.created_at.desc()).limit(5000).all()
+    analytics = {}
+    for config in providers:
+        provider_events = [event for event in events if event.provider == config.provider_name]
+        queries = len(provider_events)
+        hits = sum(1 for event in provider_events if event.result_count > 0)
+        errors = sum(1 for event in provider_events if event.status not in {'success', 'not_found', 'disabled'})
+        confidences = [event.confidence for event in provider_events if event.confidence is not None]
+        analytics[config.provider_name] = {
+            'queries': queries,
+            'hits': hits,
+            'errors': errors,
+            'hit_rate': round((hits / queries) * 100, 1) if queries else 0,
+            'exact_match_rate': round((sum(1 for event in provider_events if event.exact_match) / queries) * 100, 1) if queries else 0,
+            'conflict_rate': round((sum(1 for event in provider_events if event.conflict) / queries) * 100, 1) if queries else 0,
+            'average_confidence': round((sum(confidences) / len(confidences)) * 100, 1) if confidences else 0,
+        }
+    dashboard = {
+        'components': ElectronicComponent.query.count(),
+        'documents': DatasheetDocument.query.count(),
+        'queued': DatasheetImportQueue.query.filter_by(status='queued').count(),
+        'review': DatasheetImportQueue.query.filter_by(status='needs_review').count(),
+        'automatic': ElectronicComponent.query.filter_by(publication_mode='automatic', is_published=True).count(),
+        'manual': ElectronicComponent.query.filter_by(publication_mode='manual', is_published=True).count(),
+        'duplicates': DatasheetImportQueue.query.filter_by(status='duplicate').count(),
+        'not_found': DatasheetImportQueue.query.filter_by(status='not_found').count(),
+        'blocked': DatasheetImportQueue.query.filter_by(status='blocked_by_policy').count(),
+    }
+    demands = DatasheetDemand.query.order_by(
+        DatasheetDemand.request_count.desc(), DatasheetDemand.last_requested_at.desc()
+    ).limit(50).all()
+    return render_template(
+        'admin/datasheets.html',
+        title='Motor Multi-Fonte de Datasheets',
+        providers=providers,
+        provider_data={config.id: _datasheet_provider_admin_dict(config) for config in providers},
+        queue_items=queue_items,
+        dashboard=dashboard,
+        analytics=analytics,
+        datasheet_settings=get_datasheet_settings(),
+        demands=demands,
+        status_filter=status_filter,
+        **get_admin_sidebar_stats(),
+    )
+
+
+@app.route('/api/admin/datasheets/settings', methods=['PATCH', 'POST'])
+@login_required
+@admin_required
+def admin_datasheet_settings_update():
+    payload = request.get_json(silent=True) or {}
+    unknown = set(payload) - DATASHEET_SETTING_KEYS
+    if unknown:
+        return jsonify({'success': False, 'message': f'Configurações não suportadas: {", ".join(sorted(unknown))}'}), 400
+    strategy = str(payload.get('datasheet_search_strategy', get_datasheet_settings()['strategy']))
+    if strategy not in {'priority_fallback', 'parallel_compare', 'maximum_precision'}:
+        return jsonify({'success': False, 'message': 'Estratégia inválida.'}), 400
+    values = {
+        'datasheet_engine_enabled': (coerce_bool(payload.get('datasheet_engine_enabled'), True), 'bool'),
+        'datasheet_auto_publish_enabled': (coerce_bool(payload.get('datasheet_auto_publish_enabled'), False), 'bool'),
+        'datasheet_automation_paused': (coerce_bool(payload.get('datasheet_automation_paused'), False), 'bool'),
+        'datasheet_search_strategy': (strategy, 'string'),
+        'datasheet_max_providers': (max(1, min(10, coerce_int(payload.get('datasheet_max_providers'), 2))), 'int'),
+    }
+    for key, (value, value_type) in values.items():
+        SiteConfig.set_value(key, value, value_type=value_type, is_public=False)
+    return jsonify({'success': True, 'settings': get_datasheet_settings()})
+
+
+@app.route('/api/admin/datasheets/providers/<int:provider_id>', methods=['PATCH', 'POST'])
+@login_required
+@admin_required
+def admin_datasheet_provider_update(provider_id):
+    config = DatasheetProviderConfig.query.get_or_404(provider_id)
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    mode = str(payload.get('mode', config.mode))
+    if mode not in {'disabled', 'semi_automatic', 'automatic'}:
+        return jsonify({'success': False, 'message': 'Modo do provider inválido.'}), 400
+    permission_reference = sanitize_input(str(payload.get('permission_reference', config.permission_reference or '')))[:500] or None
+    written_permission = coerce_bool(payload.get('written_permission_confirmed'), config.written_permission_confirmed)
+    protected_permissions = any(coerce_bool(payload.get(field), getattr(config, field)) for field in (
+        'public_republish_allowed', 'pdf_stream_allowed', 'pdf_mirror_allowed',
+    ))
+    if protected_permissions and (not written_permission or not permission_reference):
+        return jsonify({
+            'success': False,
+            'message': 'Republicação, streaming e espelhamento exigem autorização escrita e referência preenchida.',
+        }), 409
+    html_enabled = coerce_bool(payload.get('html_discovery_enabled'), config.html_discovery_enabled)
+    robots_allowed = coerce_bool(payload.get('robots_allowed'), config.robots_allowed)
+    policy_allows_html = coerce_bool(
+        payload.get('source_policy_allows_html_discovery'), config.source_policy_allows_html_discovery
+    )
+    if html_enabled and (
+        not permission_reference or not robots_allowed or not (written_permission or policy_allows_html)
+    ):
+        return jsonify({
+            'success': False,
+            'message': 'HTML discovery exige referência da permissão/política e robots.txt permitido.',
+        }), 409
+
+    config.mode = mode
+    config.enabled = coerce_bool(payload.get('enabled'), config.enabled) and mode != 'disabled'
+    config.api_enabled = coerce_bool(payload.get('api_enabled'), config.api_enabled)
+    config.html_discovery_enabled = html_enabled
+    config.priority = max(1, min(999, coerce_int(payload.get('priority'), config.priority)))
+    try:
+        threshold_value = float(payload.get('auto_publish_threshold', config.auto_publish_threshold))
+        interval_value = float(payload.get('interval_seconds', config.interval_seconds))
+        timeout_value = float(payload.get('timeout_seconds', config.timeout_seconds))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Threshold, intervalo ou timeout inválido.'}), 400
+    config.auto_publish_threshold = max(0.5, min(1.0, threshold_value))
+    config.interval_seconds = max(0.0, min(60.0, interval_value))
+    config.timeout_seconds = max(1.0, min(60.0, timeout_value))
+    config.max_items_per_job = max(1, min(500, coerce_int(payload.get('max_items_per_job'), config.max_items_per_job)))
+    config.retention_days = max(1, min(3650, coerce_int(payload.get('retention_days'), config.retention_days)))
+    config.requests_per_minute = max(1, min(10000, coerce_int(payload.get('requests_per_minute'), config.requests_per_minute)))
+    config.requests_per_hour = max(1, min(100000, coerce_int(payload.get('requests_per_hour'), config.requests_per_hour)))
+    config.requests_per_day = max(1, min(1000000, coerce_int(payload.get('requests_per_day'), config.requests_per_day)))
+    config.requests_per_month = max(0, min(10000000, coerce_int(payload.get('requests_per_month'), config.requests_per_month)))
+    config.retry_limit = max(0, min(5, coerce_int(payload.get('retry_limit'), config.retry_limit)))
+    for field in (
+        'fallback_enabled', 'metadata_persistence_allowed', 'public_republish_allowed',
+        'pdf_reference_allowed', 'pdf_stream_allowed', 'pdf_mirror_allowed',
+        'attribution_required', 'source_policy_allows_html_discovery', 'robots_allowed',
+    ):
+        if field in payload:
+            setattr(config, field, coerce_bool(payload[field], getattr(config, field)))
+    config.written_permission_confirmed = written_permission
+    config.permission_reference = permission_reference
+    config.permission_notes = sanitize_input(str(payload.get('permission_notes', config.permission_notes or '')))[:4000] or None
+    config.terms_version_or_date = sanitize_input(str(payload.get('terms_version_or_date', config.terms_version_or_date or '')))[:120] or None
+    if payload.get('mark_terms_reviewed'):
+        config.terms_last_checked_at = datetime.utcnow()
+    if payload.get('mark_robots_checked'):
+        config.robots_last_checked_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'success': True, 'provider': _datasheet_provider_admin_dict(config)})
+
+
+@app.route('/api/admin/datasheets/providers/<int:provider_id>/kill', methods=['POST'])
+@login_required
+@admin_required
+def admin_datasheet_provider_kill(provider_id):
+    config = DatasheetProviderConfig.query.get_or_404(provider_id)
+    config.enabled = False
+    config.mode = 'disabled'
+    config.provider_status = 'disabled'
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'{config.display_name} foi desativado imediatamente.'})
+
+
+@app.route('/api/admin/datasheets/providers/<int:provider_id>/test', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit('30 per hour')
+def admin_datasheet_provider_test(provider_id):
+    from technical_content.datasheets.services.resolver import DatasheetResolver
+
+    config = DatasheetProviderConfig.query.get_or_404(provider_id)
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    part_number = sanitize_input(str(payload.get('part_number') or ''))[:160]
+    if not looks_like_part_number(part_number):
+        return jsonify({'success': False, 'message': 'Informe um part number válido para o teste.'}), 400
+    configured = build_configured_datasheet_providers([config])
+    if not configured:
+        return jsonify({'success': False, 'message': 'O provider está desativado pela feature flag do ambiente.'}), 409
+    resolution = DatasheetResolver(configured, global_disabled=False).resolve(part_number, strategy='priority_fallback')
+    _record_datasheet_resolution(resolution, [config])
+    provider = configured[0].provider if configured else None
+    if provider and hasattr(provider, 'credit_balance'):
+        try:
+            config.credits_remaining = provider.credit_balance()
+            config.last_credit_check_at = datetime.utcnow()
+        except Exception as exc:
+            app.logger.info('Consulta de créditos indisponível para %s: %s', config.provider_name, exc)
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'found': resolution.found,
+        'confidence': resolution.confidence,
+        'conflicts': resolution.conflicts,
+        'candidates': [candidate.public_summary(include_values=True) for candidate in resolution.candidates],
+        'traces': [trace.__dict__ if hasattr(trace, '__dict__') else {
+            'provider': trace.provider, 'status': trace.status, 'result_count': trace.result_count,
+            'duration_ms': trace.duration_ms, 'message': trace.message,
+        } for trace in resolution.traces],
+    })
+
+
+@app.route('/api/admin/datasheets/benchmark', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit('5 per hour')
+def admin_datasheet_benchmark():
+    from technical_content.datasheets.services.resolver import DatasheetResolver
+
+    payload = request.get_json(silent=True) or {}
+    raw_values = payload.get('part_numbers') or ''
+    values = re.split(r'[,;\n]+', raw_values) if isinstance(raw_values, str) else list(raw_values or [])
+    part_numbers = [sanitize_input(str(value))[:160] for value in values if looks_like_part_number(value)][:20]
+    if not part_numbers:
+        return jsonify({'success': False, 'message': 'Informe ao menos um part number válido.'}), 400
+    ensure_default_datasheet_providers()
+    configs = DatasheetProviderConfig.query.order_by(DatasheetProviderConfig.priority.asc()).all()
+    configured = build_configured_datasheet_providers(configs)
+    rows = []
+    totals = {config.provider_name: {'queries': 0, 'hits': 0, 'exact': 0, 'duration_ms': 0} for config in configs}
+    for part_number in part_numbers:
+        resolution = DatasheetResolver(configured, global_disabled=False).resolve(
+            part_number, strategy='parallel_compare', max_providers=10,
+        )
+        _record_datasheet_resolution(resolution, configs)
+        row = {'part_number': part_number, 'selected': resolution.selected.provider if resolution.selected else None, 'providers': {}}
+        for trace in resolution.traces:
+            candidate = next((item for item in resolution.candidates if item.provider == trace.provider), None)
+            row['providers'][trace.provider] = {
+                'status': trace.status, 'results': trace.result_count, 'duration_ms': trace.duration_ms,
+                'exact': bool(candidate and candidate.exact_match),
+                'confidence': round((candidate.confidence if candidate else 0) * 100, 1),
+            }
+            if trace.provider in totals:
+                totals[trace.provider]['queries'] += 1
+                totals[trace.provider]['hits'] += int(trace.result_count > 0)
+                totals[trace.provider]['exact'] += int(bool(candidate and candidate.exact_match))
+                totals[trace.provider]['duration_ms'] += trace.duration_ms
+        rows.append(row)
+    db.session.commit()
+    summary = {}
+    for provider, values in totals.items():
+        queries = values['queries']
+        summary[provider] = {
+            **values,
+            'coverage': round((values['hits'] / queries) * 100, 1) if queries else 0,
+            'exact_rate': round((values['exact'] / queries) * 100, 1) if queries else 0,
+            'average_ms': round(values['duration_ms'] / queries) if queries else 0,
+        }
+    return jsonify({'success': True, 'rows': rows, 'summary': summary})
+
+
+@app.route('/api/admin/datasheets/queue', methods=['POST'])
+@login_required
+@admin_required
+def admin_datasheet_queue_create():
+    strategy = request.form.get('strategy') or (request.get_json(silent=True) or {}).get('strategy')
+    entries = []
+    upload = request.files.get('csv_file')
+    if upload and upload.filename:
+        try:
+            text_value = upload.stream.read(1_000_000).decode('utf-8-sig')
+            for row in csv.DictReader(text_value.splitlines()):
+                entries.append((row.get('part_number'), row.get('manufacturer')))
+        except (UnicodeDecodeError, csv.Error) as exc:
+            return jsonify({'success': False, 'message': f'CSV inválido: {exc}'}), 400
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    raw_parts = payload.get('part_numbers') or payload.get('part_number') or ''
+    if isinstance(raw_parts, str):
+        for value in re.split(r'[,;\n]+', raw_parts):
+            if value.strip():
+                entries.append((value.strip(), payload.get('manufacturer')))
+    created = 0
+    existing = 0
+    for part_number, manufacturer in entries[:500]:
+        if not looks_like_part_number(part_number):
+            continue
+        _, was_created = enqueue_datasheet(
+            part_number,
+            manufacturer,
+            priority=coerce_int(payload.get('priority'), 0),
+            strategy=strategy,
+            requested_by=current_user.id,
+        )
+        created += int(was_created)
+        existing += int(not was_created)
+    if not created and not existing:
+        return jsonify({'success': False, 'message': 'Nenhum part number válido foi informado.'}), 400
+    return jsonify({'success': True, 'created': created, 'existing': existing, 'message': f'{created} item(ns) adicionado(s) à fila.'}), 201
+
+
+@app.route('/api/admin/datasheets/queue/process', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit('20 per hour')
+def admin_datasheet_queue_process_batch():
+    limit = max(1, min(100, coerce_int((request.get_json(silent=True) or {}).get('limit'), 10)))
+    active_configs = DatasheetProviderConfig.query.filter(
+        DatasheetProviderConfig.enabled.is_(True), DatasheetProviderConfig.mode != 'disabled'
+    ).all()
+    configured = build_configured_datasheet_providers(active_configs)
+    if configured:
+        limit = min(limit, min(max(1, item.config.max_items_per_job) for item in configured))
+    items = DatasheetImportQueue.query.filter_by(status='queued').order_by(
+        DatasheetImportQueue.priority.desc(), DatasheetImportQueue.created_at.asc()
+    ).limit(limit).all()
+    result = {'processed': 0, 'review': 0, 'published': 0, 'failed': 0}
+    for queue_item in items:
+        process_datasheet_queue_item(
+            queue_item, configured_providers=configured, provider_configs=active_configs,
+        )
+        result['processed'] += 1
+        result['published'] += int(queue_item.status == 'published')
+        result['review'] += int(queue_item.status == 'needs_review')
+        result['failed'] += int(queue_item.status in {'failed', 'blocked_by_policy'})
+    return jsonify({'success': True, **result})
+
+
+@app.route('/api/admin/datasheets/queue/<int:item_id>/process', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit('30 per hour')
+def admin_datasheet_queue_process_one(item_id):
+    queue_item = DatasheetImportQueue.query.get_or_404(item_id)
+    if queue_item.status == 'published':
+        return jsonify({'success': False, 'message': 'O componente já foi publicado.'}), 409
+    process_datasheet_queue_item(queue_item)
+    return jsonify({'success': True, 'status': queue_item.status, 'confidence': queue_item.best_confidence})
+
+
+@app.route('/api/admin/datasheets/queue/<int:item_id>', methods=['PATCH'])
+@login_required
+@admin_required
+def admin_datasheet_queue_update(item_id):
+    queue_item = DatasheetImportQueue.query.get_or_404(item_id)
+    if queue_item.status == 'published':
+        return jsonify({'success': False, 'message': 'O componente já foi publicado.'}), 409
+    payload = request.get_json(silent=True) or {}
+    result = queue_item.result()
+    selected = result.get('selected') if isinstance(result.get('selected'), dict) else {}
+    for field in ('part_number', 'manufacturer', 'category', 'subcategory', 'package', 'lifecycle_status'):
+        if field in payload:
+            selected[field] = sanitize_input(str(payload[field] or ''))[:300]
+    result['selected'] = selected
+    queue_item.result_json = json.dumps(result, ensure_ascii=False)
+    queue_item.status = 'needs_review'
+    queue_item.admin_decision = 'edited'
+    queue_item.reviewed_by = current_user.id
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Preview atualizado.'})
+
+
+@app.route('/api/admin/datasheets/queue/<int:item_id>/<string:action>', methods=['POST'])
+@login_required
+@admin_required
+def admin_datasheet_queue_action(item_id, action):
+    queue_item = DatasheetImportQueue.query.get_or_404(item_id)
+    payload = request.get_json(silent=True) or {}
+    if action == 'publish':
+        try:
+            component = materialize_datasheet_component(queue_item, reviewer_id=current_user.id, publish=True)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 409
+        return jsonify({'success': True, 'component_id': component.id, 'url': url_for('datasheet_component_detail', slug=component.slug)})
+    if action == 'draft':
+        try:
+            component = materialize_datasheet_component(queue_item, reviewer_id=current_user.id, publish=False)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 409
+        return jsonify({'success': True, 'component_id': component.id, 'message': 'Componente salvo como rascunho.'})
+    if action == 'ignore':
+        queue_item.status = 'ignored'
+        queue_item.admin_decision = 'ignored'
+    elif action == 'duplicate':
+        component_id = coerce_int(payload.get('component_id'), 0)
+        component = db.session.get(ElectronicComponent, component_id) if component_id else find_component_by_identity(
+            queue_item.manufacturer_hint, queue_item.part_number
+        )
+        if not component:
+            return jsonify({'success': False, 'message': 'Informe um componente existente para marcar a duplicata.'}), 400
+        queue_item.status = 'duplicate'
+        queue_item.component_id = component.id
+        queue_item.admin_decision = 'marked_duplicate'
+    elif action == 'reprocess':
+        queue_item.status = 'queued'
+        queue_item.error_message = None
+        queue_item.started_at = None
+        queue_item.finished_at = None
+        queue_item.admin_decision = 'reprocess'
+    else:
+        return jsonify({'success': False, 'message': 'Ação não suportada.'}), 400
+    queue_item.reviewed_by = current_user.id
+    db.session.commit()
+    return jsonify({'success': True, 'status': queue_item.status})
 
 @app.route("/admin/settings")
 @login_required

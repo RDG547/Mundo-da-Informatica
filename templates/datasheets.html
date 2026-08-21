@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="datasheet-page">
+    <section class="datasheet-hero">
+        <div class="datasheet-hero-icon"><i class="fas fa-file-waveform"></i></div>
+        <p class="datasheet-kicker">Biblioteca técnica estruturada</p>
+        <h1>Datasheets de componentes</h1>
+        <p>Pesquise pelo part number exato, fabricante, categoria ou encapsulamento.</p>
+    </section>
+
+    <div class="datasheet-container">
+        <form class="datasheet-filters" action="{{ url_for('datasheet_library') }}" method="get">
+            <label class="datasheet-search-field">
+                <span><i class="fas fa-magnifying-glass"></i> Part number ou componente</span>
+                <input name="q" value="{{ query }}" placeholder="Ex.: TPS51225, RT8243, W25Q64" autocomplete="off">
+            </label>
+            <label>
+                <span><i class="fas fa-layer-group"></i> Categoria</span>
+                <select name="category">
+                    <option value="">Todas as categorias</option>
+                    {% for option in component_categories %}<option value="{{ option }}" {% if option == category %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                </select>
+            </label>
+            <label>
+                <span><i class="fas fa-industry"></i> Fabricante</span>
+                <select name="manufacturer">
+                    <option value="">Todos os fabricantes</option>
+                    {% for option in component_manufacturers %}<option value="{{ option }}" {% if option == manufacturer %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                </select>
+            </label>
+            <button type="submit"><i class="fas fa-search"></i> Pesquisar</button>
+        </form>
+
+        <section class="datasheet-results" aria-live="polite">
+            <header class="datasheet-section-title">
+                <div><i class="fas fa-microchip"></i><span><strong>Componentes publicados</strong><small>{{ components|length }} resultado(s) revisado(s)</small></span></div>
+                {% if query or category or manufacturer %}<a href="{{ url_for('datasheet_library') }}"><i class="fas fa-xmark"></i> Limpar filtros</a>{% endif %}
+            </header>
+            <div class="datasheet-grid">
+                {% for component in components %}
+                <article class="datasheet-card">
+                    <div class="datasheet-card-top">
+                        <span class="datasheet-category"><i class="fas fa-microchip"></i> {{ component.category or 'Componente' }}</span>
+                        <span class="datasheet-confidence" title="Confiança da consolidação"><i class="fas fa-shield-halved"></i> {{ (component.confidence * 100)|round|int }}%</span>
+                    </div>
+                    <h2><a href="{{ url_for('datasheet_component_detail', slug=component.slug) }}">{{ component.part_number }}</a></h2>
+                    <p class="datasheet-manufacturer"><i class="fas fa-industry"></i> {{ component.manufacturer or 'Fabricante não informado' }}</p>
+                    <dl>
+                        <div><dt>Encapsulamento</dt><dd>{{ component.package or 'Não informado' }}</dd></div>
+                        <div><dt>Status</dt><dd>{{ component.lifecycle_status or 'Não informado' }}</dd></div>
+                    </dl>
+                    <a class="datasheet-card-action" href="{{ url_for('datasheet_component_detail', slug=component.slug) }}"><i class="fas fa-book-open"></i> Ver ficha técnica</a>
+                </article>
+                {% else %}
+                <div class="datasheet-empty">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <h2>Nenhum datasheet publicado</h2>
+                    <p>O termo pode ter sido registrado como demanda para revisão do acervo. Confira o part number e tente novamente.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</main>
+{% endblock %}

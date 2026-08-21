@@ -16,6 +16,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     MetaData,
@@ -303,12 +304,212 @@ def create_auxiliary_tables(connection) -> int:
         Column("created_at", DateTime, nullable=False),
         extend_existing=True,
     )
+    datasheet_provider_configs = Table(
+        "datasheet_provider_configs", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("provider_name", String(80), nullable=False, unique=True),
+        Column("display_name", String(120), nullable=False),
+        Column("provider_kind", String(30), nullable=False, server_default="api"),
+        Column("enabled", Boolean, nullable=False, server_default="false"),
+        Column("mode", String(30), nullable=False, server_default="semi_automatic"),
+        Column("priority", Integer, nullable=False, server_default="100"),
+        Column("api_enabled", Boolean, nullable=False, server_default="false"),
+        Column("html_discovery_enabled", Boolean, nullable=False, server_default="false"),
+        Column("search_strategy", String(30), nullable=False, server_default="priority_fallback"),
+        Column("auto_publish_threshold", Float, nullable=False, server_default="0.95"),
+        Column("max_items_per_job", Integer, nullable=False, server_default="25"),
+        Column("interval_seconds", Float, nullable=False, server_default="1.0"),
+        Column("fallback_enabled", Boolean, nullable=False, server_default="true"),
+        Column("retention_days", Integer, nullable=False, server_default="30"),
+        Column("metadata_persistence_allowed", Boolean, nullable=False, server_default="false"),
+        Column("public_republish_allowed", Boolean, nullable=False, server_default="false"),
+        Column("pdf_reference_allowed", Boolean, nullable=False, server_default="false"),
+        Column("pdf_stream_allowed", Boolean, nullable=False, server_default="false"),
+        Column("pdf_mirror_allowed", Boolean, nullable=False, server_default="false"),
+        Column("attribution_required", Boolean, nullable=False, server_default="true"),
+        Column("written_permission_confirmed", Boolean, nullable=False, server_default="false"),
+        Column("source_policy_allows_html_discovery", Boolean, nullable=False, server_default="false"),
+        Column("permission_reference", String(500)),
+        Column("permission_notes", Text),
+        Column("robots_allowed", Boolean, nullable=False, server_default="false"),
+        Column("robots_last_checked_at", DateTime),
+        Column("terms_last_checked_at", DateTime),
+        Column("terms_version_or_date", String(120)),
+        Column("requests_per_minute", Integer, nullable=False, server_default="30"),
+        Column("requests_per_hour", Integer, nullable=False, server_default="500"),
+        Column("requests_per_day", Integer, nullable=False, server_default="5000"),
+        Column("requests_per_month", Integer, nullable=False, server_default="0"),
+        Column("timeout_seconds", Float, nullable=False, server_default="15"),
+        Column("retry_limit", Integer, nullable=False, server_default="2"),
+        Column("provider_status", String(40), nullable=False, server_default="not_configured"),
+        Column("consecutive_failures", Integer, nullable=False, server_default="0"),
+        Column("circuit_open_until", DateTime),
+        Column("credits_remaining", Integer),
+        Column("last_credit_check_at", DateTime),
+        Column("last_success_at", DateTime),
+        Column("last_error_at", DateTime),
+        Column("last_error_message", Text),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    electronic_components = Table(
+        "electronic_components", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("manufacturer", String(160)),
+        Column("normalized_manufacturer", String(160), nullable=False, server_default=""),
+        Column("part_number", String(160), nullable=False),
+        Column("normalized_part_number", String(160), nullable=False),
+        Column("title_ptbr", String(300), nullable=False),
+        Column("description_ptbr", Text),
+        Column("category", String(120)),
+        Column("subcategory", String(120)),
+        Column("package", String(120)),
+        Column("lifecycle_status", String(80)),
+        Column("confidence", Float, nullable=False, server_default="0"),
+        Column("verification_status", String(30), nullable=False, server_default="needs_review"),
+        Column("specifications_json", Text),
+        Column("slug", String(200), nullable=False, unique=True),
+        Column("is_published", Boolean, nullable=False, server_default="false"),
+        Column("publication_mode", String(20), nullable=False, server_default="manual"),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        Column("published_at", DateTime),
+        UniqueConstraint("normalized_manufacturer", "normalized_part_number", name="uq_component_identity"),
+        extend_existing=True,
+    )
+    component_alias_confirmed_by = (
+        Column("confirmed_by", Integer, ForeignKey("user.id"))
+        if "user" in tables else Column("confirmed_by", Integer)
+    )
+    component_aliases = Table(
+        "component_aliases", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("component_id", Integer, ForeignKey("electronic_components.id"), nullable=False),
+        Column("alias", String(160), nullable=False),
+        Column("normalized_alias", String(160), nullable=False, unique=True),
+        component_alias_confirmed_by,
+        Column("created_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    component_source_records = Table(
+        "component_source_records", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("component_id", Integer, ForeignKey("electronic_components.id"), nullable=False),
+        Column("provider", String(80), nullable=False),
+        Column("external_id", String(255)),
+        Column("field_name", String(120), nullable=False),
+        Column("field_value_hash", String(64), nullable=False),
+        Column("license_policy", String(80), nullable=False, server_default="metadata_only"),
+        Column("first_seen_at", DateTime, nullable=False),
+        Column("last_seen_at", DateTime, nullable=False),
+        Column("confidence", Float, nullable=False, server_default="0"),
+        Column("persisted_value_allowed", Boolean, nullable=False, server_default="false"),
+        extend_existing=True,
+    )
+    datasheet_documents = Table(
+        "datasheet_documents", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("component_id", Integer, ForeignKey("electronic_components.id"), nullable=False),
+        Column("document_title", String(300), nullable=False),
+        Column("revision", String(80)),
+        Column("document_date", String(40)),
+        Column("language", String(20)),
+        Column("pages", Integer),
+        Column("source_provider", String(80), nullable=False),
+        Column("source_reference", Text),
+        Column("distribution_policy", String(50), nullable=False, server_default="metadata_only"),
+        Column("pdf_storage_provider", String(40)),
+        Column("pdf_internal_reference", Text),
+        Column("sha256", String(64)),
+        Column("file_size", BigInteger),
+        Column("verification_status", String(30), nullable=False, server_default="needs_review"),
+        Column("is_active", Boolean, nullable=False, server_default="true"),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    board_components = Table(
+        "board_components", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("board_id", Integer, ForeignKey("hardware_boards.id"), nullable=False),
+        Column("component_id", Integer, ForeignKey("electronic_components.id"), nullable=False),
+        Column("reference_designator", String(50)),
+        Column("source_resource_id", Integer, ForeignKey("technical_resources.id")),
+        Column("verified", Boolean, nullable=False, server_default="false"),
+        Column("created_at", DateTime, nullable=False),
+        UniqueConstraint("board_id", "component_id", "reference_designator", name="uq_board_component_ref"),
+        extend_existing=True,
+    )
+    datasheet_queue_requested_by = (
+        Column("requested_by", Integer, ForeignKey("user.id"))
+        if "user" in tables else Column("requested_by", Integer)
+    )
+    datasheet_queue_reviewed_by = (
+        Column("reviewed_by", Integer, ForeignKey("user.id"))
+        if "user" in tables else Column("reviewed_by", Integer)
+    )
+    datasheet_import_queue = Table(
+        "datasheet_import_queue", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("part_number", String(160), nullable=False),
+        Column("normalized_part_number", String(160), nullable=False),
+        Column("manufacturer_hint", String(160)),
+        Column("source_board_id", Integer, ForeignKey("hardware_boards.id")),
+        Column("source_resource_id", Integer, ForeignKey("technical_resources.id")),
+        Column("priority", Integer, nullable=False, server_default="0"),
+        Column("status", String(40), nullable=False, server_default="queued"),
+        Column("requested_strategy", String(30), nullable=False, server_default="priority_fallback"),
+        Column("attempt_count", Integer, nullable=False, server_default="0"),
+        Column("best_confidence", Float, nullable=False, server_default="0"),
+        Column("selected_provider", String(80)),
+        Column("candidate_count", Integer, nullable=False, server_default="0"),
+        Column("result_json", Text),
+        Column("conflict_json", Text),
+        Column("component_id", Integer, ForeignKey("electronic_components.id")),
+        datasheet_queue_requested_by,
+        datasheet_queue_reviewed_by,
+        Column("admin_decision", String(40)),
+        Column("created_at", DateTime, nullable=False),
+        Column("started_at", DateTime),
+        Column("finished_at", DateTime),
+        Column("error_message", Text),
+        extend_existing=True,
+    )
+    datasheet_demands = Table(
+        "datasheet_demands", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("normalized_query", String(160), nullable=False, unique=True),
+        Column("display_query", String(160), nullable=False),
+        Column("request_count", Integer, nullable=False, server_default="1"),
+        Column("last_requested_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    datasheet_provider_events = Table(
+        "datasheet_provider_events", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("provider", String(80), nullable=False),
+        Column("normalized_query", String(160), nullable=False),
+        Column("status", String(40), nullable=False),
+        Column("result_count", Integer, nullable=False, server_default="0"),
+        Column("selected", Boolean, nullable=False, server_default="false"),
+        Column("exact_match", Boolean, nullable=False, server_default="false"),
+        Column("confidence", Float),
+        Column("conflict", Boolean, nullable=False, server_default="false"),
+        Column("duration_ms", Integer, nullable=False, server_default="0"),
+        Column("message", String(500)),
+        Column("created_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
 
     created = 0
     tables_to_create = [
         webhook_events, content_requests, hardware_boards, content_sources,
         technical_resources, technical_files, import_jobs, import_items,
-        file_contributions,
+        file_contributions, datasheet_provider_configs, electronic_components,
+        component_aliases, component_source_records, datasheet_documents,
+        board_components, datasheet_import_queue, datasheet_demands,
+        datasheet_provider_events,
     ]
     for table in tables_to_create:
         if table.name not in tables:
@@ -434,6 +635,9 @@ def migrate() -> None:
             "technical_notes": "TEXT",
         })
         applied += create_auxiliary_tables(connection)
+        applied += add_missing_columns(connection, "datasheet_provider_configs", {
+            "requests_per_month": "INTEGER NOT NULL DEFAULT 0",
+        })
         applied += add_missing_columns(connection, "technical_resources", {
             "external_id": "VARCHAR(255)",
             "external_version": "VARCHAR(120)",
@@ -471,6 +675,12 @@ def migrate() -> None:
             ("import_items", "CREATE INDEX IF NOT EXISTS ix_import_items_status ON import_items (status)"),
             ("file_contributions", "CREATE INDEX IF NOT EXISTS ix_file_contributions_status ON file_contributions (status)"),
             ("file_contributions", "CREATE INDEX IF NOT EXISTS ix_file_contributions_import_item_id ON file_contributions (import_item_id)"),
+            ("datasheet_provider_configs", "CREATE INDEX IF NOT EXISTS ix_datasheet_provider_name ON datasheet_provider_configs (provider_name)"),
+            ("electronic_components", "CREATE INDEX IF NOT EXISTS ix_component_part_number ON electronic_components (normalized_part_number)"),
+            ("electronic_components", "CREATE INDEX IF NOT EXISTS ix_component_published ON electronic_components (is_published)"),
+            ("datasheet_import_queue", "CREATE INDEX IF NOT EXISTS ix_datasheet_queue_status_priority ON datasheet_import_queue (status, priority)"),
+            ("datasheet_provider_events", "CREATE INDEX IF NOT EXISTS ix_datasheet_event_provider_created ON datasheet_provider_events (provider, created_at)"),
+            ("datasheet_demands", "CREATE INDEX IF NOT EXISTS ix_datasheet_demand_count ON datasheet_demands (request_count)"),
         ):
             if inspect(connection).has_table(table_name):
                 connection.execute(text(statement))

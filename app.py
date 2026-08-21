@@ -636,11 +636,17 @@ def get_admin_posts_overview() -> dict[str, int]:
 
 
 DEFAULT_DOWNLOAD_FILE_TYPES = [
-    {'label': 'BIOS'},
-    {'label': 'EC'},
-    {'label': 'ME'},
-    {'label': 'Outros'},
+    {'label': 'BIOS', 'icon': 'fas fa-microchip', 'color': '#3a86ff'},
+    {'label': 'EC', 'icon': 'fas fa-memory', 'color': '#7c3aed'},
+    {'label': 'ME', 'icon': 'fas fa-shield-alt', 'color': '#f59e0b'},
+    {'label': 'Outros', 'icon': 'fas fa-file-archive', 'color': '#64748b'},
+    {'label': 'BoardView', 'icon': 'fas fa-project-diagram', 'color': '#0891b2'},
 ]
+
+DOWNLOAD_FILE_TYPE_PRESENTATION = {
+    item['label'].casefold(): dict(item)
+    for item in DEFAULT_DOWNLOAD_FILE_TYPES
+}
 
 CATEGORY_ICON_FALLBACKS = {
     'bios': 'fas fa-microchip',
@@ -656,7 +662,20 @@ CATEGORY_ICON_FALLBACKS = {
 def normalize_download_file_type_label(value: Any) -> str:
     label = str(value or '').strip()
     label = re.sub(r'\s+', ' ', label)
-    return label[:30]
+    aliases = {
+        'bios': 'BIOS', 'ec': 'EC', 'me': 'ME',
+        'outro': 'Outros', 'outros': 'Outros',
+        'board view': 'BoardView', 'boardview': 'BoardView',
+    }
+    return aliases.get(label.casefold(), label)[:30]
+
+
+def get_download_file_type_presentation(value: Any) -> dict[str, str]:
+    label = normalize_download_file_type_label(value) or 'Outros'
+    presentation = DOWNLOAD_FILE_TYPE_PRESENTATION.get(label.casefold())
+    if presentation:
+        return dict(presentation)
+    return {'label': label, 'icon': 'fas fa-file', 'color': '#64748b'}
 
 
 def normalize_download_file_types(raw_types: Any) -> list[dict[str, str]]:
@@ -686,7 +705,11 @@ def normalize_download_file_types(raw_types: Any) -> list[dict[str, str]]:
 def get_download_file_types() -> list[dict[str, str]]:
     configured_types = SiteConfig.get_value('download_file_types', None)
     normalized_types = normalize_download_file_types(configured_types)
-    return normalized_types or [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES]
+    merged_labels = [item['label'] for item in DEFAULT_DOWNLOAD_FILE_TYPES]
+    merged_labels.extend(item['label'] for item in normalized_types)
+    unique_labels = list(dict.fromkeys(label.casefold() for label in merged_labels))
+    label_by_key = {label.casefold(): label for label in merged_labels}
+    return [get_download_file_type_presentation(label_by_key[key]) for key in unique_labels[:12]]
 
 
 def get_download_file_type_labels() -> list[str]:
@@ -1668,7 +1691,7 @@ def normalize_download_files(raw_value):
         if not file_url:
             raise ValueError('Um dos links de download é inválido.')
         normalized_files.append({
-            'type': sanitize_input(str(item.get('type') or 'Arquivo'))[:50],
+            'type': normalize_download_file_type_label(item.get('type') or 'Outros'),
             'url': file_url,
             'name': sanitize_input(str(item.get('name') or ''))[:200],
             'format': sanitize_input(str(item.get('format') or ''))[:30],
@@ -1680,30 +1703,61 @@ def normalize_download_files(raw_value):
 
 def get_public_download_files(post):
     """Expõe metadados úteis sem revelar os links externos de origem."""
-    persisted_files = TechnicalFile.query.filter_by(post_id=post.id, is_active=True).order_by(TechnicalFile.id.asc()).all()
-    if persisted_files:
-        return [technical_file.public_dict() for technical_file in persisted_files]
-
     files = post.get_metadata('download_files') or []
-    if not isinstance(files, list):
-        return []
-    public_files = []
-    for index, item in enumerate(files):
-        if not isinstance(item, dict):
+    if isinstance(files, list) and files:
+        public_files = []
+        for index, item in enumerate(files):
+            if not isinstance(item, dict):
+                continue
+            try:
+                file_hash = normalize_sha256(item.get('sha256')) or ''
+            except ValueError:
+                file_hash = ''
+            public_files.append({
+                'type': normalize_download_file_type_label(item.get('type') or 'Outros'),
+                'name': sanitize_input(str(item.get('name') or ''))[:200],
+                'format': sanitize_input(str(item.get('format') or ''))[:30],
+                'size': sanitize_input(str(item.get('size') or ''))[:50],
+                'sha256': file_hash,
+                'url': url_for('download_post', post_id=post.id, file=index),
+            })
+        return public_files
+
+    persisted_files = TechnicalFile.query.filter_by(
+        post_id=post.id, is_active=True,
+    ).order_by(TechnicalFile.id.asc()).all()
+    return [technical_file.public_dict() for technical_file in persisted_files]
+
+
+def sync_post_download_summary(post, download_files):
+    """Sincroniza o resumo e registros legados sem trocar BIOS/EC pela ordem de clique."""
+    if not download_files:
+        return
+
+    types = list(dict.fromkeys(
+        normalize_download_file_type_label(item.get('type') or 'Outros')
+        for item in download_files
+    ))
+    formats = list(dict.fromkeys(
+        sanitize_input(str(item.get('format') or '')).upper()[:30]
+        for item in download_files if item.get('format')
+    ))
+    post.file_type = '/'.join(types)[:80] or None
+    post.file_extension = '/'.join(formats)[:30] or None
+    post.technical_file_size = sanitize_input(str(download_files[0].get('size') or ''))[:50] or None
+
+    persisted_files = TechnicalFile.query.filter_by(post_id=post.id).all() if post.id else []
+    for item in download_files:
+        source_url = normalize_download_url(item.get('url'))
+        if not source_url:
             continue
-        try:
-            file_hash = normalize_sha256(item.get('sha256')) or ''
-        except ValueError:
-            file_hash = ''
-        public_files.append({
-            'type': sanitize_input(str(item.get('type') or 'Arquivo'))[:50],
-            'name': sanitize_input(str(item.get('name') or ''))[:200],
-            'format': sanitize_input(str(item.get('format') or ''))[:30],
-            'size': sanitize_input(str(item.get('size') or ''))[:50],
-            'sha256': file_hash,
-            'url': url_for('download_post', post_id=post.id, file=index),
-        })
-    return public_files
+        technical_file = next((candidate for candidate in persisted_files if source_url in {
+            candidate.provider_url, candidate.provider_direct_url, candidate.source_url,
+        }), None)
+        if not technical_file:
+            continue
+        technical_file.file_type = normalize_download_file_type_label(item.get('type') or 'Outros')[:80]
+        technical_file.extension = sanitize_input(str(item.get('format') or ''))[:30] or None
 
 
 def format_technical_file_size(size_bytes):
@@ -1722,20 +1776,27 @@ def format_technical_file_size(size_bytes):
     return f'{size:.{precision}f} {units[unit_index]}'
 
 
-def apply_post_technical_form(post, form):
+def apply_post_technical_form(post, form, *, preserve_missing=False):
     """Valida e aplica os campos técnicos enviados pelo painel."""
     for field_name in POST_TECHNICAL_FIELDS:
+        if preserve_missing and field_name not in form:
+            continue
         raw_value = str(form.get(field_name, '') or '').strip()
         max_length = 2000 if field_name in {'compatibility', 'technical_notes'} else 160
         setattr(post, field_name, sanitize_input(raw_value[:max_length]) or None)
 
-    status = str(form.get('verification_status', 'unverified') or 'unverified').strip().lower()
+    raw_status = str(form.get('verification_status', '') or '').strip().lower()
+    if preserve_missing and 'verification_status' not in form:
+        return
+    status = raw_status or 'unverified'
     if status not in VERIFICATION_STATUSES:
         raise ValueError('Status de verificação inválido.')
 
     post.verification_status = status
-    post.last_verified_at = parse_optional_date(form.get('last_verified_at'))
-    post.sha256 = normalize_sha256(form.get('sha256'))
+    if not preserve_missing or 'last_verified_at' in form:
+        post.last_verified_at = parse_optional_date(form.get('last_verified_at'))
+    if not preserve_missing or 'sha256' in form:
+        post.sha256 = normalize_sha256(form.get('sha256'))
 
 
 def post_search_values(post):
@@ -6047,13 +6108,24 @@ def download_post(post_id):
 
     technical_file = None
     persisted = TechnicalFile.query.filter_by(post_id=post.id, is_active=True).order_by(TechnicalFile.id.asc()).all()
-    if selected_index is not None and selected_index < len(persisted):
-        technical_file = persisted[selected_index]
-    if not technical_file and redirect_url.startswith(('http://', 'https://')):
+    if redirect_url.startswith(('http://', 'https://')):
         technical_file = TechnicalFile.query.filter(
             TechnicalFile.post_id == post.id,
-            db.or_(TechnicalFile.provider_direct_url == redirect_url, TechnicalFile.provider_url == redirect_url),
+            db.or_(
+                TechnicalFile.provider_direct_url == redirect_url,
+                TechnicalFile.provider_url == redirect_url,
+                TechnicalFile.source_url == redirect_url,
+            ),
         ).first()
+    if not technical_file and not selected_metadata and selected_index is not None and selected_index < len(persisted):
+        technical_file = persisted[selected_index]
+    if technical_file and selected_metadata:
+        technical_file.file_type = normalize_download_file_type_label(
+            selected_metadata.get('type') or technical_file.file_type or 'Outros'
+        )[:80]
+        technical_file.extension = sanitize_input(
+            str(selected_metadata.get('format') or technical_file.extension or '')
+        )[:30] or None
     if not technical_file:
         resource = TechnicalResource.query.filter_by(post_id=post.id).first()
         if not resource:
@@ -9257,13 +9329,14 @@ def admin_update_post(post_id):
         post.seo_title = seo_title or None
         post.seo_description = seo_description or None
         post.date_updated = datetime.utcnow()
-        apply_post_technical_form(post, request.form)
+        apply_post_technical_form(post, request.form, preserve_missing=True)
 
         # Armazenar download_files no custom_metadata
         if download_files_json:
             download_files = normalize_download_files(download_files_json)
             if download_files:
                 post.set_metadata('download_files', download_files)
+                sync_post_download_summary(post, download_files)
                 if not download_link:
                     post.download_link = download_files[0]['url']
 
@@ -11302,6 +11375,7 @@ def admin_create_post():
             download_files = normalize_download_files(download_files_json)
             if download_files:
                 new_post.set_metadata('download_files', download_files)
+                sync_post_download_summary(new_post, download_files)
 
         db.session.commit()
 

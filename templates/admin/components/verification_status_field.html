@@ -1,0 +1,38 @@
+{% set verification_prefix = technical_prefix or '' %}
+<div class="form-group verification-status-field">
+    <label class="form-label" for="{{ verification_prefix }}verification_status">
+        <i class="fas fa-user-check" aria-hidden="true"></i> Status de verificação
+        <span class="optional-field-label">Opcional</span>
+    </label>
+    <select class="form-control modern-select icon-select-native"
+            id="{{ verification_prefix }}verification_status"
+            name="verification_status">
+        <option value="" data-icon="fas fa-minus-circle" data-color="#64748b">Não informado</option>
+        <option value="unverified" data-icon="fas fa-question-circle" data-color="#f59e0b">Não verificado</option>
+        <option value="verified" data-icon="fas fa-check-circle" data-color="#16a34a">Verificado</option>
+        <option value="needs_review" data-icon="fas fa-search" data-color="#7c3aed">Revisão necessária</option>
+    </select>
+    <div class="icon-select verification-icon-select" data-icon-select data-source-select="{{ verification_prefix }}verification_status">
+        <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="icon-select-current">
+                <i class="fas fa-minus-circle"></i>
+                <span>Não informado</span>
+            </span>
+            <i class="fas fa-chevron-down icon-select-arrow"></i>
+        </button>
+        <div class="icon-select-menu" role="listbox">
+            <button type="button" class="icon-select-option" data-value="" data-icon="fas fa-minus-circle" data-color="#64748b" role="option">
+                <i class="fas fa-minus-circle"></i><span>Não informado</span>
+            </button>
+            <button type="button" class="icon-select-option" data-value="unverified" data-icon="fas fa-question-circle" data-color="#f59e0b" role="option">
+                <i class="fas fa-question-circle"></i><span>Não verificado</span>
+            </button>
+            <button type="button" class="icon-select-option" data-value="verified" data-icon="fas fa-check-circle" data-color="#16a34a" role="option">
+                <i class="fas fa-check-circle"></i><span>Verificado</span>
+            </button>
+            <button type="button" class="icon-select-option" data-value="needs_review" data-icon="fas fa-search" data-color="#7c3aed" role="option">
+                <i class="fas fa-search"></i><span>Revisão necessária</span>
+            </button>
+        </div>
+    </div>
+</div>

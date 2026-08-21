@@ -229,7 +229,7 @@
                             <div class="multi-file-item">
                                 <a href="{{ url_for('download_post', post_id=post.id, file=loop.index0) }}" class="btn-download-primary download-btn" data-action="download">
                                     <i class="fas fa-download" aria-hidden="true"></i>
-                                    <span>Download {{ df.name or df.type or ('Arquivo ' ~ loop.index) }}</span>
+                                    <span>Download {{ df.type or ('Arquivo ' ~ loop.index) }}</span>
                                     {% if df.size %}<span class="download-button-size">{{ df.size }}</span>{% endif %}
                                 </a>
                                 {% if df.format %}<small>{{ df.format }}</small>{% endif %}
@@ -246,7 +246,8 @@
                         {% else %}
                         <a href="{{ url_for('download_post', post_id=post.id) }}" class="btn-download-primary download-btn" data-action="download">
                             <i class="fas fa-download"></i>
-                            <span>Fazer Download{% if dl_files_detail and dl_files_detail[0].size %} ({{ dl_files_detail[0].size }}){% endif %}</span>
+                            <span>Download {{ (dl_files_detail[0].type if dl_files_detail else post.file_type) or 'Arquivo' }}</span>
+                            {% if dl_files_detail and dl_files_detail[0].size %}<span class="download-button-size">{{ dl_files_detail[0].size }}</span>{% endif %}
                         </a>
                         {% endif %}
                         <p class="download-notice">

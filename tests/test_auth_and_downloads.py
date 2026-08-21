@@ -7,6 +7,7 @@ from app import (
     NewsletterGroup,
     Post,
     Subscriber,
+    TechnicalFile,
     User,
     _get_chat_permissions_for_user,
     app,
@@ -222,8 +223,58 @@ def test_post_detail_places_each_file_size_inside_download_button(client):
     body = client.get(f"/post/{post_id}").get_data(as_text=True)
     assert '<span class="download-button-size">8 MB</span>' in body
     assert '<span class="download-button-size">4 MB</span>' in body
+    assert '<span>Download BIOS</span>' in body
+    assert '<span>Download EC</span>' in body
+    assert "Download bios.bin" not in body
+    assert "Download ec.bin" not in body
     assert body.count("Miniatura ilustrativa") == 1
     assert body.count("<strong>Atenção:</strong>") == 1
+
+
+def test_download_metadata_remains_source_of_truth_after_out_of_order_download(client):
+    post_id = create_multi_file_post()
+    with app.app_context():
+        db.session.add_all([
+            TechnicalFile(
+                post_id=post_id, display_filename="arquivo-generico.bin", file_type="Arquivo",
+                storage_provider="http", provider_url="https://files.example.test/ec.bin",
+                provider_direct_url="https://files.example.test/ec.bin", is_active=True,
+            ),
+            TechnicalFile(
+                post_id=post_id, display_filename="tipo-incorreto.bin", file_type="EC",
+                storage_provider="http", provider_url="https://files.example.test/bios.bin",
+                provider_direct_url="https://files.example.test/bios.bin", is_active=True,
+            ),
+        ])
+        db.session.commit()
+
+    payload = client.get(f"/api/posts/{post_id}").get_json()
+    assert [item["type"] for item in payload["download_files"]] == ["BIOS", "EC"]
+
+    vip_id = create_user("download_order", plan="vip")
+    login_session(client, vip_id)
+    response = client.get(f"/download/{post_id}?file=0")
+    assert response.status_code == 302
+    assert response.headers["Location"] == "https://files.example.test/bios.bin"
+
+
+def test_admin_post_modals_use_simplified_file_fields_and_visual_steps(client):
+    admin_id = create_user("post_modal_admin", role="admin")
+    with app.app_context():
+        db.session.add(Category(name="BIOS", slug="bios", is_active=True, is_visible=True))
+        db.session.commit()
+    login_session(client, admin_id)
+
+    body = client.get("/admin/posts").get_data(as_text=True)
+    assert body.count('class="steps-progress-track"') == 2
+    assert "Informações técnicas" not in body
+    assert "Nome do arquivo (opcional)" not in body
+    assert "SHA-256 (opcional)" not in body
+    assert 'data-icon="fas fa-microchip" data-color="#3a86ff">BIOS</option>' in body
+    assert 'data-icon="fas fa-project-diagram"' in body
+    assert body.count('data-value="verified" data-icon="fas fa-check-circle"') == 2
+    assert body.index('name="download_size_unit_0"') < body.index('name="download_size_0"')
+    assert "window.enhanceDownloadTypeSelect" in body
 
 
 def test_search_suggestions_expose_all_download_file_types(client):

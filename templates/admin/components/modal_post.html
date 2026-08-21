@@ -92,16 +92,27 @@
         position: relative !important;
     }
 
-    /* Linha de fundo conectando os steps */
-    #addPostModal .form-steps::before {
-        content: '' !important;
+    #addPostModal .steps-progress-track {
         position: absolute !important;
         top: 20px !important;
-        left: 20px !important;
-        right: 20px !important;
+        left: 16.6667% !important;
+        right: 16.6667% !important;
         height: 3px !important;
         background: #e9ecef !important;
         z-index: 1 !important;
+        overflow: hidden;
+    }
+
+    #addPostModal .steps-progress-fill {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #28a745;
+        transition: width 0.3s ease;
+    }
+
+    #addPostModal .form-steps .step:not(:last-child)::after {
+        display: none !important;
     }
 
     /* Cada step individual */
@@ -112,7 +123,7 @@
         position: relative !important;
         z-index: 2 !important;
         cursor: pointer !important;
-        flex: 0 0 auto !important;
+        flex: 1 1 0 !important;
         transition: all 0.3s ease !important;
     }
 
@@ -208,9 +219,12 @@
     }
 
     #addPostModal .download-type-select {
-        flex: 0 0 120px !important;
-        width: 120px !important;
-        max-width: 120px !important;
+        flex: 0 0 1px !important;
+    }
+
+    #addPostModal .download-type-icon-select {
+        flex: 0 0 150px;
+        width: 150px;
     }
 
     #addPostModal .download-url-group {
@@ -223,7 +237,7 @@
         gap: 8px;
         align-items: center;
         margin-bottom: 8px;
-        margin-left: 128px;
+        margin-left: 158px;
     }
 
     #addPostModal .download-size-input {
@@ -233,10 +247,28 @@
     }
 
     #addPostModal .download-size-unit {
-        width: 96px !important;
-        max-width: 96px !important;
-        flex: 0 0 96px !important;
+        width: 108px !important;
+        max-width: 108px !important;
+        flex: 0 0 108px !important;
         padding-right: 2.25rem !important;
+    }
+
+    #addPostModal .download-format-row {
+        margin-left: 158px;
+        max-width: 226px;
+    }
+
+    #addPostModal .verification-status-field {
+        margin: 0 12px 1rem;
+        max-width: 420px;
+    }
+
+    .optional-field-label {
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 600;
+        margin-left: 0.35rem;
+        text-transform: uppercase;
     }
 
     .icon-select-native {
@@ -275,7 +307,7 @@
 
     .icon-select-current i,
     .icon-select-option i {
-        color: var(--admin-primary, #3a86ff);
+        color: var(--option-color, var(--admin-primary, #3a86ff));
         width: 18px;
         text-align: center;
     }
@@ -340,6 +372,10 @@
     .icon-select-option.active {
         background: rgba(58, 134, 255, 0.1);
         color: var(--admin-primary, #3a86ff);
+    }
+
+    .verification-icon-select .icon-select-option {
+        border-left: 3px solid var(--option-color, #64748b);
     }
 
     .download-types-toolbar {
@@ -410,6 +446,25 @@
         margin-top: 0.75rem;
     }
 
+    @media (max-width: 640px) {
+        #addPostModal .download-entry-row {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        #addPostModal .download-type-icon-select,
+        #addPostModal .download-url-group {
+            flex: 1 1 auto;
+            width: 100%;
+        }
+
+        #addPostModal .download-size-row,
+        #addPostModal .download-format-row {
+            margin-left: 0;
+            max-width: none;
+        }
+    }
+
 </style>
 <div class="modal" id="addPostModal">
     <div class="modal-content modal-xl">
@@ -423,6 +478,7 @@
         <div class="modal-body">
             <!-- Progress Steps -->
             <div class="form-steps">
+                <div class="steps-progress-track" aria-hidden="true"><span class="steps-progress-fill"></span></div>
                 <div class="step active" data-step="1">
                     <span class="step-number">1</span>
                     <span class="step-title">Informações Básicas</span>
@@ -582,7 +638,7 @@
                                         <div class="download-entry-row">
                                             <select name="download_type_0" class="form-select download-type-select">
                                                 {% for file_type in download_file_types %}
-                                                <option value="{{ file_type.label }}">{{ file_type.label }}</option>
+                                                <option value="{{ file_type.label }}" data-icon="{{ file_type.icon }}" data-color="{{ file_type.color }}">{{ file_type.label }}</option>
                                                 {% endfor %}
                                             </select>
                                             <div class="input-group download-url-group">
@@ -596,17 +652,16 @@
                                             </div>
                                         </div>
                                         <div class="download-size-row">
-                                            <input type="text" name="download_size_0" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
                                             <select name="download_size_unit_0" class="form-select download-size-unit">
-                                                <option value="MB">MB</option>
-                                                <option value="GB">GB</option>
                                                 <option value="KB">KB</option>
+                                                <option value="MB" selected>MB</option>
+                                                <option value="GB">GB</option>
                                             </select>
+                                            <input type="text" name="download_size_0" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
                                         </div>
-                                        <div class="download-file-metadata-row">
-                                            <input type="text" name="download_name_0" class="form-control modern-input download-name-input" maxlength="200" placeholder="Nome do arquivo (opcional)">
-                                            <input type="text" name="download_format_0" class="form-control modern-input download-format-input" maxlength="30" placeholder="Formato, ex.: BIN">
-                                            <input type="text" name="download_sha256_0" class="form-control modern-input download-sha256-input" minlength="64" maxlength="64" pattern="[A-Fa-f0-9]{64}" spellcheck="false" placeholder="SHA-256 (opcional)">
+                                        <div class="download-format-row">
+                                            <label class="form-label" for="downloadFormat0"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>
+                                            <input type="text" id="downloadFormat0" name="download_format_0" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">
                                         </div>
                                     </div>
                                 </div>
@@ -640,14 +695,6 @@
                                 {% endif %}
                             </div>
 
-                            <div class="form-group">
-                                <label for="postVersion" class="form-label">
-                                    <i class="fas fa-code-branch"></i> Versão
-                                </label>
-                                <input type="text" id="postVersion" name="version"
-                                       class="form-control modern-input"
-                                       placeholder="Ex: 2.1.0, v1.5, 2023.1">
-                            </div>
                         </div>
 
                         <div class="col-md-6" style="flex: 0 0 50% !important; max-width: 50% !important; width: 50% !important; padding: 0 12px !important; box-sizing: border-box !important;">
@@ -697,7 +744,7 @@
                         </div>
                     </div>
                     {% set technical_prefix = 'create_' %}
-                    {% include 'admin/components/technical_fields.html' %}
+                    {% include 'admin/components/verification_status_field.html' %}
                 </div>
 
                 <!-- Step 3: SEO & Publicação -->

@@ -424,6 +424,7 @@
         <div class="modal-body">
             <!-- Progress Steps -->
             <div class="form-steps">
+                <div class="steps-progress-track" aria-hidden="true"><span class="steps-progress-fill"></span></div>
                 <div class="step active" data-step="1">
                     <span class="step-number">1</span>
                     <span class="step-title">Informações Básicas</span>
@@ -618,7 +619,7 @@
                     </div>
 
                     {% set technical_prefix = 'edit_' %}
-                    {% include 'admin/components/technical_fields.html' %}
+                    {% include 'admin/components/verification_status_field.html' %}
 
                     <div class="step-navigation">
                         <button type="button" class="btn-admin btn-admin-outline" onclick="prevEditStep()">
@@ -716,6 +717,11 @@
         modal.querySelectorAll('.step-content').forEach((contentEl) => {
             contentEl.classList.toggle('active', Number(contentEl.getAttribute('data-step')) === normalizedStep);
         });
+
+        const progressFill = modal.querySelector('.steps-progress-fill');
+        if (progressFill) {
+            progressFill.style.width = `${((normalizedStep - 1) / (window.EDIT_TOTAL_STEPS - 1)) * 100}%`;
+        }
 
         window.currentEditStep = normalizedStep;
     };
@@ -1361,16 +1367,9 @@
             document.getElementById('editPostFeatured').checked = post.featured || false;
             document.getElementById('editPostActive').checked = post.is_active !== false; // Default true
 
-            const technicalFields = [
-                'manufacturer', 'brand', 'model', 'series', 'board_code', 'board_revision',
-                'platform', 'bios_chip', 'ec_chip', 'me_chip', 'file_type', 'file_extension',
-                'technical_file_size', 'version', 'sha256', 'last_verified_at',
-                'verification_status', 'compatibility', 'technical_notes'
-            ];
-            technicalFields.forEach((fieldName) => {
-                const field = document.getElementById(`edit_${fieldName}`);
-                if (field) field.value = post[fieldName] || (fieldName === 'verification_status' ? 'unverified' : '');
-            });
+            const verificationField = document.getElementById('edit_verification_status');
+            if (verificationField) verificationField.value = post.verification_status || '';
+            window.refreshIconSelects?.();
 
             // Atualizar preview SEO
             updateEditSeoPreview();
@@ -1407,11 +1406,11 @@
             }
 
             files.forEach(function(f, i) {
-                addEditDownloadEntry(f.type, f.url, f.size || '', i === 0, f.name || '', f.format || '', f.sha256 || '');
+                addEditDownloadEntry(f.type, f.url, f.size || '', i === 0, f.format || '');
             });
         }
 
-        function addEditDownloadEntry(type, url, size, isFirst, name, format, sha256) {
+        function addEditDownloadEntry(type, url, size, isFirst, format) {
             var container = document.getElementById('editDownloadLinksContainer');
             var idx = editDownloadIdx++;
             var entry = document.createElement('div');
@@ -1434,23 +1433,21 @@
                 '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip">' +
                 '</div>' + removeHtml + '</div>' +
                 '<div class="download-size-row">' +
-                '<input type="number" name="edit_download_size_' + idx + '" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0" value="' + sizeVal + '">' +
                 '<select name="edit_download_size_unit_' + idx + '" class="form-select download-size-unit">' +
+                '<option value="KB"' + (sizeUnit === 'KB' ? ' selected' : '') + '>KB</option>' +
                 '<option value="MB"' + (sizeUnit === 'MB' ? ' selected' : '') + '>MB</option>' +
                 '<option value="GB"' + (sizeUnit === 'GB' ? ' selected' : '') + '>GB</option>' +
-                '<option value="KB"' + (sizeUnit === 'KB' ? ' selected' : '') + '>KB</option>' +
                 '</select>' +
+                '<input type="number" name="edit_download_size_' + idx + '" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0" value="' + sizeVal + '">' +
                 '</div>' +
-                '<div class="download-file-metadata-row">' +
-                '<input type="text" class="form-control modern-input download-name-input" maxlength="200" placeholder="Nome do arquivo (opcional)">' +
-                '<input type="text" class="form-control modern-input download-format-input" maxlength="30" placeholder="Formato, ex.: BIN">' +
-                '<input type="text" class="form-control modern-input download-sha256-input" minlength="64" maxlength="64" pattern="[A-Fa-f0-9]{64}" spellcheck="false" placeholder="SHA-256 (opcional)">' +
+                '<div class="download-format-row">' +
+                '<label class="form-label" for="editDownloadFormat' + idx + '"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>' +
+                '<input type="text" id="editDownloadFormat' + idx + '" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">' +
                 '</div>';
             container.appendChild(entry);
             entry.querySelector('input[type="url"]').value = url || '';
-            entry.querySelector('.download-name-input').value = name || '';
             entry.querySelector('.download-format-input').value = format || '';
-            entry.querySelector('.download-sha256-input').value = sha256 || '';
+            window.enhanceDownloadTypeSelect?.(entry.querySelector('.download-type-select'));
 
             var removeBtn = entry.querySelector('.edit-remove-dl');
             if (removeBtn) {
@@ -1459,7 +1456,7 @@
         }
 
         document.getElementById('editAddDownloadEntry')?.addEventListener('click', function() {
-            addEditDownloadEntry('BIOS', '', '', false, '', '', '');
+            addEditDownloadEntry('BIOS', '', '', false, '');
         });
 
         function collectEditDownloadData() {
@@ -1469,8 +1466,8 @@
                 var sel = entry.querySelector('select');
                 var inp = entry.querySelector('input[type="url"]');
                 if (sel && inp && inp.value.trim()) {
-                    var sizeInput = entry.querySelector('input[type="number"]');
-                    var unitSelect = entry.querySelectorAll('select')[1];
+                    var sizeInput = entry.querySelector('.download-size-input');
+                    var unitSelect = entry.querySelector('.download-size-unit');
                     var size = '';
                     if (sizeInput && sizeInput.value) {
                         var unit = unitSelect ? unitSelect.value : 'MB';
@@ -1479,10 +1476,8 @@
                     files.push({
                         type: sel.value,
                         url: inp.value.trim(),
-                        name: entry.querySelector('.download-name-input')?.value.trim() || '',
                         format: entry.querySelector('.download-format-input')?.value.trim() || '',
-                        size: size,
-                        sha256: entry.querySelector('.download-sha256-input')?.value.trim() || ''
+                        size: size
                     });
                 }
             });
@@ -1661,23 +1656,34 @@
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        margin-bottom: 2rem;
+        margin: 0 auto 2rem;
+        max-width: 600px;
         padding: 0;
         position: relative;
         gap: 0;
     }
 
-    #editPostModal .form-steps::before {
-        content: '';
+    #editPostModal .steps-progress-track {
         position: absolute;
         top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: calc(100% - 160px);
-        max-width: 600px;
+        left: 16.6667%;
+        right: 16.6667%;
         height: 2px;
         background: #e0e0e0;
         z-index: 0;
+        overflow: hidden;
+    }
+
+    #editPostModal .steps-progress-fill {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #28a745;
+        transition: width 0.3s ease;
+    }
+
+    #editPostModal .form-steps .step:not(:last-child)::after {
+        display: none !important;
     }
 
     #editPostModal .form-steps .step {
@@ -1688,7 +1694,6 @@
         position: relative;
         z-index: 1;
         flex: 1;
-        max-width: 200px;
     }
 
     #editPostModal .form-steps .step-number {
@@ -1786,9 +1791,12 @@
     }
 
     #editPostModal .download-type-select {
-        flex: 0 0 120px !important;
-        width: 120px !important;
-        max-width: 120px !important;
+        flex: 0 0 1px !important;
+    }
+
+    #editPostModal .download-type-icon-select {
+        flex: 0 0 150px;
+        width: 150px;
     }
 
     #editPostModal .download-url-group {
@@ -1801,7 +1809,7 @@
         gap: 8px;
         align-items: center;
         margin-bottom: 8px;
-        margin-left: 128px;
+        margin-left: 158px;
     }
 
     #editPostModal .download-size-input {
@@ -1811,10 +1819,39 @@
     }
 
     #editPostModal .download-size-unit {
-        width: 96px !important;
-        max-width: 96px !important;
-        flex: 0 0 96px !important;
+        width: 108px !important;
+        max-width: 108px !important;
+        flex: 0 0 108px !important;
         padding-right: 2.25rem !important;
+    }
+
+    #editPostModal .download-format-row {
+        margin-left: 158px;
+        max-width: 226px;
+    }
+
+    #editPostModal .verification-status-field {
+        margin: 0 15px 1rem;
+        max-width: 420px;
+    }
+
+    @media (max-width: 640px) {
+        #editPostModal .download-entry-row {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        #editPostModal .download-type-icon-select,
+        #editPostModal .download-url-group {
+            flex: 1 1 auto;
+            width: 100%;
+        }
+
+        #editPostModal .download-size-row,
+        #editPostModal .download-format-row {
+            margin-left: 0;
+            max-width: none;
+        }
     }
 
     /* Melhorar editor rico no modal */

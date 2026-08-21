@@ -31,7 +31,15 @@ function initPostWizard() {
     const addPostForm = document.getElementById('addPostForm');
     const saveBtnDefaultHtml = saveBtn ? saveBtn.innerHTML : '';
     const VALIDATABLE_FIELDS_SELECTOR = 'input, select, textarea';
+    const DOWNLOAD_TYPE_PRESENTATION = {
+        bios: { icon: 'fas fa-microchip', color: '#3a86ff' },
+        ec: { icon: 'fas fa-memory', color: '#7c3aed' },
+        me: { icon: 'fas fa-shield-alt', color: '#f59e0b' },
+        outros: { icon: 'fas fa-file-archive', color: '#64748b' },
+        boardview: { icon: 'fas fa-project-diagram', color: '#0891b2' }
+    };
     let downloadTypes = getConfiguredDownloadTypes();
+    let downloadTypeSelectId = 0;
 
     if (!nextBtn || !prevBtn || !saveBtn) {
         console.error('Botões do wizard não encontrados!');
@@ -56,7 +64,7 @@ function initPostWizard() {
     }
 
     function getConfiguredDownloadTypes() {
-        const fallbackTypes = [{ label: 'BIOS' }, { label: 'EC' }, { label: 'ME' }, { label: 'Outros' }];
+        const fallbackTypes = ['BIOS', 'EC', 'ME', 'Outros', 'BoardView'].map(getDownloadTypePresentation);
         const script = document.getElementById('download-file-types-data');
 
         try {
@@ -66,13 +74,23 @@ function initPostWizard() {
             }
 
             const normalized = parsed
-                .map((item) => ({ label: String(item?.label || item || '').trim() }))
+                .map((item) => getDownloadTypePresentation(item?.label || item, item))
                 .filter((item, index, list) => item.label && list.findIndex((candidate) => candidate.label.toLowerCase() === item.label.toLowerCase()) === index);
 
             return normalized.length ? normalized : fallbackTypes;
         } catch (_error) {
             return fallbackTypes;
         }
+    }
+
+    function getDownloadTypePresentation(value, source = {}) {
+        const label = String(value || '').trim() || 'Outros';
+        const preset = DOWNLOAD_TYPE_PRESENTATION[label.toLowerCase().replace(/\s+/g, '')] || {};
+        return {
+            label,
+            icon: String(source?.icon || preset.icon || 'fas fa-file'),
+            color: String(source?.color || preset.color || '#64748b')
+        };
     }
 
     function escapeHtml(value) {
@@ -92,9 +110,52 @@ function initPostWizard() {
             optionLabels.push(selected);
         }
 
-        return optionLabels.map((label) => (
-            `<option value="${escapeHtml(label)}"${label === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
-        )).join('');
+        return optionLabels.map((label) => {
+            const presentation = getDownloadTypePresentation(label, downloadTypes.find((item) => item.label === label));
+            return `<option value="${escapeHtml(label)}" data-icon="${escapeHtml(presentation.icon)}" data-color="${escapeHtml(presentation.color)}"${label === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('');
+    }
+
+    function enhanceDownloadTypeSelect(select) {
+        if (!select) return;
+
+        const previousWrapper = select.nextElementSibling?.matches('.download-type-icon-select')
+            ? select.nextElementSibling
+            : null;
+        previousWrapper?.remove();
+        if (!select.id) {
+            select.id = `downloadTypeSelect${++downloadTypeSelectId}`;
+        }
+        select.classList.add('icon-select-native');
+
+        const options = Array.from(select.options).map((option) => ({
+            value: option.value,
+            label: option.textContent.trim(),
+            icon: option.dataset.icon || getDownloadTypePresentation(option.value).icon,
+            color: option.dataset.color || getDownloadTypePresentation(option.value).color
+        }));
+        const selected = options.find((option) => option.value === select.value) || options[0];
+        const wrapper = document.createElement('div');
+        wrapper.className = 'icon-select download-type-icon-select';
+        wrapper.dataset.iconSelect = '';
+        wrapper.dataset.sourceSelect = select.id;
+        wrapper.innerHTML = `
+            <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="icon-select-current" style="--option-color:${escapeHtml(selected?.color || '#64748b')}">
+                    <i class="${escapeHtml(selected?.icon || 'fas fa-file')}"></i>
+                    <span>${escapeHtml(selected?.label || 'Outros')}</span>
+                </span>
+                <i class="fas fa-chevron-down icon-select-arrow"></i>
+            </button>
+            <div class="icon-select-menu" role="listbox">
+                ${options.map((option) => `
+                    <button type="button" class="icon-select-option" data-value="${escapeHtml(option.value)}" data-icon="${escapeHtml(option.icon)}" data-color="${escapeHtml(option.color)}" style="--option-color:${escapeHtml(option.color)}" role="option">
+                        <i class="${escapeHtml(option.icon)}"></i><span>${escapeHtml(option.label)}</span>
+                    </button>
+                `).join('')}
+            </div>`;
+        select.insertAdjacentElement('afterend', wrapper);
+        initIconSelects(select.parentElement || document);
     }
 
     function refreshDownloadTypeSelects() {
@@ -104,6 +165,7 @@ function initPostWizard() {
             if (!select.value && downloadTypes[0]) {
                 select.value = downloadTypes[0].label;
             }
+            enhanceDownloadTypeSelect(select);
         });
     }
 
@@ -244,9 +306,9 @@ function initPostWizard() {
 
     function getConfiguredDownloadTypesFromPayload(payload) {
         const normalized = Array.isArray(payload)
-            ? payload.map((item) => ({ label: String(item?.label || item || '').trim() })).filter((item) => item.label)
+            ? payload.map((item) => getDownloadTypePresentation(item?.label || item, item)).filter((item) => item.label)
             : [];
-        return normalized.length ? normalized : [{ label: 'BIOS' }];
+        return normalized.length ? normalized : [getDownloadTypePresentation('BIOS')];
     }
 
     function initIconSelects(root = document) {
@@ -298,12 +360,15 @@ function initPostWizard() {
 
         const selectedOption = select.options[select.selectedIndex] || select.options[0];
         const icon = selectedOption?.dataset?.icon || 'fas fa-folder';
+        const color = selectedOption?.dataset?.color || '#3a86ff';
         const label = selectedOption?.textContent?.trim() || 'Selecione uma categoria';
 
         current.innerHTML = `<i class="${escapeHtml(icon)}"></i><span>${escapeHtml(label)}</span>`;
+        current.style.setProperty('--option-color', color);
 
         wrapper.querySelectorAll('.icon-select-option').forEach((option) => {
             option.classList.toggle('active', (option.dataset.value || '') === select.value);
+            option.style.setProperty('--option-color', option.dataset.color || '#3a86ff');
         });
     }
 
@@ -464,6 +529,11 @@ function initPostWizard() {
             if (prevStepEl) {
                 prevStepEl.classList.add('completed');
             }
+        }
+
+        const progressFill = addPostModal.querySelector('.steps-progress-fill');
+        if (progressFill) {
+            progressFill.style.width = `${((step - 1) / (totalSteps - 1)) * 100}%`;
         }
 
         // Controlar visibilidade dos botões
@@ -867,20 +937,20 @@ function initPostWizard() {
                     </button>
                 </div>
                 <div class="download-size-row">
-                    <input type="text" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
                     <select name="download_size_unit_${idx}" class="form-select download-size-unit">
-                        <option value="MB">MB</option>
-                        <option value="GB">GB</option>
                         <option value="KB">KB</option>
+                        <option value="MB" selected>MB</option>
+                        <option value="GB">GB</option>
                     </select>
+                    <input type="text" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
                 </div>
-                <div class="download-file-metadata-row">
-                    <input type="text" name="download_name_${idx}" class="form-control modern-input download-name-input" maxlength="200" placeholder="Nome do arquivo (opcional)">
-                    <input type="text" name="download_format_${idx}" class="form-control modern-input download-format-input" maxlength="30" placeholder="Formato, ex.: BIN">
-                    <input type="text" name="download_sha256_${idx}" class="form-control modern-input download-sha256-input" minlength="64" maxlength="64" pattern="[A-Fa-f0-9]{64}" spellcheck="false" placeholder="SHA-256 (opcional)">
+                <div class="download-format-row">
+                    <label class="form-label" for="downloadFormat${idx}"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>
+                    <input type="text" id="downloadFormat${idx}" name="download_format_${idx}" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">
                 </div>
             `;
             container.appendChild(entry);
+            enhanceDownloadTypeSelect(entry.querySelector('.download-type-select'));
 
             // bind remove
             entry.querySelector('.remove-download-entry').addEventListener('click', function() {
@@ -931,7 +1001,7 @@ function initPostWizard() {
             const urlInput = entry.querySelector('input[type="url"]');
             if (typeSelect && urlInput && urlInput.value.trim()) {
                 const sizeInput = entry.querySelector('.download-size-input');
-                const unitSelect = entry.querySelectorAll('select')[1];
+                const unitSelect = entry.querySelector('.download-size-unit');
                 let size = '';
                 if (sizeInput) {
                     const normalizedSize = normalizeDownloadSizeValue(sizeInput.value);
@@ -947,10 +1017,8 @@ function initPostWizard() {
                 files.push({
                     type: typeSelect.value,
                     url: urlInput.value.trim(),
-                    name: entry.querySelector('.download-name-input')?.value.trim() || '',
                     format: entry.querySelector('.download-format-input')?.value.trim() || '',
-                    size: size,
-                    sha256: entry.querySelector('.download-sha256-input')?.value.trim() || ''
+                    size: size
                 });
             }
         });
@@ -969,6 +1037,7 @@ function initPostWizard() {
     window.adminDownloadTypes = downloadTypes;
     window.renderDownloadTypeOptions = renderDownloadTypeOptions;
     window.refreshDownloadTypeSelects = refreshDownloadTypeSelects;
+    window.enhanceDownloadTypeSelect = enhanceDownloadTypeSelect;
     window.initializeIconSelects = initIconSelects;
     window.refreshIconSelects = function () {
         initIconSelects(document);

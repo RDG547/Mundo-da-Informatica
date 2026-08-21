@@ -1,6 +1,15 @@
 import os
+import sys
+from pathlib import Path
 
 import pytest
+
+
+# Mantém o módulo principal importável tanto com ``python -m pytest`` quanto
+# pelo executável ``pytest`` instalado no ambiente virtual.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 # A aplicação lê estas variáveis durante o import. O banco em memória impede
@@ -10,6 +19,10 @@ os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["FLASK_ENV"] = "development"
 os.environ["SITE_URL"] = "https://mundodainformatica.com"
 os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+# A suíte legada valida o feature flag de rollback por redirect. Testes do
+# motor técnico ativam explicitamente o modo proxy e garantem que ele não
+# devolve a URL externa.
+os.environ["DOWNLOAD_DELIVERY_MODE"] = "redirect"
 
 from app import app, db, limiter  # noqa: E402
 

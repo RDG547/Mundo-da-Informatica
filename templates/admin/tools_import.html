@@ -1,1067 +1,259 @@
 {% extends "admin/base.html" %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/technical-import.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="admin-header slide-in-up">
-    <h1>Importação de Dados</h1>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('admin_tools_backup') }}" class="btn-admin btn-admin-outline">
-            <i class="fas fa-database"></i> Backup do Sistema
-        </a>
-    </div>
-</div>
-
-<div class="admin-card slide-in-up">
-    <div class="admin-card-header">
-        <h2 class="admin-card-title">Importar Dados</h2>
-        <div class="info-badge">
-            <i class="fas fa-info-circle"></i> Importe dados a partir de arquivos CSV, Excel, ou JSON
+<div class="technical-import-page" id="technicalImportPage">
+    <header class="admin-header technical-import-header">
+        <div>
+            <span class="technical-eyebrow"><i class="fas fa-microchip"></i> Ingestão auditável</span>
+            <h1>Motor de Conteúdo Técnico</h1>
+            <p>Importe, normalize, revise e publique sem expor o storage ao visitante.</p>
         </div>
-    </div>
+        <button class="btn-admin btn-admin-primary" type="button" data-open-import>
+            <i class="fas fa-plus"></i> Nova importação
+        </button>
+    </header>
 
-    <div class="admin-card-body">
-        <div class="import-steps">
-            <div class="import-step active" id="step1">
-                <div class="step-header">
-                    <div class="step-number">1</div>
-                    <h3>Selecione o tipo de dados</h3>
-                </div>
-                <div class="step-content">
-                    <div class="form-group">
-                        <label for="importType">O que você deseja importar?</label>
-                        <select id="importType" class="form-control">
-                            <option value="">Selecione um tipo de dados...</option>
-                            <option value="posts">Posts</option>
-                            <option value="categories">Categorias</option>
-                            <option value="users">Usuários</option>
-                            <option value="files">Arquivos</option>
-                            <option value="subscribers">Assinantes da Newsletter</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="importFile">Upload do arquivo</label>
-                        <div class="file-upload-container">
-                            <input type="file" id="importFile" class="file-upload-input" accept=".csv,.xlsx,.json">
-                            <label for="importFile" class="file-upload-label">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <span class="file-upload-text">Arraste ou clique para selecionar um arquivo</span>
-                            </label>
-                        </div>
-                        <div class="upload-info" id="uploadInfo" style="display:none">
-                            <div class="file-name" id="fileName"></div>
-                            <div class="file-size" id="fileSize"></div>
-                            <button class="btn-remove-file" id="removeFile">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div class="form-text">
-                            Formatos suportados: CSV, Excel (.xlsx), JSON. Tamanho máximo: 10MB
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button class="btn-admin btn-admin-primary" id="continueToStep2" disabled>
-                            Continuar <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                </div>
+    <section class="automation-console admin-card">
+        <div class="admin-card-header">
+            <div>
+                <h2 class="admin-card-title"><i class="fas fa-robot"></i> Controle da automação</h2>
+                <p>O modo completo ainda respeita confiança, política da fonte, distribuição e storage.</p>
             </div>
-
-            <div class="import-step" id="step2">
-                <div class="step-header">
-                    <div class="step-number">2</div>
-                    <h3>Mapeamento de dados</h3>
-                </div>
-                <div class="step-content">
-                    <div class="mapping-container">
-                        <div class="mapping-info">
-                            <p>Mapeie as colunas do seu arquivo para os campos do sistema</p>
-                        </div>
-
-                        <div class="mapping-table-container">
-                            <table class="admin-table mapping-table">
-                                <thead>
-                                    <tr>
-                                        <th>Campo do Sistema</th>
-                                        <th>Coluna do Arquivo</th>
-                                        <th>Valor Padrão (opcional)</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mappingFields">
-                                    <!-- Os campos serão gerados dinamicamente baseados no tipo selecionado -->
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="preview-section" id="previewSection" style="display:none">
-                            <h4>Visualização dos Dados</h4>
-                            <div class="preview-table-container">
-                                <table class="admin-table preview-table" id="previewTable">
-                                    <!-- Visualização dos dados será gerada aqui -->
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button class="btn-admin btn-admin-outline" id="backToStep1">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </button>
-                        <button class="btn-admin btn-admin-primary" id="continueToStep3">
-                            Continuar <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="import-step" id="step3">
-                <div class="step-header">
-                    <div class="step-number">3</div>
-                    <h3>Configurar importação</h3>
-                </div>
-                <div class="step-content">
-                    <div class="config-options">
-                        <div class="form-group">
-                            <label>Comportamento para duplicatas</label>
-                            <div class="radio-group">
-                                <div class="form-check">
-                                    <input type="radio" id="skipDuplicates" name="duplicateAction" class="form-check-input" checked>
-                                    <label for="skipDuplicates" class="form-check-label">Pular registros duplicados</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="radio" id="overwriteDuplicates" name="duplicateAction" class="form-check-input">
-                                    <label for="overwriteDuplicates" class="form-check-label">Sobrescrever registros duplicados</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="radio" id="keepBoth" name="duplicateAction" class="form-check-input">
-                                    <label for="keepBoth" class="form-check-label">Manter ambos (pode criar duplicatas)</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Opções adicionais</label>
-                            <div class="checkbox-group">
-                                <div class="form-check">
-                                    <input type="checkbox" id="ignoreErrors" class="form-check-input">
-                                    <label for="ignoreErrors" class="form-check-label">Ignorar erros e continuar importação</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="checkbox" id="sendNotification" class="form-check-input" checked>
-                                    <label for="sendNotification" class="form-check-label">Enviar notificação quando finalizar</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="checkbox" id="createBackup" class="form-check-input" checked>
-                                    <label for="createBackup" class="form-check-label">Criar backup antes de importar</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="import-summary">
-                            <h4>Resumo da Importação</h4>
-                            <div class="summary-item">
-                                <span class="summary-label">Tipo de dados:</span>
-                                <span class="summary-value" id="summaryType">Usuários</span>
-                            </div>
-                            <div class="summary-item">
-                                <span class="summary-label">Arquivo:</span>
-                                <span class="summary-value" id="summaryFile">usuarios.csv</span>
-                            </div>
-                            <div class="summary-item">
-                                <span class="summary-label">Registros identificados:</span>
-                                <span class="summary-value" id="summaryRecords">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button class="btn-admin btn-admin-outline" id="backToStep2">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </button>
-                        <button class="btn-admin btn-admin-success" id="startImport">
-                            <i class="fas fa-upload"></i> Iniciar Importação
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="import-step" id="step4">
-                <div class="step-header">
-                    <div class="step-number">4</div>
-                    <h3>Processando importação</h3>
-                </div>
-                <div class="step-content">
-                    <div class="processing-container" id="processingContainer">
-                        <div class="progress-section">
-                            <div class="progress-status">
-                                <div class="status-icon processing">
-                                    <i class="fas fa-sync-alt fa-spin"></i>
-                                </div>
-                                <h4>Importação em andamento</h4>
-                                <p class="status-message">Processando seus dados...</p>
-                            </div>
-
-                            <div class="progress-bar-container">
-                                <div class="progress-bar-outer">
-                                    <div class="progress-bar-inner" id="importProgressBar" style="width: 0%"></div>
-                                </div>
-                                <div class="progress-text">
-                                    <span id="importProgressText">0%</span>
-                                    <span id="importCountText">0 de 0 registros processados</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="log-section">
-                            <h4>Log de Importação</h4>
-                            <div class="log-container" id="importLog">
-                                <div class="log-entry info">
-                                    <span class="log-time">00:00:00</span>
-                                    <span class="log-message">Iniciando processo de importação...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="complete-container" id="completeContainer" style="display:none">
-                        <div class="success-section">
-                            <div class="success-icon">
-                                <i class="fas fa-check-circle"></i>
-                            </div>
-                            <h3>Importação Concluída!</h3>
-                            <p>Todos os dados foram processados com sucesso.</p>
-
-                            <div class="import-stats">
-                                <div class="stat-item">
-                                    <div class="stat-value" id="statTotal">0</div>
-                                    <div class="stat-label">Total Processado</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value success" id="statSuccess">0</div>
-                                    <div class="stat-label">Importados</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value warning" id="statSkipped">0</div>
-                                    <div class="stat-label">Pulados</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value danger" id="statError">0</div>
-                                    <div class="stat-label">Erros</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-actions">
-                            <a href="{{ url_for('admin_tools_import') }}" class="btn-admin btn-admin-outline">
-                                <i class="fas fa-redo"></i> Nova Importação
-                            </a>
-                            <a href="#" class="btn-admin btn-admin-primary" id="viewImportedData">
-                                <i class="fas fa-eye"></i> Ver Dados Importados
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% if not automation.feature_enabled %}
+            <span class="technical-badge danger">Bloqueado no ambiente</span>
+            {% endif %}
         </div>
-    </div>
-</div>
+        <form id="automationForm" class="automation-grid">
+            <label class="automation-switch">
+                <input type="checkbox" name="technical_import_enabled" {% if automation.configured_enabled %}checked{% endif %}>
+                <span><strong>Automação ativa</strong><small>Permite sincronizações e jobs automáticos; previews manuais continuam disponíveis.</small></span>
+            </label>
+            <label>
+                <span>Modo de publicação</span>
+                <select name="technical_automation_mode" class="form-control">
+                    <option value="off" {% if automation.mode == 'off' %}selected{% endif %}>Desativada</option>
+                    <option value="semi" {% if automation.mode == 'semi' %}selected{% endif %}>Semiautomática — exige aprovação</option>
+                    <option value="full" {% if automation.mode == 'full' %}selected{% endif %}>Automática — conforme percentual e elegibilidade</option>
+                </select>
+            </label>
+            <label>
+                <span>Percentual de rollout <strong data-percentage-output>{{ automation.percentage }}%</strong></span>
+                <input type="range" min="0" max="100" step="5" name="technical_automation_percentage" value="{{ automation.percentage }}">
+            </label>
+            <label>
+                <span>Confiança mínima <strong data-threshold-output>{{ automation.threshold }}%</strong></span>
+                <input type="range" min="0" max="100" step="1" name="technical_auto_publish_threshold" value="{{ automation.threshold }}">
+            </label>
+            <label class="automation-switch">
+                <input type="checkbox" name="technical_require_storage_ready" {% if automation.require_storage_ready %}checked{% endif %}>
+                <span><strong>Exigir storage pronto</strong><small>Bloqueia publicação de arquivos sem origem distribuível.</small></span>
+            </label>
+            <button type="submit" class="btn-admin btn-admin-success"><i class="fas fa-save"></i> Salvar automação</button>
+        </form>
+    </section>
 
-<div class="admin-card slide-in-up">
-    <div class="admin-card-header">
-        <h2 class="admin-card-title">Histórico de Importação</h2>
-    </div>
+    <nav class="technical-tabs" aria-label="Seções do motor">
+        <button class="active" data-tab="reviews"><i class="fas fa-eye"></i> Previews <span>{{ review_items|length }}</span></button>
+        <button data-tab="automatic"><i class="fas fa-magic"></i> Publicados automáticos <span>{{ automatic_items|length }}</span></button>
+        <button data-tab="jobs"><i class="fas fa-tasks"></i> Jobs <span>{{ jobs|length }}</span></button>
+        <button data-tab="sources"><i class="fas fa-satellite-dish"></i> Fontes <span>{{ sources|length }}</span></button>
+        <button data-tab="health"><i class="fas fa-heartbeat"></i> Links</button>
+        <button data-tab="contributions"><i class="fas fa-hands-helping"></i> Contribuições <span>{{ contributions|length }}</span></button>
+    </nav>
 
-    <div class="table-responsive">
-        <table class="admin-table">
-            <thead>
+    <section class="technical-panel active" data-panel="reviews">
+        {% if review_items %}
+        <div class="preview-grid">
+            {% for item in review_items %}
+            {% set metadata = item.normalized_data() %}
+            <article class="preview-card" data-item-id="{{ item.id }}">
+                <header>
+                    <div>
+                        <span class="technical-badge {{ item.status }}">{{ item.status|replace('_', ' ') }}</span>
+                        <h3>{{ (metadata.get('copy') or {}).get('title') or metadata.get('title') or item.source_name }}</h3>
+                    </div>
+                    <div class="confidence-ring" style="--confidence: {{ item.confidence }}" title="Confiança da classificação">
+                        {{ item.confidence }}%
+                    </div>
+                </header>
+                <dl class="preview-details">
+                    <div><dt>Fabricante</dt><dd>{{ metadata.get('manufacturer') or 'Não identificado' }}</dd></div>
+                    <div><dt>Modelo</dt><dd>{{ metadata.get('model') or 'Não identificado' }}</dd></div>
+                    <div><dt>Placa</dt><dd>{{ metadata.get('board_code') or 'Não identificada' }}</dd></div>
+                    <div><dt>Revisão</dt><dd>{{ metadata.get('board_revision') or '—' }}</dd></div>
+                    <div><dt>Tipo</dt><dd>{{ metadata.get('file_type') or 'Arquivo técnico' }}</dd></div>
+                    <div><dt>Chip/posição</dt><dd>{{ metadata.get('chip_type') or '—' }} {{ metadata.get('chip_position') or '' }}</dd></div>
+                    <div><dt>SHA-256</dt><dd class="hash-value">{{ item.sha256 or 'Será obtido no storage' }}</dd></div>
+                    <div><dt>Fonte</dt><dd>{{ metadata.get('source_provider') or item.job.source }}</dd></div>
+                    <div><dt>Storage</dt><dd>{{ 'Pronto' if item.temp_path or metadata.get('provider_url') or metadata.get('provider_direct_url') else 'Pendente' }}</dd></div>
+                    <div><dt>Política</dt><dd>{{ metadata.get('distribution_policy') or 'unknown' }}</dd></div>
+                </dl>
+                {% if item.decision_reason %}<p class="decision-reason"><i class="fas fa-info-circle"></i> {{ item.decision_reason }}</p>{% endif %}
+                <div class="preview-actions">
+                    {% if item.status not in ['duplicate', 'error'] %}
+                    <button class="btn-admin btn-admin-outline" type="button" data-edit-item><i class="fas fa-edit"></i> Editar</button>
+                    <button class="btn-admin btn-admin-success" type="button" data-approve-item><i class="fas fa-check"></i> Aprovar</button>
+                    <button class="btn-admin btn-admin-danger" type="button" data-reject-item><i class="fas fa-times"></i> Rejeitar</button>
+                    {% else %}
+                    <span class="muted-note">Este item permanece no histórico e não será publicado.</span>
+                    {% endif %}
+                </div>
+                <script type="application/json" data-item-metadata>{{ metadata|tojson }}</script>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="technical-empty"><i class="fas fa-check-circle"></i><h3>Nenhuma revisão pendente</h3><p>Novos itens e duplicados aparecerão aqui.</p></div>
+        {% endif %}
+    </section>
+
+    <section class="technical-panel" data-panel="automatic">
+        <div class="technical-table-wrap">
+            <table class="technical-table">
+                <thead><tr><th>Post</th><th>Fonte</th><th>Confiança</th><th>Arquivo/placa</th><th>Publicado em</th><th>Ação</th></tr></thead>
+                <tbody>
+                {% for item in automatic_items %}
+                {% set metadata = item.normalized_data() %}
+                <tr><td>{{ (metadata.get('copy') or {}).get('title') or metadata.get('title') or item.source_name }}</td><td>{{ item.job.source }}</td><td>{{ item.confidence }}%</td><td>{{ metadata.get('file_type') or 'Arquivo' }}{% if metadata.get('board_code') %} · {{ metadata.get('board_code') }}{% endif %}</td><td>{{ item.reviewed_at.strftime('%d/%m/%Y %H:%M') if item.reviewed_at else '—' }}</td><td>{% if item.post_id %}<a class="btn-admin btn-admin-outline" href="{{ url_for('post', post_id=item.post_id) }}"><i class="fas fa-external-link-alt"></i> Ver post</a>{% endif %}</td></tr>
+                {% else %}<tr><td colspan="6">Nenhum post foi publicado automaticamente ainda.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="technical-panel" data-panel="jobs">
+        <div class="technical-table-wrap">
+            <table class="technical-table">
+                <thead><tr><th>ID</th><th>Tipo</th><th>Origem</th><th>Modo</th><th>Status</th><th>Resultado</th><th>Criado em</th></tr></thead>
+                <tbody>
+                {% for job in jobs %}
                 <tr>
-                    <th>Data/Hora</th>
-                    <th>Tipo</th>
-                    <th>Arquivo</th>
-                    <th>Usuário</th>
-                    <th>Registros</th>
-                    <th>Status</th>
-                    <th>Ações</th>
+                    <td>#{{ job.id }}</td><td>{{ job.job_type }}</td><td>{{ job.source }}</td><td>{{ job.automation_mode }}</td>
+                    <td><span class="technical-badge {{ job.status }}">{{ job.status }}</span></td>
+                    <td>{{ job.success_count }} publicados · {{ job.duplicate_count }} duplicados · {{ job.error_count }} erros</td>
+                    <td>{{ job.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                 </tr>
-            </thead>
-            <tbody>
-                {% if import_history %}
-                    {% for item in import_history %}
-                    <tr>
-                        <td>{{ item.date }}</td>
-                        <td>{{ item.type }}</td>
-                        <td>{{ item.file }}</td>
-                        <td>{{ item.user }}</td>
-                        <td>{{ item.records }}</td>
-                        <td><span class="status-badge status-success">Concluído</span></td>
-                        <td class="actions">
-                            <a href="#" class="btn-action btn-view" title="Ver Detalhes">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                <tr class="empty-state">
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: #6c757d;">
-                        <i class="fas fa-history fa-2x" style="margin-bottom: 1rem; opacity: 0.5;"></i>
-                        <p>Nenhum histórico de importação encontrado.</p>
-                    </td>
-                </tr>
+                {% else %}<tr><td colspan="7">Nenhum job executado.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="technical-panel" data-panel="sources">
+        <div class="source-grid">
+            {% for source in sources %}
+            <article class="source-card" data-source-id="{{ source.id }}">
+                <header><div class="trust-level">{{ source.trust_level }}</div><div><h3>{{ source.name }}</h3><p>{{ source.provider_type }}</p></div></header>
+                <label><input type="checkbox" data-source-field="enabled" {% if source.enabled %}checked{% endif %}> Ativa</label>
+                <label><input type="checkbox" data-source-field="auto_publish" {% if source.auto_publish %}checked{% endif %}> Pode publicar automaticamente</label>
+                <label><input type="checkbox" data-source-field="metadata_allowed" {% if source.metadata_allowed %}checked{% endif %}> Uso de metadados autorizado</label>
+                <label><input type="checkbox" data-source-field="distribution_allowed" {% if source.distribution_allowed %}checked{% endif %}> Distribuição autorizada</label>
+                <label><input type="checkbox" data-source-field="file_mirroring_allowed" {% if source.file_mirroring_allowed %}checked{% endif %}> Espelhamento autorizado</label>
+                <label><input type="checkbox" data-source-field="attribution_required" {% if source.attribution_required %}checked{% endif %}> Exige atribuição da fonte</label>
+                <label>Nível
+                    <select data-source-field="trust_level" class="form-control">
+                        {% for level in ['A', 'B', 'C', 'D'] %}<option value="{{ level }}" {% if source.trust_level == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+                    </select>
+                </label>
+                {% if source.provider_type not in ['manual', 'contribution'] %}
+                <label>Part numbers monitorados
+                    <textarea rows="3" data-source-field="part_numbers" placeholder="Um por linha">{{ source.configuration().get('part_numbers', [])|join('\n') }}</textarea>
+                </label>
                 {% endif %}
-            </tbody>
-        </table>
+                <div class="source-actions">
+                    <button type="button" class="btn-admin btn-admin-outline" data-save-source><i class="fas fa-save"></i> Salvar fonte</button>
+                    {% if source.provider_type not in ['manual', 'contribution'] %}
+                    <button type="button" class="btn-admin btn-admin-primary" data-sync-source><i class="fas fa-sync-alt"></i> Sincronizar agora</button>
+                    {% endif %}
+                </div>
+                {% if source.last_sync_at %}<p class="muted-note">Sincronizada em {{ source.last_sync_at.strftime('%d/%m/%Y %H:%M') }}</p>{% endif %}
+                {% if source.last_error %}<p class="source-error">{{ source.last_error }}</p>{% endif %}
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="technical-panel" data-panel="health">
+        <div class="health-summary">
+            <i class="fas fa-shield-alt"></i>
+            <div><h3>Storage invisível e verificável</h3><p>Os testes de link são executados no servidor. URLs e identificadores do provider não aparecem nesta interface pública nem nas APIs públicas.</p></div>
+        </div>
+        <div class="health-metrics">
+            <article><strong>{{ link_health.total }}</strong><span>Arquivos ativos</span></article>
+            <article class="online"><strong>{{ link_health.active }}</strong><span>Online</span></article>
+            <article class="broken"><strong>{{ link_health.broken }}</strong><span>Quebrados</span></article>
+            <article><strong>{{ link_health.unchecked }}</strong><span>Não verificados</span></article>
+        </div>
+        <div class="technical-table-wrap">
+            <table class="technical-table">
+                <thead><tr><th>Arquivo</th><th>Provider</th><th>Status</th><th>HTTP</th><th>Última verificação</th><th>Ação</th></tr></thead>
+                <tbody>{% for file in health_files %}<tr data-health-file-id="{{ file.id }}"><td>{{ file.display_filename }}</td><td>{{ file.storage_provider }}</td><td><span class="technical-badge {{ file.link_status }}" data-health-status>{{ file.link_status }}</span></td><td data-health-http>{{ file.last_link_http_status or '—' }}</td><td data-health-date>{{ file.last_link_check_at.strftime('%d/%m/%Y %H:%M') if file.last_link_check_at else 'Nunca' }}</td><td><button type="button" class="btn-admin btn-admin-outline" data-check-health><i class="fas fa-heartbeat"></i> Verificar</button></td></tr>{% else %}<tr><td colspan="6">Nenhum arquivo técnico publicado.</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
+        <a class="btn-admin btn-admin-outline" href="{{ url_for('admin_posts') }}"><i class="fas fa-file-download"></i> Gerenciar arquivos publicados</a>
+    </section>
+
+    <section class="technical-panel" data-panel="contributions">
+        <div class="technical-table-wrap">
+            <table class="technical-table">
+                <thead><tr><th>ID</th><th>Arquivo</th><th>Usuário</th><th>Placa</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead>
+                <tbody>
+                {% for contribution in contributions %}
+                <tr data-contribution-id="{{ contribution.id }}"><td>#{{ contribution.id }}</td><td>{{ contribution.original_filename }}</td><td>{{ contribution.contributor.username }}</td><td>{{ contribution.board_code or '—' }}</td><td><span class="technical-badge {{ contribution.status }}">{{ contribution.status }}</span></td><td>{{ contribution.created_at.strftime('%d/%m/%Y %H:%M') }}</td><td><div class="source-actions">{% if contribution.status not in ['published', 'rejected', 'duplicate', 'error'] %}<button type="button" class="btn-admin btn-admin-primary" data-analyze-contribution><i class="fas fa-eye"></i> {{ 'Abrir preview' if contribution.import_item_id else 'Gerar preview' }}</button><button type="button" class="btn-admin btn-admin-danger" data-reject-contribution><i class="fas fa-times"></i> Rejeitar</button>{% else %}<span class="muted-note">Sem ações pendentes</span>{% endif %}</div></td></tr>
+                {% else %}<tr><td colspan="7">Nenhuma contribuição enviada.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="technical-modal" id="importModal" aria-hidden="true">
+    <div class="technical-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+        <header><div><span class="technical-eyebrow">Nova análise</span><h2 id="importModalTitle">Importar conteúdo técnico</h2></div><button type="button" data-close-modal aria-label="Fechar">&times;</button></header>
+        <form id="technicalImportForm" enctype="multipart/form-data">
+            <div class="import-kind-grid">
+                <label><input type="radio" name="type" value="files" checked><span><i class="fas fa-file-upload"></i><strong>Arquivos / ZIP / CSV</strong><small>Até 50 uploads por job</small></span></label>
+                <label><input type="radio" name="type" value="part_numbers"><span><i class="fas fa-barcode"></i><strong>Part Numbers</strong><small>Mouser ou DigiKey</small></span></label>
+                <label><input type="radio" name="type" value="link"><span><i class="fas fa-link"></i><strong>Link de storage</strong><small>URL direta privada</small></span></label>
+            </div>
+            <div data-import-fields="files">
+                <label>Arquivos técnicos
+                    <input type="file" name="files" multiple accept=".bin,.rom,.fd,.cap,.hex,.efi,.bio,.pdf,.brd,.bdv,.fz,.sch,.zip,.rar,.7z,.cab,.exe,.msi,.inf,.txt,.csv,.json">
+                </label>
+            </div>
+            <div data-import-fields="part_numbers" hidden>
+                <label>Provedor<select name="provider" class="form-control"><option value="mouser">Mouser</option><option value="digikey">DigiKey</option></select></label>
+                <label>Part numbers<textarea name="part_numbers" rows="5" placeholder="RT8206A&#10;TPS51225"></textarea></label>
+            </div>
+            <div data-import-fields="link" hidden>
+                <label>Link direto do arquivo<input type="url" name="provider_url" placeholder="https://storage.exemplo/arquivo.bin"></label>
+                <label>Nome do arquivo<input type="text" name="filename" placeholder="Lenovo-LA-5751P-U3.bin"></label>
+            </div>
+            <label>Origem técnica<select name="source" class="form-control">{% for source in sources if source.enabled %}<option value="{{ source.name }}">{{ source.name }} (nível {{ source.trust_level }})</option>{% endfor %}</select></label>
+            <div class="modal-actions"><button type="button" class="btn-admin btn-admin-outline" data-close-modal>Cancelar</button><button type="submit" class="btn-admin btn-admin-primary"><i class="fas fa-search"></i> Analisar e gerar previews</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="technical-modal" id="editPreviewModal" aria-hidden="true">
+    <div class="technical-modal-dialog compact" role="dialog" aria-modal="true" aria-labelledby="editPreviewTitle">
+        <header><h2 id="editPreviewTitle">Editar preview</h2><button type="button" data-close-edit aria-label="Fechar">&times;</button></header>
+        <form id="editPreviewForm"><input type="hidden" name="item_id"><div class="edit-grid">
+            <label>Fabricante<input name="manufacturer"></label><label>Modelo<input name="model"></label>
+            <label>Código da placa<input name="board_code"></label><label>Revisão<input name="board_revision"></label>
+            <label>Tipo<input name="file_type"></label><label>Chip/posição<input name="chip_position"></label>
+            <label class="wide">Link direto privado<input type="url" name="provider_url"></label>
+            <label>Política<select name="distribution_policy"><option value="local_allowed">local_allowed</option><option value="external_storage_allowed">external_storage_allowed</option><option value="remote_only">remote_only</option><option value="metadata_only">metadata_only</option><option value="manual_review">manual_review</option><option value="unknown">unknown</option></select></label>
+            <label>Confiança<input type="number" min="0" max="100" name="confidence"></label>
+        </div><div class="modal-actions"><button type="button" class="btn-admin btn-admin-outline" data-close-edit>Cancelar</button><button class="btn-admin btn-admin-success" type="submit">Salvar preview</button></div></form>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<style>
-    /* Estilos para o processo de importação */
-    .import-steps {
-        position: relative;
-    }
-
-    .import-step {
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-        background-color: white;
-        margin-bottom: 1.5rem;
-        display: none;
-    }
-
-    .import-step.active {
-        display: block;
-    }
-
-    .step-header {
-        padding: 1.5rem;
-        background-color: rgba(0, 0, 0, 0.02);
-        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .step-number {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background-color: var(--primary-color);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-    }
-
-    .step-header h3 {
-        margin: 0;
-        font-size: 1.2rem;
-    }
-
-    .step-content {
-        padding: 2rem;
-    }
-
-    /* File Upload */
-    .file-upload-container {
-        position: relative;
-        margin-bottom: 1rem;
-    }
-
-    .file-upload-input {
-        position: absolute;
-        opacity: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 2;
-        cursor: pointer;
-    }
-
-    .file-upload-label {
-        border: 2px dashed rgba(0, 0, 0, 0.1);
-        border-radius: var(--radius-md);
-        padding: 2.5rem 1rem;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1rem;
-        cursor: pointer;
-        transition: var(--transition-normal);
-    }
-
-    .file-upload-label i {
-        font-size: 2.5rem;
-        color: var(--primary-color);
-    }
-
-    .file-upload-label:hover {
-        border-color: var(--primary-color);
-        background-color: rgba(58, 134, 255, 0.05);
-    }
-
-    .upload-info {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background-color: rgba(58, 134, 255, 0.1);
-        border-radius: var(--radius-md);
-        padding: 0.75rem 1rem;
-    }
-
-    .file-name {
-        font-weight: 600;
-        color: var(--primary-color);
-    }
-
-    .file-size {
-        font-size: 0.9rem;
-        color: var(--gray-color);
-    }
-
-    .btn-remove-file {
-        background: none;
-        border: none;
-        color: var(--gray-color);
-        cursor: pointer;
-    }
-
-    .btn-remove-file:hover {
-        color: var(--accent-color);
-    }
-
-    /* Mapping Table */
-    .mapping-table-container {
-        margin-bottom: 2rem;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-
-    .mapping-table select {
-        width: 100%;
-    }
-
-    /* Preview Table */
-    .preview-section {
-        margin-top: 2rem;
-        border-top: 1px solid rgba(0, 0, 0, 0.1);
-        padding-top: 2rem;
-    }
-
-    .preview-section h4 {
-        margin-bottom: 1rem;
-    }
-
-    .preview-table-container {
-        max-height: 300px;
-        overflow-y: auto;
-        margin-bottom: 1rem;
-    }
-
-    /* Processing Status */
-    .progress-section {
-        margin-bottom: 2rem;
-        text-align: center;
-        padding: 2rem;
-        background-color: rgba(0, 0, 0, 0.02);
-        border-radius: var(--radius-md);
-    }
-
-    .progress-status {
-        margin-bottom: 2rem;
-    }
-
-    .status-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-    }
-
-    .status-icon.processing {
-        color: var(--primary-color);
-    }
-
-    .status-icon.success {
-        color: var(--success-color);
-    }
-
-    .status-message {
-        color: var(--gray-color);
-    }
-
-    .progress-bar-container {
-        max-width: 500px;
-        margin: 0 auto;
-    }
-
-    .progress-bar-outer {
-        height: 10px;
-        background-color: rgba(0, 0, 0, 0.1);
-        border-radius: var(--radius-full);
-        overflow: hidden;
-        margin-bottom: 0.5rem;
-    }
-
-    .progress-bar-inner {
-        height: 100%;
-        background-color: var(--primary-color);
-        border-radius: var(--radius-full);
-        transition: width 0.3s ease;
-    }
-
-    .progress-text {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.9rem;
-        color: var(--gray-color);
-    }
-
-    /* Log Section */
-    .log-section {
-        margin-bottom: 2rem;
-    }
-
-    .log-section h4 {
-        margin-bottom: 1rem;
-    }
-
-    .log-container {
-        height: 200px;
-        overflow-y: auto;
-        background-color: #f8f9fa;
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: var(--radius-md);
-        padding: 1rem;
-        font-family: monospace;
-        font-size: 0.9rem;
-    }
-
-    .log-entry {
-        margin-bottom: 0.5rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
-    }
-
-    .log-time {
-        color: var(--gray-color);
-        margin-right: 0.5rem;
-    }
-
-    .log-entry.info .log-message {
-        color: var(--primary-color);
-    }
-
-    .log-entry.success .log-message {
-        color: var(--success-color);
-    }
-
-    .log-entry.warning .log-message {
-        color: var(--warning-color);
-    }
-
-    .log-entry.error .log-message {
-        color: var(--accent-color);
-    }
-
-    /* Complete Section */
-    .success-section {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-
-    .success-icon {
-        font-size: 5rem;
-        color: var(--success-color);
-        margin-bottom: 1.5rem;
-    }
-
-    .import-stats {
-        display: flex;
-        justify-content: center;
-        gap: 2rem;
-        margin-top: 2rem;
-    }
-
-    .stat-item {
-        text-align: center;
-    }
-
-    .stat-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--primary-color);
-        margin-bottom: 0.5rem;
-    }
-
-    .stat-value.success {
-        color: var(--success-color);
-    }
-
-    .stat-value.warning {
-        color: var(--warning-color);
-    }
-
-    .stat-value.danger {
-        color: var(--accent-color);
-    }
-
-    .stat-label {
-        font-size: 0.9rem;
-        color: var(--gray-color);
-    }
-
-    /* Import Summary */
-    .import-summary {
-        background-color: rgba(0, 0, 0, 0.02);
-        border-radius: var(--radius-md);
-        padding: 1.5rem;
-        margin-top: 2rem;
-    }
-
-    .import-summary h4 {
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .summary-item {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.75rem;
-    }
-
-    .summary-label {
-        font-weight: 600;
-    }
-
-    /* Status badges */
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.25rem 0.75rem;
-        border-radius: var(--radius-full);
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-
-    .status-success {
-        background-color: rgba(56, 176, 0, 0.1);
-        color: var(--success-color);
-    }
-
-    .status-warning {
-        background-color: rgba(255, 190, 11, 0.1);
-        color: var(--warning-color);
-    }
-
-    .status-danger {
-        background-color: rgba(255, 0, 110, 0.1);
-        color: var(--accent-color);
-    }
-
-    /* Info Badge */
-    .info-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.5rem 1rem;
-        background-color: rgba(58, 134, 255, 0.1);
-        color: var(--primary-color);
-        border-radius: var(--radius-md);
-        font-size: 0.9rem;
-    }
-
-    .info-badge i {
-        margin-right: 0.5rem;
-    }
-
-    /* Form Actions */
-    .form-actions {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 2rem;
-        gap: 1rem;
-    }
-</style>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Simulação de dados para os campos de mapeamento baseados no tipo selecionado
-        const fieldMappings = {
-            posts: [
-                { field: 'title', label: 'Título', required: true },
-                { field: 'content', label: 'Conteúdo', required: true },
-                { field: 'slug', label: 'Slug', required: false },
-                { field: 'category', label: 'Categoria', required: true },
-                { field: 'tags', label: 'Tags', required: false },
-                { field: 'status', label: 'Status', required: false },
-                { field: 'author', label: 'Autor', required: false },
-                { field: 'date_posted', label: 'Data de Publicação', required: false },
-                { field: 'featured_image', label: 'Imagem Destacada', required: false }
-            ],
-            categories: [
-                { field: 'name', label: 'Nome', required: true },
-                { field: 'slug', label: 'Slug', required: false },
-                { field: 'description', label: 'Descrição', required: false },
-                { field: 'parent', label: 'Categoria Pai', required: false }
-            ],
-            users: [
-                { field: 'username', label: 'Nome de Usuário', required: true },
-                { field: 'email', label: 'Email', required: true },
-                { field: 'password', label: 'Senha', required: true },
-                { field: 'name', label: 'Nome Completo', required: false },
-                { field: 'role', label: 'Papel', required: false }
-            ],
-            files: [
-                { field: 'filename', label: 'Nome do Arquivo', required: true },
-                { field: 'path', label: 'Caminho', required: true },
-                { field: 'type', label: 'Tipo', required: true },
-                { field: 'size', label: 'Tamanho', required: false },
-                { field: 'description', label: 'Descrição', required: false },
-                { field: 'category', label: 'Categoria', required: false }
-            ],
-            subscribers: [
-                { field: 'email', label: 'Email', required: true },
-                { field: 'name', label: 'Nome', required: false },
-                { field: 'status', label: 'Status', required: false },
-                { field: 'group', label: 'Grupo', required: false },
-                { field: 'date_subscribed', label: 'Data de Inscrição', required: false }
-            ]
-        };
-
-        // Simulação de colunas do arquivo
-        const fileColumns = ['email', 'full_name', 'date', 'status', 'group', 'notes'];
-
-        // Elementos DOM
-        const importType = document.getElementById('importType');
-        const importFile = document.getElementById('importFile');
-        const uploadInfo = document.getElementById('uploadInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const removeFile = document.getElementById('removeFile');
-        const continueToStep2 = document.getElementById('continueToStep2');
-        const backToStep1 = document.getElementById('backToStep1');
-        const continueToStep3 = document.getElementById('continueToStep3');
-        const backToStep2 = document.getElementById('backToStep2');
-        const startImport = document.getElementById('startImport');
-        const mappingFields = document.getElementById('mappingFields');
-        const previewSection = document.getElementById('previewSection');
-        const previewTable = document.getElementById('previewTable');
-        const importProgressBar = document.getElementById('importProgressBar');
-        const importProgressText = document.getElementById('importProgressText');
-        const importCountText = document.getElementById('importCountText');
-        const importLog = document.getElementById('importLog');
-        const processingContainer = document.getElementById('processingContainer');
-        const completeContainer = document.getElementById('completeContainer');
-        const summaryType = document.getElementById('summaryType');
-        const summaryFile = document.getElementById('summaryFile');
-        const summaryRecords = document.getElementById('summaryRecords');
-        const statTotal = document.getElementById('statTotal');
-        const statSuccess = document.getElementById('statSuccess');
-        const statSkipped = document.getElementById('statSkipped');
-        const statError = document.getElementById('statError');
-
-        // Evento para upload de arquivo
-        importFile.addEventListener('change', function(e) {
-            if (this.files.length > 0) {
-                const file = this.files[0];
-
-                // Verificar tamanho do arquivo (máximo 10MB)
-                if (file.size > 10 * 1024 * 1024) {
-                    showNotification('O arquivo é muito grande. Tamanho máximo: 10MB', 'error');
-                    this.value = '';
-                    return;
-                }
-
-                // Verificar tipo do arquivo
-                const fileExt = file.name.split('.').pop().toLowerCase();
-                if (!['csv', 'xlsx', 'json'].includes(fileExt)) {
-                    showNotification('Formato de arquivo não suportado. Use CSV, XLSX ou JSON.', 'error');
-                    this.value = '';
-                    return;
-                }
-
-                // Mostrar informações do arquivo
-                fileName.textContent = file.name;
-                fileSize.textContent = formatFileSize(file.size);
-                uploadInfo.style.display = 'flex';
-
-                // Atualizar botão Continuar
-                if (importType.value) {
-                    continueToStep2.disabled = false;
-                }
-
-                // Atualizar resumo
-                summaryFile.textContent = file.name;
-                summaryRecords.textContent = '215'; // Valor simulado
-            }
-        });
-
-        // Remover arquivo
-        removeFile.addEventListener('click', function() {
-            importFile.value = '';
-            uploadInfo.style.display = 'none';
-            continueToStep2.disabled = true;
-        });
-
-        // Evento para selecionar tipo de importação
-        importType.addEventListener('change', function() {
-            if (this.value) {
-                // Habilitar botão Continuar se um arquivo já foi selecionado
-                if (importFile.files.length > 0) {
-                    continueToStep2.disabled = false;
-                }
-
-                // Atualizar resumo
-                summaryType.textContent = this.options[this.selectedIndex].text;
-            } else {
-                continueToStep2.disabled = true;
-            }
-        });
-
-        // Navegar para o Passo 2
-        continueToStep2.addEventListener('click', function() {
-            // Verificar se tipo e arquivo foram selecionados
-            if (!importType.value || importFile.files.length === 0) {
-                showNotification('Por favor, selecione o tipo de dados e o arquivo.', 'warning');
-                return;
-            }
-
-            // Avançar para o passo 2
-            document.getElementById('step1').classList.remove('active');
-            document.getElementById('step2').classList.add('active');
-
-            // Preencher campos de mapeamento
-            populateMappingFields();
-
-            // Mostrar visualização (simulada)
-            showPreview();
-        });
-
-        // Voltar para o Passo 1
-        backToStep1.addEventListener('click', function() {
-            document.getElementById('step2').classList.remove('active');
-            document.getElementById('step1').classList.add('active');
-        });
-
-        // Navegar para o Passo 3
-        continueToStep3.addEventListener('click', function() {
-            document.getElementById('step2').classList.remove('active');
-            document.getElementById('step3').classList.add('active');
-        });
-
-        // Voltar para o Passo 2
-        backToStep2.addEventListener('click', function() {
-            document.getElementById('step3').classList.remove('active');
-            document.getElementById('step2').classList.add('active');
-        });
-
-        // Iniciar Importação
-        startImport.addEventListener('click', function() {
-            document.getElementById('step3').classList.remove('active');
-            document.getElementById('step4').classList.add('active');
-
-            // Simular importação
-            simulateImport();
-        });
-
-        // Função para preencher campos de mapeamento
-        function populateMappingFields() {
-            const selectedType = importType.value;
-            const fields = fieldMappings[selectedType] || [];
-
-            mappingFields.innerHTML = '';
-
-            fields.forEach(field => {
-                const row = document.createElement('tr');
-
-                // Coluna 1: Campo do sistema
-                const tdField = document.createElement('td');
-                tdField.innerHTML = `${field.label} ${field.required ? '<span class="required">*</span>' : ''}`;
-                row.appendChild(tdField);
-
-                // Coluna 2: Mapeamento para coluna do arquivo
-                const tdMapping = document.createElement('td');
-                const select = document.createElement('select');
-                select.className = 'form-control';
-                select.name = `mapping_${field.field}`;
-
-                // Opção para não mapear
-                const optionNone = document.createElement('option');
-                optionNone.value = '';
-                optionNone.textContent = 'Não mapear';
-                select.appendChild(optionNone);
-
-                // Opções baseadas nas colunas do arquivo
-                fileColumns.forEach(column => {
-                    const option = document.createElement('option');
-                    option.value = column;
-                    option.textContent = column;
-
-                    // Auto-selecionar se os nomes coincidirem
-                    if (field.field === column || field.field === column.replace('_', '') || field.field === column.toLowerCase()) {
-                        option.selected = true;
-                    }
-
-                    select.appendChild(option);
-                });
-
-                tdMapping.appendChild(select);
-                row.appendChild(tdMapping);
-
-                // Coluna 3: Valor padrão
-                const tdDefault = document.createElement('td');
-                const inputDefault = document.createElement('input');
-                inputDefault.type = 'text';
-                inputDefault.className = 'form-control';
-                inputDefault.name = `default_${field.field}`;
-                inputDefault.placeholder = 'Valor padrão';
-                tdDefault.appendChild(inputDefault);
-                row.appendChild(tdDefault);
-
-                mappingFields.appendChild(row);
-            });
-        }
-
-        // Função para mostrar visualização dos dados
-        function showPreview() {
-            // Dados simulados para visualização
-            const previewData = [
-                { email: 'joao@example.com', full_name: 'João Silva', date: '2023-05-15', status: 'active', group: 'Técnicos', notes: 'Interessado em BIOS' },
-                { email: 'maria@example.com', full_name: 'Maria Santos', date: '2023-05-14', status: 'active', group: 'Geral', notes: 'Entusiasta de tecnologia' },
-                { email: 'pedro@example.com', full_name: 'Pedro Costa', date: '2023-05-13', status: 'pending', group: 'Técnicos', notes: 'Técnico de informática' }
-            ];
-
-            // Mostrar seção de visualização
-            previewSection.style.display = 'block';
-
-            // Criar cabeçalho da tabela
-            let tableHtml = '<thead><tr>';
-            fileColumns.forEach(column => {
-                tableHtml += `<th>${column}</th>`;
-            });
-            tableHtml += '</tr></thead>';
-
-            // Criar corpo da tabela com os dados
-            tableHtml += '<tbody>';
-            previewData.forEach(row => {
-                tableHtml += '<tr>';
-                fileColumns.forEach(column => {
-                    tableHtml += `<td>${row[column] || ''}</td>`;
-                });
-                tableHtml += '</tr>';
-            });
-            tableHtml += '</tbody>';
-
-            previewTable.innerHTML = tableHtml;
-        }
-
-        // Função para simular o processo de importação
-        function simulateImport() {
-            const totalRecords = 215; // Simulação
-            let processedRecords = 0;
-            let successRecords = 0;
-            let skippedRecords = 0;
-            let errorRecords = 0;
-
-            // Adicionar log inicial
-            addImportLog('Iniciando processo de importação...', 'info');
-
-            // Simulação de progresso
-            const importInterval = setInterval(() => {
-                // Incrementar registros processados
-                processedRecords += Math.floor(Math.random() * 5) + 1;
-                if (processedRecords > totalRecords) processedRecords = totalRecords;
-
-                // Calcular estatísticas para esse lote
-                const currentBatchSize = Math.min(5, totalRecords - (successRecords + skippedRecords + errorRecords));
-                const successBatch = Math.floor(Math.random() * currentBatchSize * 0.8);
-                const errorBatch = Math.floor(Math.random() * (currentBatchSize - successBatch) * 0.3);
-                const skippedBatch = currentBatchSize - successBatch - errorBatch;
-
-                successRecords += successBatch;
-                errorRecords += errorBatch;
-                skippedRecords += skippedBatch;
-
-                // Atualizar barra de progresso
-                const progress = Math.floor((processedRecords / totalRecords) * 100);
-                importProgressBar.style.width = `${progress}%`;
-                importProgressText.textContent = `${progress}%`;
-                importCountText.textContent = `${processedRecords} de ${totalRecords} registros processados`;
-
-                // Adicionar alguns logs aleatórios
-                if (successBatch > 0) {
-                    addImportLog(`Importados ${successBatch} registros com sucesso.`, 'success');
-                }
-                if (skippedBatch > 0) {
-                    addImportLog(`Pulados ${skippedBatch} registros duplicados.`, 'warning');
-                }
-                if (errorBatch > 0) {
-                    addImportLog(`Erro ao processar ${errorBatch} registros.`, 'error');
-                }
-
-                // Verificar se a importação foi concluída
-                if (processedRecords >= totalRecords) {
-                    clearInterval(importInterval);
-
-                    // Adicionar log final
-                    addImportLog('Importação concluída!', 'success');
-
-                    // Atualizar estatísticas finais
-                    statTotal.textContent = totalRecords;
-                    statSuccess.textContent = successRecords;
-                    statSkipped.textContent = skippedRecords;
-                    statError.textContent = errorRecords;
-
-                    // Mostrar tela de conclusão
-                    setTimeout(() => {
-                        processingContainer.style.display = 'none';
-                        completeContainer.style.display = 'block';
-                    }, 1000);
-                }
-            }, 500);
-        }
-
-        // Função para adicionar log de importação
-        function addImportLog(message, type = 'info') {
-            const now = new Date();
-            const timeStr = now.toTimeString().split(' ')[0];
-
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry ${type}`;
-            logEntry.innerHTML = `<span class="log-time">${timeStr}</span><span class="log-message">${message}</span>`;
-
-            importLog.appendChild(logEntry);
-            importLog.scrollTop = importLog.scrollHeight;
-        }
-
-        // Função para formatar tamanho de arquivo
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // Botão para ver dados importados
-        document.getElementById('viewImportedData').addEventListener('click', function(e) {
-            e.preventDefault();
-
-            // Aqui você redirecionaria para a página apropriada baseado no tipo de dados
-            // Para este exemplo, apenas mostraremos uma notificação
-            showNotification('Redirecionando para visualizar dados importados...', 'info');
-
-            setTimeout(() => {
-                window.location.href = importType.value === 'users' ?
-                    '{{ url_for("admin_users") }}' :
-                    '{{ url_for("admin_dashboard") }}';
-            }, 1500);
-        });
-    });
-</script>
+<script src="{{ url_for('static', filename='js/technical-import.js') }}"></script>
 {% endblock %}

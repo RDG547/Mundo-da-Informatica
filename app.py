@@ -25,6 +25,8 @@ import hmac
 import hashlib
 import logging
 import unicodedata
+import csv
+import zipfile
 import urllib.request
 import urllib.error
 import stripe
@@ -67,6 +69,17 @@ from services.entitlement_service import (
     can_use_public_chat,
     get_plan_entitlements as resolve_plan_entitlements,
 )
+from technical_content.content import build_post_copy, category_for_file_type
+from technical_content.parsers import (
+    ArchiveSafetyError,
+    format_board_code,
+    inspect_zip_archive,
+    normalize_board_code,
+    parse_technical_filename,
+    sha256_file,
+)
+from technical_content.providers import DigiKeyProvider, MouserProvider, ProviderError
+from technical_content.storage import HttpStorageProvider, StorageError, sanitize_download_name
 from sqlalchemy.exc import IntegrityError
 try:
     import firebase_admin
@@ -372,7 +385,16 @@ CONTACT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 
 # Configurações adicionais
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB máximo
+app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', str(64 * 1024 * 1024)))
+app.config['DOWNLOAD_DELIVERY_MODE'] = os.environ.get('DOWNLOAD_DELIVERY_MODE', 'proxy').strip().lower()
+app.config['TECHNICAL_IMPORT_ENABLED'] = os.environ.get('TECHNICAL_IMPORT_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on')
+app.config['TECHNICAL_CONTRIBUTIONS_ENABLED'] = os.environ.get('TECHNICAL_CONTRIBUTIONS_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on')
+app.config['TECHNICAL_IMPORT_TEMP_DIR'] = os.environ.get(
+    'TECHNICAL_IMPORT_TEMP_DIR', os.path.join(app.instance_path, 'technical-imports')
+)
+app.config['TECHNICAL_LOCAL_STORAGE_DIR'] = os.environ.get(
+    'TECHNICAL_LOCAL_STORAGE_DIR', os.path.join(app.instance_path, 'technical-files')
+)
 
 # Inicializar as extensões
 db = SQLAlchemy(app)
@@ -1638,6 +1660,10 @@ def normalize_download_files(raw_value):
 
 def get_public_download_files(post):
     """Expõe metadados úteis sem revelar os links externos de origem."""
+    persisted_files = TechnicalFile.query.filter_by(post_id=post.id, is_active=True).order_by(TechnicalFile.id.asc()).all()
+    if persisted_files:
+        return [technical_file.public_dict() for technical_file in persisted_files]
+
     files = post.get_metadata('download_files') or []
     if not isinstance(files, list):
         return []
@@ -1658,6 +1684,22 @@ def get_public_download_files(post):
             'url': url_for('download_post', post_id=post.id, file=index),
         })
     return public_files
+
+
+def format_technical_file_size(size_bytes):
+    if size_bytes is None:
+        return ''
+    try:
+        size = float(size_bytes)
+    except (TypeError, ValueError):
+        return ''
+    units = ('B', 'KB', 'MB', 'GB', 'TB')
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    precision = 0 if unit_index == 0 else 1
+    return f'{size:.{precision}f} {units[unit_index]}'
 
 
 def apply_post_technical_form(post, form):
@@ -2479,6 +2521,7 @@ def inject_admin_data():
                 'total_users': User.query.filter_by(is_active=True).count(),
                 'total_subscribers': Subscriber.query.filter_by(is_active=True).count(),
                 'content_request_count': ContentRequest.query.filter(ContentRequest.status.in_(['pending', 'reviewing', 'searching'])).count(),
+                'technical_review_count': ImportItem.query.filter(ImportItem.status.in_(['pending_review', 'needs_storage', 'needs_review'])).count(),
                 'download_file_types': get_download_file_types(),
                 'app_version': '1.6.2'
             }
@@ -2491,6 +2534,7 @@ def inject_admin_data():
                 'total_users': 0,
                 'total_subscribers': 0,
                 'content_request_count': 0,
+                'technical_review_count': 0,
                 'download_file_types': [dict(item) for item in DEFAULT_DOWNLOAD_FILE_TYPES],
                 'app_version': '1.6.2'
             }
@@ -2653,6 +2697,9 @@ class Download(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=False)
+    technical_file_id = db.Column(db.Integer, db.ForeignKey('technical_files.id'), nullable=True)
+    resource_id = db.Column(db.Integer, db.ForeignKey('technical_resources.id'), nullable=True)
+    plan_snapshot = db.Column(db.String(20), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relacionamentos
@@ -2661,6 +2708,214 @@ class Download(db.Model):
 
     # Constraint para evitar duplicatas no mesmo momento
     __table_args__ = (db.UniqueConstraint('user_id', 'post_id', 'timestamp', name='unique_user_post_download_time'),)
+
+
+class HardwareBoard(db.Model):
+    """Placa normalizada compartilhada por posts e recursos técnicos."""
+    __tablename__ = 'hardware_boards'
+
+    id = db.Column(db.Integer, primary_key=True)
+    manufacturer = db.Column(db.String(120), nullable=True, index=True)
+    board_manufacturer = db.Column(db.String(120), nullable=True)
+    device_model = db.Column(db.String(160), nullable=True, index=True)
+    device_series = db.Column(db.String(160), nullable=True)
+    board_code = db.Column(db.String(120), nullable=False)
+    normalized_board_code = db.Column(db.String(120), nullable=False, index=True)
+    board_revision = db.Column(db.String(80), nullable=True)
+    platform = db.Column(db.String(120), nullable=True)
+    chipset = db.Column(db.String(120), nullable=True)
+    cpu_family = db.Column(db.String(120), nullable=True)
+    super_io = db.Column(db.String(120), nullable=True)
+    ec_controller = db.Column(db.String(120), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    slug = db.Column(db.String(250), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ContentSource(db.Model):
+    """Origem técnica e política de confiança/distribuição."""
+    __tablename__ = 'content_sources'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+    provider_type = db.Column(db.String(40), nullable=False, default='manual')
+    trust_level = db.Column(db.String(1), nullable=False, default='C')
+    auto_publish = db.Column(db.Boolean, nullable=False, default=False)
+    metadata_allowed = db.Column(db.Boolean, nullable=False, default=True)
+    distribution_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    file_mirroring_allowed = db.Column(db.Boolean, nullable=False, default=False)
+    attribution_required = db.Column(db.Boolean, nullable=False, default=False)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    config_json = db.Column(db.Text, nullable=True)
+    last_sync_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def configuration(self):
+        try:
+            value = json.loads(self.config_json or '{}')
+            return value if isinstance(value, dict) else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+
+class TechnicalResource(db.Model):
+    __tablename__ = 'technical_resources'
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=True, index=True)
+    board_id = db.Column(db.Integer, db.ForeignKey('hardware_boards.id'), nullable=True, index=True)
+    resource_type = db.Column(db.String(40), nullable=False, default='other')
+    title = db.Column(db.String(200), nullable=False)
+    manufacturer = db.Column(db.String(120), nullable=True)
+    model = db.Column(db.String(160), nullable=True)
+    part_number = db.Column(db.String(160), nullable=True, index=True)
+    board_code = db.Column(db.String(120), nullable=True, index=True)
+    board_revision = db.Column(db.String(80), nullable=True)
+    chip = db.Column(db.String(120), nullable=True)
+    chip_position = db.Column(db.String(50), nullable=True)
+    version = db.Column(db.String(80), nullable=True)
+    source_type = db.Column(db.String(40), nullable=False, default='manual')
+    source_provider = db.Column(db.String(120), nullable=True)
+    source_reference = db.Column(db.Text, nullable=True)
+    external_id = db.Column(db.String(255), nullable=True, index=True)
+    external_version = db.Column(db.String(120), nullable=True)
+    last_synced_at = db.Column(db.DateTime, nullable=True)
+    verification_status = db.Column(db.String(30), nullable=False, default='needs_review')
+    verification_date = db.Column(db.DateTime, nullable=True)
+    license_status = db.Column(db.String(40), nullable=False, default='unknown')
+    distribution_policy = db.Column(db.String(40), nullable=False, default='unknown')
+    metadata_json = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    board = db.relationship('HardwareBoard', backref=db.backref('resources', lazy=True))
+    post = db.relationship('Post', backref=db.backref('technical_resources', lazy=True))
+
+
+class TechnicalFile(db.Model):
+    __tablename__ = 'technical_files'
+
+    id = db.Column(db.Integer, primary_key=True)
+    resource_id = db.Column(db.Integer, db.ForeignKey('technical_resources.id'), nullable=True, index=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=True, index=True)
+    display_filename = db.Column(db.String(200), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=True)
+    file_type = db.Column(db.String(80), nullable=False, default='Arquivo')
+    chip = db.Column(db.String(120), nullable=True)
+    chip_position = db.Column(db.String(50), nullable=True)
+    version = db.Column(db.String(80), nullable=True)
+    extension = db.Column(db.String(30), nullable=True)
+    mime_type = db.Column(db.String(120), nullable=True)
+    file_size = db.Column(db.BigInteger, nullable=True)
+    sha256 = db.Column(db.String(64), nullable=True, index=True)
+    storage_provider = db.Column(db.String(40), nullable=False, default='http')
+    provider_file_id = db.Column(db.String(255), nullable=True)
+    provider_url = db.Column(db.Text, nullable=True)
+    provider_direct_url = db.Column(db.Text, nullable=True)
+    provider_metadata_json = db.Column(db.Text, nullable=True)
+    source_provider = db.Column(db.String(120), nullable=True)
+    source_url = db.Column(db.Text, nullable=True)
+    link_status = db.Column(db.String(30), nullable=False, default='unchecked')
+    last_link_check_at = db.Column(db.DateTime, nullable=True)
+    last_link_http_status = db.Column(db.Integer, nullable=True)
+    verification_status = db.Column(db.String(30), nullable=False, default='needs_review')
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    resource = db.relationship('TechnicalResource', backref=db.backref('files', lazy=True, cascade='all, delete-orphan'))
+    post = db.relationship('Post', backref=db.backref('technical_files', lazy=True))
+
+    def public_dict(self):
+        return {
+            'id': self.id,
+            'type': self.file_type,
+            'name': self.display_filename,
+            'format': self.extension or '',
+            'size': format_technical_file_size(self.file_size),
+            'sha256': self.sha256 or '',
+            'url': url_for('download_technical_file', file_id=self.id),
+        }
+
+
+class ImportJob(db.Model):
+    __tablename__ = 'import_jobs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_type = db.Column(db.String(40), nullable=False)
+    source = db.Column(db.String(120), nullable=False, default='admin')
+    status = db.Column(db.String(30), nullable=False, default='pending')
+    automation_mode = db.Column(db.String(20), nullable=False, default='semi')
+    total_items = db.Column(db.Integer, nullable=False, default=0)
+    processed_items = db.Column(db.Integer, nullable=False, default=0)
+    success_count = db.Column(db.Integer, nullable=False, default=0)
+    duplicate_count = db.Column(db.Integer, nullable=False, default=0)
+    review_count = db.Column(db.Integer, nullable=False, default=0)
+    error_count = db.Column(db.Integer, nullable=False, default=0)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    log_summary = db.Column(db.Text, nullable=True)
+
+    creator = db.relationship('User', backref=db.backref('technical_import_jobs', lazy=True))
+
+
+class ImportItem(db.Model):
+    __tablename__ = 'import_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('import_jobs.id'), nullable=False, index=True)
+    source_name = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(30), nullable=False, default='pending_review')
+    confidence = db.Column(db.Integer, nullable=False, default=0)
+    raw_data_json = db.Column(db.Text, nullable=True)
+    normalized_data_json = db.Column(db.Text, nullable=True)
+    temp_path = db.Column(db.Text, nullable=True)
+    sha256 = db.Column(db.String(64), nullable=True, index=True)
+    duplicate_file_id = db.Column(db.Integer, db.ForeignKey('technical_files.id'), nullable=True)
+    technical_file_id = db.Column(db.Integer, db.ForeignKey('technical_files.id'), nullable=True)
+    resource_id = db.Column(db.Integer, db.ForeignKey('technical_resources.id'), nullable=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    decision_reason = db.Column(db.Text, nullable=True)
+    published_automatically = db.Column(db.Boolean, nullable=False, default=False)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    job = db.relationship('ImportJob', backref=db.backref('items', lazy=True, cascade='all, delete-orphan'))
+
+    def normalized_data(self):
+        try:
+            return json.loads(self.normalized_data_json or '{}')
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+
+class FileContribution(db.Model):
+    __tablename__ = 'file_contributions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    status = db.Column(db.String(30), nullable=False, default='pending_review')
+    original_filename = db.Column(db.String(255), nullable=False)
+    temp_path = db.Column(db.Text, nullable=False)
+    sha256 = db.Column(db.String(64), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=True)
+    board_code = db.Column(db.String(120), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    import_item_id = db.Column(db.Integer, db.ForeignKey('import_items.id'), nullable=True, index=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    contributor = db.relationship('User', foreign_keys=[user_id], backref=db.backref('file_contributions', lazy=True))
+    import_item = db.relationship('ImportItem', foreign_keys=[import_item_id], backref=db.backref('contribution', uselist=False))
 
 # Modelo de Favoritos
 class Favorite(db.Model):
@@ -3034,7 +3289,12 @@ class SiteConfig(db.Model):
                 'plan_card_enabled_premium': True,
                 'plan_card_enabled_vip': True,
                 'plan_pix_enabled_premium': True,
-                'plan_pix_enabled_vip': True
+                'plan_pix_enabled_vip': True,
+                'technical_import_enabled': True,
+                'technical_automation_mode': 'semi',
+                'technical_automation_percentage': 100,
+                'technical_auto_publish_threshold': 85,
+                'technical_require_storage_ready': True,
             }
 
             # Mesclar com valores padrão
@@ -3102,7 +3362,12 @@ class SiteConfig(db.Model):
                 'plan_card_enabled_premium': True,
                 'plan_card_enabled_vip': True,
                 'plan_pix_enabled_premium': True,
-                'plan_pix_enabled_vip': True
+                'plan_pix_enabled_vip': True,
+                'technical_import_enabled': True,
+                'technical_automation_mode': 'semi',
+                'technical_automation_percentage': 100,
+                'technical_auto_publish_threshold': 85,
+                'technical_require_storage_ready': True,
             }
 
     @staticmethod
@@ -3131,6 +3396,512 @@ class SiteConfig(db.Model):
 
         db.session.commit()
         return config
+
+
+TECHNICAL_AUTOMATION_KEYS = {
+    'technical_import_enabled',
+    'technical_automation_mode',
+    'technical_automation_percentage',
+    'technical_auto_publish_threshold',
+    'technical_require_storage_ready',
+}
+
+
+def get_technical_automation_settings():
+    mode = str(SiteConfig.get_value('technical_automation_mode', 'semi') or 'semi').lower()
+    if mode not in {'off', 'semi', 'full'}:
+        mode = 'semi'
+    enabled = bool(SiteConfig.get_value('technical_import_enabled', True))
+    return {
+        'feature_enabled': bool(app.config.get('TECHNICAL_IMPORT_ENABLED')),
+        'configured_enabled': enabled,
+        'enabled': bool(app.config.get('TECHNICAL_IMPORT_ENABLED')) and enabled and mode != 'off',
+        'mode': mode,
+        'percentage': max(0, min(100, coerce_int(SiteConfig.get_value('technical_automation_percentage', 100), 100))),
+        'threshold': max(0, min(100, coerce_int(SiteConfig.get_value('technical_auto_publish_threshold', 85), 85))),
+        'require_storage_ready': bool(SiteConfig.get_value('technical_require_storage_ready', True)),
+    }
+
+
+def ensure_default_content_sources():
+    defaults = (
+        ('Admin', 'manual', 'C', False, True, True, True, False),
+        ('Contribuição de usuário', 'contribution', 'D', False, True, False, False, True),
+        ('Mouser', 'api', 'B', False, True, False, False, True),
+        ('DigiKey', 'api', 'B', False, True, False, False, True),
+        ('Dell', 'official', 'A', True, True, False, False, True),
+        ('HP', 'official', 'A', True, True, False, False, True),
+        ('Lenovo', 'official', 'A', True, True, False, False, True),
+        ('Feed licenciado', 'licensed', 'B', False, True, False, False, True),
+    )
+    changed = False
+    for name, provider_type, trust, auto, metadata, distribution, mirror, attribution in defaults:
+        if ContentSource.query.filter_by(name=name).first():
+            continue
+        db.session.add(ContentSource(
+            name=name,
+            provider_type=provider_type,
+            trust_level=trust,
+            auto_publish=auto,
+            metadata_allowed=metadata,
+            distribution_allowed=distribution,
+            file_mirroring_allowed=mirror,
+            attribution_required=attribution,
+            enabled=True,
+        ))
+        changed = True
+    if changed:
+        db.session.commit()
+
+
+def technical_auto_publish_decision(item, source=None):
+    settings = get_technical_automation_settings()
+    if not settings['enabled'] or settings['mode'] != 'full':
+        return False, 'Modo semiautomático: aprovação administrativa obrigatória.'
+    if item.confidence < settings['threshold']:
+        return False, f'Confiança {item.confidence}% abaixo do mínimo de {settings["threshold"]}%.'
+    if not source:
+        return False, 'Fonte não cadastrada; revisão obrigatória.'
+    if not source.enabled or not source.auto_publish or source.trust_level not in {'A', 'B'}:
+        return False, 'A política da fonte exige revisão.'
+    if not source.metadata_allowed:
+        return False, 'A fonte não autoriza o uso dos metadados.'
+    metadata = item.normalized_data()
+    storage_ready = bool(metadata.get('provider_url') or metadata.get('provider_direct_url') or item.temp_path)
+    distribution_policy = str(metadata.get('distribution_policy') or 'unknown').lower()
+    if distribution_policy == 'metadata_only' and not storage_ready:
+        return False, 'Metadados prontos; associe um arquivo distribuível antes da publicação.'
+    if storage_ready and distribution_policy != 'metadata_only' and not source.distribution_allowed:
+        return False, 'A fonte não autoriza distribuição automática de arquivos.'
+    if settings['require_storage_ready'] and not storage_ready and metadata.get('distribution_policy') != 'metadata_only':
+        return False, 'Arquivo ainda não possui storage pronto.'
+    rollout_seed = item.sha256 or f'import-item-{item.id}'
+    rollout_value = int(hashlib.sha256(rollout_seed.encode('utf-8')).hexdigest()[:8], 16) % 100
+    if rollout_value >= settings['percentage']:
+        return False, f'Item fora da faixa atual de automação ({settings["percentage"]}%).'
+    return True, 'Elegível para publicação automática pela política atual.'
+
+
+TECHNICAL_UPLOAD_EXTENSIONS = {
+    'bin', 'rom', 'fd', 'cap', 'hex', 'efi', 'bio', 'pdf', 'brd', 'bdv', 'fz',
+    'sch', 'zip', 'rar', '7z', 'cab', 'exe', 'msi', 'inf', 'txt', 'csv', 'json',
+}
+
+
+def _technical_job_directory(job_id):
+    root = os.path.abspath(app.config['TECHNICAL_IMPORT_TEMP_DIR'])
+    directory = os.path.join(root, str(int(job_id)))
+    os.makedirs(directory, exist_ok=True)
+    return directory
+
+
+def _safe_write_uploaded_file(upload, job_id):
+    original = sanitize_download_name(upload.filename or 'arquivo-tecnico')
+    extension = os.path.splitext(original)[1].lower().lstrip('.')
+    if extension not in TECHNICAL_UPLOAD_EXTENSIONS:
+        raise ValueError(f'Extensão .{extension or "(sem extensão)"} não permitida.')
+    if original.lower().endswith(('.html', '.htm', '.svg', '.js', '.php', '.py', '.sh')):
+        raise ValueError('Tipo de arquivo executável ou ativo não permitido.')
+    destination = os.path.join(_technical_job_directory(job_id), f'{uuid.uuid4().hex}-{secure_filename(original)}')
+    upload.save(destination)
+    if not os.path.isfile(destination) or os.path.getsize(destination) == 0:
+        raise ValueError('O arquivo enviado está vazio.')
+    _validate_technical_file_content(destination, original)
+    return destination, original
+
+
+def _validate_technical_file_content(path, original_name):
+    size = os.path.getsize(path)
+    max_bytes = int(os.environ.get('TECHNICAL_MAX_FILE_BYTES', str(256 * 1024 * 1024)))
+    if size > max_bytes:
+        raise ValueError(f'Arquivo excede o limite individual de {format_technical_file_size(max_bytes)}.')
+    suffixes = [suffix.lower() for suffix in os.path.basename(original_name).split('.')[1:]]
+    if len(suffixes) > 1 and suffixes[-1] in {'exe', 'msi', 'js', 'html', 'svg', 'sh'} and suffixes[-2] in TECHNICAL_UPLOAD_EXTENSIONS:
+        raise ValueError('Arquivo com extensão dupla ambígua não permitido.')
+    with open(path, 'rb') as source:
+        prefix = source.read(1024).lstrip().lower()
+    active_prefixes = (b'<!doctype html', b'<html', b'<svg', b'<?php', b'<script', b'#!/bin/sh', b'#!/usr/bin/env')
+    if prefix.startswith(active_prefixes):
+        raise ValueError('Conteúdo ativo ou executável incompatível com o tipo informado.')
+
+
+def _merge_parsed_metadata(filename, overrides=None):
+    parsed = parse_technical_filename(filename).to_dict()
+    overrides = overrides or {}
+    allowed = {
+        'manufacturer', 'model', 'board_code', 'board_revision', 'version',
+        'file_type', 'chip_type', 'chip_position', 'part_number', 'source_provider',
+        'source_url', 'provider_url', 'provider_direct_url', 'storage_provider',
+        'distribution_policy', 'license_status', 'mime_type', 'title', 'description',
+        'external_id', 'external_version',
+    }
+    for key in allowed:
+        value = overrides.get(key)
+        if value not in (None, ''):
+            parsed[key] = sanitize_input(str(value))[:2000]
+    parsed['board_code'] = format_board_code(parsed.get('board_code'))
+    parsed.setdefault('distribution_policy', 'local_allowed' if overrides.get('temp_path') else 'unknown')
+    parsed.setdefault('license_status', 'unknown')
+    parsed['copy'] = build_post_copy(parsed)
+    confidence = coerce_int(overrides.get('confidence'), parsed.get('confidence', 0))
+    if overrides.get('source_provider'):
+        confidence = min(100, confidence + 5)
+    parsed['confidence'] = max(0, min(100, confidence))
+    return parsed
+
+
+def _append_import_item(job, metadata, *, source_name=None, temp_path=None, file_hash=None, raw=None):
+    if file_hash:
+        duplicate = TechnicalFile.query.filter_by(sha256=file_hash).first()
+    else:
+        duplicate = None
+    status = 'duplicate' if duplicate else 'pending_review'
+    item = ImportItem(
+        job=job,
+        source_name=source_name or metadata.get('original_name') or metadata.get('title'),
+        status=status,
+        confidence=max(0, min(100, coerce_int(metadata.get('confidence'), 0))),
+        raw_data_json=json.dumps(raw or {}, ensure_ascii=False, default=str),
+        normalized_data_json=json.dumps(metadata, ensure_ascii=False, default=str),
+        temp_path=temp_path,
+        sha256=file_hash,
+        duplicate_file_id=duplicate.id if duplicate else None,
+        decision_reason='SHA-256 já cadastrado.' if duplicate else 'Aguardando decisão de publicação.',
+    )
+    db.session.add(item)
+    job.total_items += 1
+    job.processed_items += 1
+    if duplicate:
+        job.duplicate_count += 1
+    else:
+        job.review_count += 1
+    return item
+
+
+def _cleanup_import_item_temp(item):
+    """Remove somente o temporário pertencente ao motor e preserva a auditoria."""
+    path = os.path.abspath(item.temp_path) if item.temp_path else None
+    root = os.path.abspath(app.config['TECHNICAL_IMPORT_TEMP_DIR'])
+    if path:
+        try:
+            if os.path.commonpath([root, path]) == root and os.path.isfile(path):
+                os.remove(path)
+        except (OSError, ValueError):
+            app.logger.warning('Não foi possível remover o temporário do item %s.', item.id)
+        item.temp_path = None
+
+    terminal = {'published', 'duplicate', 'rejected', 'error'}
+    if item.job and item.job.items and all(candidate.status in terminal for candidate in item.job.items):
+        directory = os.path.abspath(os.path.join(root, str(item.job.id)))
+        try:
+            if os.path.commonpath([root, directory]) == root and directory != root and os.path.isdir(directory):
+                shutil.rmtree(directory)
+        except (OSError, ValueError):
+            app.logger.warning('Não foi possível limpar o diretório temporário do job %s.', item.job.id)
+
+
+def _analyze_uploaded_file(job, upload):
+    path, original_name = _safe_write_uploaded_file(upload, job.id)
+    if original_name.lower().endswith('.zip'):
+        archive_members = inspect_zip_archive(path)
+        archive_metadata = _merge_parsed_metadata(original_name, {'temp_path': path})
+        created = []
+        with zipfile.ZipFile(path) as archive:
+            for member in archive_members:
+                extension = member.extension.lower()
+                if extension not in TECHNICAL_UPLOAD_EXTENSIONS or extension == 'zip':
+                    continue
+                member_name = sanitize_download_name(member.name)
+                destination = os.path.join(
+                    _technical_job_directory(job.id),
+                    f'{uuid.uuid4().hex}-{secure_filename(member_name)}',
+                )
+                with archive.open(member.name) as source, open(destination, 'wb') as target:
+                    shutil.copyfileobj(source, target, 1024 * 1024)
+                _validate_technical_file_content(destination, member_name)
+                parsed = _merge_parsed_metadata(member.name, {'temp_path': destination})
+                for inherited in ('manufacturer', 'model', 'board_code', 'board_revision'):
+                    if not parsed.get(inherited) and archive_metadata.get(inherited):
+                        parsed[inherited] = archive_metadata[inherited]
+                parsed['copy'] = build_post_copy(parsed)
+                created.append(_append_import_item(
+                    job, parsed, source_name=member.name, temp_path=destination,
+                    file_hash=sha256_file(destination), raw={'archive': original_name, 'member': member.to_dict()},
+                ))
+        if not created:
+            raise ValueError('O ZIP não contém arquivos técnicos reconhecidos.')
+        return created
+
+    if original_name.lower().endswith('.csv'):
+        created = []
+        with open(path, 'r', encoding='utf-8-sig', newline='') as csv_file:
+            for row_number, row in enumerate(csv.DictReader(csv_file), start=2):
+                if row_number > 501:
+                    raise ValueError('CSV excede o limite de 500 registros.')
+                filename = row.get('filename') or row.get('original_filename') or row.get('title') or f'linha-{row_number}'
+                parsed = _merge_parsed_metadata(filename, row)
+                created.append(_append_import_item(
+                    job, parsed, source_name=filename, raw={'row': row_number, 'data': row},
+                ))
+        if not created:
+            raise ValueError('O CSV não contém registros.')
+        return created
+
+    parsed = _merge_parsed_metadata(original_name, {'temp_path': path})
+    return [_append_import_item(
+        job, parsed, source_name=original_name, temp_path=path,
+        file_hash=sha256_file(path), raw={'filename': original_name},
+    )]
+
+
+def _provider_records(provider_name, part_number):
+    provider_name = str(provider_name or '').lower()
+    if provider_name == 'mouser':
+        provider = MouserProvider(os.environ.get('MOUSER_API_KEY', ''))
+    elif provider_name == 'digikey':
+        provider = DigiKeyProvider(
+            os.environ.get('DIGIKEY_CLIENT_ID', ''),
+            os.environ.get('DIGIKEY_CLIENT_SECRET', ''),
+            os.environ.get('DIGIKEY_ACCOUNT_ID') or None,
+        )
+    else:
+        raise ValueError('Provedor não suportado. Use Mouser ou DigiKey.')
+    return provider.lookup(part_number)
+
+
+def _create_board_from_metadata(metadata):
+    board_code = format_board_code(metadata.get('board_code'))
+    if not board_code:
+        return None
+    manufacturer = sanitize_input(str(metadata.get('manufacturer') or ''))[:120] or None
+    board = HardwareBoard.query.filter_by(
+        normalized_board_code=normalize_board_code(board_code),
+        manufacturer=manufacturer,
+    ).first()
+    if board:
+        return board
+    slug_base = generate_slug(' '.join(filter(None, [manufacturer, board_code]))) or f'placa-{uuid.uuid4().hex[:8]}'
+    slug = slug_base
+    suffix = 2
+    while HardwareBoard.query.filter_by(slug=slug).first():
+        slug = f'{slug_base}-{suffix}'
+        suffix += 1
+    board = HardwareBoard(
+        manufacturer=manufacturer,
+        device_model=sanitize_input(str(metadata.get('model') or ''))[:160] or None,
+        board_code=board_code,
+        normalized_board_code=normalize_board_code(board_code),
+        board_revision=sanitize_input(str(metadata.get('board_revision') or ''))[:80] or None,
+        platform=sanitize_input(str(metadata.get('platform') or ''))[:120] or None,
+        slug=slug,
+    )
+    db.session.add(board)
+    db.session.flush()
+    return board
+
+
+def _unique_post_slug(base_value):
+    base = generate_slug(base_value) or f'recurso-{uuid.uuid4().hex[:8]}'
+    slug = base
+    suffix = 2
+    while Post.query.filter_by(slug=slug).first():
+        slug = f'{base}-{suffix}'
+        suffix += 1
+    return slug
+
+
+def _technical_group_identity(metadata):
+    board_code = normalize_board_code(metadata.get('board_code'))
+    if board_code:
+        return f'board:{board_code}'
+    manufacturer = generate_slug(metadata.get('manufacturer') or '')
+    model = generate_slug(metadata.get('model') or '')
+    if manufacturer and model:
+        return f'model:{manufacturer}:{model}'
+    return None
+
+
+def _published_group_resource(item, metadata) -> Optional['TechnicalResource']:
+    identity = _technical_group_identity(metadata)
+    if not identity or not item.job_id:
+        return None
+    siblings = ImportItem.query.filter(
+        ImportItem.job_id == item.job_id,
+        ImportItem.id != item.id,
+        ImportItem.status == 'published',
+        ImportItem.resource_id.isnot(None),
+    ).order_by(ImportItem.id.asc()).all()
+    for sibling in siblings:
+        if sibling.resource_id and _technical_group_identity(sibling.normalized_data()) == identity:
+            return db.session.get(TechnicalResource, sibling.resource_id)
+    return None
+
+
+def publish_import_item(item, reviewer_id=None, automatic=False):
+    if item.status == 'published':
+        return item
+    if item.status == 'duplicate':
+        raise ValueError('O item é duplicado e não será publicado novamente.')
+    metadata = item.normalized_data()
+    verification_status = str(metadata.get('verification_status') or 'unverified').lower()
+    if verification_status not in VERIFICATION_STATUSES:
+        verification_status = 'unverified'
+    post_copy = metadata.get('copy') if isinstance(metadata.get('copy'), dict) else build_post_copy(metadata)
+    resource: Optional[TechnicalResource] = _published_group_resource(item, metadata)
+    post: Optional[Post] = db.session.get(Post, resource.post_id) if resource and resource.post_id else None
+    is_new_post = post is None
+    category = None
+    if is_new_post:
+        category_name = post_copy.get('category') or category_for_file_type(metadata.get('file_type', ''))
+        category = Category.query.filter(db.func.lower(Category.name) == category_name.lower()).first()
+        if not category:
+            category = Category(
+                name=category_name[:50], slug=generate_slug(category_name)[:50],
+                description='Recursos técnicos importados e revisados.', is_active=True,
+                is_visible=True, show_in_menu=True,
+            )
+            db.session.add(category)
+            db.session.flush()
+        if category is None:
+            raise RuntimeError('Não foi possível criar ou localizar a categoria do recurso técnico.')
+
+    provider_url = normalize_download_url(metadata.get('provider_direct_url') or metadata.get('provider_url'))
+    storage_provider = str(metadata.get('storage_provider') or ('local' if item.temp_path else 'http')).lower()
+    local_final_path = None
+    if item.temp_path and os.path.isfile(item.temp_path):
+        storage_root = os.path.abspath(app.config['TECHNICAL_LOCAL_STORAGE_DIR'])
+        os.makedirs(storage_root, exist_ok=True)
+        extension = os.path.splitext(item.temp_path)[1].lower()
+        storage_name = f'{item.sha256 or sha256_file(item.temp_path)}{extension}'
+        local_final_path = os.path.join(storage_root, storage_name)
+        if not os.path.exists(local_final_path):
+            shutil.copy2(item.temp_path, local_final_path)
+        storage_provider = 'local'
+    elif not provider_url:
+        if metadata.get('distribution_policy') == 'metadata_only':
+            item.status = 'needs_storage'
+            item.decision_reason = 'Metadado analisado; associe um arquivo distribuível antes de publicar no acervo.'
+            db.session.commit()
+            raise ValueError(item.decision_reason)
+        item.status = 'needs_storage'
+        item.decision_reason = 'Informe um link direto privado ou envie o arquivo antes de publicar.'
+        db.session.commit()
+        raise ValueError(item.decision_reason)
+
+    if is_new_post:
+        board = _create_board_from_metadata(metadata)
+        post = Post(
+            title=sanitize_input(str(post_copy.get('title') or metadata.get('title') or item.source_name or 'Recurso técnico'))[:200],
+            content=sanitize_html(str(post_copy.get('content') or metadata.get('description') or 'Recurso técnico importado.')),
+            author_id=reviewer_id,
+            category_id=category.id,
+            category_str=category.name,
+            is_active=True,
+            download_link='/download/pending',
+            tags=sanitize_input(str(post_copy.get('tags') or ''))[:200] or None,
+            seo_title=sanitize_input(str(post_copy.get('seo_title') or ''))[:100] or None,
+            seo_description=sanitize_input(str(post_copy.get('seo_description') or ''))[:200] or None,
+            slug=_unique_post_slug(post_copy.get('slug') or post_copy.get('title') or item.source_name),
+            manufacturer=sanitize_input(str(metadata.get('manufacturer') or ''))[:120] or None,
+            brand=sanitize_input(str(metadata.get('manufacturer') or ''))[:120] or None,
+            model=sanitize_input(str(metadata.get('model') or ''))[:160] or None,
+            board_code=format_board_code(metadata.get('board_code')),
+            board_revision=sanitize_input(str(metadata.get('board_revision') or ''))[:80] or None,
+            file_type=sanitize_input(str(metadata.get('file_type') or 'Arquivo técnico'))[:80],
+            file_extension=sanitize_input(str(metadata.get('extension') or ''))[:30] or None,
+            version=sanitize_input(str(metadata.get('version') or ''))[:80] or None,
+            sha256=item.sha256,
+            verification_status=verification_status,
+            compatibility=sanitize_input(str(post_copy.get('compatibility') or ''))[:2000] or None,
+            technical_notes='Publicado automaticamente.' if automatic else 'Revisado no centro de importação.',
+        )
+        db.session.add(post)
+        db.session.flush()
+
+        resource = TechnicalResource(
+            post_id=post.id,
+            board_id=board.id if board else None,
+            resource_type=generate_slug(metadata.get('file_type') or 'other').replace('-', '_')[:40],
+            title=post.title,
+            manufacturer=post.manufacturer,
+            model=post.model,
+            part_number=sanitize_input(str(metadata.get('part_number') or ''))[:160] or None,
+            board_code=post.board_code,
+            board_revision=post.board_revision,
+            chip=sanitize_input(str(metadata.get('chip_type') or metadata.get('chip') or ''))[:120] or None,
+            chip_position=sanitize_input(str(metadata.get('chip_position') or ''))[:50] or None,
+            version=post.version,
+            source_type='automatic' if automatic else 'admin',
+            source_provider=sanitize_input(str(metadata.get('source_provider') or 'Admin'))[:120],
+            source_reference=sanitize_input(str(metadata.get('source_url') or ''))[:2000] or None,
+            external_id=sanitize_input(str(metadata.get('external_id') or ''))[:255] or None,
+            external_version=sanitize_input(str(metadata.get('external_version') or metadata.get('version') or ''))[:120] or None,
+            last_synced_at=datetime.utcnow() if automatic or metadata.get('external_id') else None,
+            verification_status=post.verification_status,
+            verification_date=datetime.utcnow() if verification_status == 'verified' else None,
+            license_status=sanitize_input(str(metadata.get('license_status') or 'unknown'))[:40],
+            distribution_policy=sanitize_input(str(metadata.get('distribution_policy') or 'unknown'))[:40],
+            metadata_json=json.dumps(metadata, ensure_ascii=False, default=str),
+        )
+        db.session.add(resource)
+        db.session.flush()
+
+    if post is None or resource is None:
+        raise RuntimeError('Não foi possível criar ou localizar o recurso técnico agrupado.')
+
+    display_filename = sanitize_download_name(
+        metadata.get('original_name') or item.source_name or f'{post.slug}.{metadata.get("extension") or "bin"}'
+    )
+    technical_file = TechnicalFile(
+        resource_id=resource.id,
+        post_id=post.id,
+        display_filename=display_filename,
+        original_filename=display_filename,
+        file_type=sanitize_input(str(metadata.get('file_type') or 'Arquivo'))[:80],
+        chip=sanitize_input(str(metadata.get('chip_type') or ''))[:120] or None,
+        chip_position=sanitize_input(str(metadata.get('chip_position') or ''))[:50] or None,
+        version=sanitize_input(str(metadata.get('version') or ''))[:80] or None,
+        extension=(metadata.get('extension') or os.path.splitext(display_filename)[1].lstrip('.'))[:30],
+        mime_type=sanitize_input(str(metadata.get('mime_type') or ''))[:120] or None,
+        file_size=os.path.getsize(local_final_path) if local_final_path else coerce_int(metadata.get('file_size'), 0) or None,
+        sha256=item.sha256,
+        storage_provider=storage_provider,
+        provider_file_id=os.path.basename(local_final_path) if local_final_path else sanitize_input(str(metadata.get('provider_file_id') or ''))[:255] or None,
+        provider_url=provider_url if storage_provider != 'local' else None,
+        provider_direct_url=provider_url if storage_provider != 'local' else None,
+        source_provider=resource.source_provider,
+        source_url=resource.source_reference,
+        link_status='online' if storage_provider == 'local' else 'unchecked',
+        verification_status=resource.verification_status,
+        is_active=True,
+    )
+    db.session.add(technical_file)
+    db.session.flush()
+    if is_new_post:
+        post.download_link = url_for('download_technical_file', file_id=technical_file.id)
+        post.file_size = (technical_file.file_size / (1024 * 1024)) if technical_file.file_size else None
+        post.technical_file_size = format_technical_file_size(technical_file.file_size) or None
+    item.status = 'published'
+    item.post_id = post.id
+    item.resource_id = resource.id
+    item.technical_file_id = technical_file.id
+    item.reviewed_by = reviewer_id
+    item.reviewed_at = datetime.utcnow()
+    item.decision_reason = 'Publicado automaticamente.' if automatic else 'Aprovado pelo administrador.'
+    item.published_automatically = bool(automatic)
+    item.job.success_count += 1
+    item.job.review_count = max(0, item.job.review_count - 1)
+    if not item.job.items or all(candidate.status in {'published', 'duplicate', 'rejected', 'error'} for candidate in item.job.items):
+        item.job.status = 'completed'
+        item.job.finished_at = datetime.utcnow()
+    db.session.commit()
+    _cleanup_import_item_temp(item)
+    if item.contribution:
+        item.contribution.status = 'published'
+        item.contribution.reviewed_by = reviewer_id
+        item.contribution.reviewed_at = datetime.utcnow()
+    db.session.commit()
+    return item
 
 
 def normalize_hex_color(value, default='#3a86ff'):
@@ -4069,6 +4840,16 @@ def _build_sitemap_entries() -> list[dict[str, str]]:
             priority='0.7',
         )
 
+    for board_item in HardwareBoard.query.order_by(HardwareBoard.updated_at.desc()).all():
+        _add_sitemap_entry(
+            entries,
+            seen_urls,
+            url_for('hardware_board_detail', slug=board_item.slug),
+            lastmod=board_item.updated_at,
+            changefreq='weekly',
+            priority='0.7',
+        )
+
     return entries
 
 
@@ -4325,94 +5106,210 @@ def check_download_limit_legacy(user):
 @app.route('/download/<int:post_id>')
 @login_required
 def download_post(post_id):
-    """Rota para downloads que incrementa o contador e verifica permissões"""
+    """Wrapper legado: preserva URLs antigas e resolve um TechnicalFile."""
     post = Post.query.get_or_404(post_id)
-    user = current_user
-
-    # Resolver o arquivo solicitado antes de consumir o limite. O índice torna
-    # possível ter dois arquivos do mesmo tipo; ``type`` segue como fallback
-    # retrocompatível para links antigos.
     redirect_url = post.download_link
     download_files = post.get_metadata('download_files')
+    selected_index = None
+    selected_metadata = {}
     if isinstance(download_files, list) and download_files:
         file_index = request.args.get('file', type=int)
         download_type = request.args.get('type', '')
         if file_index is not None and 0 <= file_index < len(download_files):
-            redirect_url = download_files[file_index].get('url', post.download_link)
+            selected_index = file_index
+            selected_metadata = download_files[file_index]
+            redirect_url = selected_metadata.get('url', post.download_link)
         elif download_type:
-            for download_file in download_files:
+            for index, download_file in enumerate(download_files):
                 if download_file.get('type') == download_type:
+                    selected_index = index
+                    selected_metadata = download_file
                     redirect_url = download_file.get('url', post.download_link)
                     break
-
     redirect_url = normalize_download_url(redirect_url)
     if not redirect_url:
         flash('Link de download indisponível ou inválido para este post.', 'error')
         return redirect(url_for('post', post_id=post_id))
 
-    # Log para debug
-    debug_log(f"Usuário {user.username} (plano: {user.plan}) tentando download do post {post_id}")
+    # Posts novos já apontam para a rota canônica. O redirect continua interno
+    # e o limite só será consumido uma vez na rota final.
+    canonical_match = re.fullmatch(r'/download/file/(\d+)', redirect_url)
+    if canonical_match:
+        return redirect(url_for('download_technical_file', file_id=int(canonical_match.group(1))))
 
-    # Verificar permissões baseadas no plano ANTES de registrar o download
-    can_download, remaining, limit, reset_time, period = check_user_download_limit(user)
-    debug_log(f"Verificação de limite: can_download={can_download}, remaining={remaining}/{limit}, period={period}")
+    technical_file = None
+    persisted = TechnicalFile.query.filter_by(post_id=post.id, is_active=True).order_by(TechnicalFile.id.asc()).all()
+    if selected_index is not None and selected_index < len(persisted):
+        technical_file = persisted[selected_index]
+    if not technical_file and redirect_url.startswith(('http://', 'https://')):
+        technical_file = TechnicalFile.query.filter(
+            TechnicalFile.post_id == post.id,
+            db.or_(TechnicalFile.provider_direct_url == redirect_url, TechnicalFile.provider_url == redirect_url),
+        ).first()
+    if not technical_file:
+        resource = TechnicalResource.query.filter_by(post_id=post.id).first()
+        if not resource:
+            resource = TechnicalResource(
+                post_id=post.id,
+                resource_type=generate_slug(selected_metadata.get('type') or post.file_type or 'other').replace('-', '_'),
+                title=post.title,
+                manufacturer=post.manufacturer,
+                model=post.model,
+                board_code=post.board_code,
+                board_revision=post.board_revision,
+                source_type='legacy',
+                source_provider='Acervo legado',
+                verification_status=post.verification_status,
+                license_status='unknown',
+                distribution_policy='external_storage_allowed',
+            )
+            db.session.add(resource)
+            db.session.flush()
+        technical_file = TechnicalFile(
+            resource_id=resource.id,
+            post_id=post.id,
+            display_filename=sanitize_download_name(selected_metadata.get('name') or f'{post.slug or post.id}.{selected_metadata.get("format") or post.file_extension or "bin"}'),
+            original_filename=sanitize_download_name(selected_metadata.get('name') or post.title),
+            file_type=sanitize_input(str(selected_metadata.get('type') or post.file_type or 'Arquivo'))[:80],
+            extension=sanitize_input(str(selected_metadata.get('format') or post.file_extension or ''))[:30] or None,
+            sha256=normalize_sha256(selected_metadata.get('sha256')) if selected_metadata.get('sha256') else post.sha256,
+            storage_provider='http',
+            provider_url=redirect_url,
+            provider_direct_url=redirect_url,
+            source_provider='Acervo legado',
+            link_status='unchecked',
+            verification_status=post.verification_status,
+            is_active=True,
+        )
+        db.session.add(technical_file)
+        db.session.commit()
+    return _deliver_technical_file(technical_file)
 
-    if not can_download:
-        # Se a verificação JavaScript falhou ou foi bypassada, retornar erro 403
-        # O frontend DEVE fazer a verificação primeiro via /check-download-limit
-        download_text = "download" if limit == 1 else "downloads"
-        period_text = "diários" if period == 'daily' else "semanais" if period == 'weekly' else ""
-        reset_text = "à meia-noite" if period == 'daily' else "no domingo às 00:00" if period == 'weekly' else ""
-        message = f"Você atingiu o limite de {int(limit)} {download_text} {period_text}. Próximo reset {reset_text}."
 
-        debug_log(f"Download negado para {user.username}")
+def _download_denied_response(remaining, limit, period, post_id):
+    download_text = 'download' if limit == 1 else 'downloads'
+    period_text = 'diários' if period == 'daily' else 'semanais' if period == 'weekly' else ''
+    reset_text = 'à meia-noite' if period == 'daily' else 'no domingo às 00:00' if period == 'weekly' else ''
+    message = f'Você atingiu o limite de {int(limit)} {download_text} {period_text}. Próximo reset {reset_text}.'
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': False,
+            'message': message,
+            'can_download': False,
+            'remaining': int(remaining) if remaining != float('inf') else 'unlimited',
+            'limit': int(limit) if limit != float('inf') else 'unlimited',
+        }), 403
+    flash(message, 'warning')
+    return redirect(url_for('post', post_id=post_id))
 
-        # Retornar JSON se for requisição AJAX, senão mostrar flash message
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
-                'success': False,
-                'message': message,
-                'can_download': False,
-                'remaining': int(remaining) if remaining != float('inf') else 'unlimited',
-                'limit': int(limit) if limit != float('inf') else 'unlimited'
-            }), 403
-        else:
-            flash(message, 'warning')
-            return redirect(url_for('post', post_id=post_id))
 
-    # Registrar download (isso incrementa o contador para próxima verificação)
-    new_download = Download(user_id=user.id, post_id=post.id, timestamp=datetime.utcnow())
-    db.session.add(new_download)
-
-    # Incrementar somente o contador usado pelo período do plano.
+def _record_successful_download(technical_file, period, http_status=None):
+    user = current_user
+    post = technical_file.post
+    db.session.add(Download(
+        user_id=user.id,
+        post_id=post.id,
+        technical_file_id=technical_file.id,
+        resource_id=technical_file.resource_id,
+        plan_snapshot=user.plan,
+        timestamp=datetime.utcnow(),
+    ))
     if period == 'weekly':
         user.weekly_downloads = (user.weekly_downloads or 0) + 1
-        debug_log(f"Download registrado para {user.username} - Total esta semana: {user.weekly_downloads}")
     elif period == 'daily':
         user.daily_downloads = (user.daily_downloads or 0) + 1
-        debug_log(f"Download registrado para {user.username} - Total hoje: {user.daily_downloads}")
-
+    technical_file.link_status = 'online'
+    technical_file.last_link_check_at = datetime.utcnow()
+    technical_file.last_link_http_status = http_status
     db.session.commit()
-
-    # Incrementar downloads do post
-    increment_post_downloads(post_id)
-
-    # Log da atividade de download
+    increment_post_downloads(post.id)
     try:
         log_admin_activity(
-            user_id=current_user.id if current_user.is_authenticated else None,
-            action="file_downloaded",
-            description=f"Download do arquivo: {post.title}",
+            user_id=user.id,
+            action='file_downloaded',
+            description=f'Download do arquivo: {post.title}',
             metadata={
-                'post_id': post_id,
-                'post_title': post.title,
-                'download_url': post.download_link
-            }
+                'post_id': post.id,
+                'technical_file_id': technical_file.id,
+                'resource_id': technical_file.resource_id,
+                'plan': user.plan,
+            },
         )
     except Exception:
-        pass  # Não interromper o download se o log falhar
+        pass
 
-    return redirect(redirect_url)
+
+def _deliver_technical_file(technical_file):
+    if not technical_file or not technical_file.is_active or not technical_file.post or not technical_file.post.is_active:
+        abort(404)
+    can_download, remaining, limit, _reset_time, period = check_user_download_limit(current_user)
+    if not can_download:
+        return _download_denied_response(remaining, limit, period, technical_file.post_id)
+
+    filename = sanitize_download_name(technical_file.display_filename)
+    if technical_file.storage_provider == 'local':
+        storage_root = os.path.abspath(app.config['TECHNICAL_LOCAL_STORAGE_DIR'])
+        local_path = os.path.abspath(os.path.join(storage_root, technical_file.provider_file_id or ''))
+        if os.path.commonpath([storage_root, local_path]) != storage_root or not os.path.isfile(local_path):
+            technical_file.link_status = 'broken'
+            technical_file.last_link_check_at = datetime.utcnow()
+            db.session.commit()
+            abort(404)
+        _record_successful_download(technical_file, period, http_status=200)
+        return send_file(
+            local_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=technical_file.mime_type or 'application/octet-stream',
+            conditional=True,
+            etag=True,
+        )
+
+    provider_url = technical_file.provider_direct_url or technical_file.provider_url
+    if not provider_url:
+        abort(404)
+    if app.config.get('DOWNLOAD_DELIVERY_MODE') == 'redirect':
+        _record_successful_download(technical_file, period)
+        return redirect(provider_url)
+
+    allowed_hosts = {
+        host.strip().lower()
+        for host in os.environ.get('STORAGE_ALLOWED_HOSTS', '').split(',')
+        if host.strip()
+    }
+    storage = HttpStorageProvider(
+        allowed_hosts=allowed_hosts,
+        connect_timeout=float(os.environ.get('STORAGE_CONNECT_TIMEOUT', '5')),
+        read_timeout=float(os.environ.get('STORAGE_READ_TIMEOUT', '45')),
+    )
+    try:
+        upstream = storage.open(provider_url, request.headers.get('Range'))
+    except StorageError as exc:
+        technical_file.link_status = 'broken'
+        technical_file.last_link_check_at = datetime.utcnow()
+        technical_file.last_link_http_status = exc.status_code
+        db.session.commit()
+        app.logger.warning('Falha no storage do arquivo técnico %s: %s', technical_file.id, exc)
+        message = 'Não foi possível iniciar este download no momento. Tente novamente em instantes.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': message}), 502
+        flash(message, 'error')
+        return redirect(url_for('post', post_id=technical_file.post_id))
+
+    _record_successful_download(technical_file, period, http_status=upstream.status_code)
+    headers = dict(upstream.headers)
+    headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    headers['X-Content-Type-Options'] = 'nosniff'
+    headers['Cache-Control'] = 'private, no-store'
+    response = Response(upstream.iterator, status=upstream.status_code, headers=headers, direct_passthrough=True)
+    response.call_on_close(upstream.close)
+    return response
+
+
+@app.route('/download/file/<int:file_id>')
+@login_required
+def download_technical_file(file_id):
+    return _deliver_technical_file(TechnicalFile.query.get_or_404(file_id))
 
 
 # ====================
@@ -6762,6 +7659,23 @@ def search_suggestions():
                 'icon': cat.icon or 'fas fa-folder'
             })
 
+        scored_boards = []
+        for board in HardwareBoard.query.all():
+            score = get_search_match_score(
+                query, board.board_code, board.normalized_board_code,
+                board.device_model, board.device_series, board.manufacturer,
+            )
+            if score is not None:
+                scored_boards.append((score, board.board_code.casefold(), board))
+        for _score, _code, board in sorted(scored_boards, key=lambda entry: (entry[0], entry[1]))[:2]:
+            suggestions.append({
+                'type': 'board',
+                'title': board.board_code,
+                'description': ' · '.join(filter(None, [board.manufacturer, board.device_model, board.board_revision])),
+                'url': url_for('hardware_board_detail', slug=board.slug),
+                'icon': 'fas fa-microchip',
+            })
+
     posts_query = Post.query.filter_by(is_active=True)
     if category:
         posts_query = posts_query.filter(Post.category_str == category)
@@ -6833,6 +7747,100 @@ def search_suggestions():
         unique_suggestions.append(item)
 
     return jsonify(unique_suggestions[:max_suggestions])
+
+
+@app.route('/placa/<string:slug>')
+def hardware_board_detail(slug):
+    board = HardwareBoard.query.filter_by(slug=slug).first_or_404()
+    resources = TechnicalResource.query.filter_by(board_id=board.id).order_by(TechnicalResource.created_at.desc()).all()
+    public_resources = [resource for resource in resources if resource.post and resource.post.is_active]
+    return render_template(
+        'hardware_board.html',
+        board=board,
+        resources=public_resources,
+        title=f'{board.board_code} - Placa técnica',
+    )
+
+
+@app.route('/api/placas/<string:slug>')
+def hardware_board_api(slug):
+    board = HardwareBoard.query.filter_by(slug=slug).first_or_404()
+    resources = []
+    for resource in TechnicalResource.query.filter_by(board_id=board.id).all():
+        if not resource.post or not resource.post.is_active:
+            continue
+        resources.append({
+            'id': resource.id,
+            'title': resource.title,
+            'type': resource.resource_type,
+            'version': resource.version,
+            'verification_status': resource.verification_status,
+            'source_provider': resource.source_provider,
+            'post_url': url_for('post', post_id=resource.post_id),
+            'files': [file.public_dict() for file in resource.files if file.is_active],
+        })
+    return jsonify({
+        'id': board.id,
+        'manufacturer': board.manufacturer,
+        'device_model': board.device_model,
+        'device_series': board.device_series,
+        'board_code': board.board_code,
+        'board_revision': board.board_revision,
+        'platform': board.platform,
+        'chipset': board.chipset,
+        'resources': resources,
+    })
+
+
+@app.route('/contribuir-arquivo', methods=['GET', 'POST'])
+@login_required
+@limiter.limit('5 per day')
+def contribute_technical_file():
+    if not app.config.get('TECHNICAL_CONTRIBUTIONS_ENABLED'):
+        abort(404)
+    if request.method == 'GET':
+        contributions = FileContribution.query.filter_by(user_id=current_user.id).order_by(FileContribution.created_at.desc()).all()
+        return render_template('contribute_file.html', contributions=contributions, title='Contribuir com arquivo')
+
+    upload = request.files.get('file')
+    if not upload or not upload.filename:
+        return jsonify({'success': False, 'message': 'Selecione um arquivo técnico.'}), 400
+    original = sanitize_download_name(upload.filename or 'arquivo-tecnico')
+    extension = os.path.splitext(original)[1].lower().lstrip('.')
+    if extension not in TECHNICAL_UPLOAD_EXTENSIONS or extension in {'html', 'svg', 'js'}:
+        return jsonify({'success': False, 'message': 'Tipo de arquivo não permitido.'}), 400
+    contribution_root = os.path.abspath(os.path.join(app.config['TECHNICAL_IMPORT_TEMP_DIR'], 'contributions'))
+    os.makedirs(contribution_root, exist_ok=True)
+    destination = os.path.join(contribution_root, f'{uuid.uuid4().hex}-{secure_filename(original)}')
+    upload.save(destination)
+    if not os.path.isfile(destination) or os.path.getsize(destination) == 0:
+        return jsonify({'success': False, 'message': 'O arquivo enviado está vazio.'}), 400
+    try:
+        _validate_technical_file_content(destination, original)
+        if extension == 'zip':
+            inspect_zip_archive(destination)
+    except (ValueError, ArchiveSafetyError, OSError) as exc:
+        try:
+            os.remove(destination)
+        except OSError:
+            pass
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    file_hash = sha256_file(destination)
+    duplicate = TechnicalFile.query.filter_by(sha256=file_hash).first()
+    contribution = FileContribution(
+        user_id=current_user.id,
+        status='duplicate' if duplicate else 'pending_review',
+        original_filename=original,
+        temp_path=destination,
+        sha256=file_hash,
+        title=sanitize_input(str(request.form.get('title') or ''))[:200] or None,
+        board_code=format_board_code(request.form.get('board_code')),
+        notes=sanitize_input(str(request.form.get('notes') or ''))[:2000] or None,
+    )
+    db.session.add(contribution)
+    db.session.commit()
+    message = 'Este arquivo já existe no acervo e foi marcado como duplicado.' if duplicate else 'Arquivo enviado para revisão administrativa.'
+    return jsonify({'success': True, 'message': message, 'status': contribution.status}), 201
 
 @app.route('/admin/posts/<int:post_id>/toggle-active', methods=['POST'])
 @login_required
@@ -11408,15 +12416,460 @@ def admin_delete_backup(backup_id):
 @login_required
 @admin_required
 def admin_tools_import():
-    """
-    Página para importação de dados
-    """
-    # Obter estatísticas para a sidebar
+    """Central real de ingestão, revisão, fontes e saúde dos arquivos."""
+    ensure_default_content_sources()
     sidebar_stats = get_admin_sidebar_stats()
-
+    jobs = ImportJob.query.order_by(ImportJob.created_at.desc()).limit(25).all()
+    review_items = ImportItem.query.filter(
+        ImportItem.status.in_(['pending_review', 'needs_review', 'needs_storage', 'duplicate', 'error'])
+    ).order_by(ImportItem.created_at.desc()).limit(100).all()
+    automatic_items = ImportItem.query.filter_by(
+        status='published', published_automatically=True
+    ).order_by(ImportItem.reviewed_at.desc()).limit(50).all()
+    sources = ContentSource.query.order_by(ContentSource.trust_level.asc(), ContentSource.name.asc()).all()
+    contributions = FileContribution.query.order_by(FileContribution.created_at.desc()).limit(50).all()
+    health_files = TechnicalFile.query.order_by(
+        TechnicalFile.last_link_check_at.desc().nullslast(), TechnicalFile.created_at.desc()
+    ).limit(100).all()
+    link_health = {
+        'active': TechnicalFile.query.filter_by(is_active=True, link_status='online').count(),
+        'broken': TechnicalFile.query.filter_by(is_active=True, link_status='broken').count(),
+        'unchecked': TechnicalFile.query.filter(
+            TechnicalFile.is_active == True,
+            TechnicalFile.link_status.in_(['unchecked', 'unknown', 'needs_review']),
+        ).count(),
+        'total': TechnicalFile.query.filter_by(is_active=True).count(),
+    }
     return render_template('admin/tools_import.html',
-                         title="Importar Dados",
+                         title="Motor de Conteúdo Técnico",
+                         jobs=jobs,
+                         review_items=review_items,
+                         automatic_items=automatic_items,
+                         sources=sources,
+                         contributions=contributions,
+                         health_files=health_files,
+                         link_health=link_health,
+                         automation=get_technical_automation_settings(),
                          **sidebar_stats)
+
+
+@app.route('/api/admin/technical-import/settings', methods=['POST'])
+@login_required
+@admin_required
+def admin_technical_import_settings():
+    payload = request.get_json(silent=True) or {}
+    unknown = set(payload) - TECHNICAL_AUTOMATION_KEYS
+    if unknown:
+        return jsonify({'success': False, 'message': f'Configurações não suportadas: {", ".join(sorted(unknown))}'}), 400
+    mode = str(payload.get('technical_automation_mode', SiteConfig.get_value('technical_automation_mode', 'semi'))).lower()
+    if mode not in {'off', 'semi', 'full'}:
+        return jsonify({'success': False, 'message': 'Modo inválido.'}), 400
+    values = {
+        'technical_import_enabled': (coerce_bool(payload.get('technical_import_enabled'), True), 'bool'),
+        'technical_automation_mode': (mode, 'string'),
+        'technical_automation_percentage': (
+            max(0, min(100, coerce_int(payload.get('technical_automation_percentage'), 100))), 'int'
+        ),
+        'technical_auto_publish_threshold': (
+            max(0, min(100, coerce_int(payload.get('technical_auto_publish_threshold'), 85))), 'int'
+        ),
+        'technical_require_storage_ready': (coerce_bool(payload.get('technical_require_storage_ready'), True), 'bool'),
+    }
+    for key, (value, value_type) in values.items():
+        SiteConfig.set_value(key, value, value_type=value_type, is_public=False)
+    return jsonify({'success': True, 'settings': get_technical_automation_settings()})
+
+
+@app.route('/api/admin/technical-import/sources/<int:source_id>', methods=['PATCH', 'POST'])
+@login_required
+@admin_required
+def admin_technical_source_update(source_id):
+    source = ContentSource.query.get_or_404(source_id)
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    trust = str(payload.get('trust_level', source.trust_level)).upper()
+    if trust not in {'A', 'B', 'C', 'D'}:
+        return jsonify({'success': False, 'message': 'Nível de confiança inválido.'}), 400
+    source.trust_level = trust
+    for field in (
+        'enabled', 'auto_publish', 'metadata_allowed', 'distribution_allowed',
+        'file_mirroring_allowed', 'attribution_required',
+    ):
+        if field in payload:
+            setattr(source, field, coerce_bool(payload[field], getattr(source, field)))
+    if 'part_numbers' in payload:
+        raw_parts = payload.get('part_numbers') or ''
+        if isinstance(raw_parts, str):
+            raw_parts = re.split(r'[,;\n]+', raw_parts)
+        parts = []
+        for raw_part in list(raw_parts)[:100]:
+            part = sanitize_input(str(raw_part)).strip()[:160]
+            if part and part.lower() not in {existing.lower() for existing in parts}:
+                parts.append(part)
+        config = source.configuration()
+        config['part_numbers'] = parts
+        source.config_json = json.dumps(config, ensure_ascii=False)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Política da fonte atualizada.'})
+
+
+@app.route('/api/admin/technical-import/sources/<int:source_id>/sync', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit('10 per hour')
+def admin_technical_source_sync(source_id):
+    source = ContentSource.query.get_or_404(source_id)
+    if not source.enabled:
+        return jsonify({'success': False, 'message': 'Ative a fonte antes de sincronizar.'}), 409
+    # Import tardio evita acoplamento circular no boot dos jobs CLI.
+    from jobs.sync_configured_sources import run as run_source_sync
+    result = run_source_sync({source.name}, reviewer_id=current_user.id)
+    items_count = coerce_int(result.get('items'), 0)
+    raw_messages = result.get('messages')
+    messages = raw_messages if isinstance(raw_messages, list) else []
+    if not items_count:
+        message = messages[0] if messages else (source.last_error or 'Nenhum item novo foi encontrado.')
+        return jsonify({'success': False, 'message': message, 'result': result}), 409
+    return jsonify({
+        'success': True,
+        'message': f'{items_count} item(ns) analisado(s); previews atualizados.',
+        'result': result,
+    })
+
+
+@app.route('/api/admin/technical-import/analyze', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit('20 per hour')
+def admin_technical_import_analyze():
+    if not app.config.get('TECHNICAL_IMPORT_ENABLED'):
+        return jsonify({'success': False, 'message': 'O motor está desativado pela configuração de ambiente.'}), 503
+    automation = get_technical_automation_settings()
+    job_type = sanitize_input(str(request.form.get('type') or (request.get_json(silent=True) or {}).get('type') or 'files'))[:40]
+    source_name = sanitize_input(str(request.form.get('source') or (request.get_json(silent=True) or {}).get('source') or 'Admin'))[:120]
+    job = ImportJob(
+        job_type=job_type,
+        source=source_name,
+        status='processing',
+        automation_mode=automation['mode'],
+        created_by=current_user.id,
+        started_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+    )
+    db.session.add(job)
+    db.session.flush()
+    created_items = []
+    errors = []
+    try:
+        uploads = request.files.getlist('files') or request.files.getlist('files[]')
+        if request.files.get('file'):
+            uploads.append(request.files['file'])
+        for upload in uploads[:50]:
+            try:
+                created_items.extend(_analyze_uploaded_file(job, upload))
+            except (ValueError, ArchiveSafetyError, OSError) as exc:
+                errors.append(f'{sanitize_download_name(upload.filename or "arquivo-tecnico")}: {exc}')
+                job.error_count += 1
+
+        payload = request.get_json(silent=True) or request.form.to_dict()
+        if job_type in {'part_number', 'part_numbers', 'provider'}:
+            part_numbers = payload.get('part_numbers') or payload.get('part_number') or ''
+            if isinstance(part_numbers, str):
+                part_numbers = [part.strip() for part in re.split(r'[,;\n]+', part_numbers) if part.strip()]
+            provider_name = str(payload.get('provider') or 'mouser').lower()
+            for part_number in list(part_numbers)[:100]:
+                try:
+                    records = _provider_records(provider_name, sanitize_input(str(part_number))[:160])
+                    for record in records:
+                        metadata = _merge_parsed_metadata(record.part_number, {
+                            'manufacturer': record.manufacturer,
+                            'model': record.part_number,
+                            'part_number': record.part_number,
+                            'file_type': 'Datasheet',
+                            'source_provider': record.source,
+                            'source_url': record.product_url,
+                            'provider_url': record.datasheet_url,
+                            'distribution_policy': 'remote_only' if record.datasheet_url else 'metadata_only',
+                            'license_status': 'official_metadata',
+                            'title': record.title,
+                            'description': record.description,
+                            'confidence': 90,
+                        })
+                        created_items.append(_append_import_item(
+                            job, metadata, source_name=record.part_number, raw={'provider': record.source},
+                        ))
+                except (ProviderError, ValueError) as exc:
+                    errors.append(f'{part_number}: {exc}')
+                    job.error_count += 1
+
+        if job_type in {'link', 'links'}:
+            link_items = payload.get('items') or []
+            if isinstance(link_items, str):
+                try:
+                    link_items = json.loads(link_items)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    link_items = [{'provider_url': link_items}]
+            if payload.get('provider_url'):
+                link_items.append(payload)
+            for link_data in list(link_items)[:100]:
+                if not isinstance(link_data, dict):
+                    continue
+                provider_url = normalize_download_url(link_data.get('provider_url') or link_data.get('url'))
+                if not provider_url or not provider_url.startswith(('http://', 'https://')):
+                    errors.append('Um link informado é inválido.')
+                    job.error_count += 1
+                    continue
+                filename = link_data.get('filename') or os.path.basename(url_parse(provider_url).path) or 'arquivo-tecnico.bin'
+                metadata = _merge_parsed_metadata(filename, {
+                    **link_data,
+                    'provider_url': provider_url,
+                    'distribution_policy': link_data.get('distribution_policy') or 'external_storage_allowed',
+                })
+                created_items.append(_append_import_item(job, metadata, source_name=filename, raw={'kind': 'link'}))
+
+        if not created_items:
+            job.status = 'error'
+            job.finished_at = datetime.utcnow()
+            job.log_summary = '\n'.join(errors) or 'Nenhum item técnico foi recebido.'
+            db.session.commit()
+            return jsonify({'success': False, 'message': job.log_summary, 'job_id': job.id}), 400
+
+        job.status = 'reviewing'
+        job.log_summary = '\n'.join(errors) if errors else 'Análise concluída.'
+        db.session.commit()
+
+        for duplicate_item in created_items:
+            if duplicate_item.status == 'duplicate':
+                _cleanup_import_item_temp(duplicate_item)
+        db.session.commit()
+
+        source = ContentSource.query.filter(db.func.lower(ContentSource.name) == source_name.lower()).first()
+        auto_published = 0
+        for created in list(created_items):
+            created = db.session.get(ImportItem, created.id)
+            if created.status == 'duplicate':
+                continue
+            should_publish, reason = technical_auto_publish_decision(created, source)
+            created.decision_reason = reason
+            db.session.commit()
+            if should_publish:
+                try:
+                    publish_import_item(created, reviewer_id=current_user.id, automatic=True)
+                    auto_published += 1
+                except ValueError as exc:
+                    created.decision_reason = str(exc)
+                    db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'job_id': job.id,
+            'items': len(created_items),
+            'errors': errors,
+            'auto_published': auto_published,
+            'message': 'Análise concluída. Os previews estão disponíveis no painel.',
+        }), 201
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception('Falha ao analisar importação técnica')
+        return jsonify({'success': False, 'message': f'Falha na análise: {exc}'}), 500
+
+
+@app.route('/api/admin/technical-import/items/<int:item_id>', methods=['PATCH'])
+@login_required
+@admin_required
+def admin_technical_import_item_update(item_id):
+    item = ImportItem.query.get_or_404(item_id)
+    if item.status == 'published':
+        return jsonify({'success': False, 'message': 'O item já foi publicado.'}), 409
+    payload = request.get_json(silent=True) or {}
+    metadata = item.normalized_data()
+    editable = {
+        'manufacturer', 'model', 'board_code', 'board_revision', 'version', 'file_type',
+        'chip_type', 'chip_position', 'part_number', 'source_provider', 'source_url',
+        'provider_url', 'provider_direct_url', 'storage_provider', 'distribution_policy',
+        'license_status', 'mime_type', 'title', 'description',
+        'external_id', 'external_version',
+    }
+    for key in editable:
+        if key in payload:
+            metadata[key] = sanitize_input(str(payload[key] or ''))[:2000]
+    if 'confidence' in payload:
+        item.confidence = max(0, min(100, coerce_int(payload['confidence'], item.confidence)))
+        metadata['confidence'] = item.confidence
+    metadata['board_code'] = format_board_code(metadata.get('board_code'))
+    metadata['copy'] = build_post_copy(metadata)
+    item.normalized_data_json = json.dumps(metadata, ensure_ascii=False)
+    item.status = 'pending_review'
+    item.decision_reason = 'Preview editado; aguardando aprovação.'
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Preview atualizado.', 'item': metadata})
+
+
+@app.route('/api/admin/technical-import/items/<int:item_id>/approve', methods=['POST'])
+@login_required
+@admin_required
+def admin_technical_import_item_approve(item_id):
+    item = ImportItem.query.get_or_404(item_id)
+    try:
+        publish_import_item(item, reviewer_id=current_user.id, automatic=False)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc), 'status': item.status}), 409
+    return jsonify({
+        'success': True,
+        'message': 'Item publicado com sucesso.',
+        'post_id': item.post_id,
+        'url': url_for('post', post_id=item.post_id),
+    })
+
+
+@app.route('/api/admin/technical-import/items/<int:item_id>/reject', methods=['POST'])
+@login_required
+@admin_required
+def admin_technical_import_item_reject(item_id):
+    item = ImportItem.query.get_or_404(item_id)
+    if item.status == 'published':
+        return jsonify({'success': False, 'message': 'Posts publicados devem ser gerenciados na tela de posts.'}), 409
+    payload = request.get_json(silent=True) or {}
+    item.status = 'rejected'
+    item.reviewed_by = current_user.id
+    item.reviewed_at = datetime.utcnow()
+    item.decision_reason = sanitize_input(str(payload.get('reason') or 'Rejeitado pelo administrador.'))[:500]
+    item.job.review_count = max(0, item.job.review_count - 1)
+    terminal = {'published', 'duplicate', 'rejected', 'error'}
+    if all(candidate.status in terminal for candidate in item.job.items):
+        item.job.status = 'completed'
+        item.job.finished_at = datetime.utcnow()
+    if item.contribution:
+        item.contribution.status = 'rejected'
+        item.contribution.reviewed_by = current_user.id
+        item.contribution.reviewed_at = datetime.utcnow()
+    _cleanup_import_item_temp(item)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Item rejeitado e mantido no histórico de auditoria.'})
+
+
+@app.route('/api/admin/technical-import/contributions/<int:contribution_id>/analyze', methods=['POST'])
+@login_required
+@admin_required
+def admin_technical_contribution_analyze(contribution_id):
+    contribution = FileContribution.query.get_or_404(contribution_id)
+    if contribution.import_item_id:
+        return jsonify({
+            'success': True,
+            'message': 'A contribuição já possui preview.',
+            'item_id': contribution.import_item_id,
+        })
+    if contribution.status == 'duplicate':
+        return jsonify({'success': False, 'message': 'O arquivo já existe no acervo.'}), 409
+    if contribution.status == 'rejected':
+        return jsonify({'success': False, 'message': 'A contribuição foi rejeitada.'}), 409
+    if not os.path.isfile(contribution.temp_path):
+        contribution.status = 'error'
+        db.session.commit()
+        return jsonify({'success': False, 'message': 'O arquivo temporário da contribuição não está disponível.'}), 410
+    try:
+        _validate_technical_file_content(contribution.temp_path, contribution.original_filename)
+    except (ValueError, OSError) as exc:
+        contribution.status = 'error'
+        db.session.commit()
+        return jsonify({'success': False, 'message': str(exc)}), 400
+
+    automation = get_technical_automation_settings()
+    job = ImportJob(
+        job_type='contribution',
+        source='Contribuição de usuário',
+        status='reviewing',
+        automation_mode='semi',
+        created_by=current_user.id,
+        started_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        log_summary='Contribuição encaminhada para revisão humana obrigatória.',
+    )
+    db.session.add(job)
+    db.session.flush()
+    metadata = _merge_parsed_metadata(contribution.original_filename, {
+        'title': contribution.title,
+        'description': contribution.notes,
+        'board_code': contribution.board_code,
+        'source_provider': 'Contribuição de usuário',
+        'distribution_policy': 'manual_review',
+        'license_status': 'needs_review',
+        'temp_path': contribution.temp_path,
+    })
+    item = _append_import_item(
+        job,
+        metadata,
+        source_name=contribution.original_filename,
+        temp_path=contribution.temp_path,
+        file_hash=contribution.sha256,
+        raw={'contribution_id': contribution.id, 'user_id': contribution.user_id},
+    )
+    db.session.flush()
+    item.decision_reason = 'Contribuição de usuário: revisão administrativa obrigatória.'
+    contribution.import_item_id = item.id
+    contribution.status = 'pending_review'
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'Preview gerado para revisão; a contribuição nunca será autopublicada.',
+        'item_id': item.id,
+        'automation': automation['mode'],
+    }), 201
+
+
+@app.route('/api/admin/technical-import/contributions/<int:contribution_id>/reject', methods=['POST'])
+@login_required
+@admin_required
+def admin_technical_contribution_reject(contribution_id):
+    contribution = FileContribution.query.get_or_404(contribution_id)
+    if contribution.status == 'published':
+        return jsonify({'success': False, 'message': 'Gerencie o post publicado na tela de posts.'}), 409
+    contribution.status = 'rejected'
+    contribution.reviewed_by = current_user.id
+    contribution.reviewed_at = datetime.utcnow()
+    if contribution.import_item and contribution.import_item.status != 'published':
+        contribution.import_item.status = 'rejected'
+        contribution.import_item.reviewed_by = current_user.id
+        contribution.import_item.reviewed_at = datetime.utcnow()
+        contribution.import_item.decision_reason = 'Contribuição rejeitada pelo administrador.'
+        contribution.import_item.job.review_count = max(0, contribution.import_item.job.review_count - 1)
+        _cleanup_import_item_temp(contribution.import_item)
+    else:
+        root = os.path.abspath(app.config['TECHNICAL_IMPORT_TEMP_DIR'])
+        path = os.path.abspath(contribution.temp_path)
+        try:
+            if os.path.commonpath([root, path]) == root and os.path.isfile(path):
+                os.remove(path)
+        except (OSError, ValueError):
+            pass
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Contribuição rejeitada.'})
+
+
+@app.route('/api/admin/technical-import/files/<int:file_id>/health', methods=['POST'])
+@login_required
+@admin_required
+def admin_technical_file_health(file_id):
+    technical_file = TechnicalFile.query.get_or_404(file_id)
+    if technical_file.storage_provider == 'local':
+        root = os.path.abspath(app.config['TECHNICAL_LOCAL_STORAGE_DIR'])
+        path = os.path.abspath(os.path.join(root, technical_file.provider_file_id or ''))
+        online = os.path.commonpath([root, path]) == root and os.path.isfile(path)
+        message = 'online' if online else 'Arquivo local ausente.'
+        status_code = 200 if online else None
+    else:
+        storage = HttpStorageProvider()
+        online, message, status_code = storage.health(technical_file.provider_direct_url or technical_file.provider_url or '')
+    technical_file.link_status = 'online' if online else 'broken'
+    technical_file.last_link_check_at = datetime.utcnow()
+    technical_file.last_link_http_status = status_code
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'online': online,
+        'status': technical_file.link_status,
+        'message': message,
+        'http_status': status_code,
+    })
 
 @app.route("/admin/settings")
 @login_required
@@ -12663,6 +14116,7 @@ with app.app_context():
         except Exception:
             pass
         ensure_default_categories()
+        ensure_default_content_sources()
         # Garantir que colunas novas existam em tabelas existentes
         try:
             from sqlalchemy import text

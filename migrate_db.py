@@ -12,6 +12,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -74,6 +76,8 @@ def create_auxiliary_tables(connection) -> int:
     # banco vazio, app.py criará todo o esquema de uma vez no primeiro start.
     if "user" in tables:
         Table("user", metadata, autoload_with=connection)
+    if "posts" in tables:
+        Table("posts", metadata, autoload_with=connection)
 
     webhook_events = Table(
         "payment_webhook_events",
@@ -117,8 +121,196 @@ def create_auxiliary_tables(connection) -> int:
         extend_existing=True,
     )
 
+    hardware_boards = Table(
+        "hardware_boards", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("manufacturer", String(120)),
+        Column("board_manufacturer", String(120)),
+        Column("device_model", String(160)),
+        Column("device_series", String(160)),
+        Column("board_code", String(120), nullable=False),
+        Column("normalized_board_code", String(120), nullable=False),
+        Column("board_revision", String(80)),
+        Column("platform", String(120)),
+        Column("chipset", String(120)),
+        Column("cpu_family", String(120)),
+        Column("super_io", String(120)),
+        Column("ec_controller", String(120)),
+        Column("notes", Text),
+        Column("slug", String(250), nullable=False, unique=True),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    content_sources = Table(
+        "content_sources", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(120), nullable=False, unique=True),
+        Column("provider_type", String(40), nullable=False, server_default="manual"),
+        Column("trust_level", String(1), nullable=False, server_default="C"),
+        Column("auto_publish", Boolean, nullable=False, server_default="false"),
+        Column("metadata_allowed", Boolean, nullable=False, server_default="true"),
+        Column("distribution_allowed", Boolean, nullable=False, server_default="false"),
+        Column("file_mirroring_allowed", Boolean, nullable=False, server_default="false"),
+        Column("attribution_required", Boolean, nullable=False, server_default="false"),
+        Column("enabled", Boolean, nullable=False, server_default="true"),
+        Column("config_json", Text),
+        Column("last_sync_at", DateTime),
+        Column("last_error", Text),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    post_id_resource = (
+        Column("post_id", Integer, ForeignKey("posts.id"), nullable=True)
+        if "posts" in tables else Column("post_id", Integer, nullable=True)
+    )
+    technical_resources = Table(
+        "technical_resources", metadata,
+        Column("id", Integer, primary_key=True),
+        post_id_resource,
+        Column("board_id", Integer, ForeignKey("hardware_boards.id")),
+        Column("resource_type", String(40), nullable=False, server_default="other"),
+        Column("title", String(200), nullable=False),
+        Column("manufacturer", String(120)),
+        Column("model", String(160)),
+        Column("part_number", String(160)),
+        Column("board_code", String(120)),
+        Column("board_revision", String(80)),
+        Column("chip", String(120)),
+        Column("chip_position", String(50)),
+        Column("version", String(80)),
+        Column("source_type", String(40), nullable=False, server_default="manual"),
+        Column("source_provider", String(120)),
+        Column("source_reference", Text),
+        Column("external_id", String(255)),
+        Column("external_version", String(120)),
+        Column("last_synced_at", DateTime),
+        Column("verification_status", String(30), nullable=False, server_default="needs_review"),
+        Column("verification_date", DateTime),
+        Column("license_status", String(40), nullable=False, server_default="unknown"),
+        Column("distribution_policy", String(40), nullable=False, server_default="unknown"),
+        Column("metadata_json", Text),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    post_id_file = (
+        Column("post_id", Integer, ForeignKey("posts.id"), nullable=True)
+        if "posts" in tables else Column("post_id", Integer, nullable=True)
+    )
+    technical_files = Table(
+        "technical_files", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("resource_id", Integer, ForeignKey("technical_resources.id")),
+        post_id_file,
+        Column("display_filename", String(200), nullable=False),
+        Column("original_filename", String(255)),
+        Column("file_type", String(80), nullable=False, server_default="Arquivo"),
+        Column("chip", String(120)),
+        Column("chip_position", String(50)),
+        Column("version", String(80)),
+        Column("extension", String(30)),
+        Column("mime_type", String(120)),
+        Column("file_size", BigInteger),
+        Column("sha256", String(64)),
+        Column("storage_provider", String(40), nullable=False, server_default="http"),
+        Column("provider_file_id", String(255)),
+        Column("provider_url", Text),
+        Column("provider_direct_url", Text),
+        Column("provider_metadata_json", Text),
+        Column("source_provider", String(120)),
+        Column("source_url", Text),
+        Column("link_status", String(30), nullable=False, server_default="unchecked"),
+        Column("last_link_check_at", DateTime),
+        Column("last_link_http_status", Integer),
+        Column("verification_status", String(30), nullable=False, server_default="needs_review"),
+        Column("is_active", Boolean, nullable=False, server_default="true"),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    created_by_column = (
+        Column("created_by", Integer, ForeignKey("user.id"))
+        if "user" in tables else Column("created_by", Integer)
+    )
+    import_jobs = Table(
+        "import_jobs", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("job_type", String(40), nullable=False),
+        Column("source", String(120), nullable=False, server_default="admin"),
+        Column("status", String(30), nullable=False, server_default="pending"),
+        Column("automation_mode", String(20), nullable=False, server_default="semi"),
+        Column("total_items", Integer, nullable=False, server_default="0"),
+        Column("processed_items", Integer, nullable=False, server_default="0"),
+        Column("success_count", Integer, nullable=False, server_default="0"),
+        Column("duplicate_count", Integer, nullable=False, server_default="0"),
+        Column("review_count", Integer, nullable=False, server_default="0"),
+        Column("error_count", Integer, nullable=False, server_default="0"),
+        created_by_column,
+        Column("created_at", DateTime, nullable=False),
+        Column("started_at", DateTime),
+        Column("finished_at", DateTime),
+        Column("log_summary", Text),
+        extend_existing=True,
+    )
+    reviewed_by_column = (
+        Column("reviewed_by", Integer, ForeignKey("user.id"))
+        if "user" in tables else Column("reviewed_by", Integer)
+    )
+    import_items = Table(
+        "import_items", metadata,
+        Column("id", Integer, primary_key=True),
+        Column("job_id", Integer, ForeignKey("import_jobs.id"), nullable=False),
+        Column("source_name", String(255)),
+        Column("status", String(30), nullable=False, server_default="pending_review"),
+        Column("confidence", Integer, nullable=False, server_default="0"),
+        Column("raw_data_json", Text),
+        Column("normalized_data_json", Text),
+        Column("temp_path", Text),
+        Column("sha256", String(64)),
+        Column("duplicate_file_id", Integer, ForeignKey("technical_files.id")),
+        Column("technical_file_id", Integer, ForeignKey("technical_files.id")),
+        Column("resource_id", Integer, ForeignKey("technical_resources.id")),
+        Column("post_id", Integer),
+        Column("error_message", Text),
+        Column("decision_reason", Text),
+        Column("published_automatically", Boolean, nullable=False, server_default="false"),
+        reviewed_by_column,
+        Column("reviewed_at", DateTime),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+    contribution_user_column = (
+        Column("user_id", Integer, ForeignKey("user.id"), nullable=False)
+        if "user" in tables else Column("user_id", Integer, nullable=False)
+    )
+    file_contributions = Table(
+        "file_contributions", metadata,
+        Column("id", Integer, primary_key=True),
+        contribution_user_column,
+        Column("status", String(30), nullable=False, server_default="pending_review"),
+        Column("original_filename", String(255), nullable=False),
+        Column("temp_path", Text, nullable=False),
+        Column("sha256", String(64), nullable=False),
+        Column("title", String(200)),
+        Column("board_code", String(120)),
+        Column("notes", Text),
+        Column("import_item_id", Integer, ForeignKey("import_items.id")),
+        Column("reviewed_by", Integer),
+        Column("reviewed_at", DateTime),
+        Column("created_at", DateTime, nullable=False),
+        extend_existing=True,
+    )
+
     created = 0
-    for table in (webhook_events, content_requests):
+    tables_to_create = [
+        webhook_events, content_requests, hardware_boards, content_sources,
+        technical_resources, technical_files, import_jobs, import_items,
+        file_contributions,
+    ]
+    for table in tables_to_create:
         if table.name not in tables:
             table.create(connection, checkfirst=True)
             print(f"  + tabela {table.name}")
@@ -214,11 +406,12 @@ def migrate() -> None:
         applied += add_missing_columns(connection, "content_requests", {
             "requester_plan": "VARCHAR(20) NOT NULL DEFAULT 'guest'",
         })
-        connection.execute(text(
-            'UPDATE content_requests '
-            'SET requester_plan = COALESCE((SELECT plan FROM "user" WHERE "user".id = content_requests.user_id), \'guest\') '
-            "WHERE user_id IS NOT NULL AND (requester_plan IS NULL OR requester_plan = 'guest')"
-        ))
+        if inspect(connection).has_table("content_requests") and inspect(connection).has_table("user"):
+            connection.execute(text(
+                'UPDATE content_requests '
+                'SET requester_plan = COALESCE((SELECT plan FROM "user" WHERE "user".id = content_requests.user_id), \'guest\') '
+                "WHERE user_id IS NOT NULL AND (requester_plan IS NULL OR requester_plan = 'guest')"
+            ))
         applied += add_missing_columns(connection, "posts", {
             "manufacturer": "VARCHAR(120)",
             "brand": "VARCHAR(120)",
@@ -240,11 +433,41 @@ def migrate() -> None:
             "compatibility": "TEXT",
             "technical_notes": "TEXT",
         })
-        applied += update_legacy_public_copy(connection)
         applied += create_auxiliary_tables(connection)
+        applied += add_missing_columns(connection, "technical_resources", {
+            "external_id": "VARCHAR(255)",
+            "external_version": "VARCHAR(120)",
+            "last_synced_at": "DATETIME",
+        })
+        applied += add_missing_columns(connection, "technical_files", {
+            "last_link_http_status": "INTEGER",
+        })
+        applied += add_missing_columns(connection, "file_contributions", {
+            "import_item_id": "INTEGER",
+        })
+        applied += add_missing_columns(connection, "import_items", {
+            "published_automatically": "BOOLEAN NOT NULL DEFAULT FALSE",
+        })
+        applied += add_missing_columns(connection, "download", {
+            "technical_file_id": "INTEGER",
+            "resource_id": "INTEGER",
+            "plan_snapshot": "VARCHAR(20)",
+        })
+        applied += update_legacy_public_copy(connection)
 
         if inspect(connection).has_table("posts"):
             connection.execute(text("CREATE INDEX IF NOT EXISTS ix_posts_board_code ON posts (board_code)"))
+        for table_name, statement in (
+            ("hardware_boards", "CREATE INDEX IF NOT EXISTS ix_hardware_boards_normalized_board_code ON hardware_boards (normalized_board_code)"),
+            ("technical_resources", "CREATE INDEX IF NOT EXISTS ix_technical_resources_board_code ON technical_resources (board_code)"),
+            ("technical_resources", "CREATE INDEX IF NOT EXISTS ix_technical_resources_external_id ON technical_resources (external_id)"),
+            ("technical_files", "CREATE INDEX IF NOT EXISTS ix_technical_files_sha256 ON technical_files (sha256)"),
+            ("import_items", "CREATE INDEX IF NOT EXISTS ix_import_items_status ON import_items (status)"),
+            ("file_contributions", "CREATE INDEX IF NOT EXISTS ix_file_contributions_status ON file_contributions (status)"),
+            ("file_contributions", "CREATE INDEX IF NOT EXISTS ix_file_contributions_import_item_id ON file_contributions (import_item_id)"),
+        ):
+            if inspect(connection).has_table(table_name):
+                connection.execute(text(statement))
 
     if applied:
         print(f"Migração concluída: {applied} alteração(ões) aplicada(s).")

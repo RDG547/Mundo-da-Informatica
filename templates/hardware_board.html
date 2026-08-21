@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/technical-public.css') }}">{% endblock %}
+{% block content %}
+<main class="technical-public-page">
+    <section class="technical-hero">
+        <div class="technical-hero-icon"><i class="fas fa-microchip"></i></div>
+        <p class="technical-kicker">Placa técnica</p>
+        <h1>{{ board.board_code }}</h1>
+        <p>{{ [board.manufacturer, board.device_model, board.device_series]|select|join(' · ') }}</p>
+    </section>
+    <div class="technical-public-container">
+        <section class="board-overview">
+            <header><i class="fas fa-info-circle"></i><div><h2>Identificação da placa</h2><p>Dados estruturados e recursos associados.</p></div></header>
+            <dl>
+                <div><dt>Código</dt><dd>{{ board.board_code }}</dd></div>
+                <div><dt>Revisão</dt><dd>{{ board.board_revision or 'Não informada' }}</dd></div>
+                <div><dt>Fabricante</dt><dd>{{ board.manufacturer or 'Não informado' }}</dd></div>
+                <div><dt>Modelo</dt><dd>{{ board.device_model or 'Não informado' }}</dd></div>
+                <div><dt>Plataforma</dt><dd>{{ board.platform or 'Não informada' }}</dd></div>
+                <div><dt>Chipset</dt><dd>{{ board.chipset or 'Não informado' }}</dd></div>
+            </dl>
+            {% if board.notes %}<p class="board-notes">{{ board.notes }}</p>{% endif %}
+        </section>
+        <section class="board-resources">
+            <div class="section-title"><i class="fas fa-layer-group"></i><div><h2>Recursos técnicos</h2><p>{{ resources|length }} recurso(s) publicado(s)</p></div></div>
+            <div class="board-resource-grid">
+                {% for resource in resources %}
+                <article>
+                    <span class="resource-type">{{ resource.resource_type|replace('_', ' ') }}</span>
+                    <h3><a href="{{ url_for('post', post_id=resource.post_id) }}">{{ resource.title }}</a></h3>
+                    <p>{{ [resource.version, resource.chip, resource.chip_position]|select|join(' · ') or 'Consulte os detalhes técnicos.' }}</p>
+                    <div class="resource-meta"><span><i class="fas fa-shield-alt"></i> {{ resource.verification_status }}</span>{% if resource.source_provider %}<span><i class="fas fa-database"></i> {{ resource.source_provider }}</span>{% endif %}</div>
+                    <div class="resource-files">
+                        {% for file in resource.files if file.is_active %}
+                        <a href="{{ url_for('download_technical_file', file_id=file.id) }}" class="resource-download" data-action="download"><i class="fas fa-download"></i><span>{{ file.file_type }}{% if file.file_size %}<small>{{ file.public_dict().size }}</small>{% endif %}</span></a>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% else %}<div class="technical-empty"><i class="fas fa-folder-open"></i><h3>Nenhum recurso publicado</h3><p>Esta placa já está catalogada e aguarda recursos revisados.</p></div>{% endfor %}
+            </div>
+        </section>
+    </div>
+</main>
+{% endblock %}

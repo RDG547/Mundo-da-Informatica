@@ -24,6 +24,18 @@ services:
         value: https://mundodainformatica.com
       - key: CANONICAL_HOST
         value: mundodainformatica.com
+      - key: DOWNLOAD_DELIVERY_MODE
+        value: proxy
+      - key: TECHNICAL_IMPORT_ENABLED
+        value: "true"
+      - key: TECHNICAL_CONTRIBUTIONS_ENABLED
+        value: "true"
+      - key: TECHNICAL_IMPORT_TEMP_DIR
+        value: /opt/render/project/src/data/technical-imports
+      - key: TECHNICAL_LOCAL_STORAGE_DIR
+        value: /opt/render/project/src/data/technical-files
+      # APIs técnicas (Mouser/DigiKey) são opcionais e devem ser cadastradas
+      # como secrets no Dashboard, nunca neste arquivo.
       # IDs de produto são identificadores públicos; chaves e webhooks devem
       # ser configurados como secrets no painel do Render.
       - key: STRIPE_PRODUCT_PREMIUM

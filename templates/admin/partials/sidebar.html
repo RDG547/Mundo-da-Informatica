@@ -119,7 +119,8 @@
                 <svg class="admin-icon" viewBox="0 0 512 512">
                     <path fill="currentColor" d="M128 64c0-35.3 28.7-64 64-64H352V128c0 17.7 14.3 32 32 32H512V448c0 35.3-28.7 64-64 64H192c-35.3 0-64-28.7-64-64V336H302.1l-39 39c-9.4 9.4-9.4 24.6 0 33.9s24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9l-80-80c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l39 39H128V160 128 64zm0 256V416c0 17.7 14.3 32 32 32c0 17.7-14.3 32-32 32s-32-14.3-32-32V320c0-17.7 14.3-32 32-32s32 14.3 32 32z"/>
                 </svg>
-                <span class="admin-nav-text">Importar</span>
+                <span class="admin-nav-text">Conteúdo Técnico</span>
+                {% if technical_review_count is defined and technical_review_count %}<span class="nav-badge">{{ technical_review_count }}</span>{% endif %}
             </a>
 
             <a href="#" class="admin-nav-item" id="clearCacheBtn">

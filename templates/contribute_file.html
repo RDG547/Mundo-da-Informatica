@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/technical-public.css') }}">{% endblock %}
+{% block content %}
+<main class="technical-public-page">
+    <section class="technical-hero compact"><div class="technical-hero-icon"><i class="fas fa-hands-helping"></i></div><p class="technical-kicker">Comunidade técnica</p><h1>Contribuir com arquivo</h1><p>Todo envio passa por revisão humana e nunca é publicado automaticamente.</p></section>
+    <div class="technical-public-container contribution-layout">
+        <section class="contribution-card">
+            <header><i class="fas fa-file-upload"></i><div><h2>Enviar para revisão</h2><p>Informe o máximo de contexto técnico possível.</p></div></header>
+            <form id="contributionForm" enctype="multipart/form-data">
+                <label>Arquivo técnico<input type="file" name="file" required accept=".bin,.rom,.fd,.cap,.hex,.efi,.bio,.pdf,.brd,.bdv,.fz,.sch,.zip,.rar,.7z,.cab,.exe,.msi,.inf,.txt"></label>
+                <label>Título sugerido<input type="text" name="title" maxlength="200" placeholder="BIOS Lenovo IdeaPad Z460"></label>
+                <label>Código da placa<input type="text" name="board_code" maxlength="120" placeholder="LA-5751P"></label>
+                <label>Notas e procedência<textarea name="notes" rows="5" maxlength="2000" placeholder="Modelo, revisão, chip, posição e como o arquivo foi obtido."></textarea></label>
+                <div class="contribution-warning"><i class="fas fa-shield-alt"></i><p>Envie apenas conteúdo que você pode compartilhar. Arquivos duplicados, perigosos ou sem política de distribuição clara não serão publicados.</p></div>
+                <button type="submit" class="resource-download"><i class="fas fa-paper-plane"></i> Enviar contribuição</button>
+            </form>
+        </section>
+        <aside class="contribution-history"><h2>Seus envios</h2>
+            {% for contribution in contributions %}<article><div><strong>{{ contribution.original_filename }}</strong><small>{{ contribution.created_at.strftime('%d/%m/%Y %H:%M') }}</small></div><span class="contribution-status {{ contribution.status }}">{{ contribution.status|replace('_', ' ') }}</span></article>
+            {% else %}<p>Você ainda não enviou arquivos.</p>{% endfor %}
+        </aside>
+    </div>
+    <script src="{{ url_for('static', filename='js/contribute-file.js') }}"></script>
+</main>
+{% endblock %}

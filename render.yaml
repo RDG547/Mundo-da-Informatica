@@ -36,8 +36,6 @@ services:
         value: /opt/render/project/src/data/technical-files
       - key: ENABLE_DATASHEET_ENGINE
         value: "true"
-      - key: ENABLE_DATASHEET_AUTO_PUBLISH
-        value: "false"
       - key: DISABLE_ALL_DATASHEET_AUTOMATION
         value: "false"
       - key: ENABLE_SOURCE_PARTS

@@ -413,7 +413,6 @@ app.config['ENABLE_ALLDATASHEET_API'] = os.environ.get('ENABLE_ALLDATASHEET_API'
 app.config['ENABLE_ALLDATASHEET_HTML'] = os.environ.get('ENABLE_ALLDATASHEET_HTML', 'false').lower() in ('true', '1', 'yes', 'on')
 app.config['ENABLE_DATASHEETS_COM_API'] = os.environ.get('ENABLE_DATASHEETS_COM_API', 'false').lower() in ('true', '1', 'yes', 'on')
 app.config['ENABLE_DATASHEETS_COM_HTML'] = os.environ.get('ENABLE_DATASHEETS_COM_HTML', 'false').lower() in ('true', '1', 'yes', 'on')
-app.config['ENABLE_DATASHEET_AUTO_PUBLISH'] = os.environ.get('ENABLE_DATASHEET_AUTO_PUBLISH', 'false').lower() in ('true', '1', 'yes', 'on')
 app.config['DISABLE_ALL_DATASHEET_AUTOMATION'] = os.environ.get('DISABLE_ALL_DATASHEET_AUTOMATION', 'false').lower() in ('true', '1', 'yes', 'on')
 
 # Inicializar as extensões
@@ -2552,7 +2551,10 @@ def inject_admin_data():
                 'total_users': User.query.filter_by(is_active=True).count(),
                 'total_subscribers': Subscriber.query.filter_by(is_active=True).count(),
                 'content_request_count': ContentRequest.query.filter(ContentRequest.status.in_(['pending', 'reviewing', 'searching'])).count(),
-                'technical_review_count': ImportItem.query.filter(ImportItem.status.in_(['pending_review', 'needs_storage', 'needs_review'])).count(),
+                'technical_review_count': (
+                    ImportItem.query.filter(ImportItem.status.in_(['pending_review', 'needs_storage', 'needs_review'])).count()
+                    + DatasheetImportQueue.query.filter_by(status='needs_review').count()
+                ),
                 'download_file_types': get_download_file_types(),
                 'app_version': '1.6.2'
             }
@@ -3004,6 +3006,7 @@ class ElectronicComponent(db.Model):
     __tablename__ = 'electronic_components'
 
     id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=True, index=True)
     manufacturer = db.Column(db.String(160), nullable=True, index=True)
     normalized_manufacturer = db.Column(db.String(160), nullable=False, default='', index=True)
     part_number = db.Column(db.String(160), nullable=False, index=True)
@@ -3023,6 +3026,8 @@ class ElectronicComponent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     published_at = db.Column(db.DateTime, nullable=True)
+
+    post = db.relationship('Post', backref=db.backref('datasheet_component', uselist=False))
 
     __table_args__ = (
         db.UniqueConstraint('normalized_manufacturer', 'normalized_part_number', name='uq_component_identity'),
@@ -3749,17 +3754,27 @@ def get_datasheet_settings():
         strategy = 'priority_fallback'
     environment_kill_switch = bool(app.config.get('DISABLE_ALL_DATASHEET_AUTOMATION'))
     configured_paused = bool(SiteConfig.get_value('datasheet_automation_paused', False))
+    feature_enabled = bool(app.config.get('ENABLE_DATASHEET_ENGINE'))
+    configured_enabled = bool(SiteConfig.get_value('datasheet_engine_enabled', True))
+    auto_publish_configured = bool(SiteConfig.get_value('datasheet_auto_publish_enabled', False))
+    if not configured_enabled:
+        mode = 'off'
+    elif auto_publish_configured:
+        mode = 'full'
+    else:
+        mode = 'semi'
     return {
-        'feature_enabled': bool(app.config.get('ENABLE_DATASHEET_ENGINE')),
-        'configured_enabled': bool(SiteConfig.get_value('datasheet_engine_enabled', True)),
-        'auto_publish_environment': bool(app.config.get('ENABLE_DATASHEET_AUTO_PUBLISH')),
-        'auto_publish_configured': bool(SiteConfig.get_value('datasheet_auto_publish_enabled', False)),
+        'feature_enabled': feature_enabled,
+        'configured_enabled': configured_enabled,
+        'auto_publish_configured': auto_publish_configured,
         'auto_publish_enabled': bool(
-            app.config.get('ENABLE_DATASHEET_AUTO_PUBLISH')
-            and SiteConfig.get_value('datasheet_auto_publish_enabled', False)
+            feature_enabled
+            and configured_enabled
+            and auto_publish_configured
             and not environment_kill_switch
             and not configured_paused
         ),
+        'mode': mode,
         'paused': environment_kill_switch or configured_paused,
         'environment_kill_switch': environment_kill_switch,
         'strategy': strategy,
@@ -4137,6 +4152,108 @@ def _unique_component_slug(part_number, manufacturer=None):
     return candidate
 
 
+def _ensure_datasheet_post(component, selected, *, author_id, publish, automatic=False):
+    """Mantém o componente e o post público de datasheet como uma única publicação."""
+    post = component.post
+    expected_slug = f'datasheet-{component.slug}'[:250]
+    if post is None:
+        candidate = Post.query.filter_by(slug=expected_slug).first()
+        try:
+            candidate_metadata = json.loads(candidate.custom_metadata or '{}') if candidate else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            candidate_metadata = {}
+        if not isinstance(candidate_metadata, dict):
+            candidate_metadata = {}
+        if candidate and candidate_metadata.get('electronic_component_id') == component.id:
+            post = candidate
+
+    category = Category.query.filter(db.func.lower(Category.name) == 'datasheet').first()
+    if category is None:
+        category = Category(
+            name='Datasheet',
+            slug='datasheet',
+            description='Datasheets e informações técnicas de componentes eletrônicos.',
+            icon='fas fa-file-alt',
+            is_active=True,
+            is_visible=True,
+            show_in_menu=True,
+        )
+        db.session.add(category)
+        db.session.flush()
+
+    details = [
+        ('Fabricante', component.manufacturer),
+        ('Part number', component.part_number),
+        ('Categoria', component.category),
+        ('Subcategoria', component.subcategory),
+        ('Encapsulamento', component.package),
+        ('Ciclo de vida', component.lifecycle_status),
+    ]
+    specifications = component.specifications()
+    description = component.description_ptbr or generate_component_summary(
+        component.part_number, component.manufacturer, component.category
+    )
+    content_parts = [f'<p>{xml_escape(description)}</p>', '<ul>']
+    content_parts.extend(
+        f'<li><strong>{xml_escape(label)}:</strong> {xml_escape(str(value))}</li>'
+        for label, value in details if value
+    )
+    content_parts.extend(
+        f'<li><strong>{xml_escape(str(label))}:</strong> {xml_escape(str(value))}</li>'
+        for label, value in specifications.items() if value not in (None, '')
+    )
+    content_parts.append('</ul>')
+    content = sanitize_html(''.join(content_parts))
+    title = sanitize_input(component.title_ptbr or f'{component.part_number} Datasheet')[:200]
+    source_provider = sanitize_input(str(selected.get('provider') or selected.get('source_provider') or ''))[:120]
+    metadata = {
+        'electronic_component_id': component.id,
+        'datasheet_slug': component.slug,
+        'source_provider': source_provider or None,
+    }
+
+    if post is None:
+        post = Post(
+            title=title,
+            content=content,
+            author_id=author_id,
+            category_id=category.id,
+            category_str=category.name,
+            is_active=bool(publish),
+            download_link=f'/datasheet/{component.slug}',
+            tags=', '.join(filter(None, ['datasheet', component.part_number, component.manufacturer]))[:200],
+            seo_title=title[:100],
+            seo_description=sanitize_input(description)[:200],
+            slug=_unique_post_slug(expected_slug),
+            manufacturer=component.manufacturer,
+            brand=component.manufacturer,
+            model=component.part_number,
+            file_type='Datasheet',
+            verification_status='verified' if component.verification_status == 'verified_consensus' else 'unverified',
+            technical_notes='Publicado automaticamente pelo motor de datasheets.' if automatic else 'Aprovado pelo técnico no painel.',
+            custom_metadata=json.dumps(metadata, ensure_ascii=False),
+        )
+        db.session.add(post)
+        db.session.flush()
+        component.post_id = post.id
+    else:
+        component.post_id = post.id
+        post.title = title
+        post.content = content
+        post.author_id = post.author_id or author_id
+        post.category_id = category.id
+        post.category_str = category.name
+        post.is_active = bool(publish)
+        post.download_link = f'/datasheet/{component.slug}'
+        post.manufacturer = component.manufacturer
+        post.brand = component.manufacturer
+        post.model = component.part_number
+        post.file_type = 'Datasheet'
+        post.date_updated = datetime.utcnow()
+        post.custom_metadata = json.dumps(metadata, ensure_ascii=False)
+    return post
+
+
 def materialize_datasheet_component(queue_item, *, reviewer_id, publish, automatic=False):
     payload = queue_item.result()
     selected = payload.get('selected') if isinstance(payload.get('selected'), dict) else {}
@@ -4152,6 +4269,8 @@ def materialize_datasheet_component(queue_item, *, reviewer_id, publish, automat
     manufacturer = sanitize_input(str(selected.get('manufacturer') or queue_item.manufacturer_hint or ''))[:160] or None
     duplicate = find_component_by_identity(manufacturer, part_number)
     if duplicate:
+        if publish and duplicate.post_id is None:
+            _ensure_datasheet_post(duplicate, selected, author_id=reviewer_id, publish=True, automatic=automatic)
         queue_item.component_id = duplicate.id
         queue_item.status = 'duplicate'
         queue_item.admin_decision = 'marked_duplicate'
@@ -4228,6 +4347,13 @@ def materialize_datasheet_component(queue_item, *, reviewer_id, publish, automat
             source_resource_id=queue_item.source_resource_id,
             verified=bool(reviewer_id),
         ))
+    _ensure_datasheet_post(
+        component,
+        selected,
+        author_id=reviewer_id,
+        publish=publish,
+        automatic=automatic,
+    )
     queue_item.component_id = component.id
     queue_item.reviewed_by = reviewer_id
     queue_item.admin_decision = 'published' if publish else 'draft'
@@ -13427,8 +13553,9 @@ def admin_delete_backup(backup_id):
 @login_required
 @admin_required
 def admin_tools_import():
-    """Central real de ingestão, revisão, fontes e saúde dos arquivos."""
+    """Central única de ingestão, datasheets, revisão e publicação."""
     ensure_default_content_sources()
+    ensure_default_datasheet_providers()
     sidebar_stats = get_admin_sidebar_stats()
     jobs = ImportJob.query.order_by(ImportJob.created_at.desc()).limit(25).all()
     review_items = ImportItem.query.filter(
@@ -13437,6 +13564,11 @@ def admin_tools_import():
     automatic_items = ImportItem.query.filter_by(
         status='published', published_automatically=True
     ).order_by(ImportItem.reviewed_at.desc()).limit(50).all()
+    automatic_datasheets = ElectronicComponent.query.filter_by(
+        publication_mode='automatic', is_published=True
+    ).filter(ElectronicComponent.post_id.isnot(None)).order_by(
+        ElectronicComponent.published_at.desc()
+    ).limit(50).all()
     sources = ContentSource.query.order_by(ContentSource.trust_level.asc(), ContentSource.name.asc()).all()
     contributions = FileContribution.query.order_by(FileContribution.created_at.desc()).limit(50).all()
     health_files = TechnicalFile.query.order_by(
@@ -13451,16 +13583,46 @@ def admin_tools_import():
         ).count(),
         'total': TechnicalFile.query.filter_by(is_active=True).count(),
     }
+    datasheet_items = DatasheetImportQueue.query.order_by(
+        DatasheetImportQueue.priority.desc(), DatasheetImportQueue.created_at.desc()
+    ).limit(100).all()
+    datasheet_stats = {
+        'queued': DatasheetImportQueue.query.filter_by(status='queued').count(),
+        'review': DatasheetImportQueue.query.filter_by(status='needs_review').count(),
+        'published': DatasheetImportQueue.query.filter_by(status='published').count(),
+        'posts': ElectronicComponent.query.filter(ElectronicComponent.post_id.isnot(None)).count(),
+    }
+    source_parts = DatasheetProviderConfig.query.filter_by(provider_name='source_parts').first()
+    datasheet_source = {
+        'name': source_parts.display_name if source_parts else 'Source Parts',
+        'enabled': bool(source_parts and source_parts.enabled),
+        'credentials_configured': bool(
+            source_parts and datasheet_provider_credentials_status(source_parts)['configured']
+        ),
+        'publication_ready': bool(
+            source_parts
+            and source_parts.metadata_persistence_allowed
+            and source_parts.public_republish_allowed
+            and source_parts.written_permission_confirmed
+        ),
+        'permission_reference': source_parts.permission_reference if source_parts else '',
+    }
+    sidebar_stats['technical_review_count'] = len(review_items) + datasheet_stats['review']
     return render_template('admin/tools_import.html',
-                         title="Motor de Conteúdo Técnico",
+                         title="Conteúdo Técnico",
                          jobs=jobs,
                          review_items=review_items,
                          automatic_items=automatic_items,
+                         automatic_datasheets=automatic_datasheets,
                          sources=sources,
                          contributions=contributions,
                          health_files=health_files,
                          link_health=link_health,
                          automation=get_technical_automation_settings(),
+                         datasheet_settings=get_datasheet_settings(),
+                         datasheet_items=datasheet_items,
+                         datasheet_stats=datasheet_stats,
+                         datasheet_source=datasheet_source,
                          **sidebar_stats)
 
 
@@ -13475,20 +13637,75 @@ def admin_technical_import_settings():
     mode = str(payload.get('technical_automation_mode', SiteConfig.get_value('technical_automation_mode', 'semi'))).lower()
     if mode not in {'off', 'semi', 'full'}:
         return jsonify({'success': False, 'message': 'Modo inválido.'}), 400
+    enabled = mode != 'off'
     values = {
-        'technical_import_enabled': (coerce_bool(payload.get('technical_import_enabled'), True), 'bool'),
+        'technical_import_enabled': (
+            coerce_bool(payload.get('technical_import_enabled'), enabled) if mode != 'off' else False,
+            'bool',
+        ),
         'technical_automation_mode': (mode, 'string'),
         'technical_automation_percentage': (
-            max(0, min(100, coerce_int(payload.get('technical_automation_percentage'), 100))), 'int'
+            max(0, min(100, coerce_int(
+                payload.get('technical_automation_percentage'),
+                SiteConfig.get_value('technical_automation_percentage', 100),
+            ))), 'int'
         ),
         'technical_auto_publish_threshold': (
-            max(0, min(100, coerce_int(payload.get('technical_auto_publish_threshold'), 85))), 'int'
+            max(0, min(100, coerce_int(
+                payload.get('technical_auto_publish_threshold'),
+                SiteConfig.get_value('technical_auto_publish_threshold', 85),
+            ))), 'int'
         ),
-        'technical_require_storage_ready': (coerce_bool(payload.get('technical_require_storage_ready'), True), 'bool'),
+        'technical_require_storage_ready': (
+            coerce_bool(
+                payload.get('technical_require_storage_ready'),
+                SiteConfig.get_value('technical_require_storage_ready', True),
+            ),
+            'bool',
+        ),
     }
     for key, (value, value_type) in values.items():
         SiteConfig.set_value(key, value, value_type=value_type, is_public=False)
-    return jsonify({'success': True, 'settings': get_technical_automation_settings()})
+    SiteConfig.set_value('datasheet_engine_enabled', enabled, value_type='bool', is_public=False)
+    SiteConfig.set_value('datasheet_auto_publish_enabled', mode == 'full', value_type='bool', is_public=False)
+    SiteConfig.set_value('datasheet_automation_paused', False, value_type='bool', is_public=False)
+    ensure_default_datasheet_providers()
+    provider_mode = {'off': 'disabled', 'semi': 'semi_automatic', 'full': 'automatic'}[mode]
+    DatasheetProviderConfig.query.update({DatasheetProviderConfig.mode: provider_mode})
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'settings': get_technical_automation_settings(),
+        'datasheet_settings': get_datasheet_settings(),
+    })
+
+
+@app.route('/api/admin/technical-import/datasheets/source-policy', methods=['POST'])
+@login_required
+@admin_required
+def admin_datasheet_source_policy():
+    """Configura somente a autorização necessária para gerar posts; PDFs permanecem protegidos."""
+    payload = request.get_json(silent=True) or {}
+    confirmed = coerce_bool(payload.get('publication_authorized'), False)
+    reference = sanitize_input(str(payload.get('permission_reference') or ''))[:500]
+    if confirmed and not reference:
+        return jsonify({
+            'success': False,
+            'message': 'Informe o contrato, termo, e-mail ou outra referência que autoriza a publicação.',
+        }), 400
+    ensure_default_datasheet_providers()
+    config = DatasheetProviderConfig.query.filter_by(provider_name='source_parts').first_or_404()
+    config.metadata_persistence_allowed = confirmed
+    config.public_republish_allowed = confirmed
+    config.written_permission_confirmed = confirmed
+    config.permission_reference = reference or None
+    config.terms_last_checked_at = datetime.utcnow() if confirmed else config.terms_last_checked_at
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'publication_ready': confirmed,
+        'message': 'Autorização da fonte atualizada.',
+    })
 
 
 @app.route('/api/admin/technical-import/sources/<int:source_id>', methods=['PATCH', 'POST'])
@@ -13906,57 +14123,8 @@ def _datasheet_provider_admin_dict(config):
 @login_required
 @admin_required
 def admin_datasheets():
-    ensure_default_datasheet_providers()
-    providers = DatasheetProviderConfig.query.order_by(DatasheetProviderConfig.priority.asc()).all()
-    status_filter = sanitize_input(str(request.args.get('status') or ''))[:40]
-    queue_query = DatasheetImportQueue.query
-    if status_filter:
-        queue_query = queue_query.filter_by(status=status_filter)
-    queue_items = queue_query.order_by(DatasheetImportQueue.priority.desc(), DatasheetImportQueue.created_at.asc()).limit(200).all()
-    events = DatasheetProviderEvent.query.order_by(DatasheetProviderEvent.created_at.desc()).limit(5000).all()
-    analytics = {}
-    for config in providers:
-        provider_events = [event for event in events if event.provider == config.provider_name]
-        queries = len(provider_events)
-        hits = sum(1 for event in provider_events if event.result_count > 0)
-        errors = sum(1 for event in provider_events if event.status not in {'success', 'not_found', 'disabled'})
-        confidences = [event.confidence for event in provider_events if event.confidence is not None]
-        analytics[config.provider_name] = {
-            'queries': queries,
-            'hits': hits,
-            'errors': errors,
-            'hit_rate': round((hits / queries) * 100, 1) if queries else 0,
-            'exact_match_rate': round((sum(1 for event in provider_events if event.exact_match) / queries) * 100, 1) if queries else 0,
-            'conflict_rate': round((sum(1 for event in provider_events if event.conflict) / queries) * 100, 1) if queries else 0,
-            'average_confidence': round((sum(confidences) / len(confidences)) * 100, 1) if confidences else 0,
-        }
-    dashboard = {
-        'components': ElectronicComponent.query.count(),
-        'documents': DatasheetDocument.query.count(),
-        'queued': DatasheetImportQueue.query.filter_by(status='queued').count(),
-        'review': DatasheetImportQueue.query.filter_by(status='needs_review').count(),
-        'automatic': ElectronicComponent.query.filter_by(publication_mode='automatic', is_published=True).count(),
-        'manual': ElectronicComponent.query.filter_by(publication_mode='manual', is_published=True).count(),
-        'duplicates': DatasheetImportQueue.query.filter_by(status='duplicate').count(),
-        'not_found': DatasheetImportQueue.query.filter_by(status='not_found').count(),
-        'blocked': DatasheetImportQueue.query.filter_by(status='blocked_by_policy').count(),
-    }
-    demands = DatasheetDemand.query.order_by(
-        DatasheetDemand.request_count.desc(), DatasheetDemand.last_requested_at.desc()
-    ).limit(50).all()
-    return render_template(
-        'admin/datasheets.html',
-        title='Motor Multi-Fonte de Datasheets',
-        providers=providers,
-        provider_data={config.id: _datasheet_provider_admin_dict(config) for config in providers},
-        queue_items=queue_items,
-        dashboard=dashboard,
-        analytics=analytics,
-        datasheet_settings=get_datasheet_settings(),
-        demands=demands,
-        status_filter=status_filter,
-        **get_admin_sidebar_stats(),
-    )
+    """Compatibilidade para favoritos antigos; a tela foi incorporada à central técnica."""
+    return redirect(url_for('admin_tools_import', section='datasheets'))
 
 
 @app.route('/api/admin/datasheets/settings', methods=['PATCH', 'POST'])
@@ -14265,7 +14433,12 @@ def admin_datasheet_queue_action(item_id, action):
             component = materialize_datasheet_component(queue_item, reviewer_id=current_user.id, publish=True)
         except ValueError as exc:
             return jsonify({'success': False, 'message': str(exc)}), 409
-        return jsonify({'success': True, 'component_id': component.id, 'url': url_for('datasheet_component_detail', slug=component.slug)})
+        return jsonify({
+            'success': True,
+            'component_id': component.id,
+            'post_id': component.post_id,
+            'url': url_for('post', post_id=component.post_id) if component.post_id else url_for('datasheet_component_detail', slug=component.slug),
+        })
     if action == 'draft':
         try:
             component = materialize_datasheet_component(queue_item, reviewer_id=current_user.id, publish=False)

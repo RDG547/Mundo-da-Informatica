@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, inspect
 import app as app_module
 from app import (
     BoardComponent, DatasheetDocument, DatasheetImportQueue, DatasheetProviderConfig,
-    ElectronicComponent, HardwareBoard, User, app, db, ensure_default_datasheet_providers,
+    ElectronicComponent, HardwareBoard, Post, SiteConfig, User, app, db, ensure_default_datasheet_providers,
     materialize_datasheet_component,
 )
 from migrate_db import migrate
@@ -241,6 +241,12 @@ def test_manual_preview_materializes_component_and_public_routes(client):
         component = materialize_datasheet_component(queue, reviewer_id=None, publish=True)
         component_id, slug = component.id, component.slug
         assert DatasheetDocument.query.filter_by(component_id=component_id).count() == 1
+        assert component.post_id is not None
+        post = db.session.get(Post, component.post_id)
+        assert post is not None
+        assert post.is_active is True
+        assert post.category_str == 'Datasheet'
+        assert post.title == component.title_ptbr
 
     library = client.get('/datasheets')
     detail = client.get(f'/datasheet/{slug}')
@@ -249,6 +255,38 @@ def test_manual_preview_materializes_component_and_public_routes(client):
     assert 'TPS51225' in library.get_data(as_text=True)
     assert 'Tensão de entrada' in detail.get_data(as_text=True)
     assert 'Datasheets' in search.get_data(as_text=True)
+
+
+def test_automatic_datasheet_materialization_creates_a_real_post():
+    with app.app_context():
+        ensure_default_datasheet_providers()
+        config = DatasheetProviderConfig.query.filter_by(provider_name='source_parts').one()
+        config.enabled = True
+        config.metadata_persistence_allowed = True
+        config.public_republish_allowed = True
+        config.written_permission_confirmed = True
+        queue = DatasheetImportQueue(
+            part_number='IT8587E', normalized_part_number='IT8587E', status='processing',
+            selected_provider='source_parts', best_confidence=.99, candidate_count=1,
+            result_json=app_module.json.dumps({'selected': {
+                'provider': 'source_parts', 'part_number': 'IT8587E',
+                'manufacturer': 'ITE', 'category': 'Embedded Controller',
+                'package': 'LQFP', 'specifications': {'Interface': 'LPC'},
+            }}),
+        )
+        db.session.add(queue)
+        db.session.commit()
+
+        component = materialize_datasheet_component(
+            queue, reviewer_id=None, publish=True, automatic=True,
+        )
+        post = db.session.get(Post, component.post_id)
+
+        assert component.publication_mode == 'automatic'
+        assert queue.status == 'published'
+        assert post is not None and post.is_active is True
+        assert post.download_link == f'/datasheet/{component.slug}'
+        assert 'automaticamente' in post.technical_notes
 
 
 def test_board_page_exposes_only_published_related_components(client):
@@ -302,7 +340,7 @@ def test_document_proxy_requires_login_and_recorded_stream_permission(client):
     assert denied.status_code == 403
 
 
-def test_admin_datasheet_center_renders_safe_controls(client):
+def test_admin_datasheet_center_is_merged_into_technical_content(client):
     with app.app_context():
         admin = User(
             username='datasheet_admin', email='datasheet-admin@example.test',
@@ -312,13 +350,57 @@ def test_admin_datasheet_center_renders_safe_controls(client):
         db.session.commit()
         admin_id = admin.id
     _login(client, admin_id)
-    response = client.get('/admin/datasheets')
+    legacy = client.get('/admin/datasheets')
+    assert legacy.status_code == 302
+    assert legacy.headers['Location'].endswith('/admin/tools/import?section=datasheets')
+    response = client.get('/admin/tools/import?section=datasheets')
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert 'Motor Multi-Fonte de Datasheets' in body
-    assert 'HTML discovery' in body
-    assert 'SOURCE_PARTS_API_KEY' in body
+    assert 'Conteúdo Técnico' in body
+    assert 'Automação de datasheets' in body
+    assert 'Semiautomático — aprovação do técnico' in body
+    assert 'Métricas e benchmark' not in body
+    assert 'SOURCE_PARTS_API_KEY' not in body
     assert 'secret' not in body.lower()
+
+
+def test_unified_mode_controls_datasheets_and_source_authorization(client):
+    with app.app_context():
+        admin = User(
+            username='automation_admin', email='automation-admin@example.test',
+            password_hash='x', role='admin', plan='free', is_active=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+        admin_id = admin.id
+    _login(client, admin_id)
+
+    mode_response = client.post('/api/admin/technical-import/settings', json={
+        'technical_automation_mode': 'full',
+    })
+    assert mode_response.status_code == 200
+    with app.app_context():
+        assert SiteConfig.get_value('technical_automation_mode') == 'full'
+        assert SiteConfig.get_value('datasheet_engine_enabled') is True
+        assert SiteConfig.get_value('datasheet_auto_publish_enabled') is True
+        assert {
+            config.mode for config in DatasheetProviderConfig.query.all()
+        } == {'automatic'}
+
+    missing_reference = client.post('/api/admin/technical-import/datasheets/source-policy', json={
+        'publication_authorized': True,
+    })
+    assert missing_reference.status_code == 400
+    authorized = client.post('/api/admin/technical-import/datasheets/source-policy', json={
+        'publication_authorized': True,
+        'permission_reference': 'Contrato interno TEST-1',
+    })
+    assert authorized.status_code == 200
+    with app.app_context():
+        source = DatasheetProviderConfig.query.filter_by(provider_name='source_parts').one()
+        assert source.metadata_persistence_allowed is True
+        assert source.public_republish_allowed is True
+        assert source.written_permission_confirmed is True
 
 
 def test_additive_migration_creates_datasheet_tables_idempotently(tmp_path, monkeypatch):
@@ -333,3 +415,5 @@ def test_additive_migration_creates_datasheet_tables_idempotently(tmp_path, monk
         'component_source_records', 'datasheet_documents', 'board_components',
         'datasheet_import_queue', 'datasheet_demands', 'datasheet_provider_events',
     }.issubset(tables)
+    component_columns = {column['name'] for column in inspect(create_engine(url)).get_columns('electronic_components')}
+    assert 'post_id' in component_columns

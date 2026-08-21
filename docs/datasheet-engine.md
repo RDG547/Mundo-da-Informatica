@@ -20,7 +20,7 @@ O motor cataloga componentes eletrônicos por `part number`, compara candidatos 
 - Normalização: part number, fabricante, aliases, specs PT-BR, deduplicação e consenso.
 - Banco: componentes, aliases, proveniência por campo, documentos, relação com placas, fila, demandas e eventos de providers.
 - Público: `/datasheets`, `/datasheet/<slug>`, busca global, sugestões e componentes vinculados em `/placa/<slug>`.
-- Admin: `/admin/datasheets`, controles globais, fontes, permissões, limites, kill switch, fila, previews, métricas, teste isolado e benchmark.
+- Admin: `/admin/tools/import?section=datasheets`, central unificada com modo desativado, semiautomático ou automático, fila e previews.
 - Jobs: `jobs.sync_datasheets`, `jobs.process_datasheet_queue`, `jobs.verify_datasheet_sources` e `jobs.verify_sources`.
 
 ## Credenciais
@@ -31,7 +31,7 @@ O motor cataloga componentes eletrônicos por `part number`, compara candidatos 
 2. Configure `SOURCE_PARTS_API_KEY`.
 3. Configure um `SOURCE_PARTS_USER_AGENT` descritivo com um contato real.
 4. Mantenha `ENABLE_SOURCE_PARTS=true`.
-5. No painel, abra **Motor de Datasheets > Fontes > Source Parts**, habilite a fonte e registre somente os direitos efetivamente concedidos.
+5. No painel, abra **Gerenciamento > Conteúdo Técnico > Datasheets** e escolha o modo de automação. As permissões de fonte continuam sendo respeitadas pelo backend.
 
 A visão geral oficial (incluindo o acesso às chaves) está em
 <https://source.parts/docs>; a referência atual da API está em
@@ -88,7 +88,7 @@ Depois de alterar variáveis no Render, salve e faça um novo deploy. O painel m
 
 1. Rode `python migrate_db.py`.
 2. Configure uma fonte por vez, começando pela Source Parts.
-3. Deixe `ENABLE_DATASHEET_AUTO_PUBLISH=false`.
+3. Comece no modo semiautomático em **Conteúdo Técnico**.
 4. No painel, registre a política da fonte e habilite somente **Persistir metadados** quando o contrato permitir.
 5. Adicione part numbers, processe a fila e revise os previews.
 6. Publique manualmente apenas se **Republicar publicamente** estiver documentado.

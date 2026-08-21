@@ -18,36 +18,109 @@
         return payload;
     };
 
-    page.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
+    const activateTab = (button) => {
+        if (!button) return;
         page.querySelectorAll('[data-tab]').forEach(item => item.classList.toggle('active', item === button));
         page.querySelectorAll('[data-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === button.dataset.tab));
-    }));
+    };
+    page.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => activateTab(button)));
+    const requestedSection = new URLSearchParams(window.location.search).get('section');
+    if (requestedSection) activateTab(page.querySelector(`[data-tab="${CSS.escape(requestedSection)}"]`));
 
     const automationForm = document.getElementById('automationForm');
-    automationForm?.querySelector('[name="technical_automation_percentage"]')?.addEventListener('input', event => {
-        automationForm.querySelector('[data-percentage-output]').textContent = `${event.target.value}%`;
-    });
-    automationForm?.querySelector('[name="technical_auto_publish_threshold"]')?.addEventListener('input', event => {
-        automationForm.querySelector('[data-threshold-output]').textContent = `${event.target.value}%`;
-    });
+    const automationMode = automationForm?.querySelector('[name="technical_automation_mode"]');
+    const automationHelp = automationForm?.querySelector('[data-automation-help]');
+    const updateAutomationHelp = () => {
+        if (!automationHelp || !automationMode) return;
+        const messages = {
+            off: '<i class="fas fa-power-off"></i><span><strong>Desativado</strong><small>Nenhum item será processado ou publicado automaticamente.</small></span>',
+            semi: '<i class="fas fa-user-check"></i><span><strong>Aprovação do técnico</strong><small>O motor gera previews e aguarda sua confirmação para criar o post.</small></span>',
+            full: '<i class="fas fa-robot"></i><span><strong>Publicação automática</strong><small>Itens elegíveis viram posts; conflitos e bloqueios continuam aguardando revisão.</small></span>'
+        };
+        automationHelp.innerHTML = messages[automationMode.value] || messages.semi;
+    };
+    automationMode?.addEventListener('change', updateAutomationHelp);
+    updateAutomationHelp();
     automationForm?.addEventListener('submit', async event => {
         event.preventDefault();
         const form = event.currentTarget;
         const submit = form.querySelector('[type="submit"]');
         submit.disabled = true;
         try {
-            const data = new FormData(form);
             const payload = {
-                technical_import_enabled: data.has('technical_import_enabled'),
-                technical_automation_mode: data.get('technical_automation_mode'),
-                technical_automation_percentage: Number(data.get('technical_automation_percentage')),
-                technical_auto_publish_threshold: Number(data.get('technical_auto_publish_threshold')),
-                technical_require_storage_ready: data.has('technical_require_storage_ready'),
+                technical_automation_mode: new FormData(form).get('technical_automation_mode'),
             };
             await api('/api/admin/technical-import/settings', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(payload) });
-            notify('Configuração da automação salva.');
+            notify('Modo de automação salvo para conteúdos técnicos e datasheets.');
         } catch (error) { notify(error.message, 'error'); }
         finally { submit.disabled = false; }
+    });
+
+    const datasheetQueueForm = document.getElementById('datasheetQueueForm');
+    datasheetQueueForm?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submit = form.querySelector('[type="submit"]');
+        submit.disabled = true;
+        try {
+            const payload = await api('/api/admin/datasheets/queue', { method: 'POST', body: new FormData(form) });
+            notify(payload.message || 'Itens adicionados à fila.');
+            window.location.assign('/admin/tools/import?section=datasheets');
+        } catch (error) { notify(error.message, 'error'); }
+        finally { submit.disabled = false; }
+    });
+
+    document.getElementById('datasheetPermissionForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submit = form.querySelector('[type="submit"]');
+        const data = new FormData(form);
+        submit.disabled = true;
+        try {
+            const payload = await api('/api/admin/technical-import/datasheets/source-policy', {
+                method: 'POST',
+                headers: jsonHeaders,
+                body: JSON.stringify({
+                    publication_authorized: data.has('publication_authorized'),
+                    permission_reference: data.get('permission_reference'),
+                })
+            });
+            notify(payload.message || 'Autorização da fonte atualizada.');
+            window.location.assign('/admin/tools/import?section=datasheets');
+        } catch (error) { notify(error.message, 'error'); }
+        finally { submit.disabled = false; }
+    });
+
+    document.getElementById('processDatasheetQueue')?.addEventListener('click', async event => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+            const payload = await api('/api/admin/datasheets/queue/process', {
+                method: 'POST', headers: jsonHeaders, body: JSON.stringify({ limit: 20 })
+            });
+            notify(`${payload.processed} item(ns) processado(s); ${payload.published} post(s) publicado(s).`);
+            window.location.assign('/admin/tools/import?section=datasheets');
+        } catch (error) { notify(error.message, 'error'); }
+        finally { button.disabled = false; }
+    });
+
+    page.querySelectorAll('[data-datasheet-item-id]').forEach(item => {
+        item.querySelectorAll('[data-datasheet-action]').forEach(button => button.addEventListener('click', async () => {
+            const action = button.dataset.datasheetAction;
+            if (['publish', 'ignore'].includes(action) && !window.confirm(
+                action === 'publish' ? 'Aprovar este preview e criar o post?' : 'Ignorar este item?'
+            )) return;
+            const itemId = item.dataset.datasheetItemId;
+            const url = action === 'process'
+                ? `/api/admin/datasheets/queue/${itemId}/process`
+                : `/api/admin/datasheets/queue/${itemId}/${action}`;
+            button.disabled = true;
+            try {
+                const payload = await api(url, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({}) });
+                notify(action === 'publish' ? 'Post criado e publicado.' : (payload.message || 'Item atualizado.'));
+                window.location.assign('/admin/tools/import?section=datasheets');
+            } catch (error) { notify(error.message, 'error'); button.disabled = false; }
+        }));
     });
 
     const importModal = document.getElementById('importModal');

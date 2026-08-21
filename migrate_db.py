@@ -353,9 +353,14 @@ def create_auxiliary_tables(connection) -> int:
         Column("updated_at", DateTime, nullable=False),
         extend_existing=True,
     )
+    electronic_component_post_id = (
+        Column("post_id", Integer, ForeignKey("posts.id"))
+        if "posts" in tables else Column("post_id", Integer)
+    )
     electronic_components = Table(
         "electronic_components", metadata,
         Column("id", Integer, primary_key=True),
+        electronic_component_post_id,
         Column("manufacturer", String(160)),
         Column("normalized_manufacturer", String(160), nullable=False, server_default=""),
         Column("part_number", String(160), nullable=False),
@@ -638,6 +643,9 @@ def migrate() -> None:
         applied += add_missing_columns(connection, "datasheet_provider_configs", {
             "requests_per_month": "INTEGER NOT NULL DEFAULT 0",
         })
+        applied += add_missing_columns(connection, "electronic_components", {
+            "post_id": "INTEGER",
+        })
         applied += add_missing_columns(connection, "technical_resources", {
             "external_id": "VARCHAR(255)",
             "external_version": "VARCHAR(120)",
@@ -678,6 +686,7 @@ def migrate() -> None:
             ("datasheet_provider_configs", "CREATE INDEX IF NOT EXISTS ix_datasheet_provider_name ON datasheet_provider_configs (provider_name)"),
             ("electronic_components", "CREATE INDEX IF NOT EXISTS ix_component_part_number ON electronic_components (normalized_part_number)"),
             ("electronic_components", "CREATE INDEX IF NOT EXISTS ix_component_published ON electronic_components (is_published)"),
+            ("electronic_components", "CREATE INDEX IF NOT EXISTS ix_electronic_components_post_id ON electronic_components (post_id)"),
             ("datasheet_import_queue", "CREATE INDEX IF NOT EXISTS ix_datasheet_queue_status_priority ON datasheet_import_queue (status, priority)"),
             ("datasheet_provider_events", "CREATE INDEX IF NOT EXISTS ix_datasheet_event_provider_created ON datasheet_provider_events (provider, created_at)"),
             ("datasheet_demands", "CREATE INDEX IF NOT EXISTS ix_datasheet_demand_count ON datasheet_demands (request_count)"),

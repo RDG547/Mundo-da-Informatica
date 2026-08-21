@@ -8,6 +8,12 @@
 .automation-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 1.25rem 1.5rem 1.5rem; }
 .automation-grid > label { display: grid; gap: .45rem; font-weight: 650; }
 .automation-grid input[type="range"] { accent-color: var(--primary-color, #3a86ff); width: 100%; }
+.automation-simple-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.35fr) auto; align-items: end; gap: 1rem; padding: 1.25rem 1.5rem 1.5rem; }
+.automation-simple-grid > label { display: grid; gap: .45rem; font-weight: 700; }
+.automation-mode-help { display: flex; align-items: center; gap: .8rem; min-height: 54px; margin: 0; padding: .7rem .85rem; border: 1px solid #dce5f2; border-radius: 12px; background: #f7faff; color: #53627a; }
+.automation-mode-help > i { flex: 0 0 auto; color: #3a86ff; font-size: 1.35rem; }
+.automation-mode-help span { display: grid; gap: .15rem; }
+.automation-mode-help small { color: #758399; }
 .automation-switch { grid-template-columns: auto 1fr; align-items: center; border: 1px solid #dce5f2; border-radius: 12px; padding: .8rem; }
 .automation-switch input { width: 1.1rem; height: 1.1rem; accent-color: #22a447; }
 .automation-switch span { display: grid; }
@@ -18,6 +24,37 @@
 .technical-tabs button span { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; margin-left: .3rem; padding: 0 .3rem; border-radius: 999px; background: rgba(127, 143, 169, .15); font-size: .72rem; }
 .technical-panel { display: none; }
 .technical-panel.active { display: block; animation: technicalFade .2s ease; }
+.datasheet-simple-layout { display: grid; gap: 1rem; }
+.datasheet-simple-card { overflow: hidden; background: #fff; border: 1px solid #dfe7f2; border-radius: 16px; box-shadow: 0 10px 28px rgba(30, 58, 100, .06); }
+.datasheet-simple-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.2rem; border-bottom: 1px solid #edf1f6; }
+.datasheet-simple-card > header h2 { margin: .45rem 0 .2rem; font-size: 1.15rem; }
+.datasheet-simple-card > header p { margin: 0; color: #758399; }
+.datasheet-source-state { display: flex; flex-wrap: wrap; gap: .65rem; padding: .9rem 1.2rem 0; }
+.datasheet-source-state span { display: inline-flex; align-items: center; gap: .4rem; padding: .42rem .65rem; border-radius: 999px; background: #eef3fb; color: #5a6980; font-size: .78rem; }
+.datasheet-source-state span.ok { background: #e5f8eb; color: #18813b; }
+.datasheet-source-state span.warning { background: #fff3d9; color: #93620a; }
+.datasheet-permission { margin: .8rem 1.2rem 0; border: 1px solid #dce5f2; border-radius: 12px; background: #fbfcff; }
+.datasheet-permission summary { padding: .75rem .85rem; color: #53627a; font-weight: 750; cursor: pointer; }
+.datasheet-permission summary i { margin-right: .35rem; color: #3a86ff; }
+.datasheet-permission form { display: grid; grid-template-columns: minmax(280px, 1.5fr) minmax(250px, 1fr) auto; align-items: end; gap: .8rem; padding: 0 .85rem .85rem; }
+.datasheet-permission form > label:not(.automation-switch) { display: grid; gap: .4rem; font-weight: 700; }
+.datasheet-permission input[type="text"], .datasheet-permission input:not([type]) { width: 100%; border: 1px solid #cad5e4; border-radius: 10px; padding: .72rem .8rem; font: inherit; }
+.datasheet-queue-form { display: grid; grid-template-columns: minmax(280px, 2fr) minmax(220px, 1fr) auto; align-items: end; gap: .8rem; padding: 1rem 1.2rem 1.2rem; }
+.datasheet-queue-form label { display: grid; gap: .4rem; font-weight: 700; }
+.datasheet-queue-form textarea, .datasheet-queue-form input { width: 100%; border: 1px solid #cad5e4; border-radius: 10px; padding: .72rem .8rem; font: inherit; resize: vertical; }
+.datasheet-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; }
+.datasheet-stat-grid article { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .15rem .7rem; padding: .9rem 1rem; border: 1px solid #dfe7f2; border-radius: 14px; background: #fff; }
+.datasheet-stat-grid i { grid-row: 1 / span 2; color: #3a86ff; font-size: 1.4rem; }
+.datasheet-stat-grid strong { font-size: 1.35rem; }
+.datasheet-stat-grid span { color: #758399; font-size: .8rem; }
+.datasheet-simple-list { display: grid; }
+.datasheet-simple-list > article { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.2rem; border-bottom: 1px solid #edf1f6; }
+.datasheet-simple-list > article:last-child { border-bottom: 0; }
+.datasheet-item-main h3 { margin: .4rem 0 .1rem; font-size: 1rem; }
+.datasheet-item-main p { margin: 0; color: #758399; }
+.datasheet-item-error { display: block; max-width: 760px; margin-top: .4rem; color: #b43b46; }
+.datasheet-item-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.technical-empty.compact { min-height: 180px; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 @keyframes technicalFade { from { opacity: 0; transform: translateY(5px); } }
 .preview-grid, .source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .preview-card, .source-card { background: #fff; border: 1px solid #dfe7f2; border-radius: 16px; padding: 1.1rem; box-shadow: 0 10px 28px rgba(30, 58, 100, .06); }
@@ -77,10 +114,11 @@
 .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
 .edit-grid .wide { grid-column: 1 / -1; }
 body.technical-modal-lock { overflow: hidden; }
-[data-theme="dark"] .preview-card, [data-theme="dark"] .source-card, [data-theme="dark"] .technical-tabs, [data-theme="dark"] .technical-table-wrap, [data-theme="dark"] .technical-modal-dialog, [data-theme="dark"] .health-summary, [data-theme="dark"] .technical-empty { background: #202633; color: #e7edf7; border-color: #364052; }
+[data-theme="dark"] .preview-card, [data-theme="dark"] .source-card, [data-theme="dark"] .technical-tabs, [data-theme="dark"] .technical-table-wrap, [data-theme="dark"] .technical-modal-dialog, [data-theme="dark"] .health-summary, [data-theme="dark"] .technical-empty, [data-theme="dark"] .datasheet-simple-card, [data-theme="dark"] .datasheet-stat-grid article { background: #202633; color: #e7edf7; border-color: #364052; }
+[data-theme="dark"] .automation-mode-help, [data-theme="dark"] .datasheet-queue-form textarea, [data-theme="dark"] .datasheet-queue-form input, [data-theme="dark"] .datasheet-permission, [data-theme="dark"] .datasheet-permission input { background: #171c26; color: #e7edf7; border-color: #465166; }
 [data-theme="dark"] .source-card textarea { background: #171c26; color: #e7edf7; border-color: #465166; }
 [data-theme="dark"] .health-metrics article { background: #202633; border-color: #364052; }
 [data-theme="dark"] .health-metrics strong { color: #e7edf7; }
 [data-theme="dark"] .confidence-ring { background: radial-gradient(closest-side, #202633 78%, transparent 80%), conic-gradient(#5a96ff calc(var(--confidence) * 1%), #3a4354 0); color: #fff; }
-@media (max-width: 980px) { .automation-grid { grid-template-columns: 1fr 1fr; } .preview-grid, .source-grid { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .technical-import-header { align-items: stretch; } .automation-grid, .preview-details, .edit-grid, .import-kind-grid, .health-metrics { grid-template-columns: 1fr; } .edit-grid .wide { grid-column: auto; } .technical-modal { padding: .35rem; } .technical-modal-dialog { max-height: calc(100vh - .7rem); border-radius: 13px; } }
+@media (max-width: 980px) { .automation-grid, .automation-simple-grid { grid-template-columns: 1fr 1fr; } .automation-simple-grid button { grid-column: 1 / -1; } .preview-grid, .source-grid { grid-template-columns: 1fr; } .datasheet-queue-form, .datasheet-permission form { grid-template-columns: 1fr 1fr; } .datasheet-queue-form button, .datasheet-permission form button { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .technical-import-header { align-items: stretch; } .automation-grid, .automation-simple-grid, .preview-details, .edit-grid, .import-kind-grid, .health-metrics, .datasheet-queue-form, .datasheet-stat-grid, .datasheet-permission form { grid-template-columns: 1fr; } .automation-simple-grid button, .datasheet-queue-form button, .datasheet-permission form button { grid-column: auto; } .datasheet-simple-card > header, .datasheet-simple-list > article { align-items: stretch; flex-direction: column; } .datasheet-item-actions { justify-content: flex-start; } .datasheet-item-actions .btn-admin { flex: 1 1 100%; justify-content: center; } .edit-grid .wide { grid-column: auto; } .technical-modal { padding: .35rem; } .technical-modal-dialog { max-height: calc(100vh - .7rem); border-radius: 13px; } }

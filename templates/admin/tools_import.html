@@ -8,9 +8,9 @@
 <div class="technical-import-page" id="technicalImportPage">
     <header class="admin-header technical-import-header">
         <div>
-            <span class="technical-eyebrow"><i class="fas fa-microchip"></i> Ingestão auditável</span>
-            <h1>Motor de Conteúdo Técnico</h1>
-            <p>Importe, normalize, revise e publique sem expor o storage ao visitante.</p>
+            <span class="technical-eyebrow"><i class="fas fa-microchip"></i> Gerenciamento</span>
+            <h1>Conteúdo Técnico</h1>
+            <p>Automatize posts técnicos e datasheets ou aprove cada preview antes da publicação.</p>
         </div>
         <button class="btn-admin btn-admin-primary" type="button" data-open-import>
             <i class="fas fa-plus"></i> Nova importação
@@ -21,44 +21,30 @@
         <div class="admin-card-header">
             <div>
                 <h2 class="admin-card-title"><i class="fas fa-robot"></i> Controle da automação</h2>
-                <p>O modo completo ainda respeita confiança, política da fonte, distribuição e storage.</p>
+                <p>Um único controle define como arquivos técnicos e datasheets viram posts.</p>
             </div>
             {% if not automation.feature_enabled %}
             <span class="technical-badge danger">Bloqueado no ambiente</span>
             {% endif %}
         </div>
-        <form id="automationForm" class="automation-grid">
-            <label class="automation-switch">
-                <input type="checkbox" name="technical_import_enabled" {% if automation.configured_enabled %}checked{% endif %}>
-                <span><strong>Automação ativa</strong><small>Permite sincronizações e jobs automáticos; previews manuais continuam disponíveis.</small></span>
-            </label>
+        <form id="automationForm" class="automation-simple-grid">
             <label>
-                <span>Modo de publicação</span>
+                <span>Funcionamento</span>
                 <select name="technical_automation_mode" class="form-control">
-                    <option value="off" data-icon="fas fa-ban" {% if automation.mode == 'off' %}selected{% endif %}>Desativada</option>
-                    <option value="semi" data-icon="fas fa-user-check" {% if automation.mode == 'semi' %}selected{% endif %}>Semiautomática — exige aprovação</option>
-                    <option value="full" data-icon="fas fa-robot" {% if automation.mode == 'full' %}selected{% endif %}>Automática — conforme percentual e elegibilidade</option>
+                    <option value="off" data-icon="fas fa-power-off" {% if automation.mode == 'off' %}selected{% endif %}>Desativado</option>
+                    <option value="semi" data-icon="fas fa-user-check" {% if automation.mode == 'semi' %}selected{% endif %}>Semiautomático — aprovação do técnico</option>
+                    <option value="full" data-icon="fas fa-robot" {% if automation.mode == 'full' %}selected{% endif %}>Automático — publica posts elegíveis</option>
                 </select>
             </label>
-            <label>
-                <span>Percentual de rollout <strong data-percentage-output>{{ automation.percentage }}%</strong></span>
-                <input type="range" min="0" max="100" step="5" name="technical_automation_percentage" value="{{ automation.percentage }}">
-            </label>
-            <label>
-                <span>Confiança mínima <strong data-threshold-output>{{ automation.threshold }}%</strong></span>
-                <input type="range" min="0" max="100" step="1" name="technical_auto_publish_threshold" value="{{ automation.threshold }}">
-            </label>
-            <label class="automation-switch">
-                <input type="checkbox" name="technical_require_storage_ready" {% if automation.require_storage_ready %}checked{% endif %}>
-                <span><strong>Exigir storage pronto</strong><small>Bloqueia publicação de arquivos sem origem distribuível.</small></span>
-            </label>
-            <button type="submit" class="btn-admin btn-admin-success"><i class="fas fa-save"></i> Salvar automação</button>
+            <p class="automation-mode-help" data-automation-help></p>
+            <button type="submit" class="btn-admin btn-admin-success"><i class="fas fa-save"></i> Salvar modo</button>
         </form>
     </section>
 
     <nav class="technical-tabs" aria-label="Seções do motor">
         <button class="active" data-tab="reviews"><i class="fas fa-eye"></i> Previews <span>{{ review_items|length }}</span></button>
-        <button data-tab="automatic"><i class="fas fa-magic"></i> Publicados automáticos <span>{{ automatic_items|length }}</span></button>
+        <button data-tab="datasheets"><i class="fas fa-file-alt"></i> Datasheets <span>{{ datasheet_stats.review + datasheet_stats.queued }}</span></button>
+        <button data-tab="automatic"><i class="fas fa-magic"></i> Publicados automáticos <span>{{ automatic_items|length + automatic_datasheets|length }}</span></button>
         <button data-tab="jobs"><i class="fas fa-tasks"></i> Jobs <span>{{ jobs|length }}</span></button>
         <button data-tab="sources"><i class="fas fa-satellite-dish"></i> Fontes <span>{{ sources|length }}</span></button>
         <button data-tab="health"><i class="fas fa-heartbeat"></i> Links</button>
@@ -111,6 +97,73 @@
         {% endif %}
     </section>
 
+    <section class="technical-panel" data-panel="datasheets">
+        <div class="datasheet-simple-layout">
+            <article class="datasheet-simple-card datasheet-control-card">
+                <header>
+                    <div>
+                        <span class="technical-badge {{ 'published' if datasheet_settings.mode != 'off' else 'danger' }}">{{ 'ativo' if datasheet_settings.mode != 'off' else 'desativado' }}</span>
+                        <h2><i class="fas fa-file-alt"></i> Automação de datasheets</h2>
+                        <p>Adicione part numbers. No modo semiautomático, o técnico aprova o preview; no automático, itens elegíveis viram posts.</p>
+                    </div>
+                </header>
+                <div class="datasheet-source-state">
+                    <span><i class="fas fa-satellite-dish"></i><b>{{ datasheet_source.name }}</b></span>
+                    <span class="{{ 'ok' if datasheet_source.credentials_configured else 'warning' }}"><i class="fas {{ 'fa-key' if datasheet_source.credentials_configured else 'fa-triangle-exclamation' }}"></i> {{ 'API configurada' if datasheet_source.credentials_configured else 'Credencial pendente' }}</span>
+                    <span class="{{ 'ok' if datasheet_source.publication_ready else 'warning' }}"><i class="fas {{ 'fa-check-circle' if datasheet_source.publication_ready else 'fa-shield-alt' }}"></i> {{ 'Publicação autorizada' if datasheet_source.publication_ready else 'Permissão da fonte pendente' }}</span>
+                </div>
+                <details class="datasheet-permission">
+                    <summary><i class="fas fa-shield-alt"></i> Autorização da fonte</summary>
+                    <form id="datasheetPermissionForm">
+                        <label class="automation-switch"><input type="checkbox" name="publication_authorized" {% if datasheet_source.publication_ready %}checked{% endif %}><span><strong>Tenho autorização para publicar estes metadados</strong><small>Isso libera posts gerados pelo motor; não libera download, proxy ou cópia de PDFs.</small></span></label>
+                        <label><span><i class="fas fa-file-contract"></i> Referência da autorização</span><input name="permission_reference" value="{{ datasheet_source.permission_reference or '' }}" placeholder="Contrato, termos, e-mail ou ticket"></label>
+                        <button class="btn-admin btn-admin-outline" type="submit"><i class="fas fa-save"></i> Salvar autorização</button>
+                    </form>
+                </details>
+                <form id="datasheetQueueForm" class="datasheet-queue-form">
+                    <label><span><i class="fas fa-barcode"></i> Part numbers</span><textarea name="part_numbers" rows="4" placeholder="TPS51225&#10;RT8243&#10;W25Q64" required></textarea></label>
+                    <label><span><i class="fas fa-industry"></i> Fabricante opcional</span><input name="manufacturer" placeholder="Ex.: Texas Instruments"></label>
+                    <button class="btn-admin btn-admin-primary" type="submit"><i class="fas fa-plus"></i> Adicionar à fila</button>
+                </form>
+            </article>
+
+            <div class="datasheet-stat-grid">
+                <article><i class="fas fa-hourglass-half"></i><strong>{{ datasheet_stats.queued }}</strong><span>Na fila</span></article>
+                <article><i class="fas fa-user-check"></i><strong>{{ datasheet_stats.review }}</strong><span>Para aprovar</span></article>
+                <article><i class="fas fa-check-circle"></i><strong>{{ datasheet_stats.published }}</strong><span>Publicados</span></article>
+                <article><i class="fas fa-newspaper"></i><strong>{{ datasheet_stats.posts }}</strong><span>Posts criados</span></article>
+            </div>
+
+            <article class="datasheet-simple-card datasheet-queue-card">
+                <header>
+                    <div><h2><i class="fas fa-list-check"></i> Fila e aprovações</h2><p>Previews aprovados são publicados como posts reais.</p></div>
+                    <button class="btn-admin btn-admin-primary" type="button" id="processDatasheetQueue"><i class="fas fa-play"></i> Processar fila</button>
+                </header>
+                <div class="datasheet-simple-list">
+                    {% for item in datasheet_items %}
+                    {% set preview = item.result() %}{% set selected = preview.get('selected') or {} %}
+                    <article data-datasheet-item-id="{{ item.id }}">
+                        <div class="datasheet-item-main">
+                            <span class="technical-badge {{ item.status }}">{{ item.status|replace('_', ' ') }}</span>
+                            <h3>{{ selected.get('part_number') or item.part_number }}</h3>
+                            <p>{{ selected.get('manufacturer') or item.manufacturer_hint or 'Fabricante não informado' }}{% if selected.get('category') %} · {{ selected.get('category') }}{% endif %}</p>
+                            {% if item.error_message %}<small class="datasheet-item-error">{{ item.error_message }}</small>{% endif %}
+                        </div>
+                        <div class="datasheet-item-actions">
+                            {% if item.status in ['queued', 'failed', 'not_found', 'blocked_by_policy'] %}<button class="btn-admin btn-admin-outline" type="button" data-datasheet-action="process"><i class="fas fa-sync-alt"></i> Processar</button>{% endif %}
+                            {% if item.status in ['needs_review', 'approved'] %}<button class="btn-admin btn-admin-success" type="button" data-datasheet-action="publish"><i class="fas fa-check"></i> Aprovar e criar post</button>{% endif %}
+                            {% if item.component and item.component.post_id %}<a class="btn-admin btn-admin-outline" href="{{ url_for('post', post_id=item.component.post_id) }}"><i class="fas fa-external-link-alt"></i> Ver post</a>{% endif %}
+                            {% if item.status not in ['published', 'ignored'] %}<button class="btn-admin btn-admin-danger" type="button" data-datasheet-action="ignore"><i class="fas fa-times"></i> Ignorar</button>{% endif %}
+                        </div>
+                    </article>
+                    {% else %}
+                    <div class="technical-empty compact"><i class="fas fa-inbox"></i><h3>Fila vazia</h3><p>Adicione part numbers acima para gerar previews.</p></div>
+                    {% endfor %}
+                </div>
+            </article>
+        </div>
+    </section>
+
     <section class="technical-panel" data-panel="automatic">
         <div class="technical-table-wrap">
             <table class="technical-table">
@@ -119,7 +172,11 @@
                 {% for item in automatic_items %}
                 {% set metadata = item.normalized_data() %}
                 <tr><td>{{ (metadata.get('copy') or {}).get('title') or metadata.get('title') or item.source_name }}</td><td>{{ item.job.source }}</td><td>{{ item.confidence }}%</td><td>{{ metadata.get('file_type') or 'Arquivo' }}{% if metadata.get('board_code') %} · {{ metadata.get('board_code') }}{% endif %}</td><td>{{ item.reviewed_at.strftime('%d/%m/%Y %H:%M') if item.reviewed_at else '—' }}</td><td>{% if item.post_id %}<a class="btn-admin btn-admin-outline" href="{{ url_for('post', post_id=item.post_id) }}"><i class="fas fa-external-link-alt"></i> Ver post</a>{% endif %}</td></tr>
-                {% else %}<tr><td colspan="6">Nenhum post foi publicado automaticamente ainda.</td></tr>{% endfor %}
+                {% endfor %}
+                {% for component in automatic_datasheets %}
+                <tr><td>{{ component.title_ptbr }}</td><td>Datasheets</td><td>{{ (component.confidence * 100)|round|int }}%</td><td>Datasheet · {{ component.part_number }}</td><td>{{ component.published_at.strftime('%d/%m/%Y %H:%M') if component.published_at else '—' }}</td><td><a class="btn-admin btn-admin-outline" href="{{ url_for('post', post_id=component.post_id) }}"><i class="fas fa-external-link-alt"></i> Ver post</a></td></tr>
+                {% endfor %}
+                {% if not automatic_items and not automatic_datasheets %}<tr><td colspan="6">Nenhum post foi publicado automaticamente ainda.</td></tr>{% endif %}
                 </tbody>
             </table>
         </div>
@@ -231,7 +288,12 @@
                 <label>Link direto do arquivo<input type="url" name="provider_url" placeholder="https://storage.exemplo/arquivo.bin"></label>
                 <label>Nome do arquivo<input type="text" name="filename" placeholder="Lenovo-LA-5751P-U3.bin"></label>
             </div>
-            <label>Origem técnica<select name="source" class="form-control">{% for source in sources if source.enabled %}<option value="{{ source.name }}" data-icon="{{ 'fas fa-user-edit' if source.provider_type == 'manual' else ('fas fa-hands-helping' if source.provider_type == 'contribution' else ('fas fa-certificate' if source.provider_type == 'official' else 'fas fa-file-contract')) }}">{{ source.name }} (nível {{ source.trust_level }})</option>{% endfor %}</select></label>
+            <label>Origem técnica<select name="source" class="form-control">
+                {% for source in sources if source.enabled %}
+                {% set source_icon = 'fas fa-user-edit' if source.name == 'Admin' else ('fas fa-hands-helping' if source.provider_type == 'contribution' else ('fas fa-laptop' if source.name == 'Dell' else ('fas fa-server' if source.name == 'HP' else ('fas fa-desktop' if source.name == 'Lenovo' else 'fas fa-file-contract')))) %}
+                <option value="{{ source.name }}" data-icon="{{ source_icon }}">{{ source.name }} (nível {{ source.trust_level }})</option>
+                {% endfor %}
+            </select></label>
             <div class="modal-actions"><button type="button" class="btn-admin btn-admin-outline" data-close-modal>Cancelar</button><button type="submit" class="btn-admin btn-admin-primary"><i class="fas fa-search"></i> Analisar e gerar previews</button></div>
         </form>
     </div>

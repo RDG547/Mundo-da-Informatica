@@ -13712,6 +13712,18 @@ def admin_technical_import_settings():
     if mode not in {'off', 'semi', 'full'}:
         return jsonify({'success': False, 'message': 'Modo inválido.'}), 400
     enabled = mode != 'off'
+    automation_percentage_default = coerce_int(
+        SiteConfig.get_value('technical_automation_percentage', 100),
+        100,
+    )
+    auto_publish_threshold_default = coerce_int(
+        SiteConfig.get_value('technical_auto_publish_threshold', 85),
+        85,
+    )
+    require_storage_ready_default = coerce_bool(
+        SiteConfig.get_value('technical_require_storage_ready', True),
+        True,
+    )
     values = {
         'technical_import_enabled': (
             coerce_bool(payload.get('technical_import_enabled'), enabled) if mode != 'off' else False,
@@ -13721,19 +13733,19 @@ def admin_technical_import_settings():
         'technical_automation_percentage': (
             max(0, min(100, coerce_int(
                 payload.get('technical_automation_percentage'),
-                SiteConfig.get_value('technical_automation_percentage', 100),
+                automation_percentage_default,
             ))), 'int'
         ),
         'technical_auto_publish_threshold': (
             max(0, min(100, coerce_int(
                 payload.get('technical_auto_publish_threshold'),
-                SiteConfig.get_value('technical_auto_publish_threshold', 85),
+                auto_publish_threshold_default,
             ))), 'int'
         ),
         'technical_require_storage_ready': (
             coerce_bool(
                 payload.get('technical_require_storage_ready'),
-                SiteConfig.get_value('technical_require_storage_ready', True),
+                require_storage_ready_default,
             ),
             'bool',
         ),

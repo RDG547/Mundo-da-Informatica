@@ -10,9 +10,10 @@ services:
       ([ -L /opt/render/project/src/static/uploads ] && rm -f /opt/render/project/src/static/uploads || true) &&
       ln -sfn /opt/render/project/src/data /opt/render/project/src/instance &&
       ln -sfn /opt/render/project/src/data/images /opt/render/project/src/static/images &&
-      ln -sfn /opt/render/project/src/data/uploads /opt/render/project/src/static/uploads &&
-      python migrate_db.py
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+      ln -sfn /opt/render/project/src/data/uploads /opt/render/project/src/static/uploads
+    # O disco persistente do Render é montado no runtime. A migração precisa
+    # acontecer aqui para atingir o site.db real, antes de qualquer worker web.
+    startCommand: python migrate_db.py && gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.14.2
@@ -51,7 +52,7 @@ services:
       - key: SOURCE_PARTS_API_URL
         value: https://api.source.parts/v1
       - key: SOURCE_PARTS_USER_AGENT
-        value: MundoDaInformatica/1.0 (contato: suporte@mundodainformatica.com)
+        value: "MundoDaInformatica/1.0 (contato: suporte@mundodainformatica.com)"
       - key: SOURCE_PARTS_API_KEY
         sync: false
       - key: ALLDATASHEET_API_KEY

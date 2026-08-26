@@ -6003,7 +6003,7 @@ def home():
                                favorite_post_ids=favorite_post_ids, title='Início')
     except Exception:
         app.logger.exception('Erro ao carregar a pagina inicial')
-        return render_template('500.html'), 500
+        return render_template('errors/500.html', title='Erro interno'), 500
 
 # Atualizar a rota /setup para redirecionar para o painel admin
 @app.route('/setup')

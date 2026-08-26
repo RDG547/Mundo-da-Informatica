@@ -267,10 +267,11 @@
     }
 
     #addPostModal .download-size-unit {
-        flex: 0 0 82px !important;
-        max-width: 82px !important;
-        padding-right: 1.8rem !important;
-        width: 82px !important;
+        flex: 0 0 88px !important;
+        max-width: 88px !important;
+        min-width: 88px !important;
+        padding: 0.75rem 2rem 0.75rem 0.85rem !important;
+        width: 88px !important;
     }
 
     #addPostModal .verification-status-field {
@@ -373,6 +374,58 @@
     #addPostModal .form-group:has(.icon-select.open) {
         position: relative;
         z-index: 10030;
+    }
+
+    #addPostModal .schedule-picker {
+        background: linear-gradient(145deg, rgba(58, 134, 255, 0.08), rgba(131, 56, 236, 0.06));
+        border: 1px solid rgba(58, 134, 255, 0.24);
+        border-radius: 14px;
+        display: grid;
+        gap: 0.9rem;
+        grid-template-columns: minmax(0, 1.35fr) minmax(190px, 1fr);
+        padding: 1rem;
+    }
+
+    #addPostModal .schedule-picker-field {
+        min-width: 0;
+    }
+
+    #addPostModal .schedule-picker-field > label {
+        align-items: center;
+        color: #334155;
+        display: flex;
+        font-size: 0.8rem;
+        font-weight: 700;
+        gap: 0.4rem;
+        margin-bottom: 0.45rem;
+    }
+
+    #addPostModal .schedule-time-controls {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: 1fr auto 1fr;
+    }
+
+    #addPostModal .schedule-time-separator {
+        align-self: center;
+        color: #64748b;
+        font-size: 1.15rem;
+        font-weight: 800;
+    }
+
+    #addPostModal .schedule-time-select {
+        min-width: 82px;
+        padding-right: 2rem;
+    }
+
+    #addPostModal .schedule-summary {
+        align-items: center;
+        color: #475569;
+        display: flex;
+        font-size: 0.78rem;
+        gap: 0.45rem;
+        grid-column: 1 / -1;
+        margin: 0;
     }
 
     #addPostModal .verification-status-field:has(.icon-select.open),
@@ -488,6 +541,14 @@
         #addPostModal .download-meta-row {
             grid-template-columns: 1fr;
             max-width: none;
+        }
+
+        #addPostModal .schedule-picker {
+            grid-template-columns: 1fr;
+        }
+
+        #addPostModal .schedule-summary {
+            grid-column: auto;
         }
     }
 
@@ -662,7 +723,7 @@
                                 <div id="downloadLinksContainer">
                                     <div class="download-entry" data-index="0">
                                         <div class="download-entry-row">
-                                            <select name="download_type_0" class="form-select download-type-select">
+                                            <select name="download_type_0" class="form-select download-type-select icon-select-native" data-project-select="native">
                                                 {% for file_type in download_file_types %}
                                                 <option value="{{ file_type.label }}" data-icon="{{ file_type.icon }}" data-color="{{ file_type.color }}">{{ file_type.label }}</option>
                                                 {% endfor %}
@@ -681,7 +742,7 @@
                                             <div class="download-size-row">
                                                 <label class="form-label" for="downloadSize0"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>
                                                 <div class="download-size-controls">
-                                                    <select name="download_size_unit_0" class="form-select download-size-unit">
+                                                    <select name="download_size_unit_0" class="form-select download-size-unit" data-project-select="native" aria-label="Unidade do tamanho do arquivo">
                                                         <option value="KB">KB</option>
                                                         <option value="MB" selected>MB</option>
                                                         <option value="GB">GB</option>
@@ -851,10 +912,27 @@
                                 </div>
 
                                 <div class="form-group" id="scheduleGroup" style="display: none;">
-                                    <label for="publishDate" class="form-label"><i class="fas fa-calendar-alt"></i> Data e horário de publicação</label>
-                                    <input type="datetime-local" id="publishDate" name="publish_date"
-                                           class="form-control modern-input" step="60">
-                                    <div class="form-text">Selecione a data, a hora e o minuto para publicar automaticamente.</div>
+                                    <label class="form-label"><i class="fas fa-calendar-alt"></i> Data e horário de publicação</label>
+                                    <input type="hidden" id="publishDate" name="publish_date" value="">
+                                    <div class="schedule-picker" role="group" aria-label="Agendamento da publicação">
+                                        <div class="schedule-picker-field">
+                                            <label for="publishDateDay"><i class="fas fa-calendar-day" aria-hidden="true"></i> Data</label>
+                                            <input type="date" id="publishDateDay" class="form-control modern-input">
+                                        </div>
+                                        <div class="schedule-picker-field">
+                                            <label><i class="fas fa-clock" aria-hidden="true"></i> Horário</label>
+                                            <div class="schedule-time-controls">
+                                                <select id="publishHour" class="form-select schedule-time-select" data-project-select="native" aria-label="Hora da publicação">
+                                                    {% for hour in range(24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}</option>{% endfor %}
+                                                </select>
+                                                <span class="schedule-time-separator" aria-hidden="true">:</span>
+                                                <select id="publishMinute" class="form-select schedule-time-select" data-project-select="native" aria-label="Minuto da publicação">
+                                                    {% for minute in range(60) %}<option value="{{ '%02d'|format(minute) }}">{{ '%02d'|format(minute) }}</option>{% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <p class="schedule-summary"><i class="fas fa-bolt" aria-hidden="true"></i> O post será publicado automaticamente no horário de Brasília.</p>
+                                    </div>
                                 </div>
                             </div>
 

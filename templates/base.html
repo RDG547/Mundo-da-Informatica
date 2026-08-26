@@ -15,16 +15,18 @@
         {% set page_description = post.seo_description or ('Consulte ' ~ post_kind ~ ' para ' ~ post_target ~ (', placa ' ~ post.board_code if post.board_code else '') ~ '. Veja informações técnicas, compatibilidade e arquivos disponíveis.') %}
     {% else %}
         {% set page_title = site_name ~ (' - ' ~ title if title else '') %}
-        {% set page_description = site_configs.get('site_description', 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.') %}
+        {% set page_description = seo_page_description or site_configs.get('site_description', 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.') %}
     {% endif %}
     <title>{{ page_title }}</title>
 
     <!-- Meta Tags -->
     <meta name="description" content="{{ page_description|striptags|truncate(180, True) }}">
+    <meta name="robots" content="{{ robots_directive }}">
     <meta name="author" content="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="canonical" href="{{ canonical_url }}">
     <meta property="og:site_name" content="{{ site_name }}">
+    <meta property="og:locale" content="pt_BR">
     {% if component is defined and component %}
     <meta property="og:type" content="article">
     <meta property="og:url" content="{{ canonical_url }}">

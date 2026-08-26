@@ -13,6 +13,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
             this.currentUrl = window.location.href;
             this.isLoading = false;
             this.cache = new Map();
+            this.cacheTtlMs = 15000;
+            this.loadingDelayMs = 90;
+            this.loadingTimer = null;
             this.fullReloadPaths = new Set();
             this.init();
         }
@@ -145,6 +148,32 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     return false;
                 }
             }, true); // Use capture phase
+
+            // Antecipar o HTML quando o usuário demonstra intenção de navegar.
+            // Isso elimina boa parte da espera sem alterar a navegação dinâmica.
+            document.addEventListener('pointerover', (event) => {
+                const link = event.target.closest?.('a[href]');
+                if (!this.shouldInterceptLink(link) || link.dataset.dynamicPrefetchPending === 'true') return;
+                link.dataset.dynamicPrefetchPending = 'true';
+                link._dynamicPrefetchTimer = window.setTimeout(() => {
+                    delete link.dataset.dynamicPrefetchPending;
+                    link._dynamicPrefetchTimer = null;
+                    this.preloadPage(link.href);
+                }, 60);
+            }, { passive: true });
+
+            document.addEventListener('pointerout', (event) => {
+                const link = event.target.closest?.('a[href]');
+                if (!link || link.contains(event.relatedTarget) || !link._dynamicPrefetchTimer) return;
+                window.clearTimeout(link._dynamicPrefetchTimer);
+                link._dynamicPrefetchTimer = null;
+                delete link.dataset.dynamicPrefetchPending;
+            }, { passive: true });
+
+            document.addEventListener('focusin', (event) => {
+                const link = event.target.closest?.('a[href]');
+                if (this.shouldInterceptLink(link)) this.preloadPage(link.href);
+            });
 
             // Intercept form submissions
             document.addEventListener('submit', (e) => {
@@ -287,8 +316,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             this.showLoading();
 
             try {
-                // Always fetch fresh content to avoid stale CSS/JS issues
-                const content = await this.fetchPageContent(url);
+                const content = await this.fetchPageContent(url, { force });
 
                 if (updateHistory) {
                     this.updateUrl(url);
@@ -313,8 +341,23 @@ if (typeof window.DynamicLoader !== 'undefined') {
             }
         }
 
-        async fetchPageContent(url) {
+        normalizeCacheKey(url) {
+            const normalized = new URL(url, window.location.origin);
+            normalized.hash = '';
+            return normalized.href;
+        }
+
+        async fetchPageContent(url, options = {}) {
+            const { force = false } = options;
+            const cacheKey = this.normalizeCacheKey(url);
+            const cached = this.cache.get(cacheKey);
+            if (!force && cached && Date.now() - cached.createdAt < this.cacheTtlMs) {
+                return cached.pageData;
+            }
+
             const response = await fetch(url, {
+                credentials: 'same-origin',
+                cache: force ? 'no-store' : 'default',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'
                 }
@@ -343,9 +386,32 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     doc.body;
             }
 
-            return {
+            const pageData = {
                 title: doc.title,
                 content: content,
+                head: {
+                    canonical: doc.querySelector('link[rel="canonical"]')?.href || '',
+                    metas: [
+                        'meta[name="description"]',
+                        'meta[name="robots"]',
+                        'meta[property="og:type"]',
+                        'meta[property="og:url"]',
+                        'meta[property="og:title"]',
+                        'meta[property="og:description"]',
+                        'meta[property="og:image"]',
+                        'meta[property="og:site_name"]',
+                        'meta[property="og:locale"]',
+                        'meta[name="twitter:card"]',
+                        'meta[name="twitter:title"]',
+                        'meta[name="twitter:description"]',
+                        'meta[name="twitter:image"]'
+                    ].map((selector) => ({
+                        selector,
+                        html: doc.querySelector(selector)?.outerHTML || ''
+                    })),
+                    structuredData: Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))
+                        .map((script) => script.textContent)
+                },
                 scripts: Array.from(doc.querySelectorAll('script[src]')).filter(script =>
                     !script.hasAttribute('data-static-base-script') && !content.contains(script)
                 ),
@@ -361,6 +427,41 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     !style.hasAttribute('data-static-base-style')
                 )
             };
+
+            this.cache.set(cacheKey, { createdAt: Date.now(), pageData });
+            return pageData;
+        }
+
+        updateHeadMetadata(head = {}) {
+            let canonical = document.querySelector('link[rel="canonical"]');
+            if (head.canonical) {
+                if (!canonical) {
+                    canonical = document.createElement('link');
+                    canonical.rel = 'canonical';
+                    document.head.appendChild(canonical);
+                }
+                canonical.href = head.canonical;
+            }
+
+            (head.metas || []).forEach(({ selector, html }) => {
+                const current = document.querySelector(selector);
+                if (!html) {
+                    current?.remove();
+                    return;
+                }
+                const parsed = new DOMParser().parseFromString(`<head>${html}</head>`, 'text/html').head.firstElementChild;
+                if (!parsed) return;
+                if (current) current.replaceWith(parsed);
+                else document.head.appendChild(parsed);
+            });
+
+            document.querySelectorAll('script[type="application/ld+json"]').forEach((script) => script.remove());
+            (head.structuredData || []).forEach((json) => {
+                const script = document.createElement('script');
+                script.type = 'application/ld+json';
+                script.textContent = json;
+                document.head.appendChild(script);
+            });
         }
 
         scrollToHashTarget(url) {
@@ -379,6 +480,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             const { preserveScroll = false } = options;
             // Update page title
             document.title = pageData.title;
+            this.updateHeadMetadata(pageData.head);
 
             // Load page-specific styles (skipped for admin)
             await this.loadPageStyles(url, pageData.styles);
@@ -415,8 +517,6 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     // Smooth transition for public pages
                     mainContainer.style.opacity = '0';
                     mainContainer.style.transition = 'opacity 0.15s ease-in-out';
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
 
                     console.log('[DYNAMIC-LOADING] 📄 Atualizando conteúdo da página');
                     mainContainer.innerHTML = pageData.content.innerHTML;
@@ -865,12 +965,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     .map(link => link.href)
             );
 
-            for (const href of desiredHrefs) {
-                if (existingHrefs.has(href)) {
-                    continue;
-                }
-
-                await new Promise((resolve) => {
+            const pendingStyles = Array.from(desiredHrefs)
+                .filter((href) => !existingHrefs.has(href))
+                .map((href) => new Promise((resolve) => {
                     const link = document.createElement('link');
                     const sourceStyle = desiredStyles.get(href);
                     link.rel = 'stylesheet';
@@ -881,8 +978,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     link.onload = () => resolve();
                     link.onerror = () => resolve();
                     document.head.appendChild(link);
-                });
-            }
+                }));
+            await Promise.all(pendingStyles);
         }
 
         ensureStylesheetReady(link) {
@@ -1308,15 +1405,19 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         showLoading() {
-            const loader = document.getElementById('dynamic-loader');
-            if (loader) {
+            window.clearTimeout(this.loadingTimer);
+            this.loadingTimer = window.setTimeout(() => {
+                const loader = document.getElementById('dynamic-loader');
+                if (!loader || !this.isLoading) return;
                 this.attachLoaderToMain(loader);
                 loader.style.display = 'flex';
                 window.requestAnimationFrame(() => this.attachLoaderToMain(loader));
-            }
+            }, this.loadingDelayMs);
         }
 
         hideLoading() {
+            window.clearTimeout(this.loadingTimer);
+            this.loadingTimer = null;
             const loader = document.getElementById('dynamic-loader');
             if (loader) {
                 loader.style.display = 'none';
@@ -1941,13 +2042,10 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
         // Preload page
         async preloadPage(url) {
-            if (!this.cache.has(url)) {
-                try {
-                    const content = await this.fetchPageContent(url);
-                    this.cache.set(url, content);
-                } catch (error) {
-                    console.warn('Failed to preload page:', url, error);
-                }
+            try {
+                await this.fetchPageContent(url);
+            } catch (error) {
+                console.warn('Failed to preload page:', url, error);
             }
         }
     }

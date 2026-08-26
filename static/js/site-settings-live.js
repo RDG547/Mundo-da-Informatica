@@ -288,6 +288,7 @@
 
             const loader = window.ensureDynamicLoader?.() || window.dynamicLoader;
             if (!loader?.refreshCurrentPage) return;
+            loader.clearCache?.();
             await loader.refreshCurrentPage();
             contentVersion = nextVersion;
             window.dispatchEvent(new CustomEvent('publicContentUpdated', { detail: { version: nextVersion } }));

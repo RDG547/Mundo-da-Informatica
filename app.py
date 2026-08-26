@@ -2286,6 +2286,16 @@ def get_category_query_filter(category):
         )
     ).first()
 
+    if not category_record:
+        normalized_category = str(category or '').strip().casefold()
+        category_record = next(
+            (
+                item for item in Category.query.all()
+                if category_public_url_value(item).casefold() == normalized_category
+            ),
+            None,
+        )
+
     if category_record:
         if not category_record.is_active or not category_record.is_visible:
             abort(404)
@@ -5569,7 +5579,9 @@ def inject_global_data():
         stats=stats,
         plan_pricing=plan_pricing,
         plan_entitlements=PLAN_ENTITLEMENTS,
-        canonical_url=_absolute_public_url(request.path),
+        canonical_url=_canonical_public_url_for_request(),
+        seo_page_description=_seo_page_description_for_request(),
+        robots_directive=_robots_directive_for_request(),
         public_base_url=_get_public_base_url(),
         firebase_public_config=firebase_public_config,
         meta_pixel_id=app.config.get('META_PIXEL_ID', ''),
@@ -5676,6 +5688,27 @@ SEO_PUBLIC_STATIC_PAGES = (
     ('/politica-de-privacidade', 'yearly', '0.3'),
 )
 
+SEO_PAGE_DESCRIPTIONS = {
+    'home': 'Encontre BIOS, EC, BoardView, esquemas, drivers, softwares e outros recursos técnicos organizados por modelo e código da placa.',
+    'all_categories': 'Explore todas as categorias e subcategorias do acervo técnico do Mundo da Informática.',
+    'posts': 'Consulte os recursos técnicos publicados, com busca por modelo, placa, categoria e tipo de arquivo.',
+    'datasheet_library': 'Pesquise datasheets de componentes eletrônicos, circuitos integrados e semicondutores.',
+    'about': 'Conheça o Mundo da Informática e a plataforma de recursos para profissionais de manutenção eletrônica.',
+    'faq': 'Tire dúvidas sobre downloads, contas, planos, categorias e suporte no Mundo da Informática.',
+    'contact': 'Fale com a equipe do Mundo da Informática por nossos canais oficiais de atendimento e suporte.',
+    'plans': 'Compare os planos Grátis, Premium e VIP e escolha os recursos adequados à sua rotina técnica.',
+    'content_requests': 'Sugira novos recursos técnicos ou envie uma solicitação de busca prioritária VIP.',
+    'terms_of_service': 'Consulte os termos de uso da plataforma Mundo da Informática.',
+    'privacy_policy': 'Consulte como o Mundo da Informática protege e utiliza seus dados pessoais.',
+}
+
+SEO_PAGINATED_ENDPOINTS = {'home', 'category', 'subcategory', 'posts', 'datasheet_library'}
+SEO_PRIVATE_ENDPOINT_PREFIXES = ('admin', 'api_')
+SEO_PRIVATE_PATH_PREFIXES = (
+    '/admin', '/api/', '/login', '/register', '/logout', '/profile',
+    '/reset-password', '/download/', '/checkout-', '/pix-checkout',
+)
+
 SEO_ROBOTS_DISALLOW_PATHS = (
     '/admin',
     '/api/',
@@ -5768,6 +5801,39 @@ def _absolute_public_url(path: str) -> str:
         path = f'/{path}'
 
     return f'{_get_public_base_url()}{path}'
+
+
+def _canonical_public_url_for_request() -> str:
+    """Gera uma URL canônica estável sem descartar páginas reais do acervo."""
+    path = request.path
+    if request.endpoint in SEO_PAGINATED_ENDPOINTS:
+        page = request.args.get('page', 1, type=int) or 1
+        if page > 1:
+            path = f'{path}?page={page}'
+    return _absolute_public_url(path)
+
+
+def _seo_page_description_for_request() -> str:
+    endpoint = request.endpoint or ''
+    if endpoint == 'category':
+        category_label = request.view_args.get('category', '') if request.view_args else ''
+        return f'Consulte arquivos e recursos técnicos da categoria {category_label}, organizados por modelo e compatibilidade.'
+    if endpoint == 'subcategory':
+        subcategory_label = request.view_args.get('subcategory', '') if request.view_args else ''
+        return f'Consulte recursos técnicos de {subcategory_label.replace("-", " ")}, com informações de modelo e compatibilidade.'
+    return SEO_PAGE_DESCRIPTIONS.get(endpoint, '')
+
+
+def _robots_directive_for_request() -> str:
+    endpoint = request.endpoint or ''
+    path = request.path
+    if endpoint == 'search':
+        return 'noindex,follow'
+    if endpoint.startswith(SEO_PRIVATE_ENDPOINT_PREFIXES) or path.startswith(SEO_PRIVATE_PATH_PREFIXES):
+        return 'noindex,nofollow,noarchive'
+    if endpoint in {'setup', 'post', 'static'} or path.startswith('/errors/'):
+        return 'noindex,follow'
+    return 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
 
 
 def _coerce_sitemap_datetime(value):
@@ -5970,9 +6036,11 @@ def sitemap_xml():
 
 
 # Rotas principais
-@app.route('/')
 @app.route('/home')
+@app.route('/')
 def home():
+    if request.path.rstrip('/') == '/home':
+        return redirect('/', code=301)
     try:
         page = request.args.get('page', 1, type=int)
         posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())
@@ -6031,6 +6099,13 @@ def all_categories():
 def category(category):
     page = request.args.get('page', 1, type=int)
     category_record, category_filter, category_name = get_category_query_filter(category)
+    if category_record:
+        canonical_category = category_public_url_value(category_record)
+        if category != canonical_category:
+            redirect_args = {'category': canonical_category}
+            if page > 1:
+                redirect_args['page'] = page
+            return redirect(url_for('category', **redirect_args), code=301)
     posts = Post.query.filter(category_filter, Post.is_active == True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
 
     subcategory_query = db.session.query(Post.subcategory).filter(
@@ -6137,6 +6212,10 @@ def post(post_id):
 def post_by_slug(category, slug):
     """Nova rota com URL amigável: /categoria/nome-do-post"""
     post = Post.query.filter_by(slug=slug).first_or_404()
+
+    canonical_path = _post_public_path(post)
+    if request.path.rstrip('/') != canonical_path.rstrip('/'):
+        return redirect(canonical_path, code=301)
 
     # Incrementar visualizações
     increment_post_views(post.id)

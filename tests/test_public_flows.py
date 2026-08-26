@@ -1,3 +1,5 @@
+import json
+
 import app as app_module
 from app import Category, ContentRequest, Post, User, app, db
 
@@ -56,6 +58,70 @@ def test_homepage_and_post_expose_technical_seo(client):
     assert "a" * 64 in body
     assert 'rel="canonical"' in body
     assert "TechArticle" in body
+
+
+def test_public_seo_uses_canonical_urls_and_indexing_directives(client):
+    with app.app_context():
+        category = Category(name="BIOS Técnica", slug="bios-tecnica", is_active=True, is_visible=True)
+        post = Post(
+            title="BIOS canônica",
+            content="Conteúdo técnico.",
+            download_link="https://example.test/bios.bin",
+            category_rel=category,
+            category_str=category.name,
+            slug="bios-canonica",
+            is_active=True,
+        )
+        db.session.add_all([category, post])
+        db.session.commit()
+
+    legacy_home = client.get('/home')
+    assert legacy_home.status_code == 301
+    assert legacy_home.headers['Location'].endswith('/')
+
+    paginated_home = client.get('/?page=2')
+    paginated_body = paginated_home.get_data(as_text=True)
+    assert 'rel="canonical" href="https://mundodainformatica.com/?page=2"' in paginated_body
+    assert 'name="robots" content="index,follow,max-image-preview:large' in paginated_body
+
+    search_response = client.get('/pesquisa?q=bios')
+    assert 'name="robots" content="noindex,follow"' in search_response.get_data(as_text=True)
+
+    category_alias = client.get('/categoria/BIOS%20T%C3%A9cnica')
+    assert category_alias.status_code == 301
+    assert category_alias.headers['Location'].endswith('/categoria/bios-tecnica')
+
+    wrong_post_category = client.get('/categoria-incorreta/bios-canonica')
+    assert wrong_post_category.status_code == 301
+    assert wrong_post_category.headers['Location'].endswith('/bios-tecnica/bios-canonica')
+
+
+def test_post_detail_uses_one_standard_notice_and_unframed_multi_downloads(client):
+    with app.app_context():
+        category = Category(name="BIOS", slug="bios", is_active=True, is_visible=True)
+        post = Post(
+            title="BIOS e EC",
+            content="Conteúdo técnico.",
+            download_link="https://example.test/bios.bin",
+            category_rel=category,
+            category_str="BIOS",
+            slug="bios-e-ec",
+            custom_metadata=json.dumps({
+                'download_files': [
+                    {'type': 'BIOS', 'url': 'https://example.test/bios.bin', 'size': '4 MB'},
+                    {'type': 'EC', 'url': 'https://example.test/ec.bin', 'size': '256 KB'},
+                ]
+            }),
+            is_active=True,
+        )
+        db.session.add_all([category, post])
+        db.session.commit()
+
+    body = client.get('/bios/bios-e-ec').get_data(as_text=True)
+    assert body.count('Miniatura ilustrativa') == 1
+    assert body.count('<strong>Atenção:</strong>') == 1
+    assert body.count('class="multi-file-item"') == 2
+    assert 'Os arquivos são baixados individualmente' in body
 
 
 def test_home_search_copy_and_footer_year(client):

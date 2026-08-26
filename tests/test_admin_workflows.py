@@ -81,6 +81,29 @@ def test_admin_can_schedule_post_and_due_job_publishes_it(client):
         assert schedule.published_at is not None
 
 
+def test_post_modals_render_single_icon_type_select_and_embedded_schedule(client):
+    with app.app_context():
+        admin = _admin('modal_admin')
+        category = Category(name='BIOS', slug='bios', is_active=True, is_visible=True)
+        db.session.add(category)
+        db.session.commit()
+        admin_id = admin.id
+
+    _login(client, admin_id)
+    response = client.get('/admin/posts')
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'class="schedule-picker"' in body
+    assert 'id="publishDateDay"' in body
+    assert 'id="publishHour"' in body
+    assert 'id="publishMinute"' in body
+    assert 'id="publishDate" name="publish_date"' in body
+    assert 'download-type-select icon-select-native" data-project-select="native"' in body
+    assert 'download-size-unit" data-project-select="native"' in body
+    assert '#editPostModal .icon-select[data-source-select="editPostCategory"] .icon-select-menu' in body
+
+
 def test_comment_moderation_uses_json_without_redirect_and_bulk_persists(client):
     with app.app_context():
         admin = _admin('comments_admin')

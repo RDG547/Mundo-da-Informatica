@@ -249,6 +249,9 @@
             || select.hidden
             || select.classList.contains('smart-select-native')
             || select.classList.contains('icon-select-native')
+            || select.classList.contains('download-type-select')
+            || select.classList.contains('download-size-unit')
+            || select.classList.contains('schedule-time-select')
             || select.closest('[data-project-select]');
     }
 

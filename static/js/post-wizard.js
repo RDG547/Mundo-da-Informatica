@@ -53,23 +53,65 @@ function initPostWizard() {
     const publicationRadios = addPostModal.querySelectorAll('input[name="status"]');
     const scheduleGroup = document.getElementById('scheduleGroup');
     const publishDateInput = document.getElementById('publishDate');
+    const publishDateDay = document.getElementById('publishDateDay');
+    const publishHour = document.getElementById('publishHour');
+    const publishMinute = document.getElementById('publishMinute');
+
+    function padSchedulePart(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function localScheduleParts(date) {
+        return {
+            day: `${date.getFullYear()}-${padSchedulePart(date.getMonth() + 1)}-${padSchedulePart(date.getDate())}`,
+            hour: padSchedulePart(date.getHours()),
+            minute: padSchedulePart(date.getMinutes())
+        };
+    }
+
+    function syncPublishDateValue() {
+        if (!publishDateInput) return;
+        const day = publishDateDay?.value || '';
+        const hour = publishHour?.value || '00';
+        const minute = publishMinute?.value || '00';
+        publishDateInput.value = day ? `${day}T${hour}:${minute}` : '';
+    }
+
+    function ensureScheduleDefaults() {
+        if (!publishDateDay || !publishHour || !publishMinute) return;
+        const now = new Date();
+        const minimum = localScheduleParts(now);
+        publishDateDay.min = minimum.day;
+        if (!publishDateDay.value) {
+            const suggested = new Date(now.getTime() + 5 * 60 * 1000);
+            suggested.setSeconds(0, 0);
+            const defaults = localScheduleParts(suggested);
+            publishDateDay.value = defaults.day;
+            publishHour.value = defaults.hour;
+            publishMinute.value = defaults.minute;
+        }
+        syncPublishDateValue();
+    }
 
     function syncScheduleState() {
         const scheduled = addPostModal.querySelector('input[name="status"]:checked')?.value === 'scheduled';
         if (scheduleGroup) scheduleGroup.style.display = scheduled ? 'block' : 'none';
         if (publishDateInput) {
-            publishDateInput.required = scheduled;
             if (scheduled) {
-                const localNow = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-                    .toISOString()
-                    .slice(0, 16);
-                publishDateInput.min = localNow;
-                if (!publishDateInput.value) publishDateInput.focus();
+                ensureScheduleDefaults();
+                if (publishDateDay) publishDateDay.required = true;
+                publishDateDay?.focus();
+            } else if (publishDateDay) {
+                publishDateDay.required = false;
             }
         }
     }
 
     publicationRadios.forEach((radio) => radio.addEventListener('change', syncScheduleState));
+    [publishDateDay, publishHour, publishMinute].forEach((field) => {
+        field?.addEventListener('change', syncPublishDateValue);
+        field?.addEventListener('input', syncPublishDateValue);
+    });
     syncScheduleState();
 
     function setSubmitState(isSubmitting) {
@@ -149,6 +191,7 @@ function initPostWizard() {
             select.id = `downloadTypeSelect${++downloadTypeSelectId}`;
         }
         select.classList.add('icon-select-native');
+        select.dataset.projectSelect = 'native';
 
         const options = Array.from(select.options).map((option) => ({
             value: option.value,
@@ -942,7 +985,7 @@ function initPostWizard() {
             entry.setAttribute('data-index', idx);
             entry.innerHTML = `
                 <div class="download-entry-row">
-                    <select name="download_type_${idx}" class="form-select download-type-select">
+                    <select name="download_type_${idx}" class="form-select download-type-select icon-select-native" data-project-select="native">
                         ${renderDownloadTypeOptions()}
                     </select>
                     <div class="input-group download-url-group">
@@ -963,7 +1006,7 @@ function initPostWizard() {
                     <div class="download-size-row">
                         <label class="form-label" for="downloadSize${idx}"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>
                         <div class="download-size-controls">
-                            <select name="download_size_unit_${idx}" class="form-select download-size-unit">
+                            <select name="download_size_unit_${idx}" class="form-select download-size-unit" data-project-select="native" aria-label="Unidade do tamanho do arquivo">
                                 <option value="KB">KB</option>
                                 <option value="MB" selected>MB</option>
                                 <option value="GB">GB</option>

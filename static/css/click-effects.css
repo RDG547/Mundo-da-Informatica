@@ -154,6 +154,14 @@ a[class*="btn"]:active,
     transition: all 0.1s ease !important;
 }
 
+/* Os cards de adicionados recentemente abrem o conteúdo, mas não devem
+   deslocar ou encolher quando o clique começa. */
+.recent-posts .post-card:active,
+#recent-posts-grid .post-card:active {
+    transform: none !important;
+    transition: box-shadow 0.1s ease !important;
+}
+
 /* Exceções para elementos que não devem ter o efeito */
 input[type="text"],
 input[type="email"],

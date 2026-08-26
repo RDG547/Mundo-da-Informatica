@@ -1443,7 +1443,7 @@
                 '<div class="download-size-row">' +
                 '<label class="form-label" for="editDownloadSize' + idx + '"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>' +
                 '<div class="download-size-controls">' +
-                '<select name="edit_download_size_unit_' + idx + '" class="form-select download-size-unit" data-project-select="native" aria-label="Unidade do tamanho do arquivo">' +
+                '<select name="edit_download_size_unit_' + idx + '" class="form-select download-size-unit icon-select-native" data-project-select="native" aria-label="Unidade do tamanho do arquivo">' +
                 '<option value="KB"' + (sizeUnit === 'KB' ? ' selected' : '') + '>KB</option>' +
                 '<option value="MB"' + (sizeUnit === 'MB' ? ' selected' : '') + '>MB</option>' +
                 '<option value="GB"' + (sizeUnit === 'GB' ? ' selected' : '') + '>GB</option>' +
@@ -1458,6 +1458,7 @@
             entry.querySelector('input[type="url"]').value = url || '';
             entry.querySelector('.download-format-input').value = format || '';
             window.enhanceDownloadTypeSelect?.(entry.querySelector('.download-type-select'));
+            window.enhanceDownloadSizeUnitSelect?.(entry.querySelector('.download-size-unit'));
 
             var removeBtn = entry.querySelector('.edit-remove-dl');
             if (removeBtn) {
@@ -1893,12 +1894,20 @@
         width: 100% !important;
     }
 
-    #editPostModal .download-size-unit {
-        flex: 0 0 88px !important;
-        max-width: 88px !important;
-        min-width: 88px !important;
-        padding: 0.75rem 2rem 0.75rem 0.85rem !important;
-        width: 88px !important;
+    #editPostModal .size-unit-icon-select {
+        flex: 0 0 108px;
+        max-width: 108px;
+        min-width: 108px;
+        width: 108px;
+    }
+
+    #editPostModal .size-unit-icon-select .icon-select-trigger {
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
+    }
+
+    #editPostModal .size-unit-icon-select .icon-select-menu {
+        min-width: 108px;
     }
 
     #editPostModal .verification-status-field {

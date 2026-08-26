@@ -640,9 +640,9 @@ def get_admin_posts_overview() -> dict[str, int]:
 DEFAULT_DOWNLOAD_FILE_TYPES = [
     {'label': 'BIOS', 'icon': 'fas fa-microchip', 'color': '#3a86ff'},
     {'label': 'EC', 'icon': 'fas fa-memory', 'color': '#7c3aed'},
+    {'label': 'BoardView', 'icon': 'fas fa-project-diagram', 'color': '#0891b2'},
     {'label': 'ME', 'icon': 'fas fa-shield-alt', 'color': '#f59e0b'},
     {'label': 'Outros', 'icon': 'fas fa-file-archive', 'color': '#64748b'},
-    {'label': 'BoardView', 'icon': 'fas fa-project-diagram', 'color': '#0891b2'},
 ]
 
 DOWNLOAD_FILE_TYPE_PRESENTATION = {

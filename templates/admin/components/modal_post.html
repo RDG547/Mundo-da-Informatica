@@ -266,12 +266,20 @@
         width: 100% !important;
     }
 
-    #addPostModal .download-size-unit {
-        flex: 0 0 88px !important;
-        max-width: 88px !important;
-        min-width: 88px !important;
-        padding: 0.75rem 2rem 0.75rem 0.85rem !important;
-        width: 88px !important;
+    #addPostModal .size-unit-icon-select {
+        flex: 0 0 108px;
+        max-width: 108px;
+        min-width: 108px;
+        width: 108px;
+    }
+
+    #addPostModal .size-unit-icon-select .icon-select-trigger {
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
+    }
+
+    #addPostModal .size-unit-icon-select .icon-select-menu {
+        min-width: 108px;
     }
 
     #addPostModal .verification-status-field {
@@ -452,6 +460,20 @@
     .icon-select-option.active {
         background: rgba(58, 134, 255, 0.1);
         color: var(--admin-primary, #3a86ff);
+    }
+
+    .icon-select-option .icon-select-check {
+        color: var(--admin-primary, #3a86ff);
+        margin-left: auto;
+        opacity: 0;
+        transform: scale(0.75);
+        transition: opacity 0.16s ease, transform 0.16s ease;
+        width: auto;
+    }
+
+    .icon-select-option.active .icon-select-check {
+        opacity: 1;
+        transform: scale(1);
     }
 
     .verification-icon-select .icon-select-option {
@@ -742,7 +764,7 @@
                                             <div class="download-size-row">
                                                 <label class="form-label" for="downloadSize0"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>
                                                 <div class="download-size-controls">
-                                                    <select name="download_size_unit_0" class="form-select download-size-unit" data-project-select="native" aria-label="Unidade do tamanho do arquivo">
+                                                    <select name="download_size_unit_0" class="form-select download-size-unit icon-select-native" data-project-select="native" aria-label="Unidade do tamanho do arquivo">
                                                         <option value="KB">KB</option>
                                                         <option value="MB" selected>MB</option>
                                                         <option value="GB">GB</option>

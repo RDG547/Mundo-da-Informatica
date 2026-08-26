@@ -159,7 +159,22 @@ a[class*="btn"]:active,
 .recent-posts .post-card:active,
 #recent-posts-grid .post-card:active {
     transform: none !important;
-    transition: box-shadow 0.1s ease !important;
+    box-shadow: var(--shadow-md) !important;
+    transition: none !important;
+}
+
+/* Durante o hover o clique conserva exatamente a mesma posição e sombra.
+   Voltar para transform:none faria o card descer 10px enquanto o mouse está pressionado. */
+.recent-posts .post-card:hover:active,
+#recent-posts-grid .post-card:hover:active {
+    transform: translateY(-10px) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.recent-posts .post-card h3 a:active,
+#recent-posts-grid .post-card h3 a:active {
+    transform: none !important;
+    transition: none !important;
 }
 
 /* Exceções para elementos que não devem ter o efeito */

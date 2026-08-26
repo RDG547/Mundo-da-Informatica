@@ -38,8 +38,15 @@ function initPostWizard() {
         outros: { icon: 'fas fa-file-archive', color: '#64748b' },
         boardview: { icon: 'fas fa-project-diagram', color: '#0891b2' }
     };
+    const DOWNLOAD_TYPE_ORDER = ['bios', 'ec', 'boardview', 'me', 'outros'];
+    const DOWNLOAD_SIZE_PRESENTATION = {
+        KB: { icon: 'fas fa-hdd', color: '#3a86ff' },
+        MB: { icon: 'fas fa-hdd', color: '#7c3aed' },
+        GB: { icon: 'fas fa-hdd', color: '#0891b2' }
+    };
     let downloadTypes = getConfiguredDownloadTypes();
     let downloadTypeSelectId = 0;
+    let downloadSizeSelectId = 0;
 
     if (!nextBtn || !prevBtn || !saveBtn) {
         console.error('Botões do wizard não encontrados!');
@@ -128,7 +135,7 @@ function initPostWizard() {
     }
 
     function getConfiguredDownloadTypes() {
-        const fallbackTypes = ['BIOS', 'EC', 'ME', 'Outros', 'BoardView'].map(getDownloadTypePresentation);
+        const fallbackTypes = ['BIOS', 'EC', 'BoardView', 'ME', 'Outros'].map(getDownloadTypePresentation);
         const script = document.getElementById('download-file-types-data');
 
         try {
@@ -141,10 +148,25 @@ function initPostWizard() {
                 .map((item) => getDownloadTypePresentation(item?.label || item, item))
                 .filter((item, index, list) => item.label && list.findIndex((candidate) => candidate.label.toLowerCase() === item.label.toLowerCase()) === index);
 
-            return normalized.length ? normalized : fallbackTypes;
+            return orderDownloadTypes(normalized.length ? normalized : fallbackTypes);
         } catch (_error) {
             return fallbackTypes;
         }
+    }
+
+    function orderDownloadTypes(types) {
+        return types
+            .map((item, index) => ({ item, index }))
+            .sort((left, right) => {
+                const leftLabel = String(left.item?.label || left.item?.value || '').toLowerCase().replace(/\s+/g, '');
+                const rightLabel = String(right.item?.label || right.item?.value || '').toLowerCase().replace(/\s+/g, '');
+                const leftPriority = DOWNLOAD_TYPE_ORDER.indexOf(leftLabel);
+                const rightPriority = DOWNLOAD_TYPE_ORDER.indexOf(rightLabel);
+                const normalizedLeft = leftPriority === -1 ? DOWNLOAD_TYPE_ORDER.length + left.index : leftPriority;
+                const normalizedRight = rightPriority === -1 ? DOWNLOAD_TYPE_ORDER.length + right.index : rightPriority;
+                return normalizedLeft - normalizedRight;
+            })
+            .map(({ item }) => item);
     }
 
     function getDownloadTypePresentation(value, source = {}) {
@@ -193,12 +215,12 @@ function initPostWizard() {
         select.classList.add('icon-select-native');
         select.dataset.projectSelect = 'native';
 
-        const options = Array.from(select.options).map((option) => ({
+        const options = orderDownloadTypes(Array.from(select.options).map((option) => ({
             value: option.value,
             label: option.textContent.trim(),
             icon: option.dataset.icon || getDownloadTypePresentation(option.value).icon,
             color: option.dataset.color || getDownloadTypePresentation(option.value).color
-        }));
+        })));
         const selected = options.find((option) => option.value === select.value) || options[0];
         const wrapper = document.createElement('div');
         wrapper.className = 'icon-select download-type-icon-select';
@@ -215,7 +237,7 @@ function initPostWizard() {
             <div class="icon-select-menu" role="listbox">
                 ${options.map((option) => `
                     <button type="button" class="icon-select-option" data-value="${escapeHtml(option.value)}" data-icon="${escapeHtml(option.icon)}" data-color="${escapeHtml(option.color)}" style="--option-color:${escapeHtml(option.color)}" role="option">
-                        <i class="${escapeHtml(option.icon)}"></i><span>${escapeHtml(option.label)}</span>
+                        <i class="${escapeHtml(option.icon)}"></i><span>${escapeHtml(option.label)}</span><i class="fas fa-check icon-select-check" aria-hidden="true"></i>
                     </button>
                 `).join('')}
             </div>`;
@@ -232,6 +254,59 @@ function initPostWizard() {
             }
             enhanceDownloadTypeSelect(select);
         });
+    }
+
+    function enhanceDownloadSizeUnitSelect(select) {
+        if (!select) return;
+
+        const previousWrapper = select.nextElementSibling?.matches('.size-unit-icon-select')
+            ? select.nextElementSibling
+            : null;
+        previousWrapper?.remove();
+        if (!select.id) {
+            select.id = `downloadSizeUnitSelect${++downloadSizeSelectId}`;
+        }
+        select.classList.add('icon-select-native');
+        select.dataset.projectSelect = 'native';
+
+        const options = Array.from(select.options).map((option) => {
+            const value = String(option.value || option.textContent || '').trim().toUpperCase();
+            const presentation = DOWNLOAD_SIZE_PRESENTATION[value] || DOWNLOAD_SIZE_PRESENTATION.MB;
+            option.dataset.icon = presentation.icon;
+            option.dataset.color = presentation.color;
+            return {
+                value,
+                label: value,
+                icon: presentation.icon,
+                color: presentation.color
+            };
+        });
+        const selected = options.find((option) => option.value === String(select.value || '').toUpperCase()) || options[0];
+        const wrapper = document.createElement('div');
+        wrapper.className = 'icon-select size-unit-icon-select';
+        wrapper.dataset.iconSelect = '';
+        wrapper.dataset.sourceSelect = select.id;
+        wrapper.innerHTML = `
+            <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="icon-select-current" style="--option-color:${escapeHtml(selected?.color || '#7c3aed')}">
+                    <i class="${escapeHtml(selected?.icon || 'fas fa-hdd')}"></i>
+                    <span>${escapeHtml(selected?.label || 'MB')}</span>
+                </span>
+                <i class="fas fa-chevron-down icon-select-arrow"></i>
+            </button>
+            <div class="icon-select-menu" role="listbox">
+                ${options.map((option) => `
+                    <button type="button" class="icon-select-option" data-value="${escapeHtml(option.value)}" data-icon="${escapeHtml(option.icon)}" data-color="${escapeHtml(option.color)}" style="--option-color:${escapeHtml(option.color)}" role="option">
+                        <i class="${escapeHtml(option.icon)}"></i><span>${escapeHtml(option.label)}</span><i class="fas fa-check icon-select-check" aria-hidden="true"></i>
+                    </button>
+                `).join('')}
+            </div>`;
+        select.insertAdjacentElement('afterend', wrapper);
+        initIconSelects(select.parentElement || document);
+    }
+
+    function refreshDownloadSizeUnitSelects(root = document) {
+        root.querySelectorAll('.download-size-unit').forEach(enhanceDownloadSizeUnitSelect);
     }
 
     function getCsrfToken() {
@@ -373,7 +448,7 @@ function initPostWizard() {
         const normalized = Array.isArray(payload)
             ? payload.map((item) => getDownloadTypePresentation(item?.label || item, item)).filter((item) => item.label)
             : [];
-        return normalized.length ? normalized : [getDownloadTypePresentation('BIOS')];
+        return orderDownloadTypes(normalized.length ? normalized : [getDownloadTypePresentation('BIOS')]);
     }
 
     function initIconSelects(root = document) {
@@ -432,7 +507,9 @@ function initPostWizard() {
         current.style.setProperty('--option-color', color);
 
         wrapper.querySelectorAll('.icon-select-option').forEach((option) => {
-            option.classList.toggle('active', (option.dataset.value || '') === select.value);
+            const isSelected = (option.dataset.value || '') === select.value;
+            option.classList.toggle('active', isSelected);
+            option.setAttribute('aria-selected', isSelected ? 'true' : 'false');
             option.style.setProperty('--option-color', option.dataset.color || '#3a86ff');
         });
     }
@@ -931,6 +1008,7 @@ function initPostWizard() {
             const hasDraft = loadDraft();
             initIconSelects(addPostModal);
             refreshDownloadTypeSelects();
+            refreshDownloadSizeUnitSelects(addPostModal);
             if (typeof window.refreshIconSelects === 'function') {
                 window.refreshIconSelects();
             }
@@ -968,6 +1046,7 @@ function initPostWizard() {
     }
     initDownloadTypesManager();
     refreshDownloadTypeSelects();
+    refreshDownloadSizeUnitSelects(addPostModal);
     showStep(1);
 
     // ==========================================
@@ -1006,7 +1085,7 @@ function initPostWizard() {
                     <div class="download-size-row">
                         <label class="form-label" for="downloadSize${idx}"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>
                         <div class="download-size-controls">
-                            <select name="download_size_unit_${idx}" class="form-select download-size-unit" data-project-select="native" aria-label="Unidade do tamanho do arquivo">
+                            <select name="download_size_unit_${idx}" class="form-select download-size-unit icon-select-native" data-project-select="native" aria-label="Unidade do tamanho do arquivo">
                                 <option value="KB">KB</option>
                                 <option value="MB" selected>MB</option>
                                 <option value="GB">GB</option>
@@ -1022,6 +1101,7 @@ function initPostWizard() {
             `;
             container.appendChild(entry);
             enhanceDownloadTypeSelect(entry.querySelector('.download-type-select'));
+            enhanceDownloadSizeUnitSelect(entry.querySelector('.download-size-unit'));
 
             // bind remove
             entry.querySelector('.remove-download-entry').addEventListener('click', function() {
@@ -1109,6 +1189,8 @@ function initPostWizard() {
     window.renderDownloadTypeOptions = renderDownloadTypeOptions;
     window.refreshDownloadTypeSelects = refreshDownloadTypeSelects;
     window.enhanceDownloadTypeSelect = enhanceDownloadTypeSelect;
+    window.enhanceDownloadSizeUnitSelect = enhanceDownloadSizeUnitSelect;
+    window.refreshDownloadSizeUnitSelects = refreshDownloadSizeUnitSelects;
     window.initializeIconSelects = initIconSelects;
     window.refreshIconSelects = function () {
         initIconSelects(document);

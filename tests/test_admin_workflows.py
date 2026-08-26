@@ -100,8 +100,13 @@ def test_post_modals_render_single_icon_type_select_and_embedded_schedule(client
     assert 'id="publishMinute"' in body
     assert 'id="publishDate" name="publish_date"' in body
     assert 'download-type-select icon-select-native" data-project-select="native"' in body
-    assert 'download-size-unit" data-project-select="native"' in body
+    assert 'download-size-unit icon-select-native" data-project-select="native"' in body
     assert '#editPostModal .icon-select[data-source-select="editPostCategory"] .icon-select-menu' in body
+
+    download_type_select = body.split('name="download_type_0"', 1)[1].split('</select>', 1)[0]
+    assert download_type_select.index('value="BIOS"') < download_type_select.index('value="EC"')
+    assert download_type_select.index('value="EC"') < download_type_select.index('value="BoardView"')
+    assert download_type_select.index('value="BoardView"') < download_type_select.index('value="ME"')
 
 
 def test_comment_moderation_uses_json_without_redirect_and_bulk_persists(client):

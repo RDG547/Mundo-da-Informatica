@@ -96,6 +96,22 @@ def create_auxiliary_tables(connection) -> int:
         extend_existing=True,
     )
 
+    scheduled_post_id = (
+        Column("post_id", Integer, ForeignKey("posts.id"), nullable=False, unique=True)
+        if "posts" in tables else Column("post_id", Integer, nullable=False, unique=True)
+    )
+    scheduled_posts = Table(
+        "scheduled_posts", metadata,
+        Column("id", Integer, primary_key=True),
+        scheduled_post_id,
+        Column("scheduled_for", DateTime, nullable=False),
+        Column("status", String(20), nullable=False, server_default="pending"),
+        Column("created_by", Integer),
+        Column("created_at", DateTime, nullable=False),
+        Column("published_at", DateTime),
+        extend_existing=True,
+    )
+
     user_id_column = (
         Column("user_id", Integer, ForeignKey("user.id"), nullable=True)
         if "user" in tables
@@ -509,7 +525,7 @@ def create_auxiliary_tables(connection) -> int:
 
     created = 0
     tables_to_create = [
-        webhook_events, content_requests, hardware_boards, content_sources,
+        webhook_events, scheduled_posts, content_requests, hardware_boards, content_sources,
         technical_resources, technical_files, import_jobs, import_items,
         file_contributions, datasheet_provider_configs, electronic_components,
         component_aliases, component_source_records, datasheet_documents,
@@ -600,7 +616,10 @@ def migrate() -> None:
             "preferences": "TEXT",
         })
         applied += add_missing_columns(connection, "favorites", {"position": "INTEGER DEFAULT 0"})
-        applied += add_missing_columns(connection, "comments", {"parent_id": "INTEGER"})
+        applied += add_missing_columns(connection, "comments", {
+            "parent_id": "INTEGER",
+            "moderation_status": "VARCHAR(20) NOT NULL DEFAULT 'pending'",
+        })
         applied += add_missing_columns(connection, "transactions", {
             "abacatepay_charge_id": "VARCHAR(255)",
         })
@@ -681,6 +700,7 @@ def migrate() -> None:
             ("technical_resources", "CREATE INDEX IF NOT EXISTS ix_technical_resources_external_id ON technical_resources (external_id)"),
             ("technical_files", "CREATE INDEX IF NOT EXISTS ix_technical_files_sha256 ON technical_files (sha256)"),
             ("import_items", "CREATE INDEX IF NOT EXISTS ix_import_items_status ON import_items (status)"),
+            ("scheduled_posts", "CREATE INDEX IF NOT EXISTS ix_scheduled_posts_due ON scheduled_posts (status, scheduled_for)"),
             ("file_contributions", "CREATE INDEX IF NOT EXISTS ix_file_contributions_status ON file_contributions (status)"),
             ("file_contributions", "CREATE INDEX IF NOT EXISTS ix_file_contributions_import_item_id ON file_contributions (import_item_id)"),
             ("datasheet_provider_configs", "CREATE INDEX IF NOT EXISTS ix_datasheet_provider_name ON datasheet_provider_configs (provider_name)"),

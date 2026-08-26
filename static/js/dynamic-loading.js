@@ -121,6 +121,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
         bindEvents() {
             // Intercept all internal links - use capture phase to execute before other listeners
             document.addEventListener('click', (e) => {
+                // As miniaturas usam o link do post como fallback, mas o clique
+                // principal pertence ao lightbox global. Deixar o evento seguir
+                // evita que a navegação dinâmica cancele a ampliação da imagem.
+                if (e.target.closest('.post-card .post-image img, .related-post-image img, .most-used-thumbnail, .download-title-thumb:not(.download-title-thumb-placeholder)')) {
+                    return;
+                }
                 const link = e.target.closest('a');
                 const fullReloadUrl = this.getFullReloadUrl(link);
                 if (fullReloadUrl) {
@@ -266,15 +272,16 @@ if (typeof window.DynamicLoader !== 'undefined') {
         }
 
         async loadPage(url, options = {}) {
-            const { updateHistory = true } = options;
+            const { updateHistory = true, force = false, preserveScroll = false } = options;
             // Prevent loading same page or loading while already loading
-            if (this.isLoading || url === this.currentUrl) {
+            if (this.isLoading || (!force && url === this.currentUrl)) {
                 return;
             }
 
             const targetUrl = new URL(url, window.location.origin);
             const currentPath = window.location.pathname;
             const targetPath = targetUrl.pathname;
+            const previousScrollPosition = preserveScroll ? window.scrollY : 0;
 
             this.isLoading = true;
             this.showLoading();
@@ -289,8 +296,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     this.currentUrl = url;
                 }
 
-                await this.updatePage(content, url);
-                this.scrollToHashTarget(url);
+                await this.updatePage(content, url, { preserveScroll });
+                if (preserveScroll) {
+                    window.requestAnimationFrame(() => window.scrollTo({ top: previousScrollPosition, behavior: 'auto' }));
+                } else {
+                    this.scrollToHashTarget(url);
+                }
 
             } catch (error) {
                 console.error('Error loading page:', error);
@@ -364,7 +375,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
             });
         }
 
-        async updatePage(pageData, url) {
+        async updatePage(pageData, url, options = {}) {
+            const { preserveScroll = false } = options;
             // Update page title
             document.title = pageData.title;
 
@@ -398,7 +410,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     this.applyInlineStyles(pageData.inlineStyles);
                     this.executeContentScripts(mainContainer);
                     this.reinitializeComponents();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    if (!preserveScroll) window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
                     // Smooth transition for public pages
                     mainContainer.style.opacity = '0';
@@ -425,7 +437,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
                         });
                     });
 
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    if (!preserveScroll) window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             }
 
@@ -434,6 +446,14 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
             // Update active navigation
             this.updateActiveNavigation(url);
+        }
+
+        refreshCurrentPage() {
+            return this.loadPage(window.location.href, {
+                updateHistory: false,
+                force: true,
+                preserveScroll: true,
+            });
         }
 
         handleFooterVisibility(url) {

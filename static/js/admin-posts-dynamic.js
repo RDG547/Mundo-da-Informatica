@@ -254,6 +254,7 @@
     }
 
     function getPostStatus(post) {
+        if (post.publication_status === 'scheduled') return 'scheduled';
         if (post.featured) return 'featured';
         return post.is_active ? 'active' : 'inactive';
     }
@@ -263,12 +264,13 @@
         const statuses = [
             { value: 'active', label: 'Ativo', icon: 'fas fa-check-circle', badge: 'badge-success' },
             { value: 'featured', label: 'Destaque', icon: 'fas fa-star', badge: 'badge-warning' },
+            { value: 'scheduled', label: 'Agendado', icon: 'fas fa-clock', badge: 'badge-info', disabled: true },
             { value: 'inactive', label: 'Inativo', icon: 'fas fa-pause-circle', badge: 'badge-secondary' }
         ];
         const current = statuses.find((status) => status.value === currentStatus) || statuses[0];
         const optionsHtml = statuses.map((status) => `
             <button type="button" class="quick-edit-option${status.value === currentStatus ? ' is-selected' : ''}"
-                data-quick-field="status" data-value="${status.value}" data-icon="${status.icon}">
+                data-quick-field="status" data-value="${status.value}" data-icon="${status.icon}"${status.disabled ? ' disabled' : ''}>
                 <span><i class="${status.icon}"></i> ${status.label}</span><i class="fas fa-check option-check"></i>
             </button>
         `).join('');

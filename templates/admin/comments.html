@@ -124,7 +124,9 @@
                         </td>
                         <td>
                             <div class="comment-content-cell">
-                                <div class="comment-preview">{{ comment.content|truncate(100) }}</div>
+                                <div class="comment-preview"
+                                     data-preview-text="{{ comment.content|truncate(100)|e }}"
+                                     data-full-text="{{ comment.content|e }}">{{ comment.content|truncate(100) }}</div>
                                 {% if comment.content|length > 100 %}
                                 <button class="btn-expand" onclick="expandComment({{ comment.id }})">
                                     <i class="fas fa-expand-alt"></i> Ver mais
@@ -458,6 +460,8 @@
 
     .comment-content-cell {
         max-width: 300px;
+        min-width: 180px;
+        overflow-wrap: anywhere;
     }
 
     .comment-preview {
@@ -465,6 +469,9 @@
         line-height: 1.4;
         margin-bottom: 0.5rem;
         color: var(--admin-text);
+        overflow-wrap: anywhere;
+        white-space: normal;
+        word-break: break-word;
     }
 
     .btn-expand {
@@ -496,6 +503,8 @@
 
     .post-cell {
         max-width: 200px;
+        min-width: 150px;
+        overflow-wrap: anywhere;
     }
 
     .post-link {
@@ -558,6 +567,7 @@
 
     .action-buttons {
         display: flex;
+        flex-wrap: wrap;
         gap: 4px;
         justify-content: center;
     }
@@ -652,6 +662,22 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
+
+    .admin-table th,
+    .admin-table td {
+        vertical-align: middle;
+    }
+
+    @media (max-width: 1100px) {
+        .admin-table-wrapper { overflow-x: auto; }
+        .admin-table { min-width: 900px; table-layout: fixed; }
+    }
+
+    @media (max-width: 700px) {
+        .admin-card-footer,
+        .pagination-container { align-items: stretch; flex-direction: column; }
+        .quick-stats { margin: 0 0 1rem; flex-wrap: wrap; }
+    }
 </style>
 
 <script>
@@ -674,22 +700,67 @@
             window.location.href = '/admin/comments/export';
         };
 
-        window.approveAllPending = function() {
+        async function refreshCommentsPanel() {
+            const loader = typeof window.ensureDynamicLoader === 'function'
+                ? window.ensureDynamicLoader()
+                : null;
+            if (loader && typeof loader.refreshCurrentPage === 'function') {
+                await loader.refreshCurrentPage();
+                return;
+            }
+            window.location.reload();
+        }
+
+        async function moderateComment(commentId, action) {
+            const response = await fetch(`/admin/comments/${commentId}/${action}`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken()
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível atualizar o comentário.');
+            }
+            return data;
+        }
+
+        async function moderateCommentsInBulk(payload) {
+            const response = await fetch('/admin/comments/bulk', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível processar os comentários.');
+            }
+            return data;
+        }
+
+        window.approveAllPending = async function() {
             const pendingComments = document.querySelectorAll('[data-status="pending"]');
             if (pendingComments.length === 0) {
                 showNotification('Não há comentários pendentes.', 'info');
                 return;
             }
 
-            if (confirm(`Aprovar todos os ${pendingComments.length} comentários pendentes?`)) {
-                pendingComments.forEach(row => {
-                    row.setAttribute('data-status', 'approved');
-                    row.querySelector('.badge').innerHTML = '<i class="fas fa-check-circle"></i> Aprovado';
-                    row.querySelector('.badge').className = 'badge badge-success';
-                    row.classList.remove('pending-row');
-                });
-                showNotification(`${pendingComments.length} comentários aprovados!`, 'success');
-                updateStats();
+            if (!confirm(`Aprovar todos os ${pendingComments.length} comentários pendentes?`)) return;
+            try {
+                const data = await moderateCommentsInBulk({ action: 'approve', all_pending: true });
+                showNotification(data.message || 'Comentários aprovados.', 'success');
+                await refreshCommentsPanel();
+            } catch (error) {
+                showNotification(error.message, 'error');
             }
         };
 
@@ -700,12 +771,10 @@
             const expandBtn = contentCell.querySelector('.btn-expand');
 
             if (expandBtn.innerHTML.includes('Ver mais')) {
-                // Expand - simulate full content
-                preview.innerHTML = preview.innerHTML + ' Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
+                preview.textContent = preview.dataset.fullText || preview.textContent;
                 expandBtn.innerHTML = '<i class="fas fa-compress-alt"></i> Ver menos';
             } else {
-                // Collapse
-                preview.innerHTML = preview.innerHTML.substring(0, 100) + '...';
+                preview.textContent = preview.dataset.previewText || preview.textContent;
                 expandBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Ver mais';
             }
         };
@@ -863,7 +932,7 @@
         }
 
         // Bulk actions
-        document.getElementById('applyBulkAction')?.addEventListener('click', function() {
+        document.getElementById('applyBulkAction')?.addEventListener('click', async function() {
             const action = document.getElementById('bulkActionSelect').value;
             const checkedBoxes = document.querySelectorAll('.comment-checkbox:checked');
 
@@ -874,68 +943,49 @@
 
             const commentIds = Array.from(checkedBoxes).map(cb => cb.value);
 
-            if (confirm(`Tem certeza que deseja ${action} ${commentIds.length} comentários?`)) {
-                commentIds.forEach(id => {
-                    const row = document.querySelector(`[data-id="${id}"]`);
-
-                    if (action === 'approve') {
-                        row.setAttribute('data-status', 'approved');
-                        row.querySelector('.badge').innerHTML = '<i class="fas fa-check-circle"></i> Aprovado';
-                        row.querySelector('.badge').className = 'badge badge-success';
-                        row.classList.remove('pending-row', 'rejected-row');
-                    } else if (action === 'reject') {
-                        row.setAttribute('data-status', 'rejected');
-                        row.querySelector('.badge').innerHTML = '<i class="fas fa-times-circle"></i> Rejeitado';
-                        row.querySelector('.badge').className = 'badge badge-danger';
-                        row.classList.remove('pending-row');
-                        row.classList.add('rejected-row');
-                    } else if (action === 'delete') {
-                        row.remove();
-                    }
-                });
-
-                showNotification(`${commentIds.length} comentários processados!`, 'success');
-                updateStats();
-
-                // Clear selections
-                selectAllCheckbox.checked = false;
-                commentCheckboxes.forEach(cb => cb.checked = false);
-                updateBulkActionsVisibility();
-                document.getElementById('bulkActionSelect').value = '';
+            if (!confirm(`Tem certeza que deseja ${action} ${commentIds.length} comentários?`)) return;
+            try {
+                const data = await moderateCommentsInBulk({ action, comment_ids: commentIds });
+                showNotification(data.message || 'Comentários processados.', 'success');
+                await refreshCommentsPanel();
+            } catch (error) {
+                showNotification(error.message, 'error');
             }
         });
 
         // Quick action buttons
         document.querySelectorAll('.btn-approve').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', async function(e) {
                 e.preventDefault();
                 const commentId = this.getAttribute('data-comment-id');
 
-                if (confirm('Aprovar este comentário?')) {
-                    // Criar um formulário para enviar via POST
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = `/admin/comments/${commentId}/approve`;
-                    form.style.display = 'none';
-                    document.body.appendChild(form);
-                    form.submit();
+                if (!confirm('Aprovar este comentário?')) return;
+                try {
+                    this.dataset.busy = 'true';
+                    const data = await moderateComment(commentId, 'approve');
+                    showNotification(data.message || 'Comentário aprovado.', 'success');
+                    await refreshCommentsPanel();
+                } catch (error) {
+                    this.dataset.busy = 'false';
+                    showNotification(error.message, 'error');
                 }
             });
         });
 
         document.querySelectorAll('.btn-reject').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', async function(e) {
                 e.preventDefault();
                 const commentId = this.getAttribute('data-comment-id');
 
-                if (confirm('Rejeitar este comentário?')) {
-                    // Criar um formulário para enviar via POST
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = `/admin/comments/${commentId}/reject`;
-                    form.style.display = 'none';
-                    document.body.appendChild(form);
-                    form.submit();
+                if (!confirm('Rejeitar este comentário?')) return;
+                try {
+                    this.dataset.busy = 'true';
+                    const data = await moderateComment(commentId, 'reject');
+                    showNotification(data.message || 'Comentário rejeitado.', 'success');
+                    await refreshCommentsPanel();
+                } catch (error) {
+                    this.dataset.busy = 'false';
+                    showNotification(error.message, 'error');
                 }
             });
         });

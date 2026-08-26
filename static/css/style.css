@@ -4498,6 +4498,7 @@ a.download-card-category:hover {
     border-radius: 12px;
     object-fit: cover;
     background: #eef2f7;
+    cursor: zoom-in;
 }
 
 .most-used-content {

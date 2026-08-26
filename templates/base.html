@@ -1457,7 +1457,7 @@
         });
 
         document.addEventListener('click', function(e) {
-            var cardImage = e.target.closest('.post-card .post-image img, .related-post-image img, .download-title-thumb:not(.download-title-thumb-placeholder)');
+            var cardImage = e.target.closest('.post-card .post-image img, .related-post-image img, .most-used-thumbnail, .download-title-thumb:not(.download-title-thumb-placeholder)');
             if (!cardImage) return;
             if (cardImage.tagName !== 'IMG') return;
             e.preventDefault();

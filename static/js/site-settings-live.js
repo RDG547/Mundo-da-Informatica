@@ -7,6 +7,8 @@
     const CHANNEL_NAME = 'site-settings-live';
     let latestSettings = null;
     let requestInFlight = false;
+    let contentVersion = null;
+    let contentRequestInFlight = false;
     let channel = null;
 
     try {
@@ -244,9 +246,62 @@
         }
     }
 
+    function isPublicContentPage() {
+        if (document.body?.classList.contains('admin-page')) return false;
+        const path = window.location.pathname;
+        return path === '/'
+            || path === '/posts'
+            || path.startsWith('/post/')
+            || path.startsWith('/categoria/')
+            || path.startsWith('/subcategoria/')
+            || path.startsWith('/buscar')
+            || path.startsWith('/search')
+            || (/^\/[^/]+\/[^/]+\/?$/.test(path) && !path.startsWith('/api/'));
+    }
+
+    function hasActiveEditableField() {
+        const active = document.activeElement;
+        return active instanceof HTMLElement && (
+            active.matches('input, textarea, select, [contenteditable="true"]')
+            || active.isContentEditable
+        );
+    }
+
+    async function refreshPublicContent() {
+        if (!isPublicContentPage() || document.hidden || contentRequestInFlight) return;
+        contentRequestInFlight = true;
+        try {
+            const response = await fetch('/api/public-content-version', {
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!response.ok) return;
+            const data = await response.json().catch(() => ({}));
+            const nextVersion = String(data.version || '');
+            if (!data.success || !nextVersion) return;
+            if (contentVersion === null) {
+                contentVersion = nextVersion;
+                return;
+            }
+            if (contentVersion === nextVersion || hasActiveEditableField()) return;
+
+            const loader = window.ensureDynamicLoader?.() || window.dynamicLoader;
+            if (!loader?.refreshCurrentPage) return;
+            await loader.refreshCurrentPage();
+            contentVersion = nextVersion;
+            window.dispatchEvent(new CustomEvent('publicContentUpdated', { detail: { version: nextVersion } }));
+        } catch (_error) {
+            // Uma falha transitória não deve interromper a navegação do usuário.
+        } finally {
+            contentRequestInFlight = false;
+        }
+    }
+
     window.applySiteSettings = applySettings;
     window.publishSiteSettings = publishSettings;
     window.refreshSiteSettings = refreshSettings;
+    window.refreshPublicContent = refreshPublicContent;
 
     channel?.addEventListener('message', (event) => applySettings(event.data?.settings));
     window.addEventListener('storage', (event) => {
@@ -258,11 +313,16 @@
         }
     });
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshSettings();
+        if (!document.hidden) {
+            refreshSettings();
+            refreshPublicContent();
+        }
     });
     document.addEventListener('pageLoaded', () => latestSettings ? applySettings(latestSettings) : refreshSettings());
     document.addEventListener('adminPageLoaded', () => latestSettings ? applySettings(latestSettings) : refreshSettings());
 
     refreshSettings();
+    refreshPublicContent();
     window.setInterval(refreshSettings, POLL_INTERVAL_MS);
+    window.setInterval(refreshPublicContent, POLL_INTERVAL_MS);
 })();

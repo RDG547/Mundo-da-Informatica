@@ -50,6 +50,28 @@ function initPostWizard() {
         addPostForm.noValidate = true;
     }
 
+    const publicationRadios = addPostModal.querySelectorAll('input[name="status"]');
+    const scheduleGroup = document.getElementById('scheduleGroup');
+    const publishDateInput = document.getElementById('publishDate');
+
+    function syncScheduleState() {
+        const scheduled = addPostModal.querySelector('input[name="status"]:checked')?.value === 'scheduled';
+        if (scheduleGroup) scheduleGroup.style.display = scheduled ? 'block' : 'none';
+        if (publishDateInput) {
+            publishDateInput.required = scheduled;
+            if (scheduled) {
+                const localNow = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+                    .toISOString()
+                    .slice(0, 16);
+                publishDateInput.min = localNow;
+                if (!publishDateInput.value) publishDateInput.focus();
+            }
+        }
+    }
+
+    publicationRadios.forEach((radio) => radio.addEventListener('change', syncScheduleState));
+    syncScheduleState();
+
     function setSubmitState(isSubmitting) {
         saveBtn.disabled = isSubmitting;
         saveBtn.innerHTML = isSubmitting
@@ -861,6 +883,7 @@ function initPostWizard() {
         addPostModal.addEventListener('show', function() {
             resetForm();
             showStep(1);
+            syncScheduleState();
 
             const hasDraft = loadDraft();
             initIconSelects(addPostModal);
@@ -936,17 +959,22 @@ function initPostWizard() {
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
-                <div class="download-size-row">
-                    <select name="download_size_unit_${idx}" class="form-select download-size-unit">
-                        <option value="KB">KB</option>
-                        <option value="MB" selected>MB</option>
-                        <option value="GB">GB</option>
-                    </select>
-                    <input type="text" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
-                </div>
-                <div class="download-format-row">
-                    <label class="form-label" for="downloadFormat${idx}"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>
-                    <input type="text" id="downloadFormat${idx}" name="download_format_${idx}" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">
+                <div class="download-meta-row">
+                    <div class="download-size-row">
+                        <label class="form-label" for="downloadSize${idx}"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>
+                        <div class="download-size-controls">
+                            <select name="download_size_unit_${idx}" class="form-select download-size-unit">
+                                <option value="KB">KB</option>
+                                <option value="MB" selected>MB</option>
+                                <option value="GB">GB</option>
+                            </select>
+                            <input type="text" id="downloadSize${idx}" name="download_size_${idx}" class="form-control modern-input download-size-input" placeholder="Ex.: 8" inputmode="decimal" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="download-format-row">
+                        <label class="form-label" for="downloadFormat${idx}"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>
+                        <input type="text" id="downloadFormat${idx}" name="download_format_${idx}" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">
+                    </div>
                 </div>
             `;
             container.appendChild(entry);

@@ -17,6 +17,18 @@
         if (!response.ok || payload.success === false) throw new Error(payload.message || `HTTP ${response.status}`);
         return payload;
     };
+    const refreshTechnicalPage = async (section = '') => {
+        const target = new URL('/admin/tools/import', window.location.origin);
+        if (section) target.searchParams.set('section', section);
+        const loader = typeof window.ensureDynamicLoader === 'function'
+            ? window.ensureDynamicLoader()
+            : null;
+        if (loader && typeof loader.loadPage === 'function') {
+            await loader.loadPage(target.href, { force: true });
+            return;
+        }
+        window.location.assign(target.href);
+    };
 
     const activateTab = (button) => {
         if (!button) return;
@@ -65,7 +77,7 @@
         try {
             const payload = await api('/api/admin/datasheets/queue', { method: 'POST', body: new FormData(form) });
             notify(payload.message || 'Itens adicionados à fila.');
-            window.location.assign('/admin/tools/import?section=datasheets');
+            await refreshTechnicalPage('datasheets');
         } catch (error) { notify(error.message, 'error'); }
         finally { submit.disabled = false; }
     });
@@ -86,7 +98,7 @@
                 })
             });
             notify(payload.message || 'Autorização da fonte atualizada.');
-            window.location.assign('/admin/tools/import?section=datasheets');
+            await refreshTechnicalPage('datasheets');
         } catch (error) { notify(error.message, 'error'); }
         finally { submit.disabled = false; }
     });
@@ -99,7 +111,7 @@
                 method: 'POST', headers: jsonHeaders, body: JSON.stringify({ limit: 20 })
             });
             notify(`${payload.processed} item(ns) processado(s); ${payload.published} post(s) publicado(s).`);
-            window.location.assign('/admin/tools/import?section=datasheets');
+            await refreshTechnicalPage('datasheets');
         } catch (error) { notify(error.message, 'error'); }
         finally { button.disabled = false; }
     });
@@ -118,7 +130,7 @@
             try {
                 const payload = await api(url, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({}) });
                 notify(action === 'publish' ? 'Post criado e publicado.' : (payload.message || 'Item atualizado.'));
-                window.location.assign('/admin/tools/import?section=datasheets');
+                await refreshTechnicalPage('datasheets');
             } catch (error) { notify(error.message, 'error'); button.disabled = false; }
         }));
     });
@@ -155,7 +167,7 @@
             const payload = await api('/api/admin/technical-import/analyze', { method: 'POST', body: new FormData(form) });
             notify(`${payload.message} ${payload.auto_published ? `${payload.auto_published} publicado(s) automaticamente.` : ''}`);
             setModal(importModal, false);
-            window.location.reload();
+            await refreshTechnicalPage('reviews');
         } catch (error) { notify(error.message, 'error'); }
         finally { submit.disabled = false; submit.innerHTML = '<i class="fas fa-search"></i> Analisar e gerar previews'; }
     });
@@ -180,7 +192,7 @@
         try {
             const payload = await api(`/api/admin/technical-import/sources/${card.dataset.sourceId}/sync`, { method: 'POST' });
             notify(payload.message);
-            window.location.reload();
+            await refreshTechnicalPage('sources');
         } catch (error) { notify(error.message, 'error'); }
         finally { button.disabled = false; button.innerHTML = original; }
     }));
@@ -193,7 +205,7 @@
             try {
                 const payload = await api(`/api/admin/technical-import/contributions/${contributionId}/analyze`, { method: 'POST' });
                 notify(payload.message);
-                window.location.reload();
+                await refreshTechnicalPage('contributions');
             } catch (error) { notify(error.message, 'error'); button.disabled = false; }
         });
         row.querySelector('[data-reject-contribution]')?.addEventListener('click', async event => {
@@ -257,7 +269,9 @@
         data.confidence = Number(data.confidence);
         try {
             await api(`/api/admin/technical-import/items/${itemId}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify(data) });
-            notify('Preview atualizado.'); setModal(editModal, false); window.location.reload();
+            notify('Preview atualizado.');
+            setModal(editModal, false);
+            await refreshTechnicalPage('reviews');
         } catch (error) { notify(error.message, 'error'); }
     });
 })();

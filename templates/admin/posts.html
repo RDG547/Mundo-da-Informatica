@@ -89,12 +89,13 @@
                             <option value="">Todos os Status</option>
                             <option value="active" data-tone="success" {% if selected_status == 'active' %}selected{% endif %}>Ativos</option>
                             <option value="featured" data-tone="warning" {% if selected_status == 'featured' %}selected{% endif %}>Em Destaque</option>
+                            <option value="scheduled" data-tone="info" {% if selected_status == 'scheduled' %}selected{% endif %}>Agendados</option>
                             <option value="inactive" data-tone="neutral" {% if selected_status == 'inactive' %}selected{% endif %}>Inativos</option>
                         </select>
                         <button type="button" class="smart-select-trigger" data-smart-select-trigger aria-haspopup="listbox" aria-expanded="false">
                             <span class="smart-select-current">
-                                <i class="fas fa-{% if selected_status == 'active' %}check-circle{% elif selected_status == 'featured' %}star{% elif selected_status == 'inactive' %}pause-circle{% else %}sliders-h{% endif %}"></i>
-                                <span>{% if selected_status == 'active' %}Ativos{% elif selected_status == 'featured' %}Em Destaque{% elif selected_status == 'inactive' %}Inativos{% else %}Todos os Status{% endif %}</span>
+                                <i class="fas fa-{% if selected_status == 'active' %}check-circle{% elif selected_status == 'featured' %}star{% elif selected_status == 'scheduled' %}clock{% elif selected_status == 'inactive' %}pause-circle{% else %}sliders-h{% endif %}"></i>
+                                <span>{% if selected_status == 'active' %}Ativos{% elif selected_status == 'featured' %}Em Destaque{% elif selected_status == 'scheduled' %}Agendados{% elif selected_status == 'inactive' %}Inativos{% else %}Todos os Status{% endif %}</span>
                             </span>
                             <i class="fas fa-chevron-down smart-select-chevron"></i>
                         </button>
@@ -102,6 +103,7 @@
                             <button type="button" class="smart-select-option{% if not selected_status %} is-selected{% endif %}" data-value="" data-icon="fas fa-sliders-h"><span><i class="fas fa-sliders-h"></i> Todos os Status</span><i class="fas fa-check option-check"></i></button>
                             <button type="button" class="smart-select-option{% if selected_status == 'active' %} is-selected{% endif %}" data-value="active" data-icon="fas fa-check-circle" data-tone="success"><span><i class="fas fa-check-circle"></i> Ativos</span><i class="fas fa-check option-check"></i></button>
                             <button type="button" class="smart-select-option{% if selected_status == 'featured' %} is-selected{% endif %}" data-value="featured" data-icon="fas fa-star" data-tone="warning"><span><i class="fas fa-star"></i> Em Destaque</span><i class="fas fa-check option-check"></i></button>
+                            <button type="button" class="smart-select-option{% if selected_status == 'scheduled' %} is-selected{% endif %}" data-value="scheduled" data-icon="fas fa-clock" data-tone="info"><span><i class="fas fa-clock"></i> Agendados</span><i class="fas fa-check option-check"></i></button>
                             <button type="button" class="smart-select-option{% if selected_status == 'inactive' %} is-selected{% endif %}" data-value="inactive" data-icon="fas fa-pause-circle" data-tone="neutral"><span><i class="fas fa-pause-circle"></i> Inativos</span><i class="fas fa-check option-check"></i></button>
                         </div>
                     </div>
@@ -191,7 +193,9 @@
             </thead>
             <tbody id="postsTableBody" data-per-page="{{ posts.per_page }}">
                 {% for post in posts.items %}
-                <tr data-post-id="{{ post.id }}" data-category-id="{{ post.category_id or '' }}" data-status="{% if post.featured %}featured{% elif post.is_active %}active{% else %}inactive{% endif %}" class="{% if not post.is_active %}inactive-row{% endif %}">
+                {% set pending_schedule = post.scheduled_publication if post.scheduled_publication and post.scheduled_publication.status == 'pending' else none %}
+                {% set scheduled_local = pending_schedule.scheduled_for|to_brazil_time if pending_schedule else none %}
+                <tr data-post-id="{{ post.id }}" data-category-id="{{ post.category_id or '' }}" data-status="{% if pending_schedule %}scheduled{% elif post.featured %}featured{% elif post.is_active %}active{% else %}inactive{% endif %}" class="{% if not post.is_active %}inactive-row{% endif %}">
                     <td>
                         <input type="checkbox" class="form-check-input post-checkbox" value="{{ post.id }}">
                     </td>
@@ -287,7 +291,11 @@
                     <td>
                         <div class="status-cell quick-edit-control" data-quick-edit-control="status">
                             <button type="button" class="status-quick-trigger quick-edit-trigger" data-quick-edit-trigger aria-haspopup="listbox" aria-expanded="false">
-                            {% if post.featured %}
+                            {% if pending_schedule %}
+                            <span class="badge badge-info" title="Publicação automática em {{ scheduled_local.strftime('%d/%m/%Y às %H:%M') }}">
+                                <i class="fas fa-clock"></i> Agendado
+                            </span>
+                            {% elif post.featured %}
                             <span class="badge badge-warning">
                                 <i class="fas fa-star"></i> Destaque
                             </span>
@@ -303,9 +311,10 @@
                                 <i class="fas fa-chevron-down quick-edit-chevron"></i>
                             </button>
                             <div class="quick-edit-menu quick-edit-menu-right" role="listbox">
-                                <button type="button" class="quick-edit-option{% if post.is_active and not post.featured %} is-selected{% endif %}" data-quick-field="status" data-value="active" data-icon="fas fa-check-circle"><span><i class="fas fa-check-circle"></i> Ativo</span><i class="fas fa-check option-check"></i></button>
+                                {% if pending_schedule %}<button type="button" class="quick-edit-option is-selected" data-value="scheduled" disabled><span><i class="fas fa-clock"></i> Agendado para {{ scheduled_local.strftime('%d/%m/%Y %H:%M') }}</span><i class="fas fa-check option-check"></i></button>{% endif %}
+                                <button type="button" class="quick-edit-option{% if post.is_active and not post.featured and not pending_schedule %} is-selected{% endif %}" data-quick-field="status" data-value="active" data-icon="fas fa-check-circle"><span><i class="fas fa-check-circle"></i> Ativo</span><i class="fas fa-check option-check"></i></button>
                                 <button type="button" class="quick-edit-option{% if post.featured %} is-selected{% endif %}" data-quick-field="status" data-value="featured" data-icon="fas fa-star"><span><i class="fas fa-star"></i> Destaque</span><i class="fas fa-check option-check"></i></button>
-                                <button type="button" class="quick-edit-option{% if not post.is_active %} is-selected{% endif %}" data-quick-field="status" data-value="inactive" data-icon="fas fa-pause-circle"><span><i class="fas fa-pause-circle"></i> Inativo</span><i class="fas fa-check option-check"></i></button>
+                                <button type="button" class="quick-edit-option{% if not post.is_active and not pending_schedule %} is-selected{% endif %}" data-quick-field="status" data-value="inactive" data-icon="fas fa-pause-circle"><span><i class="fas fa-pause-circle"></i> Inativo</span><i class="fas fa-check option-check"></i></button>
                             </div>
                         </div>
                     </td>
@@ -529,6 +538,40 @@
                                 </div>
                             </div>
 
+                            <div class="form-group edit-category-field">
+                                <label for="editPostCategory" class="form-label">
+                                    <i class="fas fa-folder"></i> Categoria
+                                    <span class="required">*</span>
+                                </label>
+                                <select id="editPostCategory" name="category_id" class="form-control modern-select icon-select-native" required>
+                                    <option value="" data-icon="fas fa-folder-open">Selecione uma categoria</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="icon-select" data-icon-select data-source-select="editPostCategory">
+                                    <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="icon-select-current">
+                                            <i class="fas fa-folder-open"></i>
+                                            <span>Selecione uma categoria</span>
+                                        </span>
+                                        <i class="fas fa-chevron-down icon-select-arrow"></i>
+                                    </button>
+                                    <div class="icon-select-menu" role="listbox">
+                                        <button type="button" class="icon-select-option" data-value="" data-icon="fas fa-folder-open" role="option">
+                                            <i class="fas fa-folder-open"></i>
+                                            <span>Selecione uma categoria</span>
+                                        </button>
+                                        {% for category in categories %}
+                                        <button type="button" class="icon-select-option" data-value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}" role="option">
+                                            <i class="{{ get_category_icon(category) }}"></i>
+                                            <span>{{ category.name }}</span>
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="sidebar-card">
                                 <h5><i class="fas fa-info-circle"></i> Status</h5>
                                 <div class="status-options">
@@ -564,45 +607,7 @@
                 <!-- Step 2: Detalhes -->
                 <div class="step-content" data-step="2">
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editPostCategory" class="form-label">
-                                    <i class="fas fa-folder"></i> Categoria
-                                    <span class="required">*</span>
-                                </label>
-                                <select id="editPostCategory" name="category_id" class="form-control modern-select icon-select-native"
-                                    required>
-                                    <option value="" data-icon="fas fa-folder-open">Selecione uma categoria</option>
-                                    {% for category in categories %}
-                                    <option value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}">{{ category.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <div class="icon-select" data-icon-select data-source-select="editPostCategory">
-                                    <button type="button" class="icon-select-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="icon-select-current">
-                                            <i class="fas fa-folder-open"></i>
-                                            <span>Selecione uma categoria</span>
-                                        </span>
-                                        <i class="fas fa-chevron-down icon-select-arrow"></i>
-                                    </button>
-                                    <div class="icon-select-menu" role="listbox">
-                                        <button type="button" class="icon-select-option" data-value="" data-icon="fas fa-folder-open" role="option">
-                                            <i class="fas fa-folder-open"></i>
-                                            <span>Selecione uma categoria</span>
-                                        </button>
-                                        {% for category in categories %}
-                                        <button type="button" class="icon-select-option" data-value="{{ category.id }}" data-icon="{{ get_category_icon(category) }}" role="option">
-                                            <i class="{{ get_category_icon(category) }}"></i>
-                                            <span>{{ category.name }}</span>
-                                        </button>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <div class="form-group">
                                 <label class="form-label">
                                     <i class="fas fa-download"></i> Links de Download
@@ -995,6 +1000,8 @@
                     matchesStatus = row.querySelector('.badge-success') !== null;
                 } else if (selectedStatus === 'featured') {
                     matchesStatus = row.querySelector('.badge-warning') !== null;
+                } else if (selectedStatus === 'scheduled') {
+                    matchesStatus = row.querySelector('.badge-info') !== null;
                 } else if (selectedStatus === 'inactive') {
                     matchesStatus = row.querySelector('.badge-secondary') !== null;
                 }
@@ -1432,18 +1439,21 @@
                 '<div class="input-group download-url-group">' +
                 '<input type="url" name="edit_download_url_' + idx + '" class="form-control modern-input" placeholder="https://exemplo.com/arquivo.zip">' +
                 '</div>' + removeHtml + '</div>' +
+                '<div class="download-meta-row">' +
                 '<div class="download-size-row">' +
+                '<label class="form-label" for="editDownloadSize' + idx + '"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>' +
+                '<div class="download-size-controls">' +
                 '<select name="edit_download_size_unit_' + idx + '" class="form-select download-size-unit">' +
                 '<option value="KB"' + (sizeUnit === 'KB' ? ' selected' : '') + '>KB</option>' +
                 '<option value="MB"' + (sizeUnit === 'MB' ? ' selected' : '') + '>MB</option>' +
                 '<option value="GB"' + (sizeUnit === 'GB' ? ' selected' : '') + '>GB</option>' +
                 '</select>' +
-                '<input type="number" name="edit_download_size_' + idx + '" class="form-control modern-input download-size-input" placeholder="Tamanho" step="0.1" min="0" value="' + sizeVal + '">' +
-                '</div>' +
+                '<input type="number" id="editDownloadSize' + idx + '" name="edit_download_size_' + idx + '" class="form-control modern-input download-size-input" placeholder="Ex.: 8" step="0.1" min="0" value="' + sizeVal + '">' +
+                '</div></div>' +
                 '<div class="download-format-row">' +
                 '<label class="form-label" for="editDownloadFormat' + idx + '"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>' +
                 '<input type="text" id="editDownloadFormat' + idx + '" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">' +
-                '</div>';
+                '</div></div>';
             container.appendChild(entry);
             entry.querySelector('input[type="url"]').value = url || '';
             entry.querySelector('.download-format-input').value = format || '';
@@ -1651,6 +1661,30 @@
 </script>
 
 <style>
+    /* Um único contêiner cuida da rolagem: evita as duas barras do modal. */
+    #editPostModal .modal-content {
+        display: flex !important;
+        flex-direction: column !important;
+        margin: 2rem auto !important;
+        max-height: 90vh !important;
+        max-width: 1100px !important;
+        overflow: hidden !important;
+        width: min(95vw, 1100px) !important;
+    }
+
+    #editPostModal .modal-body {
+        box-sizing: border-box !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+
+    #editPostModal .modal-header,
+    #editPostModal .modal-footer {
+        flex-shrink: 0 !important;
+    }
+
     /* Form Steps Navigation - APENAS PARA MODAL DE EDIÇÃO */
     #editPostModal .form-steps {
         display: flex;
@@ -1756,8 +1790,15 @@
 
     /* Melhorar espaçamento dos campos no MODAL DE EDIÇÃO APENAS */
     #editPostModal .step-content .row {
+        box-sizing: border-box;
+        max-width: 100%;
+        min-width: 0;
         width: 100%;
         margin: 0;
+    }
+
+    #editPostModal .step-content .row > * {
+        min-width: 0;
     }
 
     #editPostModal .step-content .col-md-8,
@@ -1770,6 +1811,15 @@
     #editPostModal .step-content .form-group {
         width: 100%;
         margin-bottom: 1.5rem;
+    }
+
+    #editPostModal .edit-category-field {
+        position: relative;
+        z-index: 8;
+    }
+
+    #editPostModal .edit-category-field:has(.icon-select.open) {
+        z-index: 10040;
     }
 
     #editPostModal .step-content .form-control,
@@ -1804,30 +1854,45 @@
         min-width: 0 !important;
     }
 
-    #editPostModal .download-size-row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin-bottom: 8px;
-        margin-left: 158px;
+    #editPostModal .download-meta-row {
+        display: grid;
+        grid-template-columns: minmax(0, 220px) minmax(0, 220px);
+        gap: 12px;
+        margin: 8px 0 10px;
+        max-width: 460px;
     }
 
-    #editPostModal .download-size-input {
-        width: 110px !important;
-        max-width: 110px !important;
-        flex: 0 0 110px !important;
+    #editPostModal .download-size-row,
+    #editPostModal .download-format-row {
+        margin: 0;
+        max-width: none;
+        min-width: 0;
+    }
+
+    #editPostModal .download-meta-row .form-label {
+        display: block;
+        font-size: 0.82rem;
+        margin: 0 0 5px;
+    }
+
+    #editPostModal .download-size-controls {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    #editPostModal .download-size-input,
+    #editPostModal .download-format-input {
+        min-width: 0;
+        width: 100% !important;
     }
 
     #editPostModal .download-size-unit {
-        width: 108px !important;
-        max-width: 108px !important;
-        flex: 0 0 108px !important;
-        padding-right: 2.25rem !important;
-    }
-
-    #editPostModal .download-format-row {
-        margin-left: 158px;
-        max-width: 226px;
+        flex: 0 0 82px !important;
+        max-width: 82px !important;
+        padding-right: 1.8rem !important;
+        width: 82px !important;
     }
 
     #editPostModal .verification-status-field {
@@ -1847,9 +1912,8 @@
             width: 100%;
         }
 
-        #editPostModal .download-size-row,
-        #editPostModal .download-format-row {
-            margin-left: 0;
+        #editPostModal .download-meta-row {
+            grid-template-columns: 1fr;
             max-width: none;
         }
     }
@@ -2476,6 +2540,11 @@
     .badge-warning {
         background-color: #fff3cd;
         color: #856404;
+    }
+
+    .badge-info {
+        background-color: #dbeafe;
+        color: #1d4ed8;
     }
 
     .badge-secondary {

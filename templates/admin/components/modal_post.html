@@ -232,35 +232,56 @@
         min-width: 0 !important;
     }
 
-    #addPostModal .download-size-row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin-bottom: 8px;
-        margin-left: 158px;
+    #addPostModal .download-meta-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+        margin: 8px 0 10px;
+        max-width: 540px;
     }
 
-    #addPostModal .download-size-input {
-        width: 110px !important;
-        max-width: 110px !important;
-        flex: 0 0 110px !important;
+    #addPostModal .download-size-row,
+    #addPostModal .download-format-row {
+        margin: 0;
+        max-width: none;
+        min-width: 0;
+    }
+
+    #addPostModal .download-meta-row .form-label {
+        display: block;
+        font-size: 0.82rem;
+        margin: 0 0 5px;
+    }
+
+    #addPostModal .download-size-controls {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    #addPostModal .download-size-input,
+    #addPostModal .download-format-input {
+        min-width: 0;
+        width: 100% !important;
     }
 
     #addPostModal .download-size-unit {
-        width: 108px !important;
-        max-width: 108px !important;
-        flex: 0 0 108px !important;
-        padding-right: 2.25rem !important;
-    }
-
-    #addPostModal .download-format-row {
-        margin-left: 158px;
-        max-width: 226px;
+        flex: 0 0 82px !important;
+        max-width: 82px !important;
+        padding-right: 1.8rem !important;
+        width: 82px !important;
     }
 
     #addPostModal .verification-status-field {
         margin: 0 12px 1rem;
         max-width: 420px;
+    }
+
+    #addPostModal .verification-icon-select .icon-select-menu,
+    #editPostModal .verification-icon-select .icon-select-menu {
+        bottom: calc(100% + 8px) !important;
+        top: auto !important;
     }
 
     .optional-field-label {
@@ -352,6 +373,12 @@
     #addPostModal .form-group:has(.icon-select.open) {
         position: relative;
         z-index: 10030;
+    }
+
+    #addPostModal .verification-status-field:has(.icon-select.open),
+    #editPostModal .verification-status-field:has(.icon-select.open) {
+        position: relative;
+        z-index: 10040;
     }
 
     .icon-select-option {
@@ -458,9 +485,8 @@
             width: 100%;
         }
 
-        #addPostModal .download-size-row,
-        #addPostModal .download-format-row {
-            margin-left: 0;
+        #addPostModal .download-meta-row {
+            grid-template-columns: 1fr;
             max-width: none;
         }
     }
@@ -651,17 +677,22 @@
                                                 </button>
                                             </div>
                                         </div>
-                                        <div class="download-size-row">
-                                            <select name="download_size_unit_0" class="form-select download-size-unit">
-                                                <option value="KB">KB</option>
-                                                <option value="MB" selected>MB</option>
-                                                <option value="GB">GB</option>
-                                            </select>
-                                            <input type="text" name="download_size_0" class="form-control modern-input download-size-input" placeholder="Tamanho" inputmode="decimal" autocomplete="off">
-                                        </div>
-                                        <div class="download-format-row">
-                                            <label class="form-label" for="downloadFormat0"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>
-                                            <input type="text" id="downloadFormat0" name="download_format_0" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">
+                                        <div class="download-meta-row">
+                                            <div class="download-size-row">
+                                                <label class="form-label" for="downloadSize0"><i class="fas fa-weight-hanging" aria-hidden="true"></i> Tamanho <span class="optional-field-label">Opcional</span></label>
+                                                <div class="download-size-controls">
+                                                    <select name="download_size_unit_0" class="form-select download-size-unit">
+                                                        <option value="KB">KB</option>
+                                                        <option value="MB" selected>MB</option>
+                                                        <option value="GB">GB</option>
+                                                    </select>
+                                                    <input type="text" id="downloadSize0" name="download_size_0" class="form-control modern-input download-size-input" placeholder="Ex.: 8" inputmode="decimal" autocomplete="off">
+                                                </div>
+                                            </div>
+                                            <div class="download-format-row">
+                                                <label class="form-label" for="downloadFormat0"><i class="fas fa-file-code" aria-hidden="true"></i> Formato <span class="optional-field-label">Opcional</span></label>
+                                                <input type="text" id="downloadFormat0" name="download_format_0" class="form-control modern-input download-format-input" maxlength="30" placeholder="Ex.: BIN">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -820,9 +851,10 @@
                                 </div>
 
                                 <div class="form-group" id="scheduleGroup" style="display: none;">
-                                    <label for="publishDate" class="form-label">Data de Publicação</label>
+                                    <label for="publishDate" class="form-label"><i class="fas fa-calendar-alt"></i> Data e horário de publicação</label>
                                     <input type="datetime-local" id="publishDate" name="publish_date"
-                                           class="form-control modern-input">
+                                           class="form-control modern-input" step="60">
+                                    <div class="form-text">Selecione a data, a hora e o minuto para publicar automaticamente.</div>
                                 </div>
                             </div>
 

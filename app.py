@@ -24,6 +24,8 @@ import secrets
 import hmac
 import hashlib
 import logging
+import threading
+import time
 import unicodedata
 import csv
 import zipfile
@@ -1020,6 +1022,10 @@ def send_password_reset_email(user, token: str) -> bool:
 
 def serialize_post_for_admin(post):
     category = post.category_rel or (db.session.get(Category, post.category_id) if post.category_id else None)
+    schedule = getattr(post, 'scheduled_publication', None)
+    publication_status = 'scheduled' if schedule and schedule.status == 'pending' else ('published' if post.is_active else 'draft')
+    posted_at = to_brazil_time(post.date_posted) if post.date_posted else None
+    scheduled_at = to_brazil_time(schedule.scheduled_for) if schedule and schedule.status == 'pending' else None
     return {
         'id': post.id,
         'title': post.title,
@@ -1030,12 +1036,14 @@ def serialize_post_for_admin(post):
         'category_icon': get_category_icon(category or post.category_str),
         'category_color': (getattr(category, 'color', None) if category else None) or '#3a86ff',
         'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg'),
-        'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
-        'time_posted': post.date_posted.strftime('%H:%M') if post.date_posted else '',
+        'date_posted': posted_at.strftime('%d/%m/%Y') if posted_at else '',
+        'time_posted': posted_at.strftime('%H:%M') if posted_at else '',
         'views': post.views or 0,
         'downloads': post.downloads or 0,
         'featured': bool(post.featured),
         'is_active': bool(post.is_active),
+        'publication_status': publication_status,
+        'scheduled_for': scheduled_at.isoformat() if scheduled_at else None,
         'post_url': url_for('post', post_id=post.id),
     }
 
@@ -1612,6 +1620,79 @@ class Post(db.Model):
             ('Observações técnicas', self.technical_notes),
         )
         return [(label, value) for label, value in details if value]
+
+
+class ScheduledPost(db.Model):
+    """Fila persistente para publicações criadas como agendadas."""
+
+    __tablename__ = 'scheduled_posts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=False, unique=True, index=True)
+    scheduled_for = db.Column(db.DateTime, nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False, default='pending', index=True)
+    created_by = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    published_at = db.Column(db.DateTime, nullable=True)
+
+    post = db.relationship('Post', backref=db.backref('scheduled_publication', uselist=False))
+
+
+_scheduled_post_worker_lock = threading.Lock()
+_scheduled_post_worker_started = False
+
+
+def publish_due_scheduled_posts(now=None):
+    """Publica de forma idempotente os itens vencidos da fila."""
+    current_time = now or datetime.utcnow()
+    due_items = ScheduledPost.query.filter(
+        ScheduledPost.status == 'pending',
+        ScheduledPost.scheduled_for <= current_time,
+    ).order_by(ScheduledPost.scheduled_for.asc()).all()
+
+    published = 0
+    for item in due_items:
+        if not item.post:
+            item.status = 'cancelled'
+            continue
+        item.post.is_active = True
+        item.post.date_posted = item.scheduled_for
+        item.post.date_updated = current_time
+        item.status = 'published'
+        item.published_at = current_time
+        published += 1
+
+    if due_items:
+        db.session.commit()
+    return published
+
+
+def ensure_scheduled_post_worker():
+    """Inicia uma verificação leve da fila uma vez por processo web."""
+    global _scheduled_post_worker_started
+    if app.testing or _scheduled_post_worker_started:
+        return
+
+    with _scheduled_post_worker_lock:
+        if _scheduled_post_worker_started:
+            return
+        _scheduled_post_worker_started = True
+
+        def worker():
+            while True:
+                try:
+                    with app.app_context():
+                        publish_due_scheduled_posts()
+                except Exception:
+                    app.logger.exception('Erro ao processar publicações agendadas')
+                    try:
+                        with app.app_context():
+                            db.session.rollback()
+                    except Exception:
+                        pass
+                time.sleep(20)
+
+        threading.Thread(target=worker, name='scheduled-post-publisher', daemon=True).start()
 
 
 POST_TECHNICAL_FIELDS = (
@@ -2556,6 +2637,13 @@ def increment_post_downloads(post_id):
 @app.before_request
 def before_request():
     """Executado antes de cada requisição"""
+    ensure_scheduled_post_worker()
+    try:
+        publish_due_scheduled_posts()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Erro ao verificar publicações agendadas durante a requisição')
+
     canonical_host = (os.environ.get('CANONICAL_HOST') or 'mundodainformatica.com').strip().lower()
     request_host = (request.host or '').split(':', 1)[0].lower()
     alternate_hosts = {f'www.{canonical_host}'} if not canonical_host.startswith('www.') else {canonical_host[4:]}
@@ -3406,6 +3494,7 @@ class Comment(db.Model):
 
     # Status de aprovação
     is_approved = db.Column(db.Boolean, default=False)
+    moderation_status = db.Column(db.String(20), nullable=False, default='pending', index=True)
 
     # Campos para edição
     is_edited = db.Column(db.Boolean, default=False)
@@ -3435,12 +3524,23 @@ class Comment(db.Model):
 
     @property
     def status(self):
-        """Retorna o status do comentário baseado em is_approved"""
-        return 'approved' if self.is_approved else 'pending'
+        """Retorna o status persistido, preservando dados legados."""
+        normalized = (self.moderation_status or '').strip().lower()
+        # Registros antigos só possuíam ``is_approved``. Priorizar esse sinal
+        # evita que um comentário aprovado antes da migração apareça como
+        # pendente apenas porque a nova coluna recebeu o valor padrão.
+        if self.is_approved:
+            return 'approved'
+        if normalized == 'rejected':
+            return 'rejected'
+        return 'pending'
 
     @status.setter
     def status(self, value):
         normalized = str(value or '').strip().lower()
+        if normalized not in {'pending', 'approved', 'rejected'}:
+            normalized = 'pending'
+        self.moderation_status = normalized
         self.is_approved = normalized == 'approved'
 
     @property
@@ -6933,6 +7033,58 @@ def api_site_settings():
     return response
 
 
+@app.route('/api/public-content-version')
+def api_public_content_version():
+    """Versão compacta do acervo para atualizar páginas públicas sem recarregar o site."""
+    posts_snapshot = [
+        {
+            'id': post.id,
+            'title': post.title,
+            'content': post.content,
+            'category_id': post.category_id,
+            'category_str': post.category_str,
+            'subcategory': post.subcategory,
+            'is_active': bool(post.is_active),
+            'featured': bool(post.featured),
+            'image_url': post.image_url,
+            'download_link': post.download_link,
+            'tags': post.tags,
+            'slug': post.slug,
+            'metadata': post.custom_metadata,
+            'verification_status': post.verification_status,
+            'updated_at': post.date_updated.isoformat() if post.date_updated else None,
+        }
+        for post in Post.query.order_by(Post.id.asc()).all()
+    ]
+    categories_snapshot = [
+        {
+            'id': category.id,
+            'name': category.name,
+            'slug': category.slug,
+            'description': category.description,
+            'icon': category.icon,
+            'color': category.color,
+            'is_active': bool(category.is_active),
+            'is_visible': bool(category.is_visible),
+            'show_in_menu': bool(category.show_in_menu),
+            'order': category.order,
+        }
+        for category in Category.query.order_by(Category.id.asc()).all()
+    ]
+    raw_snapshot = json.dumps(
+        {'posts': posts_snapshot, 'categories': categories_snapshot},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(',', ':'),
+    )
+    response = jsonify({
+        'success': True,
+        'version': hashlib.sha256(raw_snapshot.encode('utf-8')).hexdigest(),
+    })
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    return response
+
+
 @app.route('/api/user/permissions')
 @login_required
 def get_user_permissions():
@@ -9060,6 +9212,8 @@ def admin_toggle_post_active(post_id):
 
     try:
         post.is_active = not post.is_active
+        if post.scheduled_publication and post.scheduled_publication.status == 'pending':
+            post.scheduled_publication.status = 'cancelled'
         db.session.commit()
 
         status = "ativado" if post.is_active else "desativado"
@@ -9086,6 +9240,9 @@ def admin_delete_post(post_id):
     post_title = post.title
 
     try:
+        if post.scheduled_publication:
+            db.session.delete(post.scheduled_publication)
+
         # Deletar imagem do Cloudinary ou filesystem
         if post.image_url:
             if 'cloudinary.com' in post.image_url:
@@ -9325,6 +9482,8 @@ def admin_update_post(post_id):
         post.image_url = image_url if image_url else 'post-placeholder.svg'
         post.featured = featured
         post.is_active = is_active
+        if is_active and post.scheduled_publication and post.scheduled_publication.status == 'pending':
+            post.scheduled_publication.status = 'cancelled'
         post.tags = tags or None
         post.seo_title = seo_title or None
         post.seo_description = seo_description or None
@@ -9411,6 +9570,8 @@ def admin_quick_update_post(post_id):
                 post.featured = False
             else:
                 return jsonify({'success': False, 'message': 'Status inválido.'}), 400
+            if post.scheduled_publication and post.scheduled_publication.status == 'pending':
+                post.scheduled_publication.status = 'cancelled'
             changed_fields.append('status')
 
         if not changed_fields:
@@ -11219,6 +11380,24 @@ def admin_create_post():
         tags = request.form.get('tags', '').strip()
         seo_title = request.form.get('seo_title', '').strip()
         seo_description = request.form.get('seo_description', '').strip()
+        publication_status = str(request.form.get('status') or 'published').strip().lower()
+        if publication_status not in {'draft', 'published', 'scheduled'}:
+            publication_status = 'published'
+
+        scheduled_for = None
+        scheduled_for_label = ''
+        raw_publish_date = str(request.form.get('publish_date') or '').strip()
+        if publication_status == 'scheduled' and raw_publish_date:
+            try:
+                local_schedule = datetime.fromisoformat(raw_publish_date.replace('Z', '+00:00'))
+                if local_schedule.tzinfo is None:
+                    local_schedule = BRAZIL_TZ.localize(local_schedule)
+                else:
+                    local_schedule = local_schedule.astimezone(BRAZIL_TZ)
+                scheduled_for_label = local_schedule.strftime('%d/%m/%Y %H:%M')
+                scheduled_for = local_schedule.astimezone(pytz.UTC).replace(tzinfo=None)
+            except (TypeError, ValueError, pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
+                scheduled_for = None
         # Proteção contra NaN injection
         featured_value = request.form.get('featured', '')
         if isinstance(featured_value, str) and featured_value.lower() in ('nan', 'infinity', '-infinity'):
@@ -11239,6 +11418,10 @@ def admin_create_post():
             errors['category'] = 'A categoria é obrigatória.'
         if not download_link:
             errors['download_link'] = 'O link é obrigatório.'
+        if publication_status == 'scheduled' and not scheduled_for:
+            errors['publish_date'] = 'Informe uma data e horário válidos para o agendamento.'
+        elif scheduled_for and scheduled_for <= datetime.utcnow():
+            errors['publish_date'] = 'O agendamento precisa ser em uma data e horário futuros.'
 
         if errors:
             if _is_ajax_request():
@@ -11260,6 +11443,8 @@ def admin_create_post():
                     'seo_title': seo_title,
                     'seo_description': seo_description,
                     'featured': featured,
+                    'status': publication_status,
+                    'publish_date': request.form.get('publish_date', ''),
                 },
                 # Repassar posts e stats para manter a página
                 **get_admin_sidebar_stats()
@@ -11359,7 +11544,7 @@ def admin_create_post():
             image_url=image_url,
             featured=featured,
             author_id=current_user.id,
-            is_active=True,
+            is_active=publication_status == 'published',
             tags=tags or None,
             seo_title=seo_title or None,
             seo_description=seo_description or None,
@@ -11369,6 +11554,16 @@ def admin_create_post():
         apply_post_technical_form(new_post, request.form)
 
         db.session.add(new_post)
+        db.session.flush()
+
+        if publication_status == 'scheduled' and scheduled_for:
+            new_post.date_posted = scheduled_for
+            db.session.add(ScheduledPost(
+                post_id=new_post.id,
+                scheduled_for=scheduled_for,
+                status='pending',
+                created_by=current_user.id,
+            ))
 
         # Armazenar download_files no custom_metadata
         if download_files_json:
@@ -11382,12 +11577,21 @@ def admin_create_post():
         if _is_ajax_request():
             return jsonify({
                 'success': True,
-                'message': f'Post "{title}" criado com sucesso!',
+                'message': (
+                    f'Post "{title}" agendado para {scheduled_for_label}.'
+                    if publication_status == 'scheduled' and scheduled_for
+                    else f'Post "{title}" criado com sucesso!'
+                ),
                 'post': serialize_post_for_admin(new_post),
                 'stats': get_admin_posts_overview()
             })
 
-        flash(f'Post "{title}" criado com sucesso!', 'success')
+        if publication_status == 'scheduled' and scheduled_for:
+            flash(f'Post "{title}" agendado para {scheduled_for_label}.', 'success')
+        elif publication_status == 'draft':
+            flash(f'Rascunho "{title}" salvo com sucesso!', 'success')
+        else:
+            flash(f'Post "{title}" criado com sucesso!', 'success')
         return redirect(url_for('admin_posts'))
 
     except ValueError as e:
@@ -11562,8 +11766,17 @@ def admin_posts():
         posts_list = [post for post in posts_list if post.is_active and not post.featured]
     elif status_filter == 'featured':
         posts_list = [post for post in posts_list if post.featured]
+    elif status_filter == 'scheduled':
+        posts_list = [
+            post for post in posts_list
+            if post.scheduled_publication and post.scheduled_publication.status == 'pending'
+        ]
     elif status_filter == 'inactive':
-        posts_list = [post for post in posts_list if not post.is_active]
+        posts_list = [
+            post for post in posts_list
+            if not post.is_active
+            and not (post.scheduled_publication and post.scheduled_publication.status == 'pending')
+        ]
 
     if sort_by == 'title':
         posts_list.sort(key=lambda post: (post.title or '').casefold())
@@ -12553,6 +12766,8 @@ def admin_toggle_post_status(post_id):
 
         # Alternar o status
         post.is_active = not post.is_active
+        if post.scheduled_publication and post.scheduled_publication.status == 'pending':
+            post.scheduled_publication.status = 'cancelled'
         status = 'ativado' if post.is_active else 'desativado'
 
         db.session.commit()
@@ -12668,10 +12883,19 @@ def admin_approve_comment(comment_id):
                 'post_id': comment.post_id
             }
         )
-
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': 'Comentário aprovado com sucesso!',
+                'comment_id': comment.id,
+                'status': comment.status,
+                'total_comments': Comment.query.count(),
+            })
         flash('Comentário aprovado com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': f'Erro ao aprovar comentário: {str(e)}'}), 500
         flash(f'Erro ao aprovar comentário: {str(e)}', 'error')
 
     return redirect(url_for('admin_comments'))
@@ -12698,13 +12922,82 @@ def admin_reject_comment(comment_id):
                 'post_id': comment.post_id
             }
         )
-
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': 'Comentário rejeitado com sucesso!',
+                'comment_id': comment.id,
+                'status': comment.status,
+                'total_comments': Comment.query.count(),
+            })
         flash('Comentário rejeitado com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': f'Erro ao rejeitar comentário: {str(e)}'}), 500
         flash(f'Erro ao rejeitar comentário: {str(e)}', 'error')
 
     return redirect(url_for('admin_comments'))
+
+
+@app.route("/admin/comments/bulk", methods=['POST'])
+@login_required
+@editor_required
+def admin_bulk_comments():
+    """Executa a moderação em massa via JSON, sem navegar para uma tela de redirect."""
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get('action') or '').strip().lower()
+    raw_ids = payload.get('comment_ids') or []
+    all_pending = bool(payload.get('all_pending'))
+    if action not in {'approve', 'reject', 'delete', 'spam'}:
+        return jsonify({'success': False, 'message': 'Ação de moderação inválida.'}), 400
+
+    try:
+        if all_pending:
+            comments = Comment.query.filter(
+                Comment.is_approved.is_(False),
+                db.or_(Comment.moderation_status.is_(None), Comment.moderation_status == 'pending'),
+            ).all()
+        else:
+            if not isinstance(raw_ids, list):
+                return jsonify({'success': False, 'message': 'Lista de comentários inválida.'}), 400
+            comment_ids = [int(value) for value in raw_ids]
+            comments = Comment.query.filter(Comment.id.in_(comment_ids)).all() if comment_ids else []
+
+        if not comments:
+            return jsonify({'success': False, 'message': 'Nenhum comentário encontrado para processar.'}), 404
+
+        effective_action = {
+            'approve': 'approved',
+            'reject': 'rejected',
+            'spam': 'rejected',
+            'delete': 'delete',
+        }[action]
+        for comment in comments:
+            if effective_action == 'delete':
+                db.session.delete(comment)
+            else:
+                comment.status = effective_action
+        db.session.commit()
+        log_admin_activity(
+            current_user.id,
+            'bulk_moderate_comments',
+            f'{len(comments)} comentário(s) processado(s): {action}',
+            metadata={'action': action, 'count': len(comments)},
+        )
+        return jsonify({
+            'success': True,
+            'message': f'{len(comments)} comentário(s) processado(s) com sucesso!',
+            'processed_ids': [comment.id for comment in comments],
+            'action': effective_action,
+            'total_comments': Comment.query.count(),
+        })
+    except (TypeError, ValueError):
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Identificador de comentário inválido.'}), 400
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao processar comentários: {str(exc)}'}), 500
 
 @app.route("/admin/comments/<int:comment_id>/delete", methods=['POST'])
 @login_required

@@ -4595,3 +4595,16 @@ canvas {
         transition-duration: 0.01ms !important;
     }
 }
+.submenu-tree-link {
+    padding-left: calc(1rem + var(--submenu-depth, 0) * 1rem) !important;
+}
+
+.submenu-tree-link small {
+    margin-left: auto;
+    min-width: 1.5rem;
+    padding: .1rem .35rem;
+    border-radius: 999px;
+    text-align: center;
+    font-size: .68rem;
+    background: rgba(var(--primary-rgb), .12);
+}

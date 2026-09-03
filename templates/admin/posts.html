@@ -2,6 +2,7 @@
 
 {% block content %}
 <div id="pageContent">
+<script id="adminSubcategoryTreeData" type="application/json">{{ subcategory_tree | tojson }}</script>
 <!-- Enhanced Header -->
 <div class="admin-header slide-in-up">
     <div class="header-content">
@@ -570,6 +571,17 @@
                                         {% endfor %}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="editPostSubcategory" class="form-label">
+                                    <i class="fas fa-sitemap"></i> Subcategoria
+                                </label>
+                                <select id="editPostSubcategory" name="subcategory_id" class="form-control modern-select"
+                                    data-subcategory-select data-category-source="editPostCategory">
+                                    <option value="">Sem subcategoria</option>
+                                </select>
+                                <div class="form-text">A lista acompanha a hierarquia configurada em Categorias.</div>
                             </div>
 
                             <div class="sidebar-card">
@@ -1347,6 +1359,7 @@
 
             document.getElementById('editPostCategory').value = post.category_id || '';
             window.refreshIconSelects?.();
+            window.refreshAdminSubcategorySelects?.('editPostSubcategory', post.subcategory_id || '');
 
             // Populate multi-download entries (also handles download_link)
             populateEditDownloadEntries(post);

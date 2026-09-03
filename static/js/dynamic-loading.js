@@ -333,6 +333,20 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
             } catch (error) {
                 console.error('Error loading page:', error);
+                // If a post/category being viewed was removed by an admin, keep the
+                // live update inside the SPA and take the visitor to the catalogue.
+                if (force && updateHistory === false && error.status === 404 && targetPath !== '/posts') {
+                    try {
+                        const fallbackUrl = '/posts';
+                        const fallbackContent = await this.fetchPageContent(fallbackUrl, { force: true });
+                        this.currentUrl = fallbackUrl;
+                        history.replaceState({ url: fallbackUrl }, '', fallbackUrl);
+                        await this.updatePage(fallbackContent, fallbackUrl, { preserveScroll: false });
+                        return;
+                    } catch (fallbackError) {
+                        console.error('Error loading catalogue fallback:', fallbackError);
+                    }
+                }
                 // Fallback to normal navigation
                 window.location.href = url;
             } finally {
@@ -364,7 +378,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                const error = new Error(`HTTP ${response.status}`);
+                error.status = response.status;
+                throw error;
             }
 
             const html = await response.text();
@@ -389,6 +405,7 @@ if (typeof window.DynamicLoader !== 'undefined') {
             const pageData = {
                 title: doc.title,
                 content: content,
+                navigation: doc.querySelector('#primary-navigation')?.innerHTML || '',
                 head: {
                     canonical: doc.querySelector('link[rel="canonical"]')?.href || '',
                     metas: [
@@ -484,6 +501,12 @@ if (typeof window.DynamicLoader !== 'undefined') {
 
             // Load page-specific styles (skipped for admin)
             await this.loadPageStyles(url, pageData.styles);
+
+            // Categorias e subcategorias administradas também entram ao vivo no menu.
+            const navigation = document.querySelector('#primary-navigation');
+            if (navigation && pageData.navigation && navigation.innerHTML !== pageData.navigation) {
+                navigation.innerHTML = pageData.navigation;
+            }
 
             // Find main content container
             // For admin pages, target the admin-content-wrapper specifically

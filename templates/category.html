@@ -1,5 +1,19 @@
 {% extends "base.html" %}
 
+{% macro render_category_tree(nodes, depth=0) -%}
+    {% for node in nodes %}
+    <a href="{{ url_for('subcategory', subcategory=node.slug) }}"
+       class="category-tree-item{% if subcategory_record is defined and subcategory_record and subcategory_record.id == node.id %} is-current{% endif %}"
+       style="--tree-depth: {{ depth }}">
+        <span class="category-tree-icon"><i class="{{ node.icon or 'fas fa-folder' }}"></i></span>
+        <span class="category-tree-copy"><strong>{{ node.name }}</strong>{% if node.description %}<small>{{ node.description }}</small>{% endif %}</span>
+        <span class="category-tree-count">{{ node.total_post_count }} post{% if node.total_post_count != 1 %}s{% endif %}</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    {% if node.children %}{{ render_category_tree(node.children, depth + 1) }}{% endif %}
+    {% endfor %}
+{%- endmacro %}
+
 {% block content %}
 <!-- Hero Section -->
 <div class="category-hero">
@@ -260,6 +274,16 @@
                         {% endif %}
                     </div>
                 </div>
+
+                {% if subcategory_tree %}
+                <section class="category-tree-section" aria-labelledby="category-tree-title">
+                    <div class="posts-header text-center">
+                        <h2 id="category-tree-title"><i class="fas fa-sitemap"></i> Navegue pelas subcategorias</h2>
+                        <p>Escolha um grupo ou fabricante. Os níveis abaixo são atualizados automaticamente pelo painel.</p>
+                    </div>
+                    <div class="category-tree-list">{{ render_category_tree(subcategory_tree) }}</div>
+                </section>
+                {% endif %}
 
                 <!-- Posts Grid -->
                 <div class="posts-section">

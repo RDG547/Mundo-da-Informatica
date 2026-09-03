@@ -442,8 +442,86 @@
     </div>
 </div>
 
+<section class="admin-card slide-in-up subcategory-manager" id="subcategoryManager">
+    <div class="admin-card-header">
+        <div>
+            <h2 class="admin-card-title"><i class="fas fa-sitemap"></i> Subcategorias em árvore</h2>
+            <p class="subcategory-manager-subtitle">Crie níveis como BIOS → BIOS Notebook → HP, Lenovo ou Dell.</p>
+        </div>
+        <div class="subcategory-live-actions">
+            <span class="stats-live-indicator"><i class="fas fa-circle"></i> Em tempo real</span>
+            <button type="button" class="btn-admin btn-admin-primary" id="newSubcategoryBtn">
+                <i class="fas fa-folder-plus"></i> Nova subcategoria
+            </button>
+        </div>
+    </div>
+    <div class="admin-card-body">
+        <div id="subcategoryTree" class="subcategory-tree" aria-live="polite"></div>
+    </div>
+</section>
+
+<script id="subcategoryInitialTree" type="application/json">{{ subcategory_tree | tojson }}</script>
+
+<div class="modal" id="subcategoryModal">
+    <div class="modal-content subcategory-modal-content">
+        <div class="modal-header">
+            <div>
+                <h3 id="subcategoryModalTitle"><i class="fas fa-folder-plus"></i> Nova subcategoria</h3>
+                <p class="modal-subtitle">Defina a categoria principal e, se quiser, uma subcategoria pai.</p>
+            </div>
+            <button type="button" class="close-modal" data-subcategory-close>&times;</button>
+        </div>
+        <form id="subcategoryForm">
+            <div class="modal-body subcategory-form-grid">
+                <input type="hidden" id="subcategoryId">
+                <div class="form-group">
+                    <label for="subcategoryCategory" class="form-label">Categoria principal</label>
+                    <select id="subcategoryCategory" class="form-control" required>
+                        {% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="subcategoryParent" class="form-label">Subcategoria pai</label>
+                    <select id="subcategoryParent" class="form-control"><option value="">Diretamente na categoria</option></select>
+                </div>
+                <div class="form-group">
+                    <label for="subcategoryName" class="form-label">Nome</label>
+                    <input id="subcategoryName" class="form-control" maxlength="80" required placeholder="Ex.: BIOS Notebook">
+                </div>
+                <div class="form-group">
+                    <label for="subcategorySlug" class="form-label">URL amigável</label>
+                    <input id="subcategorySlug" class="form-control" maxlength="30" placeholder="bios-notebook">
+                    <small class="form-text">Até 30 caracteres; deixe vazio para gerar automaticamente.</small>
+                </div>
+                <div class="form-group subcategory-form-wide">
+                    <label for="subcategoryDescription" class="form-label">Descrição</label>
+                    <textarea id="subcategoryDescription" class="form-control" rows="3" placeholder="Descreva este agrupamento"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="subcategoryIcon" class="form-label">Ícone</label>
+                    <input id="subcategoryIcon" class="form-control" value="fas fa-folder" placeholder="fas fa-folder">
+                </div>
+                <div class="form-group">
+                    <label for="subcategoryOrder" class="form-label">Ordem</label>
+                    <input id="subcategoryOrder" type="number" class="form-control" min="0" max="999" value="0">
+                </div>
+                <div class="subcategory-flags subcategory-form-wide">
+                    <label><input id="subcategoryActive" type="checkbox" checked> Ativa</label>
+                    <label><input id="subcategoryVisible" type="checkbox" checked> Página pública</label>
+                    <label><input id="subcategoryMenu" type="checkbox" checked> Exibir no menu</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-admin btn-admin-outline" data-subcategory-close>Cancelar</button>
+                <button type="submit" class="btn-admin btn-admin-primary" id="saveSubcategoryBtn"><i class="fas fa-save"></i> Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
 .category-display-state{display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem;margin-top:.65rem}.category-display-state .status-badge{cursor:default;font-size:.68rem}
+.subcategory-manager{margin-top:1.5rem}.subcategory-manager-subtitle{margin:.35rem 0 0;color:var(--admin-text-light);font-size:.86rem}.subcategory-live-actions{display:flex;align-items:center;gap:.8rem}.subcategory-tree{display:grid;gap:1rem}.subcategory-category-group{border:1px solid var(--admin-border-color);border-radius:14px;overflow:hidden;background:var(--admin-card-bg)}.subcategory-category-title{display:flex;align-items:center;gap:.55rem;margin:0;padding:.9rem 1rem;background:var(--admin-bg-light);color:var(--admin-text-primary);font-size:1rem}.subcategory-node{--tree-depth:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;padding:.75rem 1rem .75rem calc(1rem + var(--tree-depth) * 1.7rem);border-top:1px solid var(--admin-border-color)}.subcategory-node-main{display:flex;align-items:center;gap:.7rem;min-width:0}.subcategory-node-main>i{color:var(--admin-primary)}.subcategory-node-copy strong,.subcategory-node-copy small{display:block}.subcategory-node-copy small{color:var(--admin-text-light)}.subcategory-node-badges{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.25rem}.subcategory-node-badges span{padding:.15rem .42rem;border-radius:999px;background:var(--admin-bg-light);color:var(--admin-text-light);font-size:.68rem}.subcategory-node-actions{display:flex;gap:.4rem}.subcategory-empty{padding:2.5rem;text-align:center;color:var(--admin-text-light)}.subcategory-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.subcategory-form-wide{grid-column:1/-1}.subcategory-flags{display:flex;flex-wrap:wrap;gap:1.2rem;padding:.85rem;border:1px solid var(--admin-border-color);border-radius:10px;background:var(--admin-bg-light)}.subcategory-flags label{display:flex;align-items:center;gap:.45rem;color:var(--admin-text-primary);font-weight:600}.subcategory-modal-content{max-width:720px}@media(max-width:720px){.subcategory-manager .admin-card-header,.subcategory-live-actions{align-items:stretch;flex-direction:column}.subcategory-form-grid{grid-template-columns:1fr}.subcategory-form-wide{grid-column:auto}.subcategory-node{grid-template-columns:1fr}.subcategory-node-actions{justify-content:flex-end}}
 </style>
 
 <!-- Modal de Adicionar Categoria -->
@@ -2734,4 +2812,5 @@
     });
 </script>
 <script src="{{ url_for('static', filename='js/admin-categories-dynamic.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-subcategories.js') }}"></script>
 {% endblock %}

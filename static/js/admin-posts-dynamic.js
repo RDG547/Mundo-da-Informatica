@@ -4,6 +4,81 @@
         return;
     }
 
+    let subcategoryTree = [];
+    let subcategoryVersion = '';
+
+    function readSubcategoryTree() {
+        const source = document.getElementById('adminSubcategoryTreeData');
+        if (!source) return;
+        try {
+            const parsed = JSON.parse(source.textContent || '[]');
+            if (Array.isArray(parsed)) subcategoryTree = parsed;
+        } catch (_error) {
+            subcategoryTree = [];
+        }
+    }
+
+    function flattenSubcategories(nodes, categoryId, depth = 0, output = []) {
+        (nodes || []).forEach((node) => {
+            if (String(node.category_id) === String(categoryId)) {
+                output.push({ ...node, depth });
+                flattenSubcategories(node.children || [], categoryId, depth + 1, output);
+            }
+        });
+        return output;
+    }
+
+    function refreshSubcategorySelect(select, requestedValue) {
+        if (!select) return;
+        const categorySelect = document.getElementById(select.dataset.categorySource || '');
+        const categoryId = categorySelect?.value || '';
+        const selected = requestedValue !== undefined
+            ? String(requestedValue || '')
+            : String(select.value || select.dataset.selected || '');
+        const items = flattenSubcategories(subcategoryTree, categoryId);
+
+        select.innerHTML = '<option value="">Sem subcategoria</option>' + items.map((item) => {
+            const prefix = item.depth ? `${'— '.repeat(item.depth)}` : '';
+            const disabled = item.is_active === false ? ' disabled' : '';
+            return `<option value="${item.id}"${String(item.id) === selected ? ' selected' : ''}${disabled}>${escapeHtml(prefix + item.name)}</option>`;
+        }).join('');
+        select.disabled = !categoryId || items.length === 0;
+        delete select.dataset.selected;
+    }
+
+    function bindSubcategorySelects() {
+        readSubcategoryTree();
+        document.querySelectorAll('[data-subcategory-select]').forEach((select) => {
+            refreshSubcategorySelect(select);
+            const categorySelect = document.getElementById(select.dataset.categorySource || '');
+            if (categorySelect && categorySelect.dataset.subcategoryBound !== 'true') {
+                categorySelect.dataset.subcategoryBound = 'true';
+                categorySelect.addEventListener('change', () => refreshSubcategorySelect(select, ''));
+            }
+        });
+    }
+
+    async function pollSubcategories() {
+        if (!document.getElementById('postsTableBody') || document.hidden) return;
+        try {
+            const response = await fetch('/admin/subcategories', { cache: 'no-store', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!data.success || !Array.isArray(data.tree) || data.version === subcategoryVersion) return;
+            subcategoryVersion = data.version || '';
+            subcategoryTree = data.tree;
+            document.querySelectorAll('[data-subcategory-select]').forEach((select) => refreshSubcategorySelect(select));
+        } catch (_error) {
+            // A próxima sincronização tenta novamente.
+        }
+    }
+
+    window.refreshAdminSubcategorySelects = function (selectId, selectedValue) {
+        if (!subcategoryTree.length) readSubcategoryTree();
+        if (selectId) refreshSubcategorySelect(document.getElementById(selectId), selectedValue);
+        else document.querySelectorAll('[data-subcategory-select]').forEach((select) => refreshSubcategorySelect(select));
+    };
+
     function getCsrfToken() {
         return (window.csrfUtils && window.csrfUtils.getCsrfToken && window.csrfUtils.getCsrfToken())
             || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
@@ -648,6 +723,7 @@
                 if (typeof window.refreshDownloadTypeSelects === 'function') {
                     window.refreshDownloadTypeSelects();
                 }
+                window.refreshAdminSubcategorySelects?.('postSubcategory', '');
 
                 if (typeof window.closeModal === 'function') {
                     window.closeModal('addPostModal');
@@ -679,8 +755,13 @@
         bindDeleteForm();
         bindEditForm();
         bindCreateForm();
+        bindSubcategorySelects();
         syncAllSmartSelects();
         refreshPaginationInfo();
+        if (!window.__adminPostsSubcategoryTimer) {
+            pollSubcategories();
+            window.__adminPostsSubcategoryTimer = window.setInterval(pollSubcategories, 5000);
+        }
     }
 
     window.AdminPostsDynamic = {

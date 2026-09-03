@@ -1,0 +1,149 @@
+/* Camada final do tema escuro público. Mantém contraste consistente em todas as páginas. */
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --background-color: #0b1120;
+    --surface-color: #111a2b;
+    --surface-color-alt: #172238;
+    --card-bg: #111a2b;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --border-color: #2b3a55;
+    --input-bg: #10192a;
+    --input-border: #34445f;
+    --input-text: #f8fafc;
+    --input-placeholder: #8291a8;
+    --white-color: #111a2b;
+    --light-color: #172238;
+    --dark-color: #f8fafc;
+    --gray-color: #94a3b8;
+}
+
+html[data-theme="dark"] body,
+body[data-theme="dark"] {
+    background: #0b1120 !important;
+    color: #e5edf8 !important;
+}
+
+html[data-theme="dark"] header,
+html[data-theme="dark"] .navbar,
+html[data-theme="dark"] header.scrolled {
+    color: #f8fafc !important;
+    border-bottom-color: #273550 !important;
+    background: rgba(10, 16, 29, .96) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .32) !important;
+}
+
+html[data-theme="dark"] .nav-menu > li > a,
+html[data-theme="dark"] .navbar .logo a,
+html[data-theme="dark"] .auth-section,
+html[data-theme="dark"] .user-name { color: #e8eef8 !important; }
+
+html[data-theme="dark"] .dropdown-menu,
+html[data-theme="dark"] .submenu-content,
+html[data-theme="dark"] .user-dropdown-menu,
+html[data-theme="dark"] .search-suggestions,
+html[data-theme="dark"] .search-suggestions-dropdown {
+    color: #e5edf8 !important;
+    border-color: #30405d !important;
+    background: #10192a !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .42) !important;
+}
+
+html[data-theme="dark"] .dropdown-menu a,
+html[data-theme="dark"] .submenu-content a,
+html[data-theme="dark"] .user-dropdown-menu a { color: #dce6f5 !important; }
+html[data-theme="dark"] .dropdown-menu a:hover,
+html[data-theme="dark"] .submenu-content a:hover,
+html[data-theme="dark"] .user-dropdown-menu a:hover { background: #1b2941 !important; color: #fff !important; }
+
+html[data-theme="dark"] :is(
+    .category-section, .categories-section, .categories-showcase, .recent-posts, .featured-posts, .all-posts-section,
+    .plans-section, .profile-section, .contact-section, .faq-section, .about-section,
+    .search-results-section, .content-requests-section, .legal-page-section, main
+) { background-color: #0b1120 !important; color: #e5edf8 !important; }
+
+html[data-theme="dark"] .categories-showcase::before {
+    background-color: #0d1526 !important;
+    background-image:
+        linear-gradient(rgba(58, 134, 255, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(131, 56, 236, .04) 1px, transparent 1px) !important;
+    background-size: 42px 42px !important;
+}
+
+html[data-theme="dark"] :is(
+    .post-card, .featured-card, .category-card, .category-showcase-card, .most-used-card,
+    .category-info, .category-tree-section,
+    .plan-card, .pricing-card, .profile-card, .contact-card, .faq-item, .accordion-item,
+    .request-card, .search-result-card, .comment, .related-post, .download-card,
+    .post-detail-card, .content-card, .stats-card, .modal-content, .site-confirm-dialog
+) {
+    color: #e5edf8 !important;
+    border-color: #2b3a55 !important;
+    background: #111a2b !important;
+    box-shadow: 0 14px 38px rgba(0, 0, 0, .28) !important;
+}
+
+html[data-theme="dark"] :is(
+    h1, h2, h3, h4, h5, h6, .post-content h3, .post-content h3 a,
+    .category-info h2, .posts-header h2, .section-title, .card-title, .plan-name,
+    .download-title, .profile-name, .faq-question
+) { color: #f8fafc !important; }
+
+html[data-theme="dark"] :is(.category-showcase-card h3, .most-used-card, .most-used-card a) { color: #f8fafc !important; }
+
+html[data-theme="dark"] :is(
+    p, .post-content p, .hero-subtitle, .section-subtitle, .text-muted, small,
+    .post-meta, .category-description, .form-text, .help-text
+) { color: #aebdd1 !important; }
+
+html[data-theme="dark"] .post-card .post-content,
+html[data-theme="dark"] .featured-card .post-content,
+html[data-theme="dark"] .category-tree-item,
+html[data-theme="dark"] .feature-item {
+    color: #e5edf8 !important;
+    border-color: #2b3a55 !important;
+    background: #162137 !important;
+}
+
+html[data-theme="dark"] .category-tree-item.is-current,
+html[data-theme="dark"] .category-tree-item:hover { background: rgba(var(--primary-rgb), .16) !important; }
+html[data-theme="dark"] .category-tree-count { color: #cbd5e1; background: #24324b; }
+
+html[data-theme="dark"] :is(input, textarea, select, .form-control, .form-select, .search-input, .category-search-input) {
+    color: #f8fafc !important;
+    caret-color: #fff;
+    border-color: #34445f !important;
+    background-color: #10192a !important;
+}
+html[data-theme="dark"] :is(input, textarea)::placeholder { color: #8291a8 !important; opacity: 1; }
+html[data-theme="dark"] option { color: #f8fafc; background: #10192a; }
+
+html[data-theme="dark"] :is(.pagination a, .page-link, .pagination button) {
+    color: #dbe7f6 !important;
+    border-color: #34445f !important;
+    background: #152036 !important;
+}
+html[data-theme="dark"] :is(.pagination .active, .page-link.active, .pagination button.active) {
+    color: #fff !important;
+    border-color: var(--primary-color) !important;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+}
+
+html[data-theme="dark"] :is(.modal, .site-confirm-overlay, .global-image-lightbox) { --modal-overlay: rgba(2, 6, 15, .76); }
+html[data-theme="dark"] hr { border-color: #2b3a55 !important; }
+html[data-theme="dark"] a:not(.btn):not([class*="button"]):focus-visible,
+html[data-theme="dark"] button:focus-visible { outline: 3px solid rgba(var(--primary-rgb), .48); outline-offset: 3px; }
+
+html[data-theme="dark"] .dark-mode {
+    color: #ffd166 !important;
+    border-color: rgba(255, 209, 102, .35) !important;
+    background: rgba(255, 209, 102, .1) !important;
+}
+
+html[data-theme="dark"] .preloader { color: #f8fafc; background: #0b1120 !important; }
+html[data-theme="dark"] footer { border-top: 1px solid #273550; background: #080d18 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="dark"] *, html[data-theme="dark"] *::before, html[data-theme="dark"] *::after { transition-duration: .01ms !important; }
+}

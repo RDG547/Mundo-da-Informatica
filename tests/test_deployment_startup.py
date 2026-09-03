@@ -48,6 +48,29 @@ def test_runtime_migration_adds_comment_moderation_status_idempotently(tmp_path,
     assert row == ("Legado", "pending")
 
 
+def test_runtime_migration_adds_subcategory_tree_and_statistics_controls(tmp_path, monkeypatch):
+    database = tmp_path / "legacy-content.db"
+    database_url = f"sqlite:///{database}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql('CREATE TABLE "user" (id INTEGER PRIMARY KEY)')
+        connection.exec_driver_sql('CREATE TABLE category (id INTEGER PRIMARY KEY, name VARCHAR(100))')
+        connection.exec_driver_sql(
+            'CREATE TABLE posts (id INTEGER PRIMARY KEY, category_id INTEGER, subcategory VARCHAR(30))'
+        )
+
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    migrate()
+    migrate()
+
+    inspector = inspect(engine)
+    assert "subcategories" in inspector.get_table_names()
+    assert "exclude_from_statistics" in {column["name"] for column in inspector.get_columns("user")}
+    assert "subcategory_id" in {column["name"] for column in inspector.get_columns("posts")}
+    subcategory_columns = {column["name"] for column in inspector.get_columns("subcategories")}
+    assert {"category_id", "parent_id", "name", "slug"}.issubset(subcategory_columns)
+
+
 def test_home_fallback_uses_existing_error_template(client, monkeypatch):
     original_render_template = app_module.render_template
 

@@ -5,7 +5,9 @@ from app import (
     Comment,
     Post,
     ScheduledPost,
+    Subcategory,
     User,
+    VisitorLog,
     app,
     db,
     publish_due_scheduled_posts,
@@ -145,3 +147,94 @@ def test_comment_moderation_uses_json_without_redirect_and_bulk_persists(client)
     with app.app_context():
         assert db.session.get(Comment, first_id).status == 'approved'
         assert db.session.get(Comment, second_id).status == 'rejected'
+
+
+def test_admin_manages_nested_subcategories_and_parent_includes_descendant_posts(client):
+    with app.app_context():
+        admin = _admin('subcategory_admin')
+        category = Category(name='BIOS', slug='bios', is_active=True, is_visible=True, show_in_menu=True)
+        db.session.add(category)
+        db.session.commit()
+        admin_id, category_id = admin.id, category.id
+
+    _login(client, admin_id)
+    headers = {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+    version_before = client.get('/api/public-content-version').get_json()['version']
+
+    root_response = client.post('/admin/subcategories', json={
+        'category_id': category_id, 'name': 'BIOS Notebook', 'slug': 'bios-notebook',
+    }, headers=headers)
+    assert root_response.status_code == 201
+    root_id = root_response.get_json()['subcategory_id']
+
+    brand_response = client.post('/admin/subcategories', json={
+        'category_id': category_id, 'parent_id': root_id, 'name': 'HP', 'slug': 'bios-notebook-hp',
+    }, headers=headers)
+    assert brand_response.status_code == 201
+    brand_id = brand_response.get_json()['subcategory_id']
+
+    with app.app_context():
+        post = Post(
+            title='BIOS HP EliteBook', slug='bios-hp-elitebook', content='Firmware de teste.',
+            category_id=category_id, category_str='BIOS', subcategory_id=brand_id,
+            subcategory='bios-notebook-hp', download_link='https://example.test/bios.bin', is_active=True,
+        )
+        db.session.add(post)
+        db.session.commit()
+
+    parent_page = client.get('/subcategoria/bios-notebook').get_data(as_text=True)
+    assert 'BIOS HP EliteBook' in parent_page
+    assert 'category-tree-item' in parent_page
+    assert client.get('/api/public-content-version').get_json()['version'] != version_before
+
+    renamed = client.put(f'/admin/subcategories/{brand_id}', json={
+        'category_id': category_id, 'parent_id': root_id, 'name': 'HP Corporativo',
+        'slug': 'bios-notebook-hp-corporativo',
+    }, headers=headers)
+    assert renamed.status_code == 200
+    with app.app_context():
+        post = Post.query.filter_by(title='BIOS HP EliteBook').one()
+        assert post.subcategory == 'bios-notebook-hp-corporativo'
+
+    deleted = client.delete(f'/admin/subcategories/{root_id}', headers=headers)
+    assert deleted.status_code == 200
+    with app.app_context():
+        assert db.session.get(Subcategory, root_id) is None
+        post = Post.query.filter_by(title='BIOS HP EliteBook').one()
+        assert post.subcategory_id is None
+
+
+def test_admin_can_exclude_self_from_statistics_and_ajax_delete_is_json(client):
+    with app.app_context():
+        admin = _admin('statistics_admin')
+        disposable = _admin('disposable_admin')
+        db.session.add(VisitorLog(ip_address='127.0.0.1', user_id=admin.id))
+        db.session.commit()
+        admin_id, disposable_id = admin.id, disposable.id
+
+    _login(client, admin_id)
+    headers = {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+    excluded = client.post(
+        f'/admin/users/{admin_id}/statistics', json={'excluded': True}, headers=headers,
+    )
+    assert excluded.status_code == 200
+    assert excluded.get_json()['user']['exclude_from_statistics'] is True
+    with app.app_context():
+        assert db.session.get(User, admin_id).exclude_from_statistics is True
+        assert VisitorLog.query.filter_by(user_id=admin_id).count() == 0
+
+    deleted = client.post(f'/admin/users/{disposable_id}/delete', headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.is_json
+    assert deleted.get_json()['user_id'] == disposable_id
+
+
+def test_admin_user_page_exposes_granular_live_controls(client):
+    with app.app_context():
+        admin = _admin('users_live_admin')
+        admin_id = admin.id
+    _login(client, admin_id)
+    body = client.get('/admin/users?page=2').get_data(as_text=True)
+    assert 'data-user-statistics=' in body
+    assert 'window.syncUserRow?.(userId)' in body
+    assert '__adminUsersLiveTimer' in body

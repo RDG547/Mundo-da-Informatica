@@ -1,9 +1,30 @@
+{% macro render_nav_subcategories(nodes, depth=0) -%}
+    {% for node in nodes %}
+    {% if node.show_in_menu %}
+    <a href="{{ url_for('subcategory', subcategory=node.slug) }}" class="submenu-tree-link" style="--submenu-depth: {{ depth }}">
+        <i class="{{ node.icon or 'fas fa-folder' }}"></i>
+        <span>{{ node.name }}</span>
+        {% if node.children %}<small>{{ node.total_post_count }}</small>{% endif %}
+    </a>
+    {% if node.children %}{{ render_nav_subcategories(node.children, depth + 1) }}{% endif %}
+    {% endif %}
+    {% endfor %}
+{%- endmacro %}
 <!DOCTYPE html>
 <html lang="pt-br" data-site-name="{{ site_configs.get('site_name', 'Mundo da Informática') }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script data-static-base-script="true">
+        (function () {
+            try {
+                var saved = localStorage.getItem('mundoinformatica_theme');
+                var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (_error) { document.documentElement.setAttribute('data-theme', 'light'); }
+        })();
+    </script>
     {% set site_name = site_configs.get('site_name', 'Mundo da Informática') %}
     {% if component is defined and component %}
         {% set page_title = component.part_number ~ ' Datasheet' ~ (' — ' ~ component.manufacturer if component.manufacturer else '') ~ ' | ' ~ site_name %}
@@ -171,6 +192,7 @@
     {% if request.endpoint == 'plans' %}<link id="plans-css" rel="stylesheet" href="{{ url_for('static', filename='css/plans.css') }}">{% endif %}
 
     {% block extra_css %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dark-mode.css') }}" data-static-base-style="true">
 
     <!-- Tema público configurável -->
     <style data-static-base-style="true">
@@ -262,7 +284,7 @@
                         <div class="dropdown-menu">
                             {% for nav_category in menu_categories %}
                             {% set nav_category_key = nav_category.id|string %}
-                            {% set nav_subcategories = menu_subcategories_map.get(nav_category_key, []) %}
+                            {% set nav_subcategories = menu_subcategory_tree.get(nav_category_key, []) %}
                             <div class="dropdown-submenu">
                                 <a href="{{ url_for('category', category=category_public_url_value(nav_category)) }}" class="dropdown-item-main">
                                     <i class="{{ nav_category.icon or 'fas fa-folder' }}"></i>
@@ -273,12 +295,7 @@
                                 </a>
                                 {% if nav_subcategories %}
                                 <div class="submenu-content">
-                                    {% for subcategory_name in nav_subcategories %}
-                                    <a href="{{ url_for('subcategory', subcategory=subcategory_name) }}">
-                                        <i class="{{ nav_category.icon or 'fas fa-folder' }}"></i>
-                                        <span>{{ format_subcategory_label(subcategory_name) }}</span>
-                                    </a>
-                                    {% endfor %}
+                                    {{ render_nav_subcategories(nav_subcategories) }}
                                 </div>
                                 {% endif %}
                             </div>
@@ -488,6 +505,7 @@
     <script src="{{ url_for('static', filename='js/navbar.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/csrf.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/public-theme.js') }}" data-static-base-script="true"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" data-static-base-script="true"></script>
     {% if request.endpoint in ['home', 'about'] %}<script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>{% endif %}
     {% if request.endpoint == 'profile' %}<script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>{% endif %}
@@ -1387,21 +1405,15 @@
                 }, 5000); // 5 seconds
             });
 
-            document.querySelectorAll('[data-vip-link]').forEach((link) => {
-                if (link.dataset.vipLinkBound === 'true') {
-                    return;
-                }
-
-                link.dataset.vipLinkBound = 'true';
-                link.addEventListener('click', async function (event) {
+            if (!window.__vipAccessHandlerBound) {
+                window.__vipAccessHandlerBound = true;
+                document.addEventListener('click', async function (event) {
+                    const link = event.target.closest('[data-vip-link]');
+                    if (!link || link.dataset.vipAccess !== 'locked') return;
                     event.preventDefault();
+                    event.stopPropagation();
 
-                    if (this.dataset.vipAccess !== 'locked') {
-                        window.location.href = this.href;
-                        return;
-                    }
-
-                    const plansUrl = this.dataset.plansUrl || '{{ url_for("plans") }}';
+                    const plansUrl = link.dataset.plansUrl || '{{ url_for("plans") }}';
                     let shouldProceed = false;
 
                     if (typeof window.showSiteConfirm === 'function') {
@@ -1426,7 +1438,7 @@
                         window.location.href = plansUrl;
                     }
                 });
-            });
+            }
         });
     </script>
 

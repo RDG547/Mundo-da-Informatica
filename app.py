@@ -774,13 +774,15 @@ def format_subcategory_label(subcategory_slug: str) -> str:
 def get_category_subcategories_map(include_defaults: bool = False) -> dict[str, list[str]]:
     subcategories_map: dict[str, list[str]] = {}
 
+    configured_query = Subcategory.query
     if include_defaults:
-        default_subcategories = get_default_category_subcategories()
-        categories = Category.query.filter_by(is_active=True, is_visible=True).all()
-        for category in categories:
-            defaults = default_subcategories.get(category.name, [])
-            if defaults:
-                subcategories_map[str(category.id)] = list(defaults)
+        configured_query = configured_query.filter_by(is_active=True, is_visible=True)
+
+    for item in configured_query.order_by(Subcategory.order.asc(), Subcategory.name.asc()).all():
+        key = str(item.category_id)
+        subcategories_map.setdefault(key, [])
+        if item.slug not in subcategories_map[key]:
+            subcategories_map[key].append(item.slug)
 
     rows = db.session.query(Post.category_id, Post.subcategory).filter(
         Post.category_id.isnot(None),
@@ -795,6 +797,84 @@ def get_category_subcategories_map(include_defaults: bool = False) -> dict[str, 
             subcategories_map[key].append(subcategory)
 
     return subcategories_map
+
+
+def get_subcategory_tree(category_id: int | None = None, public_only: bool = False) -> list[dict[str, Any]]:
+    """Retorna a hierarquia configurada de subcategorias em ordem estável."""
+    query = Subcategory.query
+    if category_id is not None:
+        query = query.filter_by(category_id=category_id)
+    if public_only:
+        query = query.filter_by(is_active=True, is_visible=True)
+
+    items = query.order_by(Subcategory.order.asc(), Subcategory.name.asc()).all()
+    direct_post_counts = dict(
+        db.session.query(Post.subcategory_id, db.func.count(Post.id))
+        .filter(Post.subcategory_id.isnot(None))
+        .group_by(Post.subcategory_id)
+        .all()
+    )
+    node_by_id: dict[int, dict[str, Any]] = {}
+    roots: list[dict[str, Any]] = []
+
+    for item in items:
+        node_by_id[item.id] = {
+            'id': item.id,
+            'category_id': item.category_id,
+            'parent_id': item.parent_id,
+            'name': item.name,
+            'slug': item.slug,
+            'description': item.description or '',
+            'icon': item.icon or 'fas fa-folder',
+            'order': item.order or 0,
+            'is_active': bool(item.is_active),
+            'is_visible': bool(item.is_visible),
+            'show_in_menu': bool(item.show_in_menu),
+            'post_count': int(direct_post_counts.get(item.id, 0) or 0),
+            'children': [],
+        }
+
+    for item in items:
+        node = node_by_id[item.id]
+        parent = node_by_id.get(item.parent_id) if item.parent_id else None
+        if parent and parent['category_id'] == node['category_id']:
+            parent['children'].append(node)
+        elif public_only and item.parent_id:
+            # Um descendente nunca deve ficar público como raiz quando algum
+            # ancestral estiver oculto ou inativo.
+            continue
+        else:
+            roots.append(node)
+
+    def add_total_posts(node: dict[str, Any]) -> int:
+        total = int(node['post_count'])
+        for child in node['children']:
+            total += add_total_posts(child)
+        node['total_post_count'] = total
+        return total
+
+    for root in roots:
+        add_total_posts(root)
+    return roots
+
+
+def get_subcategory_descendant_ids(subcategory_item: "Subcategory") -> list[int]:
+    children_by_parent: dict[int, list[int]] = {}
+    for item_id, parent_id in Subcategory.query.with_entities(Subcategory.id, Subcategory.parent_id).filter_by(
+        category_id=subcategory_item.category_id
+    ).all():
+        if parent_id is not None:
+            children_by_parent.setdefault(parent_id, []).append(item_id)
+
+    found: list[int] = []
+    pending = [subcategory_item.id]
+    while pending:
+        item_id = pending.pop()
+        if item_id in found:
+            continue
+        found.append(item_id)
+        pending.extend(children_by_parent.get(item_id, []))
+    return found
 
 
 def get_plain_text_excerpt(content: str | None, limit: int = 220) -> str:
@@ -1035,6 +1115,9 @@ def serialize_post_for_admin(post):
         'category_name': category.name if category else (post.category_str or 'Sem categoria'),
         'category_icon': get_category_icon(category or post.category_str),
         'category_color': (getattr(category, 'color', None) if category else None) or '#3a86ff',
+        'subcategory_id': post.subcategory_id,
+        'subcategory_name': post.subcategory_rel.name if post.subcategory_rel else '',
+        'subcategory_slug': post.subcategory_rel.slug if post.subcategory_rel else (post.subcategory or ''),
         'image_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg'),
         'date_posted': posted_at.strftime('%d/%m/%Y') if posted_at else '',
         'time_posted': posted_at.strftime('%H:%M') if posted_at else '',
@@ -1458,9 +1541,46 @@ class Category(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Data de criação
     posts = db.relationship('Post', backref='category_rel', lazy=True,
                             primaryjoin="and_(Category.id==Post.category_id, Post.is_active==True)")
+    subcategories = db.relationship(
+        'Subcategory', back_populates='category', lazy=True,
+        cascade='all, delete-orphan', order_by='Subcategory.order'
+    )
 
     def __repr__(self):
         return f"Category('{self.name}')"
+
+
+class Subcategory(db.Model):
+    """Nó hierárquico de categoria, com suporte a quantos níveis forem necessários."""
+    __tablename__ = 'subcategories'
+    __table_args__ = (
+        db.UniqueConstraint('category_id', 'slug', name='uq_subcategory_category_slug'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id', ondelete='CASCADE'), nullable=False, index=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey('subcategories.id', ondelete='CASCADE'), nullable=True, index=True)
+    name = db.Column(db.String(80), nullable=False)
+    slug = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    icon = db.Column(db.String(50), nullable=True, default='fas fa-folder')
+    order = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    is_visible = db.Column(db.Boolean, nullable=False, default=True)
+    show_in_menu = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    category = db.relationship('Category', back_populates='subcategories')
+    parent = db.relationship('Subcategory', remote_side=[id], back_populates='children')
+    children = db.relationship(
+        'Subcategory', back_populates='parent', cascade='all, delete-orphan',
+        order_by='Subcategory.order', single_parent=True
+    )
+    posts = db.relationship('Post', back_populates='subcategory_rel', lazy=True)
+
+    def __repr__(self):
+        return f"Subcategory('{self.name}', category_id={self.category_id})"
 
 # Adicionando mais campos ao Post para flexibilidade
 class Post(db.Model):
@@ -1477,6 +1597,8 @@ class Post(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     category_str = db.Column(db.String(100), nullable=True)  # Para compatibilidade
     subcategory = db.Column(db.String(30), nullable=True)
+    subcategory_id = db.Column(db.Integer, db.ForeignKey('subcategories.id', ondelete='SET NULL'), nullable=True, index=True)
+    subcategory_rel = db.relationship('Subcategory', back_populates='posts')
 
     # Status e controle
     is_active = db.Column(db.Boolean, default=True)
@@ -2556,6 +2678,12 @@ def log_admin_activity(user_id, action, description=None, metadata=None):
 def log_visitor():
     """Registra informações do visitante para analytics"""
     try:
+        visitor_user_id = None
+        if current_user.is_authenticated:
+            if bool(getattr(current_user, 'exclude_from_statistics', False)):
+                return
+            visitor_user_id = current_user.id
+
         # Pegar informações da requisição
         ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
         if ip_address and ',' in ip_address:
@@ -2567,10 +2695,21 @@ def log_visitor():
         browser = get_browser_name(user_agent)
 
         # Verificar se já existe um log recente para este IP (últimas 30 minutos)
-        recent_log = VisitorLog.query.filter(
+        recent_query = VisitorLog.query.filter(
             VisitorLog.ip_address == ip_address,
             VisitorLog.visit_time >= datetime.utcnow() - timedelta(minutes=30)
-        ).first()
+        )
+        if visitor_user_id:
+            recent_query = recent_query.filter(db.or_(
+                VisitorLog.user_id == visitor_user_id,
+                VisitorLog.user_id.is_(None),
+            ))
+        recent_log = recent_query.order_by(VisitorLog.visit_time.desc()).first()
+
+        # Associa ao usuário autenticado um acesso iniciado antes do login.
+        if recent_log and visitor_user_id and recent_log.user_id is None:
+            recent_log.user_id = visitor_user_id
+            db.session.commit()
 
         # Só criar novo log se não houver um recente
         if not recent_log:
@@ -2580,7 +2719,8 @@ def log_visitor():
                 referrer=referrer[:500] if referrer else '',  # Limitar tamanho
                 device_type=device_type,
                 browser=browser,
-                visit_time=datetime.utcnow()
+                visit_time=datetime.utcnow(),
+                user_id=visitor_user_id,
             )
             db.session.add(visitor_log)
             db.session.commit()
@@ -2778,6 +2918,7 @@ class User(db.Model, UserMixin):
     email_notifications = db.Column(db.Boolean, default=True)
     theme_preference = db.Column(db.String(20), default='light')
     preferences = db.Column(db.Text)
+    exclude_from_statistics = db.Column(db.Boolean, nullable=False, default=False)
 
     # Token para redefinição de senha (expira após 24 horas)
     reset_token = db.Column(db.String(100))
@@ -5080,6 +5221,7 @@ def serialize_user_for_admin(user):
         'is_active': bool(user.is_active),
         'is_verified': bool(user.is_verified),
         'email_notifications': bool(user.email_notifications),
+        'exclude_from_statistics': bool(user.exclude_from_statistics),
         'bio': user.bio or '',
         'location': user.location or '',
         'phone': user.phone or '',
@@ -5384,6 +5526,15 @@ class VisitorLog(db.Model):
     browser = db.Column(db.String(50))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
+
+def included_visitor_log_condition():
+    """Filtro canônico que remove das métricas os usuários marcados pelo admin."""
+    excluded_user_ids = db.session.query(User.id).filter(User.exclude_from_statistics.is_(True))
+    return db.or_(
+        VisitorLog.user_id.is_(None),
+        VisitorLog.user_id.notin_(excluded_user_ids),
+    )
+
 class Subscriber(db.Model):
     __tablename__ = 'subscribers'
 
@@ -5513,6 +5664,10 @@ def inject_global_data():
         apply_default_category_data(category_item)
     menu_categories = [category_item for category_item in categories if category_item.show_in_menu]
     home_categories = [category_item for category_item in categories if category_item.featured] or categories
+    menu_subcategory_tree = {
+        str(category_item.id): get_subcategory_tree(category_item.id, public_only=True)
+        for category_item in menu_categories
+    }
 
     # Posts em destaque
     featured_posts = Post.query.filter_by(featured=True, is_active=True).order_by(Post.date_posted.desc()).limit(4).all()
@@ -5562,6 +5717,7 @@ def inject_global_data():
         menu_categories=menu_categories,
         home_categories=home_categories,
         menu_subcategories_map=get_category_subcategories_map(include_defaults=True),
+        menu_subcategory_tree=menu_subcategory_tree,
         category_public_url_value=category_public_url_value,
         format_subcategory_label=format_subcategory_label,
         featured_posts=featured_posts,
@@ -6108,13 +6264,8 @@ def category(category):
             return redirect(url_for('category', **redirect_args), code=301)
     posts = Post.query.filter(category_filter, Post.is_active == True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
 
-    subcategory_query = db.session.query(Post.subcategory).filter(
-        category_filter,
-        Post.subcategory.isnot(None),
-        Post.subcategory != ''
-    ).distinct()
-    subcategories = subcategory_query.all()
-    subcategories = [subcategory[0] for subcategory in subcategories if subcategory[0]]
+    subcategory_tree = get_subcategory_tree(category_record.id, public_only=True) if category_record else []
+    subcategories = [node['slug'] for node in subcategory_tree]
 
     # Obter IDs dos posts favoritados do usuário logado
     favorite_post_ids = set()
@@ -6127,6 +6278,7 @@ def category(category):
         category=category_name,
         category_record=category_record,
         subcategories=subcategories,
+        subcategory_tree=subcategory_tree,
         favorite_post_ids=favorite_post_ids,
         title=f'Categoria - {category_name}'
     )
@@ -6134,20 +6286,29 @@ def category(category):
 @app.route('/subcategoria/<string:subcategory>')
 def subcategory(subcategory):
     page = request.args.get('page', 1, type=int)
-    posts = Post.query.filter_by(subcategory=subcategory, is_active=True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
-    category_name = subcategory.replace('-', ' ').title()
-    category_name = category_name.replace('Bios', 'BIOS').replace('Usb', 'USB')
-
-    subcategories = []
-    first_post = posts.items[0] if posts.items else None
-    parent_category = first_post.category_str if first_post and first_post.category_str else ''
-    if first_post and first_post.category_str:
-        sibling_rows = db.session.query(Post.subcategory).filter(
-            Post.category_str == first_post.category_str,
-            Post.subcategory.isnot(None),
-            Post.subcategory != ''
-        ).distinct().all()
-        subcategories = [row[0] for row in sibling_rows if row[0]]
+    subcategory_record = Subcategory.query.filter_by(slug=subcategory, is_active=True, is_visible=True).first()
+    if subcategory_record:
+        descendant_ids = get_subcategory_descendant_ids(subcategory_record)
+        posts_filter = db.or_(
+            Post.subcategory_id.in_(descendant_ids),
+            db.and_(Post.subcategory_id.is_(None), Post.subcategory == subcategory_record.slug),
+        )
+        posts = Post.query.filter(posts_filter, Post.is_active == True).order_by(Post.date_posted.desc()).paginate(
+            page=page, per_page=8
+        )
+        category_name = subcategory_record.name
+        parent_category = subcategory_record.category.name
+        category_record = subcategory_record.category
+        subcategory_tree = get_subcategory_tree(subcategory_record.category_id, public_only=True)
+        subcategories = [node['slug'] for node in subcategory_tree]
+    else:
+        posts = Post.query.filter_by(subcategory=subcategory, is_active=True).order_by(Post.date_posted.desc()).paginate(page=page, per_page=8)
+        category_name = format_subcategory_label(subcategory)
+        subcategories = []
+        subcategory_tree = []
+        category_record = None
+        first_post = posts.items[0] if posts.items else None
+        parent_category = first_post.category_str if first_post and first_post.category_str else ''
 
     if not parent_category:
         prefix_map = {
@@ -6170,8 +6331,11 @@ def subcategory(subcategory):
         posts=posts,
         category=category_name,
         parent_category=parent_category,
+        category_record=category_record,
+        subcategory_record=subcategory_record,
         subcategory=subcategory,
         subcategories=subcategories,
+        subcategory_tree=subcategory_tree,
         favorite_post_ids=favorite_post_ids,
         title=f'Subcategoria - {category_name}'
     )
@@ -7123,6 +7287,7 @@ def api_public_content_version():
             'category_id': post.category_id,
             'category_str': post.category_str,
             'subcategory': post.subcategory,
+            'subcategory_id': post.subcategory_id,
             'is_active': bool(post.is_active),
             'featured': bool(post.featured),
             'image_url': post.image_url,
@@ -7150,8 +7315,25 @@ def api_public_content_version():
         }
         for category in Category.query.order_by(Category.id.asc()).all()
     ]
+    subcategories_snapshot = [
+        {
+            'id': item.id,
+            'category_id': item.category_id,
+            'parent_id': item.parent_id,
+            'name': item.name,
+            'slug': item.slug,
+            'description': item.description,
+            'icon': item.icon,
+            'order': item.order,
+            'is_active': bool(item.is_active),
+            'is_visible': bool(item.is_visible),
+            'show_in_menu': bool(item.show_in_menu),
+            'updated_at': item.updated_at.isoformat() if item.updated_at else None,
+        }
+        for item in Subcategory.query.order_by(Subcategory.id.asc()).all()
+    ]
     raw_snapshot = json.dumps(
-        {'posts': posts_snapshot, 'categories': categories_snapshot},
+        {'posts': posts_snapshot, 'categories': categories_snapshot, 'subcategories': subcategories_snapshot},
         ensure_ascii=False,
         sort_keys=True,
         separators=(',', ':'),
@@ -8783,7 +8965,18 @@ def api_category_posts(category_name):
 def api_subcategory_posts(subcategory_name):
     """API para carregar mais posts de uma subcategoria."""
     page = request.args.get('page', 1, type=int)
-    posts_query = Post.query.filter_by(subcategory=subcategory_name, is_active=True).order_by(Post.date_posted.desc())
+    subcategory_item = Subcategory.query.filter_by(slug=subcategory_name, is_active=True, is_visible=True).first()
+    if subcategory_item:
+        descendant_ids = get_subcategory_descendant_ids(subcategory_item)
+        posts_query = Post.query.filter(
+            db.or_(
+                Post.subcategory_id.in_(descendant_ids),
+                db.and_(Post.subcategory_id.is_(None), Post.subcategory == subcategory_item.slug),
+            ),
+            Post.is_active == True,
+        ).order_by(Post.date_posted.desc())
+    else:
+        posts_query = Post.query.filter_by(subcategory=subcategory_name, is_active=True).order_by(Post.date_posted.desc())
     posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
 
     favorite_post_ids = []
@@ -9375,6 +9568,7 @@ def admin_duplicate_post(post_id):
             category_id=original_post.category_id,
             category_str=original_post.category_str,
             subcategory=original_post.subcategory,
+            subcategory_id=original_post.subcategory_id,
             download_link=original_post.download_link,
             image_url=duplicated_image_url,
             featured=False,  # Cópias não são destacadas por padrão
@@ -9456,6 +9650,7 @@ def admin_post_data(post_id):
         'category_id': post.category_id,
         'category_str': post.category_str,
         'subcategory': post.subcategory,
+        'subcategory_id': post.subcategory_id,
         'download_link': post.download_link,
         'image_url': post.image_url,
         'image_preview_url': get_image_url_for_response(post.image_url, folder='posts', default='default.jpg'),
@@ -9484,6 +9679,7 @@ def admin_update_post(post_id):
         title = request.form.get('title', '').strip()
         content = request.form.get('content', '').strip()
         category_id = request.form.get('category_id')
+        subcategory_id = request.form.get('subcategory_id')
         download_link = request.form.get('download_link', '').strip()
         download_files_json = request.form.get('download_files', '')
         image_url = request.form.get('image_url', '').strip()
@@ -9552,11 +9748,16 @@ def admin_update_post(post_id):
             post.slug = slug
 
         category = Category.query.get(int(category_id)) if category_id else None
+        subcategory_item = Subcategory.query.get(int(subcategory_id)) if subcategory_id else None
+        if subcategory_item and (not category or subcategory_item.category_id != category.id):
+            return jsonify({'success': False, 'message': 'A subcategoria selecionada não pertence à categoria.'}), 400
 
         post.title = title
         post.content = content
         post.category_id = int(category_id) if category_id else None
         post.category_str = category.name if category else 'Sem categoria'
+        post.subcategory_id = subcategory_item.id if subcategory_item else None
+        post.subcategory = subcategory_item.slug if subcategory_item else None
         post.download_link = download_link if download_link else None
         post.image_url = image_url if image_url else 'post-placeholder.svg'
         post.featured = featured
@@ -11051,8 +11252,9 @@ def admin_dashboard():
 
     # Visitantes únicos (usando VisitorLog se existir)
     try:
-        unique_visitors = VisitorLog.query.with_entities(VisitorLog.ip_address).distinct().count()
-        page_views = VisitorLog.query.count()
+        included_visits = VisitorLog.query.filter(included_visitor_log_condition())
+        unique_visitors = included_visits.with_entities(VisitorLog.ip_address).distinct().count()
+        page_views = included_visits.count()
     except Exception:
         unique_visitors = 0
         page_views = 0
@@ -11101,6 +11303,7 @@ def admin_dashboard():
         date = datetime.utcnow().date() - timedelta(days=6-i)
         try:
             daily_views = db.session.query(db.func.count(VisitorLog.id)).filter(
+                included_visitor_log_condition(),
                 db.func.date(VisitorLog.visit_time) == date
             ).scalar() or 0
         except Exception:
@@ -11297,7 +11500,7 @@ def admin_dashboard():
 def admin_dashboard_stats():
     """Snapshot real usado pela atualização periódica do dashboard."""
     try:
-        page_views = VisitorLog.query.count()
+        page_views = VisitorLog.query.filter(included_visitor_log_condition()).count()
     except Exception:
         page_views = 0
 
@@ -11453,6 +11656,7 @@ def admin_create_post():
         # Extrair dados do formulário
         title = request.form.get('title')
         category_id = request.form.get('category')
+        subcategory_id = request.form.get('subcategory_id')
         content = request.form.get('content')
         download_link = request.form.get('download_link', '')
         download_files_json = request.form.get('download_files', '')
@@ -11517,6 +11721,7 @@ def admin_create_post():
                     'title': title,
                     'content': content,
                     'category': category_id,
+                    'subcategory_id': subcategory_id,
                     'download_link': download_link,
                     'tags': tags,
                     'seo_title': seo_title,
@@ -11567,6 +11772,7 @@ def admin_create_post():
             context["pagination"] = pagination
             context["posts_overview"] = get_admin_posts_overview()
             context["category_subcategories_map"] = get_category_subcategories_map()
+            context["subcategory_tree"] = get_subcategory_tree()
             context["current_filters"] = {'q': '', 'category': '', 'status': '', 'sort': 'date'}
             context["system_status"] = "online"
             context["app_version"] = "1.6.2"
@@ -11574,6 +11780,12 @@ def admin_create_post():
 
         # Buscar categoria
         category = Category.query.get(category_id) if category_id else None
+        subcategory_item = Subcategory.query.get(int(subcategory_id)) if subcategory_id else None
+        if subcategory_item and (not category or subcategory_item.category_id != category.id):
+            if _is_ajax_request():
+                return jsonify({'success': False, 'message': 'A subcategoria selecionada não pertence à categoria.'}), 400
+            flash('A subcategoria selecionada não pertence à categoria.', 'error')
+            return redirect(url_for('admin_posts'))
 
         # Processar upload de imagem se fornecido
         image_url = request.form.get('image_url', '').strip()
@@ -11619,6 +11831,8 @@ def admin_create_post():
             content=content,
             category_id=category_id if category else None,
             category_str=category.name if category else 'Sem categoria',
+            subcategory_id=subcategory_item.id if subcategory_item else None,
+            subcategory=subcategory_item.slug if subcategory_item else None,
             download_link=download_link,
             image_url=image_url,
             featured=featured,
@@ -11698,36 +11912,45 @@ def admin_create_user():
     """
     try:
         # Extrair dados do formulário
-        name = sanitize_input((request.form.get('name') or '').strip())
+        supplied_first_name = sanitize_input((request.form.get('first_name') or '').strip())
+        supplied_last_name = sanitize_input((request.form.get('last_name') or '').strip())
+        name = sanitize_input((request.form.get('name') or '').strip()) or f'{supplied_first_name} {supplied_last_name}'.strip()
         username = build_safe_username((request.form.get('username') or '').strip(), fallback_prefix='user')
         email = (request.form.get('email') or '').strip().lower()
         password = request.form.get('password') or ''
         role = (request.form.get('role', 'user') or 'user').strip().lower()
+        plan = (request.form.get('plan', 'free') or 'free').strip().lower()
+
+        def create_error(message, status=400):
+            if _is_ajax_request():
+                return jsonify({'success': False, 'message': message}), status
+            flash(message, 'error')
+            return redirect(url_for('admin_users'))
 
         # Validações básicas
         if not all([name, username, email, password]):
-            flash('Todos os campos são obrigatórios', 'error')
-            return redirect(url_for('admin_users'))
+            return create_error('Todos os campos são obrigatórios')
 
         if role not in ('admin', 'editor', 'user'):
             role = 'user'
+        if plan not in ('free', 'premium', 'vip'):
+            plan = 'free'
 
         if len(email) > 255 or not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            flash('Email inválido', 'error')
-            return redirect(url_for('admin_users'))
+            return create_error('Email inválido')
 
         is_valid, password_error = validate_password_strength(password)
         if not is_valid:
-            flash(password_error, 'error')
-            return redirect(url_for('admin_users'))
+            return create_error(password_error)
 
         # Verificar se já existe usuário com este username ou email
         existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
         if existing_user:
-            flash('Já existe um usuário com este username ou email', 'error')
-            return redirect(url_for('admin_users'))
+            return create_error('Já existe um usuário com este username ou email', 409)
 
-        first_name, last_name = split_full_name(name)
+        first_name, last_name = supplied_first_name, supplied_last_name
+        if not first_name:
+            first_name, last_name = split_full_name(name)
 
         # Criar novo usuário
         new_user = User(
@@ -11737,18 +11960,38 @@ def admin_create_user():
             username=username,
             email=email,
             role=role,
-            is_active=True
+            plan=plan,
+            is_active=coerce_bool(request.form.get('is_active'), True),
+            is_verified=coerce_bool(request.form.get('is_verified'), False),
+            email_notifications=coerce_bool(request.form.get('email_notifications'), True),
+            exclude_from_statistics=coerce_bool(request.form.get('exclude_from_statistics'), False),
+            bio=sanitize_input((request.form.get('bio') or '').strip()) or None,
+            location=sanitize_input((request.form.get('location') or '').strip()) or None,
+            phone=sanitize_input((request.form.get('phone') or '').strip()) or None,
+            website=(request.form.get('website') or '').strip() or None,
+            facebook=(request.form.get('facebook') or '').strip() or None,
+            twitter=(request.form.get('twitter') or '').strip() or None,
+            linkedin=(request.form.get('linkedin') or '').strip() or None,
+            github=(request.form.get('github') or '').strip() or None,
         )
         new_user.set_password(password)
 
         db.session.add(new_user)
         db.session.commit()
 
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': f'Usuário "{username}" criado com sucesso!',
+                'user': serialize_user_for_admin(new_user),
+            }), 201
         flash(f'Usuário "{username}" criado com sucesso!', 'success')
         return redirect(url_for('admin_users'))
 
     except Exception as e:
         db.session.rollback()
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': f'Erro ao criar usuário: {str(e)}'}), 500
         flash(f'Erro ao criar usuário: {str(e)}', 'error')
         return redirect(url_for('admin_users'))
 
@@ -11926,6 +12169,7 @@ def admin_posts():
         "posts_overview": get_admin_posts_overview(),
         "categories": categories,
         "category_subcategories_map": get_category_subcategories_map(),
+        "subcategory_tree": get_subcategory_tree(),
         "current_filters": {
             'q': search_query,
             'category': category_filter,
@@ -12106,6 +12350,7 @@ def admin_analytics():
     ).count()
 
     total_unique_visits = db.session.query(db.func.count(db.func.distinct(VisitorLog.ip_address))).filter(
+        included_visitor_log_condition(),
         VisitorLog.visit_time >= start_dt,
         VisitorLog.visit_time <= end_dt
     ).scalar() or 0
@@ -12116,6 +12361,7 @@ def admin_analytics():
         db.func.date(VisitorLog.visit_time).label('day'),
         db.func.count(db.func.distinct(VisitorLog.ip_address)).label('visits')
     ).filter(
+        included_visitor_log_condition(),
         VisitorLog.visit_time >= start_dt,
         VisitorLog.visit_time <= end_dt
     ).group_by(db.func.date(VisitorLog.visit_time)).all()
@@ -12145,6 +12391,7 @@ def admin_analytics():
         VisitorLog.device_type,
         VisitorLog.browser
     ).filter(
+        included_visitor_log_condition(),
         VisitorLog.visit_time >= start_dt,
         VisitorLog.visit_time <= end_dt
     ).all()
@@ -12154,7 +12401,7 @@ def admin_analytics():
             VisitorLog.user_agent,
             VisitorLog.device_type,
             VisitorLog.browser
-        ).all()
+        ).filter(included_visitor_log_condition()).all()
 
     device_counts = {}
     browser_counts = {}
@@ -12168,7 +12415,7 @@ def admin_analytics():
         user_browser_stats = db.session.query(
             User.browser,
             db.func.count(User.id).label('count')
-        ).filter(User.browser.isnot(None))\
+        ).filter(User.browser.isnot(None), User.exclude_from_statistics.is_(False))\
          .group_by(User.browser)\
          .order_by(db.func.count(User.id).desc())\
          .limit(5).all()
@@ -12202,6 +12449,7 @@ def admin_analytics():
         VisitorLog.referrer,
         db.func.count(VisitorLog.id).label('count')
     ).filter(
+        included_visitor_log_condition(),
         VisitorLog.visit_time >= start_dt,
         VisitorLog.visit_time <= end_dt
     ).group_by(VisitorLog.referrer)\
@@ -12352,6 +12600,7 @@ def admin_categories():
     return render_template('admin/categories.html',
                          title="Gerenciar Categorias",
                          categories=category_stats,
+                         subcategory_tree=get_subcategory_tree(),
                          summary_stats=summary_stats,
                          chart_data=chart_data,
                          **sidebar_stats)
@@ -12572,7 +12821,9 @@ def admin_delete_category(category_id):
             if default_category:
                 Post.query.filter(post_filter).update({
                     'category_id': default_category.id,
-                    'category_str': default_category.name
+                    'category_str': default_category.name,
+                    'subcategory_id': None,
+                    'subcategory': None,
                 }, synchronize_session=False)
                 message = f'Categoria excluída. {post_count} posts foram movidos para "{default_category.name}".'
             else:
@@ -12710,6 +12961,184 @@ def admin_categories_stats():
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Erro ao buscar estatísticas: {str(e)}'}), 500
+
+
+def build_subcategories_admin_response():
+    tree = get_subcategory_tree()
+    raw_tree = json.dumps(tree, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    return {
+        'success': True,
+        'tree': tree,
+        'categories': [
+            {'id': category.id, 'name': category.name}
+            for category in Category.query.order_by(Category.order.asc(), Category.name.asc()).all()
+        ],
+        'version': hashlib.sha256(raw_tree.encode('utf-8')).hexdigest(),
+    }
+
+
+def parse_subcategory_payload(data: Mapping[str, Any], current: Subcategory | None = None):
+    name = sanitize_input(str(data.get('name', current.name if current else '') or '').strip())
+    raw_slug = str(data.get('slug', current.slug if current else '') or '').strip()
+    slug = generate_slug(raw_slug or name)
+    if not name:
+        raise ValueError('O nome da subcategoria é obrigatório.')
+    if not slug:
+        raise ValueError('Não foi possível gerar a URL da subcategoria.')
+    if len(slug) > 30:
+        raise ValueError('A URL da subcategoria deve ter no máximo 30 caracteres.')
+
+    raw_category_id = data.get('category_id', current.category_id if current else None)
+    raw_parent_id = data.get('parent_id', current.parent_id if current else None)
+    try:
+        category_id = int(raw_category_id)
+    except (TypeError, ValueError):
+        raise ValueError('Selecione uma categoria válida.')
+    category = db.session.get(Category, category_id)
+    if not category:
+        raise ValueError('Categoria não encontrada.')
+
+    parent_id = None
+    parent = None
+    if raw_parent_id not in (None, ''):
+        try:
+            parent_id = int(raw_parent_id)
+        except (TypeError, ValueError):
+            raise ValueError('Subcategoria pai inválida.')
+        parent = db.session.get(Subcategory, parent_id)
+        if not parent:
+            raise ValueError('Subcategoria pai não encontrada.')
+        category_id = parent.category_id
+
+    return {
+        'name': name,
+        'slug': slug,
+        'category_id': category_id,
+        'parent_id': parent_id,
+        'description': sanitize_input(str(data.get('description', current.description if current else '') or '').strip()),
+        'icon': sanitize_input(str(data.get('icon', current.icon if current else 'fas fa-folder') or '').strip()) or 'fas fa-folder',
+        'order': coerce_int(data.get('order'), current.order if current else 0),
+        'is_active': coerce_bool(data.get('is_active'), bool(current.is_active) if current else True),
+        'is_visible': coerce_bool(data.get('is_visible'), bool(current.is_visible) if current else True),
+        'show_in_menu': coerce_bool(data.get('show_in_menu'), bool(current.show_in_menu) if current else True),
+    }
+
+
+@app.route('/admin/subcategories', methods=['GET', 'POST'])
+@login_required
+@editor_required
+def admin_subcategories():
+    if request.method == 'GET':
+        response = jsonify(build_subcategories_admin_response())
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+        return response
+
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'message': 'JSON inválido.'}), 400
+    try:
+        values = parse_subcategory_payload(data)
+        if Subcategory.query.filter_by(slug=values['slug']).first():
+            return jsonify({'success': False, 'message': 'Já existe uma subcategoria com essa URL.'}), 409
+        item = Subcategory(**values)
+        db.session.add(item)
+        db.session.commit()
+        log_admin_activity(
+            current_user.id, 'create_subcategory', f'Criou a subcategoria "{item.name}"',
+            metadata={'subcategory_id': item.id, 'category_id': item.category_id, 'parent_id': item.parent_id},
+        )
+        payload = build_subcategories_admin_response()
+        payload['message'] = 'Subcategoria criada com sucesso!'
+        payload['subcategory_id'] = item.id
+        return jsonify(payload), 201
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao criar subcategoria: {str(exc)}'}), 500
+
+
+@app.route('/admin/subcategories/<int:subcategory_id>', methods=['PUT', 'DELETE'])
+@login_required
+@editor_required
+def admin_update_or_delete_subcategory(subcategory_id):
+    item = Subcategory.query.get_or_404(subcategory_id)
+    if request.method == 'DELETE':
+        try:
+            descendant_ids = get_subcategory_descendant_ids(item)
+            replacement = item.parent
+            affected_posts = Post.query.filter(Post.subcategory_id.in_(descendant_ids)).all()
+            for post_item in affected_posts:
+                post_item.subcategory_id = replacement.id if replacement else None
+                post_item.subcategory = replacement.slug if replacement else None
+            name = item.name
+            db.session.delete(item)
+            db.session.commit()
+            log_admin_activity(
+                current_user.id, 'delete_subcategory', f'Excluiu a subcategoria "{name}"',
+                metadata={'subcategory_id': subcategory_id, 'posts_reassigned': len(affected_posts)},
+            )
+            payload = build_subcategories_admin_response()
+            payload['message'] = (
+                f'Subcategoria excluída; {len(affected_posts)} post(s) foram movidos para o nível anterior.'
+                if affected_posts else 'Subcategoria excluída com sucesso!'
+            )
+            return jsonify(payload)
+        except Exception as exc:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Erro ao excluir subcategoria: {str(exc)}'}), 500
+
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'message': 'JSON inválido.'}), 400
+    try:
+        values = parse_subcategory_payload(data, current=item)
+        if values['parent_id'] == item.id:
+            return jsonify({'success': False, 'message': 'Uma subcategoria não pode ser pai dela mesma.'}), 400
+        descendant_ids = get_subcategory_descendant_ids(item)
+        if values['parent_id'] in descendant_ids:
+            return jsonify({'success': False, 'message': 'Não é possível mover o item para dentro de um descendente.'}), 400
+        duplicate = Subcategory.query.filter(Subcategory.slug == values['slug'], Subcategory.id != item.id).first()
+        if duplicate:
+            return jsonify({'success': False, 'message': 'Já existe uma subcategoria com essa URL.'}), 409
+
+        old_slug = item.slug
+        old_category_id = item.category_id
+        for key, value in values.items():
+            setattr(item, key, value)
+        item.updated_at = datetime.utcnow()
+
+        descendants = Subcategory.query.filter(Subcategory.id.in_(descendant_ids), Subcategory.id != item.id).all()
+        for descendant in descendants:
+            descendant.category_id = item.category_id
+        target_category = db.session.get(Category, item.category_id)
+        affected_posts = Post.query.filter(Post.subcategory_id.in_(descendant_ids)).all()
+        for post_item in affected_posts:
+            if post_item.subcategory_id == item.id:
+                post_item.subcategory = item.slug
+            if old_category_id != item.category_id:
+                post_item.category_id = item.category_id
+                post_item.category_str = target_category.name if target_category else 'Sem categoria'
+        if old_slug != item.slug:
+            Post.query.filter(Post.subcategory_id.is_(None), Post.subcategory == old_slug).update(
+                {'subcategory': item.slug}, synchronize_session=False
+            )
+
+        db.session.commit()
+        log_admin_activity(
+            current_user.id, 'update_subcategory', f'Atualizou a subcategoria "{item.name}"',
+            metadata={'subcategory_id': item.id, 'category_id': item.category_id, 'parent_id': item.parent_id},
+        )
+        payload = build_subcategories_admin_response()
+        payload['message'] = 'Subcategoria atualizada com sucesso!'
+        return jsonify(payload)
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao atualizar subcategoria: {str(exc)}'}), 500
 
 @app.route("/admin/categories/bulk-action", methods=['POST'])
 @login_required
@@ -13298,18 +13727,36 @@ def admin_user_delete(user_id):
 
     # Prevenir auto-exclusão
     if user.id == current_user.id:
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': 'Você não pode excluir sua própria conta.'}), 400
         flash('Você não pode excluir sua própria conta.', 'danger')
         return redirect(url_for('admin_users'))
 
     try:
-        # Excluir downloads associados? O cascade deve cuidar disso se configurado
-        # Excluir usuário
+        VisitorLog.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        deleted_id = user.id
+        deleted_username = user.username
         db.session.delete(user)
         db.session.commit()
-        flash(f'Usuário {user.username} excluído com sucesso.', 'success')
+        if _is_ajax_request():
+            return jsonify({
+                'success': True,
+                'message': f'Usuário {deleted_username} excluído com sucesso.',
+                'user_id': deleted_id,
+                'totals': {
+                    'total': User.query.count(),
+                    'admins': User.query.filter_by(role='admin').count(),
+                    'editors': User.query.filter_by(role='editor').count(),
+                    'users': User.query.filter_by(role='user').count(),
+                    'active': User.query.filter_by(is_active=True).count(),
+                },
+            })
+        flash(f'Usuário {deleted_username} excluído com sucesso.', 'success')
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Erro ao excluir usuário {user.id}: {e}")
+        if _is_ajax_request():
+            return jsonify({'success': False, 'message': 'Erro ao excluir usuário. Pode haver registros associados.'}), 500
         flash('Erro ao excluir usuário. Pode haver registros associados.', 'danger')
 
     return redirect(url_for('admin_users'))
@@ -13340,6 +13787,7 @@ def admin_update_user(user_id):
         is_active = coerce_bool(source.get('is_active'), user.is_active) if 'is_active' in source else user.is_active
         is_verified = coerce_bool(source.get('is_verified'), user.is_verified) if 'is_verified' in source else user.is_verified
         email_notifications = coerce_bool(source.get('email_notifications'), user.email_notifications) if 'email_notifications' in source else user.email_notifications
+        exclude_from_statistics = coerce_bool(source.get('exclude_from_statistics'), user.exclude_from_statistics) if 'exclude_from_statistics' in source else user.exclude_from_statistics
 
         first_name = field_value('first_name', user.first_name or '')
         last_name = field_value('last_name', user.last_name or '')
@@ -13416,6 +13864,7 @@ def admin_update_user(user_id):
             'is_active': user.is_active,
             'is_verified': user.is_verified,
             'email_notifications': user.email_notifications,
+            'exclude_from_statistics': user.exclude_from_statistics,
             'can_download': user.can_download if hasattr(user, 'can_download') else True,
             'custom_daily_limit': user.custom_daily_limit if hasattr(user, 'custom_daily_limit') else None,
             'custom_weekly_limit': user.custom_weekly_limit if hasattr(user, 'custom_weekly_limit') else None
@@ -13429,6 +13878,7 @@ def admin_update_user(user_id):
         user.is_active = is_active
         user.is_verified = is_verified
         user.email_notifications = email_notifications
+        user.exclude_from_statistics = exclude_from_statistics
         user.first_name = first_name or None
         user.last_name = last_name or None
         user.bio = bio or None
@@ -13467,6 +13917,7 @@ def admin_update_user(user_id):
                     'is_active': is_active,
                     'is_verified': is_verified,
                     'email_notifications': email_notifications,
+                    'exclude_from_statistics': exclude_from_statistics,
                     'can_download': can_download,
                     'custom_daily_limit': user.custom_daily_limit,
                     'custom_weekly_limit': user.custom_weekly_limit
@@ -13483,6 +13934,31 @@ def admin_update_user(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao atualizar usuário: {str(e)}'})
+
+
+@app.route('/admin/users/<int:user_id>/statistics', methods=['POST'])
+@login_required
+@admin_required
+def admin_update_user_statistics(user_id):
+    """Inclui ou exclui qualquer usuário, inclusive o admin atual, das métricas."""
+    user = User.query.get_or_404(user_id)
+    data = request.get_json(silent=True) or request.form
+    excluded = coerce_bool(data.get('excluded'), not bool(user.exclude_from_statistics))
+    user.exclude_from_statistics = excluded
+    if excluded:
+        VisitorLog.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    db.session.commit()
+    log_admin_activity(
+        user_id=current_user.id,
+        action='update_user_statistics',
+        description=f'{"Excluiu" if excluded else "Incluiu"} {user.username} nas estatísticas',
+        metadata={'target_user_id': user.id, 'excluded': excluded},
+    )
+    return jsonify({
+        'success': True,
+        'message': f'{user.username} foi {"excluído das" if excluded else "incluído nas"} estatísticas.',
+        'user': serialize_user_for_admin(user),
+    })
 
 @app.route("/admin/users/<int:user_id>/reset-password", methods=['POST'])
 @login_required
@@ -16155,6 +16631,75 @@ def ensure_default_categories():
         db.session.rollback()
         app.logger.error('Erro ao verificar categorias padrao: %s', e)
 
+
+def ensure_default_subcategories():
+    """Materializa a organização antiga e vincula posts legados à nova árvore."""
+    try:
+        categories_by_name = {category.name: category for category in Category.query.all()}
+        existing_by_slug = {item.slug: item for item in Subcategory.query.all()}
+        changed = False
+
+        for category_name, slugs in get_default_category_subcategories().items():
+            category = categories_by_name.get(category_name)
+            if not category:
+                continue
+            for order, slug in enumerate(slugs, start=1):
+                if slug in existing_by_slug:
+                    continue
+                item = Subcategory(
+                    category_id=category.id,
+                    name=format_subcategory_label(slug),
+                    slug=slug,
+                    icon=category.icon or get_category_icon(category),
+                    order=order,
+                    is_active=True,
+                    is_visible=True,
+                    show_in_menu=True,
+                )
+                db.session.add(item)
+                existing_by_slug[slug] = item
+                changed = True
+
+        if changed:
+            db.session.flush()
+
+        legacy_posts = Post.query.filter(
+            Post.subcategory_id.is_(None),
+            Post.subcategory.isnot(None),
+            Post.subcategory != '',
+            Post.category_id.isnot(None),
+        ).all()
+        for post_item in legacy_posts:
+            legacy_slug = generate_slug(post_item.subcategory)
+            subcategory_item = existing_by_slug.get(legacy_slug)
+            if not subcategory_item:
+                category = db.session.get(Category, post_item.category_id)
+                if not category:
+                    continue
+                unique_slug = legacy_slug
+                counter = 2
+                while unique_slug in existing_by_slug:
+                    unique_slug = f'{category.slug}-{legacy_slug}-{counter}'
+                    counter += 1
+                subcategory_item = Subcategory(
+                    category_id=category.id,
+                    name=format_subcategory_label(legacy_slug),
+                    slug=unique_slug,
+                    icon=category.icon or get_category_icon(category),
+                )
+                db.session.add(subcategory_item)
+                db.session.flush()
+                existing_by_slug[unique_slug] = subcategory_item
+            if subcategory_item.category_id == post_item.category_id:
+                post_item.subcategory_id = subcategory_item.id
+                changed = True
+
+        if changed:
+            db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.error('Erro ao sincronizar subcategorias padrao: %s', exc)
+
 with app.app_context():
     try:
         db.create_all()
@@ -16193,6 +16738,15 @@ with app.app_context():
                     conn.execute(text("ALTER TABLE user ADD COLUMN preferences TEXT"))
                     conn.commit()
                     app.logger.info("Coluna 'preferences' adicionada a user")
+                if 'exclude_from_statistics' not in user_cols:
+                    conn.execute(text("ALTER TABLE user ADD COLUMN exclude_from_statistics BOOLEAN NOT NULL DEFAULT 0"))
+                    conn.commit()
+                    app.logger.info("Coluna 'exclude_from_statistics' adicionada a user")
+                post_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(posts)"))]
+                if 'subcategory_id' not in post_cols:
+                    conn.execute(text("ALTER TABLE posts ADD COLUMN subcategory_id INTEGER"))
+                    conn.commit()
+                    app.logger.info("Coluna 'subcategory_id' adicionada a posts")
                 transaction_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(transactions)"))]
                 if transaction_cols and 'abacatepay_charge_id' not in transaction_cols:
                     conn.execute(text("ALTER TABLE transactions ADD COLUMN abacatepay_charge_id VARCHAR(255)"))
@@ -16219,6 +16773,7 @@ with app.app_context():
                     app.logger.info("Coluna 'show_in_menu' adicionada a category")
         except Exception:
             pass
+        ensure_default_subcategories()
     except Exception:
         app.logger.exception('Erro na inicializacao automatica')
 

@@ -279,6 +279,14 @@
                                 <i class="fas fa-bell"></i> Notificações
                             </small>
                             {% endif %}
+                            <button type="button"
+                                class="statistics-badge clickable-badge{% if user.exclude_from_statistics %} is-excluded{% endif %}"
+                                data-user-statistics="{{ user.id }}"
+                                data-excluded="{{ 'true' if user.exclude_from_statistics else 'false' }}"
+                                title="Clique para {{ 'incluir nas' if user.exclude_from_statistics else 'excluir das' }} estatísticas">
+                                <i class="fas {{ 'fa-eye-slash' if user.exclude_from_statistics else 'fa-chart-line' }}"></i>
+                                {{ 'Fora das estatísticas' if user.exclude_from_statistics else 'Nas estatísticas' }}
+                            </button>
                         </div>
                     </td>
                     <td class="actions-cell">
@@ -602,6 +610,14 @@
                                     <i class="fas fa-bell"></i> Notificações por Email
                                 </label>
                                 <small>Receber updates e notificações</small>
+                            </div>
+
+                            <div class="form-check">
+                                <input type="checkbox" id="excludeFromStatistics" name="exclude_from_statistics" class="form-check-input">
+                                <label for="excludeFromStatistics" class="form-check-label">
+                                    <i class="fas fa-eye-slash"></i> Excluir das estatísticas
+                                </label>
+                                <small>Não contabiliza as visitas deste usuário, inclusive administradores.</small>
                             </div>
                         </div>
                     </div>
@@ -1199,6 +1215,27 @@
         font-size: 0.7rem;
         color: var(--admin-info);
         display: block;
+    }
+
+    .statistics-badge {
+        display: flex;
+        align-items: center;
+        gap: .3rem;
+        margin-top: .3rem;
+        padding: .24rem .48rem;
+        border: 1px solid rgba(40, 167, 69, .3);
+        border-radius: 999px;
+        color: #16783a;
+        background: rgba(40, 167, 69, .08);
+        font: inherit;
+        font-size: .68rem;
+        cursor: pointer;
+    }
+
+    .statistics-badge.is-excluded {
+        color: #a15c00;
+        border-color: rgba(245, 158, 11, .38);
+        background: rgba(245, 158, 11, .1);
     }
 
     .tracking-cell {
@@ -2105,6 +2142,97 @@
         return refreshUsersListFromUrl(window.location.href, { silent: true, pushState: false, ...options });
     };
 
+    async function fetchUsersDocument() {
+        const response = await fetch(window.location.href, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const html = await response.text();
+        if (!response.ok) throw new Error('Não foi possível sincronizar a lista de usuários.');
+        return new DOMParser().parseFromString(html, 'text/html');
+    }
+
+    async function syncUserRow(userId) {
+        const parsed = await fetchUsersDocument();
+        const tbody = document.querySelector('#usersListRegion tbody');
+        const currentRow = document.querySelector(`#usersListRegion .user-row[data-id="${userId}"]`);
+        const nextRow = parsed.querySelector(`#usersListRegion .user-row[data-id="${userId}"]`);
+        const desiredIndex = Array.from(parsed.querySelectorAll('#usersListRegion tbody .user-row'))
+            .findIndex((row) => row.dataset.id === String(userId));
+        if (currentRow && nextRow) currentRow.replaceWith(nextRow);
+        else if (currentRow && !nextRow) currentRow.remove();
+        else if (!currentRow && nextRow && tbody) tbody.insertBefore(nextRow, tbody.children[desiredIndex] || null);
+        if (nextRow && tbody && desiredIndex >= 0 && tbody.children[desiredIndex] !== nextRow) {
+            tbody.insertBefore(nextRow, tbody.children[desiredIndex] || null);
+        }
+        updateUsersHeaderFromDocument(parsed);
+        markUsersPaginationLinks();
+        resetUsersStatsSnapshot(document.getElementById('usersListRegion'));
+        updateBulkActionsVisibilityDynamic();
+    }
+    window.syncUserRow = syncUserRow;
+
+    window.toggleUserStatistics = async function (userId, currentlyExcluded) {
+        try {
+            const response = await fetch(`/admin/users/${userId}/statistics`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ excluded: !currentlyExcluded }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || 'Não foi possível alterar as estatísticas.');
+            await syncUserRow(userId);
+            showNotification(data.message, 'success');
+        } catch (error) {
+            showNotification(error.message, 'error');
+        }
+    };
+
+    document.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-user-statistics]');
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.toggleUserStatistics(button.dataset.userStatistics, button.dataset.excluded === 'true');
+    }, true);
+
+    async function syncVisibleUserRows() {
+        if (document.hidden || activeUsersListController || document.querySelector('.modal.show')) return;
+        const region = document.getElementById('usersListRegion');
+        const tbody = region?.querySelector('tbody');
+        if (!tbody) return;
+        try {
+            const parsed = await fetchUsersDocument();
+            const nextRows = Array.from(parsed.querySelectorAll('#usersListRegion tbody .user-row'));
+            const nextIds = new Set(nextRows.map((row) => row.dataset.id));
+            Array.from(tbody.querySelectorAll('.user-row')).forEach((row) => {
+                if (!nextIds.has(row.dataset.id)) row.remove();
+            });
+            nextRows.forEach((nextRow, index) => {
+                let currentRow = tbody.querySelector(`.user-row[data-id="${nextRow.dataset.id}"]`);
+                if (!currentRow) {
+                    currentRow = nextRow;
+                    tbody.insertBefore(currentRow, tbody.children[index] || null);
+                } else if (currentRow.outerHTML !== nextRow.outerHTML) {
+                    currentRow.replaceWith(nextRow);
+                    currentRow = nextRow;
+                }
+                if (tbody.children[index] !== currentRow) tbody.insertBefore(currentRow, tbody.children[index] || null);
+            });
+            updateUsersHeaderFromDocument(parsed);
+            markUsersPaginationLinks();
+            resetUsersStatsSnapshot(region);
+        } catch (error) {
+            console.debug('Sincronização de usuários adiada:', error);
+        }
+    }
+
     function updateBulkActionsVisibilityDynamic() {
         const region = document.getElementById('usersListRegion');
         const checkedBoxes = region ? region.querySelectorAll('.user-checkbox:checked') : [];
@@ -2199,23 +2327,34 @@
         }
     });
 
-    function submitDeleteUser(userId) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/admin/users/${userId}/delete`;
-        form.style.display = 'none';
-
+    async function submitDeleteUser(userId) {
         const csrfToken = window.csrfUtils?.getCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
-        if (csrfToken) {
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = 'csrf_token';
-            csrfInput.value = csrfToken;
-            form.appendChild(csrfInput);
+        try {
+            const response = await fetch(`/admin/users/${userId}/delete`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'application/json',
+                },
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || 'Erro ao excluir usuário.');
+            document.querySelector(`#usersListRegion .user-row[data-id="${userId}"]`)?.remove();
+            if (data.totals) {
+                const mappings = { admins: '.stat-item.admins .stat-number', editors: '.stat-item.editors .stat-number', users: '.stat-item.users .stat-number', active: '.stat-item.active .stat-number', total: '.count-badge' };
+                Object.entries(mappings).forEach(([key, selector]) => {
+                    const element = document.querySelector(selector);
+                    if (element && data.totals[key] !== undefined) element.textContent = data.totals[key];
+                });
+            }
+            usersStatsState = null;
+            showNotification(data.message, 'success');
+            window.setTimeout(syncVisibleUserRows, 250);
+        } catch (error) {
+            showNotification(error.message || 'Erro ao excluir usuário.', 'error');
         }
-
-        document.body.appendChild(form);
-        form.submit();
     }
 
     function closeActionDropdownPortal() {
@@ -2953,6 +3092,7 @@
                 document.getElementById('editPlan').value = user.plan || 'free';
                 document.getElementById('editIsActive').checked = user.is_active;
                 document.getElementById('editIsVerified').checked = user.is_verified;
+                document.getElementById('editExcludeFromStatistics').checked = user.exclude_from_statistics === true;
                 document.getElementById('editPhone').value = user.phone || '';
                 document.getElementById('editLocation').value = user.location || '';
                 document.getElementById('editWebsite').value = user.website || '';
@@ -3056,6 +3196,14 @@
                                 </div>
 
                                 <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="editExcludeFromStatistics" name="exclude_from_statistics" class="form-check-input">
+                                        <label for="editExcludeFromStatistics" class="form-check-label"><i class="fas fa-eye-slash"></i> Excluir das estatísticas</label>
+                                        <small class="form-text">Pode ser usado no próprio administrador para não contaminar os acessos.</small>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
                                     <label for="editPhone" class="form-label"><i class="fas fa-phone"></i> Telefone</label>
                                     <input type="text" id="editPhone" name="phone" class="form-control">
                                 </div>
@@ -3123,6 +3271,7 @@
             // Converter checkbox para boolean
             formData.set('is_active', document.getElementById('editIsActive').checked);
             formData.set('is_verified', document.getElementById('editIsVerified').checked);
+            formData.set('exclude_from_statistics', document.getElementById('editExcludeFromStatistics').checked);
 
             fetch(`/admin/users/${userId}/update`, {
                 method: 'POST',
@@ -3133,7 +3282,7 @@
                     if (data.success) {
                         showNotification('Usuário atualizado com sucesso!', 'success');
                         closeEditUserModal();
-                        window.refreshCurrentUsersList?.();
+                        window.syncUserRow?.(userId);
                     } else {
                         showNotification(data.message || 'Erro ao atualizar usuário', 'error');
                     }
@@ -3219,15 +3368,32 @@
         // Fix for Add User Modal Save Button
         const saveUserBtn = document.getElementById('saveUser');
         if (saveUserBtn) {
-            saveUserBtn.addEventListener('click', function (e) {
+            saveUserBtn.addEventListener('click', async function (e) {
                 e.preventDefault();
                 const form = document.getElementById('userForm');
                 if (form) {
-                    // Basic validation
-                    if (form.checkValidity()) {
-                        form.submit();
-                    } else {
+                    if (!form.checkValidity()) {
                         form.reportValidity();
+                        return;
+                    }
+                    this.disabled = true;
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                            body: new FormData(form),
+                        });
+                        const data = await response.json();
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Erro ao criar usuário.');
+                        closeAdminModal('addUserModal');
+                        form.reset();
+                        showNotification(data.message, 'success');
+                        await syncUserRow(data.user.id);
+                    } catch (error) {
+                        showNotification(error.message, 'error');
+                    } finally {
+                        this.disabled = false;
                     }
                 }
             });
@@ -3529,6 +3695,9 @@
             applyButton.disabled = true;
             applyButton.classList.add('disabled');
         }
+
+        if (window.__adminUsersLiveTimer) window.clearInterval(window.__adminUsersLiveTimer);
+        window.__adminUsersLiveTimer = window.setInterval(syncVisibleUserRows, 5000);
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initUsersPage);

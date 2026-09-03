@@ -70,6 +70,9 @@
         (function() {
             const savedTheme = localStorage.getItem('admin_theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
+            document.addEventListener('DOMContentLoaded', function () {
+                document.body.setAttribute('data-theme', savedTheme);
+            }, { once: true });
         })();
     </script>
 

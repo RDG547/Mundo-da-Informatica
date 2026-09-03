@@ -1241,3 +1241,52 @@
 .expanding-categories h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
 .expanding-category-list { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1rem; }
 .expanding-category-list span { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.75rem; border-radius: 999px; background: var(--card-bg, #fff); }
+/* Hierarquia de subcategorias administrada em tempo real */
+.category-tree-section {
+    margin: 2.25rem 0;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 12px 35px rgba(15, 23, 42, .07);
+}
+
+.category-tree-list {
+    display: grid;
+    gap: .65rem;
+    margin-top: 1.25rem;
+}
+
+.category-tree-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: .8rem;
+    margin-left: calc(var(--tree-depth, 0) * 1.45rem);
+    padding: .85rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    color: #172033;
+    text-decoration: none;
+    background: #f8fafc;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+.category-tree-item:hover,
+.category-tree-item.is-current {
+    transform: translateX(3px);
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 24px rgba(var(--primary-rgb), .14);
+}
+
+.category-tree-item.is-current { background: rgba(var(--primary-rgb), .08); }
+.category-tree-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; color: #fff; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
+.category-tree-copy { display: grid; gap: .15rem; min-width: 0; }
+.category-tree-copy small { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.category-tree-count { padding: .3rem .55rem; border-radius: 999px; color: #475569; background: #e2e8f0; font-size: .76rem; font-weight: 600; }
+
+@media (max-width: 640px) {
+    .category-tree-section { padding: 1rem; }
+    .category-tree-item { margin-left: calc(var(--tree-depth, 0) * .6rem); grid-template-columns: auto minmax(0, 1fr) auto; }
+    .category-tree-count { display: none; }
+}

@@ -729,6 +729,18 @@
                                 {% endif %}
                             </div>
 
+                            <div class="form-group">
+                                <label for="postSubcategory" class="form-label">
+                                    <i class="fas fa-sitemap"></i> Subcategoria
+                                </label>
+                                <select id="postSubcategory" name="subcategory_id" class="form-select modern-select"
+                                    data-subcategory-select data-category-source="postCategory"
+                                    data-selected="{{ form_data.subcategory_id if form_data and form_data.subcategory_id else '' }}">
+                                    <option value="">Sem subcategoria</option>
+                                </select>
+                                <div class="form-text">Você pode escolher qualquer nível, inclusive fabricante ou modelo.</div>
+                            </div>
+
                         </div>
                     </div>
                 </div>

@@ -156,6 +156,19 @@ def test_feature_modal_controller_is_available_from_first_page_load(client):
     assert 'id="feature-modal"' in categories_body
 
 
+def test_vip_modal_and_persistent_dark_theme_survive_dynamic_navigation(client):
+    free_user = create_user(username='modal_free_user', plan='free')
+    login(client, free_user)
+    body = client.get('/').get_data(as_text=True)
+    assert 'data-vip-access="locked"' in body
+    assert '__vipAccessHandlerBound' in body
+    assert 'public-theme.js' in body
+    assert 'dark-mode.css' in body
+
+    dynamic_script = client.get('/static/js/dynamic-loading.js').get_data(as_text=True)
+    assert "navigation: doc.querySelector('#primary-navigation')" in dynamic_script
+
+
 def test_anonymous_suggestion_is_stored(client):
     response = client.post(
         "/solicitacoes",

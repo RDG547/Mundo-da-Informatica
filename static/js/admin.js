@@ -256,16 +256,18 @@ function initThemeToggle() {
     const lightIcon = document.querySelector('.theme-icon-light');
 
     // Definir ícone inicial baseado no tema atual
+    if (document.body) document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
     if (isDarkMode) {
-        darkIcon.style.display = 'none';
-        lightIcon.style.display = 'inline-block';
+        if (darkIcon) darkIcon.style.display = 'none';
+        if (lightIcon) lightIcon.style.display = 'inline-block';
     } else {
-        darkIcon.style.display = 'inline-block';
-        lightIcon.style.display = 'none';
+        if (darkIcon) darkIcon.style.display = 'inline-block';
+        if (lightIcon) lightIcon.style.display = 'none';
     }
 
     // Adicionar evento para alternar tema
-    if (themeToggle) {
+    if (themeToggle && themeToggle.dataset.adminThemeBound !== 'true') {
+        themeToggle.dataset.adminThemeBound = 'true';
         themeToggle.addEventListener('click', function (e) {
             e.preventDefault();
             const currentTheme = htmlElement.getAttribute('data-theme');
@@ -275,6 +277,7 @@ function initThemeToggle() {
             document.body.classList.add('theme-transition');
             setTimeout(() => {
                 htmlElement.setAttribute('data-theme', newTheme);
+                document.body.setAttribute('data-theme', newTheme);
                 localStorage.setItem('admin_theme', newTheme);
             }, 50);
 
@@ -284,11 +287,11 @@ function initThemeToggle() {
 
             // Alternar ícones
             if (newTheme === 'dark') {
-                darkIcon.style.display = 'none';
-                lightIcon.style.display = 'inline-block';
+                if (darkIcon) darkIcon.style.display = 'none';
+                if (lightIcon) lightIcon.style.display = 'inline-block';
             } else {
-                darkIcon.style.display = 'inline-block';
-                lightIcon.style.display = 'none';
+                if (darkIcon) darkIcon.style.display = 'inline-block';
+                if (lightIcon) lightIcon.style.display = 'none';
             }
 
             // Mostrar notificação

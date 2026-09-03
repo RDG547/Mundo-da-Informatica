@@ -2,7 +2,7 @@
     if (window.__siteSettingsLiveInitialized) return;
     window.__siteSettingsLiveInitialized = true;
 
-    const POLL_INTERVAL_MS = 8000;
+    const POLL_INTERVAL_MS = 4000;
     const STORAGE_KEY = 'site_settings_live_snapshot';
     const CHANNEL_NAME = 'site-settings-live';
     let latestSettings = null;
@@ -88,7 +88,7 @@
             toggle.setAttribute('aria-hidden', darkModeEnabled ? 'false' : 'true');
         });
         if (!darkModeEnabled && !document.body.classList.contains('admin-page')) {
-            document.body.setAttribute('data-theme', 'light');
+            window.PublicTheme?.setTheme?.('light');
         }
     }
 

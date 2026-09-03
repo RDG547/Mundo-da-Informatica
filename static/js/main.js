@@ -239,18 +239,7 @@
     }
 
     function bindDarkModeToggle() {
-        const darkModeToggle = document.querySelector('.dark-mode');
-        if (!darkModeToggle || darkModeToggle.dataset.mainDarkModeBound === 'true') {
-            return;
-        }
-
-        darkModeToggle.dataset.mainDarkModeBound = 'true';
-        darkModeToggle.addEventListener('click', () => {
-            document.body.setAttribute(
-                'data-theme',
-                document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
-            );
-        });
+        window.PublicTheme?.init?.();
     }
 
     function bindShareButtons() {
@@ -601,10 +590,17 @@
     });
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeMainUi);
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMainUi();
+            hidePreloader();
+        });
     } else {
         initializeMainUi();
+        hidePreloader();
     }
+
+    // Recursos externos lentos não podem manter a interface encoberta indefinidamente.
+    window.setTimeout(hidePreloader, 3500);
 
     document.addEventListener('pageLoaded', () => {
         setTimeout(initializeMainUi, 0);

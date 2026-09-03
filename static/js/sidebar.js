@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const adminContent = document.getElementById('adminContent');
     const navItems = document.querySelectorAll('.admin-nav-item');
-    const themeToggle = document.getElementById('themeToggle');
 
     // Verificar se a sidebar está em modo recolhido no localStorage
     const isSidebarCollapsed = localStorage.getItem('admin_sidebar_collapsed') === 'true';
@@ -58,23 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (text) {
                 item.setAttribute('data-title', text.textContent.trim());
             }
-        });
-    }
-
-    // Alternar tema claro/escuro
-    if (themeToggle) {
-        themeToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-
-            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-
-            // Atualizar tema
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('admin_theme', newTheme);
-
-            // Mostrar notificação
-            showNotification(`Tema ${newTheme === 'dark' ? 'escuro' : 'claro'} ativado`, 'success');
         });
     }
 

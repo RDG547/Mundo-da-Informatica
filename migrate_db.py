@@ -79,6 +79,31 @@ def create_auxiliary_tables(connection) -> int:
         Table("user", metadata, autoload_with=connection)
     if "posts" in tables:
         Table("posts", metadata, autoload_with=connection)
+    if "category" in tables:
+        Table("category", metadata, autoload_with=connection)
+
+    subcategory_category_id = (
+        Column("category_id", Integer, ForeignKey("category.id", ondelete="CASCADE"), nullable=False)
+        if "category" in tables else Column("category_id", Integer, nullable=False)
+    )
+    subcategories = Table(
+        "subcategories", metadata,
+        Column("id", Integer, primary_key=True),
+        subcategory_category_id,
+        Column("parent_id", Integer, ForeignKey("subcategories.id", ondelete="CASCADE")),
+        Column("name", String(80), nullable=False),
+        Column("slug", String(100), nullable=False, unique=True),
+        Column("description", Text),
+        Column("icon", String(50), server_default="fas fa-folder"),
+        Column("order", Integer, nullable=False, server_default="0"),
+        Column("is_active", Boolean, nullable=False, server_default="true"),
+        Column("is_visible", Boolean, nullable=False, server_default="true"),
+        Column("show_in_menu", Boolean, nullable=False, server_default="true"),
+        Column("created_at", DateTime, nullable=False),
+        Column("updated_at", DateTime, nullable=False),
+        UniqueConstraint("category_id", "slug", name="uq_subcategory_category_slug"),
+        extend_existing=True,
+    )
 
     webhook_events = Table(
         "payment_webhook_events",
@@ -525,7 +550,7 @@ def create_auxiliary_tables(connection) -> int:
 
     created = 0
     tables_to_create = [
-        webhook_events, scheduled_posts, content_requests, hardware_boards, content_sources,
+        subcategories, webhook_events, scheduled_posts, content_requests, hardware_boards, content_sources,
         technical_resources, technical_files, import_jobs, import_items,
         file_contributions, datasheet_provider_configs, electronic_components,
         component_aliases, component_source_records, datasheet_documents,
@@ -614,6 +639,7 @@ def migrate() -> None:
             "weekly_downloads": "INTEGER DEFAULT 0",
             "week_reset_date": "DATETIME",
             "preferences": "TEXT",
+            "exclude_from_statistics": "BOOLEAN NOT NULL DEFAULT FALSE",
         })
         applied += add_missing_columns(connection, "favorites", {"position": "INTEGER DEFAULT 0"})
         applied += add_missing_columns(connection, "comments", {
@@ -631,13 +657,18 @@ def migrate() -> None:
         applied += add_missing_columns(connection, "content_requests", {
             "requester_plan": "VARCHAR(20) NOT NULL DEFAULT 'guest'",
         })
-        if inspect(connection).has_table("content_requests") and inspect(connection).has_table("user"):
+        if (
+            inspect(connection).has_table("content_requests")
+            and inspect(connection).has_table("user")
+            and "plan" in column_names(connection, "user")
+        ):
             connection.execute(text(
                 'UPDATE content_requests '
                 'SET requester_plan = COALESCE((SELECT plan FROM "user" WHERE "user".id = content_requests.user_id), \'guest\') '
                 "WHERE user_id IS NOT NULL AND (requester_plan IS NULL OR requester_plan = 'guest')"
             ))
         applied += add_missing_columns(connection, "posts", {
+            "subcategory_id": "INTEGER",
             "manufacturer": "VARCHAR(120)",
             "brand": "VARCHAR(120)",
             "model": "VARCHAR(160)",

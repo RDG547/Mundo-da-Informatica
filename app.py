@@ -5863,6 +5863,7 @@ SEO_PRIVATE_ENDPOINT_PREFIXES = ('admin', 'api_')
 SEO_PRIVATE_PATH_PREFIXES = (
     '/admin', '/api/', '/login', '/register', '/logout', '/profile',
     '/reset-password', '/download/', '/checkout-', '/pix-checkout',
+    '/area-vip', '/debug/', '/auth/', '/datasheet/documento/',
 )
 
 SEO_ROBOTS_DISALLOW_PATHS = (
@@ -5900,7 +5901,6 @@ SEO_ROBOTS_DISALLOW_PATHS = (
     '/check-pix-payment/',
     '/stripe-webhook',
     '/abacatepay-webhook',
-    '/pesquisa',
     '/test-password-toggle',
     '/*/comments',
 )
@@ -5987,7 +5987,7 @@ def _robots_directive_for_request() -> str:
         return 'noindex,follow'
     if endpoint.startswith(SEO_PRIVATE_ENDPOINT_PREFIXES) or path.startswith(SEO_PRIVATE_PATH_PREFIXES):
         return 'noindex,nofollow,noarchive'
-    if endpoint in {'setup', 'post', 'static'} or path.startswith('/errors/'):
+    if endpoint in {'setup', 'static'} or path.startswith('/errors/'):
         return 'noindex,follow'
     return 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
 
@@ -6202,7 +6202,7 @@ def home():
         posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())
         posts_paginated = posts_query.paginate(page=page, per_page=8, error_out=False)
         posts = posts_paginated.items
-        featured = Post.query.filter_by(featured=True).limit(4).all()
+        featured = Post.query.filter_by(featured=True, is_active=True).limit(4).all()
         most_used = Post.query.filter(Post.is_active == True, Post.downloads > 0).order_by(
             Post.downloads.desc(), Post.date_posted.desc()
         ).limit(4).all()
@@ -6343,12 +6343,12 @@ def subcategory(subcategory):
 @app.route('/post/<int:post_id>')
 def post(post_id):
     """Rota antiga - redireciona para URL amigável"""
-    post = Post.query.get_or_404(post_id)
+    post = Post.query.filter_by(id=post_id, is_active=True).first_or_404()
 
     # Redirecionar para URL amigável
-    if post.slug and post.category_str:
-        category_slug = generate_slug(post.category_str)
-        return redirect(url_for('post_by_slug', category=category_slug, slug=post.slug), code=301)
+    canonical_path = _post_public_path(post)
+    if canonical_path != request.path:
+        return redirect(canonical_path, code=301)
 
     # Se não tiver slug, continuar com a rota antiga
     increment_post_views(post_id)
@@ -6375,7 +6375,7 @@ def post(post_id):
 @app.route('/<string:category>/<string:slug>')
 def post_by_slug(category, slug):
     """Nova rota com URL amigável: /categoria/nome-do-post"""
-    post = Post.query.filter_by(slug=slug).first_or_404()
+    post = Post.query.filter_by(slug=slug, is_active=True).first_or_404()
 
     canonical_path = _post_public_path(post)
     if request.path.rstrip('/') != canonical_path.rstrip('/'):

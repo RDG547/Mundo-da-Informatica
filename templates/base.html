@@ -34,9 +34,22 @@
         {% set post_target = post.model or post.title %}
         {% set page_title = post.seo_title or (post_kind ~ ' ' ~ post_target ~ (' ' ~ post.board_code if post.board_code else '') ~ ' | ' ~ site_name) %}
         {% set page_description = post.seo_description or ('Consulte ' ~ post_kind ~ ' para ' ~ post_target ~ (', placa ' ~ post.board_code if post.board_code else '') ~ '. Veja informações técnicas, compatibilidade e arquivos disponíveis.') %}
+    {% elif board is defined and board %}
+        {% set board_label = [board.board_code, board.manufacturer, board.device_model]|select|join(' ') %}
+        {% set page_title = board_label ~ ' | Placa técnica | ' ~ site_name %}
+        {% set page_description = 'Consulte a identificação da placa ' ~ board_label ~ ', componentes, datasheets e recursos técnicos associados disponíveis.' %}
+    {% elif request.endpoint == 'home' %}
+        {% set page_title = site_name ~ ' | BIOS, Esquemas e BoardView' %}
+        {% set page_description = seo_page_description %}
+    {% elif request.endpoint == 'category' or request.endpoint == 'subcategory' %}
+        {% set page_title = category ~ ' | Arquivos e recursos técnicos | ' ~ site_name %}
+        {% set page_description = seo_page_description %}
     {% else %}
-        {% set page_title = site_name ~ (' - ' ~ title if title else '') %}
+        {% set page_title = (title ~ ' | ' if title else '') ~ site_name %}
         {% set page_description = seo_page_description or site_configs.get('site_description', 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.') %}
+    {% endif %}
+    {% if request.endpoint in ['home', 'category', 'subcategory', 'posts', 'datasheet_library'] and request.args.get('page', 1, type=int) > 1 %}
+        {% set page_title = page_title ~ ' — Página ' ~ request.args.get('page', 1, type=int) %}
     {% endif %}
     <title>{{ page_title }}</title>
 

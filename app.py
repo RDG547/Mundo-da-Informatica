@@ -6214,7 +6214,7 @@ def sitemap_xml():
 def home():
     if request.path.rstrip('/') == '/home':
         page = request.args.get('page', 1, type=int)
-        return redirect(url_for('home', page=page) if page > 1 else '/', code=301)
+        return redirect(f'/?page={page}' if page > 1 else '/', code=301)
     try:
         page = request.args.get('page', 1, type=int)
         posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())

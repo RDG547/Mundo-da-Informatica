@@ -48,8 +48,8 @@
         {% set page_title = (title ~ ' | ' if title else '') ~ site_name %}
         {% set page_description = seo_page_description or site_configs.get('site_description', 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.') %}
     {% endif %}
-    {% if request.endpoint in ['home', 'category', 'subcategory', 'posts', 'datasheet_library'] and request.args.get('page', 1, type=int) > 1 %}
-        {% set page_title = page_title ~ ' — Página ' ~ request.args.get('page', 1, type=int) %}
+    {% if request.endpoint in ['home', 'category', 'subcategory', 'posts', 'datasheet_library'] and (request.args.get('page', '1')|int(1)) > 1 %}
+        {% set page_title = page_title ~ ' — Página ' ~ (request.args.get('page', '1')|int(1)) %}
     {% endif %}
     <title>{{ page_title }}</title>
 

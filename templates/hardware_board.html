@@ -27,7 +27,7 @@
                 {% for resource in resources %}
                 <article>
                     <span class="resource-type">{{ resource.resource_type|replace('_', ' ') }}</span>
-                    <h3><a href="{{ url_for('post', post_id=resource.post_id) }}">{{ resource.title }}</a></h3>
+                    <h3><a href="{{ post_url(resource.post) }}">{{ resource.title }}</a></h3>
                     <p>{{ [resource.version, resource.chip, resource.chip_position]|select|join(' · ') or 'Consulte os detalhes técnicos.' }}</p>
                     <div class="resource-meta"><span><i class="fas fa-shield-alt"></i> {{ resource.verification_status }}</span>{% if resource.source_provider %}<span><i class="fas fa-database"></i> {{ resource.source_provider }}</span>{% endif %}</div>
                     <div class="resource-files">

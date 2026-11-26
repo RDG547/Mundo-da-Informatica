@@ -1,0 +1,11 @@
+{% if posts.pages > 1 %}
+<nav class="pagination-nav" aria-label="Páginas do acervo" style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:center;margin:16px 0">
+    {% if posts.has_prev %}
+    <a href="{{ request.path }}{% if posts.prev_num > 1 %}?page={{ posts.prev_num }}{% endif %}">Anterior</a>
+    {% endif %}
+    <span>Página {{ posts.page }} de {{ posts.pages }}</span>
+    {% if posts.has_next %}
+    <a href="{{ request.path }}?page={{ posts.next_num }}">Próxima página</a>
+    {% endif %}
+</nav>
+{% endif %}

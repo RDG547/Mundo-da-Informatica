@@ -14,7 +14,7 @@
                 <i class="fas fa-home"></i> Início
             </a>
             <i class="fas fa-chevron-right"></i>
-            <a href="{{ url_for('category', category=(post.category_rel.name if post.category_rel else post.category_str)) }}">
+            <a href="{{ url_for('category', category=(category_public_url_value(post.category_rel) if post.category_rel else post.category_str)) }}">
                 {% if post.category_rel and post.category_rel.icon %}
                     <i class="{{ post.category_rel.icon }}"></i>
                 {% elif post.category_str == 'BIOS' %}
@@ -178,6 +178,14 @@
                     {% endif %}
                 </section>
                 {% endif %}
+
+                {% set linked_boards = namespace(ids=[]) %}
+                {% for resource in post.technical_resources if resource.board %}
+                    {% if resource.board.id not in linked_boards.ids %}
+                    {% set linked_boards.ids = linked_boards.ids + [resource.board.id] %}
+                    <p class="technical-info-card"><a href="{{ url_for('hardware_board_detail', slug=resource.board.slug) }}">Ver placa {{ resource.board.board_code }} e recursos técnicos associados</a></p>
+                    {% endif %}
+                {% endfor %}
 
                 <!-- Post Description -->
                 <div class="post-description-card animate-slide-up">

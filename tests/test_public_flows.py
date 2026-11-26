@@ -347,3 +347,20 @@ def test_category_cta_search_and_suggestion_buttons_have_distinct_shared_sizing(
     assert "font-size: 0.95rem" in css
     assert ".category-cta .cta-buttons .cta-search-button" in css
     assert ".category-cta .cta-buttons .cta-suggestion-button" in css
+
+
+def test_catalog_pagination_exposes_crawlable_links(client):
+    with app.app_context():
+        category = Category(name="BIOS", slug="bios", is_active=True, is_visible=True)
+        db.session.add(category)
+        for i in range(10):
+            db.session.add(Post(title=f"BIOS teste {i}", content="Recurso técnico",
+                download_link="https://example.test/bios.bin", category_rel=category,
+                category_str="BIOS", slug=f"bios-teste-{i}", is_active=True))
+        db.session.commit()
+    for path in ["/", "/posts", "/categoria/bios"]:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert f'href="{path}?page=2"' in response.get_data(as_text=True)
+    assert client.get("/home?page=2").headers["Location"].endswith("/?page=2")
+    assert client.get("/categoria/bios?page=2").status_code == 200

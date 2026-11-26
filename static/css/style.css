@@ -4608,3 +4608,10 @@ canvas {
     font-size: .68rem;
     background: rgba(var(--primary-rgb), .12);
 }
+
+/* Keep the fixed header and home hero stable on the first paint. */
+.hero h1.hero-title-3d { opacity: 1; transform: none; animation: none; }
+.hero-title-3d .hero-line-3d { white-space: normal; }
+.most-used-type { color: #2454a6; }
+.dark-mode .most-used-type, body.dark .most-used-type, [data-theme='dark'] .most-used-type { color: #9ec5ff; }
+@media (prefers-reduced-motion: reduce) { .hero { animation: none; } }

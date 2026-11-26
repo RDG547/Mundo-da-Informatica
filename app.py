@@ -544,6 +544,19 @@ def get_image_url_for_response(image_path, folder='profiles', default='default.j
     return url_for('static', filename=f'uploads/{folder}/{normalized}')
 
 
+def optimize_public_thumbnail(url, width=480):
+    """Only transform ordinary versioned Cloudinary image URLs, never originals or downloads."""
+    import re
+    match = re.fullmatch(r'(https://res\.cloudinary\.com/[^/]+/image/upload/)(v\d+/[^?#]+)', str(url or ''))
+    if not match:
+        return url
+    width = max(68, min(1200, int(width)))
+    return f'{match.group(1)}c_limit,w_{width},q_auto,f_auto/{match.group(2)}'
+
+
+app.jinja_env.filters['public_thumbnail'] = optimize_public_thumbnail
+
+
 def get_safe_internal_path(raw_path: str | None, fallback: str = '/') -> str:
     candidate = (raw_path or '').strip()
     if not candidate:
@@ -9032,6 +9045,7 @@ def _serialize_posts(posts_list, favorite_post_ids):
             'date_posted': post.date_posted.strftime('%d/%m/%Y') if post.date_posted else '',
             'views': post.views or 0,
             'image_url': img_url,
+            'thumbnail_url': optimize_public_thumbnail(img_url, 640),
             'download_link': url_for('download_post', post_id=post.id) if post.download_link else '',
             'category_str': post.category_str or 'Geral',
             'category_icon': cat_icon,

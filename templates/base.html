@@ -84,8 +84,6 @@
     <meta name="twitter:image" content="{% if social_image.startswith('http') %}{{ social_image }}{% else %}{{ public_base_url }}{{ social_image }}{% endif %}">
     {% else %}
     <meta property="og:type" content="website">
-    <meta property="og:image" content="{{ public_base_url }}{{ url_for('static', filename='images/apple-touch-icon.png') }}">
-    <meta name="twitter:image" content="{{ public_base_url }}{{ url_for('static', filename='images/apple-touch-icon.png') }}">
     <meta property="og:url" content="{{ canonical_url }}">
     <meta property="og:title" content="{{ page_title }}">
     <meta property="og:description" content="{{ page_description|striptags|truncate(180, True) }}">
@@ -98,7 +96,7 @@
     <script type="application/ld+json">{{ {
         '@context': 'https://schema.org',
         '@graph': [
-            {'@type': 'Organization', '@id': public_base_url ~ '/#organization', 'name': site_name, 'url': public_base_url, 'logo': public_base_url ~ url_for('static', filename='images/apple-touch-icon.png')},
+            {'@type': 'Organization', '@id': public_base_url ~ '/#organization', 'name': site_name, 'url': public_base_url},
             {'@type': 'WebSite', '@id': public_base_url ~ '/#website', 'name': site_name, 'url': public_base_url,
              'publisher': {'@id': public_base_url ~ '/#organization'},
              'potentialAction': {'@type': 'SearchAction', 'target': public_base_url ~ '/pesquisa?q={search_term_string}', 'query-input': 'required name=search_term_string'}}
@@ -159,10 +157,10 @@
     <!-- End Meta Pixel Code -->
 
     <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='images/favicon-48.png') }}">
-    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico', v='20261126') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
-    <meta name="msapplication-TileImage" content="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='images/favicon-mi-48.png') }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico', v='mi20261126') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/favicon.svg') }}">
+    <meta name="msapplication-TileImage" content="{{ url_for('static', filename='images/favicon.svg') }}">
     <meta name="msapplication-TileColor" content="{{ site_primary_color }}">
     <meta name="theme-color" content="{{ site_primary_color }}">
 
@@ -541,7 +539,7 @@
             <div class="container">
                 <div class="logo">
                     <a href="{{ url_for('home') }}">
-                        <img src="{{ url_for('static', filename='images/brand-logo-2026.webp') }}" alt="" width="32" height="32" style="object-fit:contain;border-radius:50%;flex-shrink:0"> <span data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
+                        <i class="fas fa-microchip"></i> <span data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
                     </a>
                 </div>
 

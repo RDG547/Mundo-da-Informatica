@@ -2822,7 +2822,8 @@ def before_request():
         return redirect(canonical_target.rstrip('?'), code=301)
 
     if request.path == '/home':
-        return redirect('/', code=301)
+        page = request.args.get('page', 1, type=int)
+        return redirect(f'/?page={page}' if page > 1 else '/', code=301)
 
     # Atualizar last_login do usuário autenticado
     if current_user.is_authenticated:

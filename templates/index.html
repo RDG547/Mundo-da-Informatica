@@ -5,7 +5,7 @@
 <!-- Hero Section -->
 <section class="hero" id="hero-particles" data-page="home">
     <div class="container">
-        <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}" data-live-setting="home_hero_title">{{ home_hero_title }}</h1>
+        <h1 class="hero-title-3d hero-split-text" aria-label="{{ home_hero_title }}" data-hero-title="{{ home_hero_title }}" data-live-setting="home_hero_title">{% set explicit_lines = home_hero_title.split('|') %}{% set words = home_hero_title.split() %}{% if explicit_lines|length > 1 %}{% set lines = explicit_lines %}{% elif words|length > 3 %}{% set first = ((words|length)/3)|round(0,'ceil')|int %}{% set second = ((words|length)*2/3)|round(0,'ceil')|int %}{% set lines = [words[:first]|join(' '), words[first:second]|join(' '), words[second:]|join(' ')] %}{% else %}{% set lines = [home_hero_title] %}{% endif %}{% for line in lines if line|trim %}<span class="hero-line hero-line-3d" data-text="{{ line|trim }}">{{ line|trim }}</span>{% endfor %}</h1>
         <p class="hero-subtitle-split" data-live-setting="home_hero_subtitle">{{ site_configs.get('home_hero_subtitle', 'BIOS, EC, BoardView, esquemas e recursos técnicos organizados por modelo e placa.') }}</p>
         <form action="{{ url_for('search') }}" method="get" class="search-bar" id="home-search-form">
             <div class="search-input-wrapper">
@@ -20,45 +20,6 @@
 
 <script>
 (function () {
-    function splitIntoChars(el, lines) {
-        var chars = [];
-        el.innerHTML = '';
-
-        for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-            var line = lines[lineIndex].trim();
-            var container = lines.length > 1 ? document.createElement('span') : el;
-
-            if (lines.length > 1) {
-                container.className = 'hero-line hero-line-3d';
-                container.setAttribute('data-text', line);
-                el.appendChild(container);
-            }
-
-            var words = line.split(/\s+/);
-            for (var wordIndex = 0; wordIndex < words.length; wordIndex++) {
-                if (wordIndex > 0) {
-                    var space = document.createElement('span');
-                    space.className = 'hero-space-3d';
-                    space.innerHTML = '&nbsp;';
-                    container.appendChild(space);
-                }
-
-                var word = document.createElement('span');
-                word.className = 'hero-word-3d';
-                for (var charIndex = 0; charIndex < words[wordIndex].length; charIndex++) {
-                    var char = document.createElement('span');
-                    char.className = 'hero-char-3d';
-                    char.textContent = words[wordIndex][charIndex];
-                    word.appendChild(char);
-                    chars.push(char);
-                }
-                container.appendChild(word);
-            }
-        }
-
-        return chars;
-    }
-
     function getHeroTitleLines(titleEl) {
         var rawTitle = (titleEl.dataset.heroTitle || titleEl.textContent || 'Encontre o arquivo certo para o reparo!').trim();
         var explicitLines = rawTitle.split('|').map(function (line) { return line.trim(); }).filter(Boolean);
@@ -88,12 +49,16 @@
         if (subtitleEl) subtitleEl.style.visibility = 'visible';
         if (searchForm) searchForm.style.opacity = '1';
 
-        if (typeof gsap !== 'undefined') {
-            gsap.killTweensOf(titleEl);
-            gsap.killTweensOf(titleEl.querySelectorAll('*'));
-        }
-
-        splitIntoChars(titleEl, getHeroTitleLines(titleEl));
+        var lines = getHeroTitleLines(titleEl);
+        if (Array.from(titleEl.children).map(function (el) { return el.textContent; }).join('|') === lines.join('|')) return;
+        titleEl.replaceChildren();
+        lines.forEach(function (line) {
+            var span = document.createElement('span');
+            span.className = 'hero-line hero-line-3d';
+            span.dataset.text = line;
+            span.textContent = line;
+            titleEl.appendChild(span);
+        });
     }
 
     function startHeroSplitText() {
@@ -125,7 +90,7 @@
         <!-- Top Pagination -->
         {% if posts_pagination and posts_pagination.pages > 1 %}
         <div class="home-pagination" id="home-pagination-top">
-            <button class="home-page-btn home-page-prev" {% if not posts_pagination.has_prev %}disabled{% endif %} data-page="{{ posts_pagination.prev_num or 1 }}">
+            <button class="home-page-btn home-page-prev" aria-label="Página anterior" {% if not posts_pagination.has_prev %}disabled{% endif %} data-page="{{ posts_pagination.prev_num or 1 }}">
                 <i class="fas fa-chevron-left"></i>
             </button>
             {% for page_num in posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
@@ -135,7 +100,7 @@
                 <span class="home-page-dots">...</span>
                 {% endif %}
             {% endfor %}
-            <button class="home-page-btn home-page-next" {% if not posts_pagination.has_next %}disabled{% endif %} data-page="{{ posts_pagination.next_num or posts_pagination.pages }}">
+            <button class="home-page-btn home-page-next" aria-label="Próxima página" {% if not posts_pagination.has_next %}disabled{% endif %} data-page="{{ posts_pagination.next_num or posts_pagination.pages }}">
                 <i class="fas fa-chevron-right"></i>
             </button>
         </div>
@@ -146,7 +111,7 @@
                 {% for post in posts %}
                 <div class="post-card">
                     <div class="post-image">
-                        <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ post.title }}" loading="lazy" width="640" height="360">
+                        <img src="{{ get_image_url(post.image_url, folder='posts', default='default.jpg')|public_thumbnail(640) }}" alt="Miniatura de {{ post.title }}" loading="lazy" width="640" height="360">
                     </div>
                     <div class="post-category">
                         {% if post.category_rel and post.category_rel.icon %}
@@ -221,7 +186,7 @@
         <!-- Pagination for Recent Posts -->
         {% if posts_pagination and posts_pagination.pages > 1 %}
         <div class="home-pagination" id="home-pagination">
-            <button class="home-page-btn home-page-prev" {% if not posts_pagination.has_prev %}disabled{% endif %} data-page="{{ posts_pagination.prev_num or 1 }}">
+            <button class="home-page-btn home-page-prev" aria-label="Página anterior" {% if not posts_pagination.has_prev %}disabled{% endif %} data-page="{{ posts_pagination.prev_num or 1 }}">
                 <i class="fas fa-chevron-left"></i>
             </button>
             {% for page_num in posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
@@ -231,7 +196,7 @@
                 <span class="home-page-dots">...</span>
                 {% endif %}
             {% endfor %}
-            <button class="home-page-btn home-page-next" {% if not posts_pagination.has_next %}disabled{% endif %} data-page="{{ posts_pagination.next_num or posts_pagination.pages }}">
+            <button class="home-page-btn home-page-next" aria-label="Próxima página" {% if not posts_pagination.has_next %}disabled{% endif %} data-page="{{ posts_pagination.next_num or posts_pagination.pages }}">
                 <i class="fas fa-chevron-right"></i>
             </button>
         </div>
@@ -258,7 +223,7 @@
             <article class="most-used-card">
                 {% set most_used_files = get_public_download_files(item) %}
                 <a class="most-used-link" href="{{ post_url(item) }}">
-                    <img class="most-used-thumbnail" src="{{ get_image_url(item.image_url, folder='posts', default='default.jpg') }}" alt="Miniatura de {{ item.title }}" loading="lazy">
+                    <img class="most-used-thumbnail" src="{{ get_image_url(item.image_url, folder='posts', default='default.jpg')|public_thumbnail(160) }}" alt="Miniatura de {{ item.title }}" loading="lazy" decoding="async" width="68" height="68">
                     <span class="most-used-content">
                         <span class="most-used-type">{% if most_used_files %}{{ most_used_files|map(attribute='type')|unique|join('/') }}{% else %}{{ item.file_type or (item.category_rel.name if item.category_rel else item.category_str) }}{% endif %}</span>
                         <strong>{{ item.model or item.title }}</strong>
@@ -301,7 +266,7 @@
 
         // Image
         var imgWrap = e('div'); imgWrap.className = 'post-image';
-        var img = e('img'); img.src = post.image_url; img.alt = post.title;
+        var img = e('img'); img.src = post.thumbnail_url || post.image_url; img.alt = post.title;
         imgWrap.appendChild(img); card.appendChild(imgWrap);
 
         // Category bar
@@ -380,7 +345,7 @@
     }
 
     function buildPaginationHTML(pg) {
-        var html = '<button class="home-page-btn home-page-prev" ' + (pg.has_prev ? '' : 'disabled') + ' data-page="' + (pg.prev_num || 1) + '"><i class="fas fa-chevron-left"></i></button>';
+        var html = '<button class="home-page-btn home-page-prev" aria-label="Página anterior" ' + (pg.has_prev ? '' : 'disabled') + ' data-page="' + (pg.prev_num || 1) + '"><i class="fas fa-chevron-left"></i></button>';
         pg.iter_pages.forEach(function(p) {
             if (p === null) {
                 html += '<span class="home-page-dots">...</span>';
@@ -388,7 +353,7 @@
                 html += '<a class="home-page-btn home-page-num ' + (p === pg.page ? 'active' : '') + '" href="' + (p > 1 ? '/?page=' + p : '/') + '" data-page="' + p + '"' + (p === pg.page ? ' aria-current="page"' : '') + '>' + p + '</a>';
             }
         });
-        html += '<button class="home-page-btn home-page-next" ' + (pg.has_next ? '' : 'disabled') + ' data-page="' + (pg.next_num || pg.pages) + '"><i class="fas fa-chevron-right"></i></button>';
+        html += '<button class="home-page-btn home-page-next" aria-label="Próxima página" ' + (pg.has_next ? '' : 'disabled') + ' data-page="' + (pg.next_num || pg.pages) + '"><i class="fas fa-chevron-right"></i></button>';
         return html;
     }
 

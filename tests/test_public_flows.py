@@ -364,3 +364,16 @@ def test_catalog_pagination_exposes_crawlable_links(client):
         assert f'href="{path}?page=2"' in response.get_data(as_text=True)
     assert client.get("/home?page=2").headers["Location"].endswith("/?page=2")
     assert client.get("/categoria/bios?page=2").status_code == 200
+
+
+def test_public_thumbnail_only_transforms_versioned_cloudinary_images():
+    original = 'https://res.cloudinary.com/demo/image/upload/v123/posts/example.jpg'
+    assert app_module.optimize_public_thumbnail(original, 160) == 'https://res.cloudinary.com/demo/image/upload/c_limit,w_160,q_auto,f_auto/v123/posts/example.jpg'
+    assert app_module.optimize_public_thumbnail('/static/images/default.jpg') == '/static/images/default.jpg'
+    assert app_module.optimize_public_thumbnail('https://example.test/image.jpg') == 'https://example.test/image.jpg'
+
+
+def test_home_hero_has_server_rendered_lines(client):
+    body = client.get('/').get_data(as_text=True)
+    assert 'class="hero-line hero-line-3d"' in body
+    assert 'aria-label="Encontre o arquivo certo para o reparo!"' in body

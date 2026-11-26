@@ -7,6 +7,8 @@
     const CHANNEL_NAME = 'site-settings-live';
     let latestSettings = null;
     let requestInFlight = false;
+    let lastSettingsRequest = 0;
+    let lastContentRequest = 0;
     let contentVersion = null;
     let contentRequestInFlight = false;
     let channel = null;
@@ -197,9 +199,7 @@
                 });
             }
         }
-        document.querySelectorAll('meta[name="description"]').forEach((meta) => {
-            meta.setAttribute('content', settings.site_description || '');
-        });
+        // Preserve the server-rendered route-specific SEO description.
         document.querySelectorAll('meta[name="author"]').forEach((meta) => {
             meta.setAttribute('content', nextName);
         });
@@ -228,8 +228,9 @@
     }
 
     async function refreshSettings() {
-        if (requestInFlight) return;
+        if (requestInFlight || document.hidden || Date.now() - lastSettingsRequest < 1500) return;
         requestInFlight = true;
+        lastSettingsRequest = Date.now();
         try {
             const response = await fetch('/api/site-settings', {
                 credentials: 'same-origin',
@@ -268,7 +269,8 @@
     }
 
     async function refreshPublicContent() {
-        if (!isPublicContentPage() || document.hidden || contentRequestInFlight) return;
+        if (!isPublicContentPage() || document.hidden || contentRequestInFlight || Date.now() - lastContentRequest < 1500) return;
+        lastContentRequest = Date.now();
         contentRequestInFlight = true;
         try {
             const response = await fetch('/api/public-content-version', {

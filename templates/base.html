@@ -48,8 +48,8 @@
         {% set page_title = (title ~ ' | ' if title else '') ~ site_name %}
         {% set page_description = seo_page_description or site_configs.get('site_description', 'Biblioteca técnica de BIOS, EC, BoardView, esquemas e recursos para profissionais de manutenção.') %}
     {% endif %}
-    {% if request.endpoint in ['home', 'category', 'subcategory', 'posts', 'datasheet_library'] and request.args.get('page', 1, type=int) > 1 %}
-        {% set page_title = page_title ~ ' — Página ' ~ request.args.get('page', 1, type=int) %}
+    {% if request.endpoint in ['home', 'category', 'subcategory', 'posts', 'datasheet_library'] and (request.args.get('page', '1')|int(1)) > 1 %}
+        {% set page_title = page_title ~ ' — Página ' ~ (request.args.get('page', '1')|int(1)) %}
     {% endif %}
     <title>{{ page_title }}</title>
 
@@ -180,7 +180,7 @@
     {% if animated_listing_page %}
     <!-- Animações usadas apenas nas páginas de descoberta -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css">
+    {% if request.endpoint != 'home' %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css">{% endif %}
     {% endif %}
 
     <!-- Custom CSS -->
@@ -250,290 +250,7 @@
         });
         {% endif %}
     </script>
-</head>
-
-<body
-    data-is-admin="{% if current_user.is_authenticated and current_user.role == 'admin' %}true{% else %}false{% endif %}"
-    data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
-    data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
-    data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
-    data-user-plan="{% if current_user.is_authenticated %}{{ current_user.plan }}{% else %}free{% endif %}"
-    data-chat-backend-enabled="{% if chat_backend_available %}true{% else %}false{% endif %}"
-    data-dark-mode-enabled="{% if site_configs.get('enable_dark_mode', True) %}true{% else %}false{% endif %}"
-    data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
-    <!-- Preloader -->
-    <div class="preloader" role="status" aria-live="polite" aria-label="Carregando">
-        <div class="preloader-content">
-            <div class="loader" aria-hidden="true"></div>
-            <p class="preloader-text">Carregando...</p>
-        </div>
-    </div>
-
-    <!-- Header & Navbar -->
-    <header>
-        <nav class="navbar" id="navbar">
-            <div class="container">
-                <div class="logo">
-                    <a href="{{ url_for('home') }}">
-                        <i class="fas fa-microchip"></i> <span data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
-                    </a>
-                </div>
-
-                <button type="button" class="mobile-menu-toggle" onclick="toggleMobileMenu()"
-                    aria-label="Abrir menu de navegação" aria-controls="primary-navigation" aria-expanded="false">
-                    <i class="fas fa-bars" aria-hidden="true"></i>
-                </button>
-
-                <ul class="nav-menu" id="primary-navigation">
-                    <li><a href="{{ url_for('home') }}"
-                            class="dropdown-toggle {% if request.path == url_for('home') %}active{% endif %}"><i
-                                class="fas fa-home"></i> Início</a></li>
-                    <li class="dropdown">
-                        <a href="{{ url_for('all_categories') }}"
-                            class="dropdown-toggle {% if request.endpoint in ['all_categories', 'category', 'subcategory'] or request.path.startswith('/categoria/') %}active{% endif %}"
-                            data-nav-group="categories">
-                            <i class="fas fa-folder"></i> Categorias <i class="fas fa-chevron-down dropdown-arrow"></i>
-                        </a>
-                        <div class="dropdown-menu">
-                            {% for nav_category in menu_categories %}
-                            {% set nav_category_key = nav_category.id|string %}
-                            {% set nav_subcategories = menu_subcategory_tree.get(nav_category_key, []) %}
-                            <div class="dropdown-submenu">
-                                <a href="{{ url_for('category', category=category_public_url_value(nav_category)) }}" class="dropdown-item-main">
-                                    <i class="{{ nav_category.icon or 'fas fa-folder' }}"></i>
-                                    <span class="dropdown-item-label">{{ nav_category.name }}</span>
-                                    {% if nav_subcategories %}
-                                    <i class="fas fa-chevron-right submenu-arrow"></i>
-                                    {% endif %}
-                                </a>
-                                {% if nav_subcategories %}
-                                <div class="submenu-content">
-                                    {{ render_nav_subcategories(nav_subcategories) }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            {% else %}
-                            <a href="{{ url_for('all_categories') }}">
-                                <i class="fas fa-folder-open"></i> Categorias
-                            </a>
-                            {% endfor %}
-                            <div class="dropdown-divider"></div>
-                            <a href="{{ url_for('all_categories') }}" class="dropdown-item-featured">
-                                <i class="fas fa-th"></i> Ver Mais
-                            </a>
-                        </div>
-                    </li>
-                    <li class="dropdown">
-                        <a href="#"
-                            class="dropdown-toggle {% if request.endpoint in ['about', 'faq', 'contact', 'content_requests', 'terms_of_service', 'privacy_policy'] or request.path in ['/about', '/sobre', '/faq', '/contact', '/contato', '/solicitacoes', '/termos-de-uso', '/politica-de-privacidade'] %}active{% endif %}"
-                            data-nav-group="support">
-                            <i class="fas fa-question-circle"></i> Ajuda & Suporte <i
-                                class="fas fa-chevron-down dropdown-arrow"></i>
-                        </a>
-                        <div class="dropdown-menu">
-                            <a href="{{ url_for('about') }}">
-                                <i class="fas fa-info-circle"></i> Sobre Nós
-                            </a>
-                            <a href="{{ url_for('faq') }}">
-                                <i class="fas fa-question-circle"></i> Perguntas Frequentes (FAQ)
-                            </a>
-                            <a href="{{ url_for('contact') }}">
-                                <i class="fas fa-envelope"></i> Contato
-                            </a>
-                            <a href="{{ url_for('content_requests') }}">
-                                <i class="fas fa-lightbulb"></i> Sugerir conteúdo
-                            </a>
-                            <a href="{{ url_for('terms_of_service') }}">
-                                <i class="fas fa-file-contract"></i> Termos de Uso
-                            </a>
-                            <a href="{{ url_for('privacy_policy') }}">
-                                <i class="fas fa-shield-alt"></i> Política de Privacidade
-                            </a>
-                        </div>
-                    </li>
-                    <li>
-                        <a href="{{ url_for('vip_area') }}"
-                            class="dropdown-toggle {% if request.path == url_for('vip_area') %}active{% endif %}{% if current_user.is_authenticated and current_user.plan != 'vip' %} is-locked-feature{% endif %}"
-                            data-vip-link="true"
-                            data-vip-access="{% if current_user.is_authenticated and current_user.plan == 'vip' %}vip{% elif current_user.is_authenticated %}locked{% else %}guest{% endif %}"
-                            data-plans-url="{{ url_for('plans') }}">
-                            <i class="fas fa-gem"></i> Área VIP
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ url_for('plans') }}"
-                            class="dropdown-toggle {% if request.path == url_for('plans') %}active{% endif %}">
-                            <i class="fas fa-crown"></i> Planos
-                        </a>
-                    </li>
-                    {% if current_user.is_authenticated %}
-                    <li class="mobile-auth-links"><a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Meu Perfil</a></li>
-                    <li class="mobile-auth-links"><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
-                    {% else %}
-                    <li class="mobile-auth-links"><a href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
-                    <li class="mobile-auth-links"><a href="{{ url_for('register') }}"><i class="fas fa-user-plus"></i> Cadastrar</a></li>
-                    {% endif %}
-                </ul>
-
-                <div class="auth-section">
-                    <button type="button" class="dark-mode" aria-label="Alternar tema claro e escuro"{% if not site_configs.get('enable_dark_mode', True) %} hidden{% endif %}>
-                        <i class="fas fa-moon" aria-hidden="true"></i>
-                    </button>
-                    {% if current_user.is_authenticated %}
-                    <div class="dropdown user-dropdown">
-                        <a href="#" class="dropdown-toggle">
-                            {% if current_user.profile_image %}
-                            <img src="{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}"
-                                alt="{{ current_user.username }}"
-                                style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
-                                onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/profiles/default_profile.jpg') }}'">
-                            {{ current_user.username }}
-                            {% else %}
-                            <i class="fas fa-user-circle"></i>
-                            {{ current_user.username }}
-                            {% endif %}
-                        </a>
-                        <div class="dropdown-menu">
-                            <a href="{{ url_for('profile') }}">
-                                <i class="fas fa-user"></i>
-                                Meu Perfil
-                            </a>
-                            {% if current_user.role == 'admin' %}
-                            <a href="{{ url_for('admin_dashboard') }}"
-                                data-no-dynamic="true"
-                                onclick="window.location.href=this.href; return false;">
-                                <i class="fas fa-tachometer-alt"></i>
-                                Painel Admin
-                            </a>
-                            {% endif %}
-                            <a href="{{ url_for('logout') }}" style="color: #ff0000 !important;">
-                                <i class="fas fa-sign-out-alt"></i>
-                                Sair
-                            </a>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="auth-buttons">
-                        <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Entrar</a>
-                        <a href="{{ url_for('register') }}" class="btn btn-sm"><i class="fas fa-user-plus" aria-hidden="true"></i> Cadastrar</a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </nav>
-    </header>
-
-    <!-- Main Content -->
-    <main class="main-content-container">
-        {% block content %}{% endblock %}
-    </main>
-
-    <!-- Footer -->
-    {% if request.endpoint != 'profile' %}
-    {% include 'components/footer.html' %}
-    {% endif %}
-
-    <!-- Back to Top Button -->
-    <div class="scroll-top">
-        <i class="fas fa-arrow-up"></i>
-    </div>
-
-    <!-- Floating Chat Button -->
-    {% if has_chat_access %}
-    <button class="floating-chat-btn" id="floating-chat-btn" title="Chat ao Vivo">
-        <i class="fas fa-comments"></i>
-        <span class="floating-chat-unread" id="floating-chat-unread" hidden>0</span>
-    </button>
-
-    <!-- Floating Chat Panel -->
-    <div class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
-        <header class="chat-panel-header">
-            <div>
-                <h4>Chat ao Vivo</h4>
-                <p id="chat-connection-status">Conectando...</p>
-            </div>
-            <button type="button" class="chat-close-btn" id="chat-close-btn" title="Fechar chat">
-                <i class="fas fa-times"></i>
-            </button>
-        </header>
-
-        <div class="chat-room-tabs" id="chat-room-tabs">
-            <button type="button" class="chat-room-tab active" data-chat-room="todos">
-                <i class="fas fa-users" aria-hidden="true"></i>
-                Todos
-                <span class="chat-tab-unread" data-chat-badge="todos" hidden>0</span>
-            </button>
-            <button type="button" class="chat-room-tab" data-chat-room="suporte">
-                <i class="fas fa-headset" aria-hidden="true"></i>
-                Suporte
-                <span class="chat-tab-unread" data-chat-badge="suporte" hidden>0</span>
-            </button>
-            {% if current_user.is_authenticated and current_user.role == 'admin' %}
-            <button type="button" class="chat-room-tab" data-chat-room="chamados">
-                <i class="fas fa-ticket-alt" aria-hidden="true"></i>
-                Chamados
-                <span class="chat-tab-unread" data-chat-badge="chamados" hidden>0</span>
-            </button>
-            {% endif %}
-        </div>
-
-        <div class="chat-ticket-list" id="chat-ticket-list" hidden></div>
-
-        <div class="chat-messages" id="chat-messages">
-            <div class="chat-empty-state">Carregando mensagens da sala...</div>
-        </div>
-
-        <form class="chat-input-wrapper" id="chat-message-form" autocomplete="off">
-            <div class="chat-composer-state" id="chat-composer-state" hidden></div>
-            <div class="chat-input-row">
-                <input type="text" id="chat-message-input" maxlength="500" placeholder="Digite sua mensagem..." required>
-                <button type="submit" id="chat-send-btn">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-        </form>
-    </div>
-    {% endif %}
-
-    <!-- JavaScript Libraries -->
-    {% if animated_listing_page %}
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
-    {% endif %}
-    {% if request.endpoint == 'home' %}
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
-    {% endif %}
-    {% set needs_firebase = request.endpoint in ['login', 'register'] or (has_chat_access and chat_backend_available) %}
-    {% if needs_firebase %}
-    <script id="firebase-config" type="application/json" data-static-base-script="true">{{ firebase_public_config | tojson | safe }}</script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" data-static-base-script="true"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" data-static-base-script="true"></script>
-    {% if has_chat_access and chat_backend_available %}
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" data-static-base-script="true"></script>
-    {% endif %}
-    {% endif %}
-
-    <!-- Custom JavaScript -->
-    {% if request.endpoint in ['login', 'register', 'reset_password', 'reset_password_request'] %}<script src="{{ url_for('static', filename='js/password-toggle.js') }}" data-static-base-script="true"></script>{% endif %}
-    <script src="{{ url_for('static', filename='js/navbar.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/csrf.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/public-theme.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}" data-static-base-script="true"></script>
-    {% if request.endpoint in ['home', 'about'] %}<script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>{% endif %}
-    {% if request.endpoint == 'profile' %}<script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>{% endif %}
-    {% if request.endpoint == 'faq' %}<script src="{{ url_for('static', filename='js/faq.js') }}"></script>{% endif %}
-    <!-- Disponível desde a primeira carga para funcionar também apó navegação dinâmica. -->
-    <script src="{{ url_for('static', filename='js/feature-modals.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
-    <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
-    {% if request.endpoint == 'plans' %}<script src="{{ url_for('static', filename='js/plan-prices.js') }}"></script>{% endif %}
-    <script src="{{ url_for('static', filename='js/site-settings-live.js') }}" data-static-base-script="true"></script>
-    {% if has_chat_access %}<script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>{% endif %}
-    <script src="{{ url_for('static', filename='js/project-dropdowns.js') }}" data-static-base-script="true"></script>
-    {% block extra_js %}{% endblock %}
-
-    <style data-static-base-style="true">
+<style data-static-base-style="true">
         /* Header styles */
         header {
             background: var(--white-color);
@@ -799,6 +516,287 @@
             }
         }
     </style>
+</head>
+
+<body
+    data-is-admin="{% if current_user.is_authenticated and current_user.role == 'admin' %}true{% else %}false{% endif %}"
+    data-user-id="{% if current_user.is_authenticated %}{{ current_user.id }}{% endif %}"
+    data-authenticated="{% if current_user.is_authenticated %}true{% else %}false{% endif %}"
+    data-user-name="{% if current_user.is_authenticated %}{{ (current_user.get_full_name() or current_user.username) }}{% endif %}"
+    data-user-plan="{% if current_user.is_authenticated %}{{ current_user.plan }}{% else %}free{% endif %}"
+    data-chat-backend-enabled="{% if chat_backend_available %}true{% else %}false{% endif %}"
+    data-dark-mode-enabled="{% if site_configs.get('enable_dark_mode', True) %}true{% else %}false{% endif %}"
+    data-user-avatar="{% if current_user.is_authenticated %}{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}{% endif %}">
+    <!-- Preloader -->
+    <div class="preloader" role="status" aria-live="polite" aria-label="Carregando">
+        <div class="preloader-content">
+            <div class="loader" aria-hidden="true"></div>
+            <p class="preloader-text">Carregando...</p>
+        </div>
+    </div>
+
+    <!-- Header & Navbar -->
+    <header>
+        <nav class="navbar" id="navbar">
+            <div class="container">
+                <div class="logo">
+                    <a href="{{ url_for('home') }}">
+                        <i class="fas fa-microchip"></i> <span data-live-setting="site_name">{{ site_configs.get('site_name', 'Mundo da Informática') }}</span>
+                    </a>
+                </div>
+
+                <button type="button" class="mobile-menu-toggle" onclick="toggleMobileMenu()"
+                    aria-label="Abrir menu de navegação" aria-controls="primary-navigation" aria-expanded="false">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
+
+                <ul class="nav-menu" id="primary-navigation">
+                    <li><a href="{{ url_for('home') }}"
+                            class="dropdown-toggle {% if request.path == url_for('home') %}active{% endif %}"><i
+                                class="fas fa-home"></i> Início</a></li>
+                    <li class="dropdown">
+                        <a href="{{ url_for('all_categories') }}"
+                            class="dropdown-toggle {% if request.endpoint in ['all_categories', 'category', 'subcategory'] or request.path.startswith('/categoria/') %}active{% endif %}"
+                            data-nav-group="categories">
+                            <i class="fas fa-folder"></i> Categorias <i class="fas fa-chevron-down dropdown-arrow"></i>
+                        </a>
+                        <div class="dropdown-menu">
+                            {% for nav_category in menu_categories %}
+                            {% set nav_category_key = nav_category.id|string %}
+                            {% set nav_subcategories = menu_subcategory_tree.get(nav_category_key, []) %}
+                            <div class="dropdown-submenu">
+                                <a href="{{ url_for('category', category=category_public_url_value(nav_category)) }}" class="dropdown-item-main">
+                                    <i class="{{ nav_category.icon or 'fas fa-folder' }}"></i>
+                                    <span class="dropdown-item-label">{{ nav_category.name }}</span>
+                                    {% if nav_subcategories %}
+                                    <i class="fas fa-chevron-right submenu-arrow"></i>
+                                    {% endif %}
+                                </a>
+                                {% if nav_subcategories %}
+                                <div class="submenu-content">
+                                    {{ render_nav_subcategories(nav_subcategories) }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <a href="{{ url_for('all_categories') }}">
+                                <i class="fas fa-folder-open"></i> Categorias
+                            </a>
+                            {% endfor %}
+                            <div class="dropdown-divider"></div>
+                            <a href="{{ url_for('all_categories') }}" class="dropdown-item-featured">
+                                <i class="fas fa-th"></i> Ver Mais
+                            </a>
+                        </div>
+                    </li>
+                    <li class="dropdown">
+                        <a href="#"
+                            class="dropdown-toggle {% if request.endpoint in ['about', 'faq', 'contact', 'content_requests', 'terms_of_service', 'privacy_policy'] or request.path in ['/about', '/sobre', '/faq', '/contact', '/contato', '/solicitacoes', '/termos-de-uso', '/politica-de-privacidade'] %}active{% endif %}"
+                            data-nav-group="support">
+                            <i class="fas fa-question-circle"></i> Ajuda & Suporte <i
+                                class="fas fa-chevron-down dropdown-arrow"></i>
+                        </a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('about') }}">
+                                <i class="fas fa-info-circle"></i> Sobre Nós
+                            </a>
+                            <a href="{{ url_for('faq') }}">
+                                <i class="fas fa-question-circle"></i> Perguntas Frequentes (FAQ)
+                            </a>
+                            <a href="{{ url_for('contact') }}">
+                                <i class="fas fa-envelope"></i> Contato
+                            </a>
+                            <a href="{{ url_for('content_requests') }}">
+                                <i class="fas fa-lightbulb"></i> Sugerir conteúdo
+                            </a>
+                            <a href="{{ url_for('terms_of_service') }}">
+                                <i class="fas fa-file-contract"></i> Termos de Uso
+                            </a>
+                            <a href="{{ url_for('privacy_policy') }}">
+                                <i class="fas fa-shield-alt"></i> Política de Privacidade
+                            </a>
+                        </div>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('vip_area') }}"
+                            class="dropdown-toggle {% if request.path == url_for('vip_area') %}active{% endif %}{% if current_user.is_authenticated and current_user.plan != 'vip' %} is-locked-feature{% endif %}"
+                            data-vip-link="true"
+                            data-vip-access="{% if current_user.is_authenticated and current_user.plan == 'vip' %}vip{% elif current_user.is_authenticated %}locked{% else %}guest{% endif %}"
+                            data-plans-url="{{ url_for('plans') }}">
+                            <i class="fas fa-gem"></i> Área VIP
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('plans') }}"
+                            class="dropdown-toggle {% if request.path == url_for('plans') %}active{% endif %}">
+                            <i class="fas fa-crown"></i> Planos
+                        </a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                    <li class="mobile-auth-links"><a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Meu Perfil</a></li>
+                    <li class="mobile-auth-links"><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
+                    {% else %}
+                    <li class="mobile-auth-links"><a href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
+                    <li class="mobile-auth-links"><a href="{{ url_for('register') }}"><i class="fas fa-user-plus"></i> Cadastrar</a></li>
+                    {% endif %}
+                </ul>
+
+                <div class="auth-section">
+                    <button type="button" class="dark-mode" aria-label="Alternar tema claro e escuro"{% if not site_configs.get('enable_dark_mode', True) %} hidden{% endif %}>
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                    </button>
+                    {% if current_user.is_authenticated %}
+                    <div class="dropdown user-dropdown">
+                        <a href="#" class="dropdown-toggle">
+                            {% if current_user.profile_image %}
+                            <img src="{{ get_image_url(current_user.profile_image, folder='profiles', default='default_profile.jpg') }}"
+                                alt="{{ current_user.username }}"
+                                style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
+                                onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/profiles/default_profile.jpg') }}'">
+                            {{ current_user.username }}
+                            {% else %}
+                            <i class="fas fa-user-circle"></i>
+                            {{ current_user.username }}
+                            {% endif %}
+                        </a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('profile') }}">
+                                <i class="fas fa-user"></i>
+                                Meu Perfil
+                            </a>
+                            {% if current_user.role == 'admin' %}
+                            <a href="{{ url_for('admin_dashboard') }}"
+                                data-no-dynamic="true"
+                                onclick="window.location.href=this.href; return false;">
+                                <i class="fas fa-tachometer-alt"></i>
+                                Painel Admin
+                            </a>
+                            {% endif %}
+                            <a href="{{ url_for('logout') }}" style="color: #ff0000 !important;">
+                                <i class="fas fa-sign-out-alt"></i>
+                                Sair
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="auth-buttons">
+                        <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Entrar</a>
+                        <a href="{{ url_for('register') }}" class="btn btn-sm"><i class="fas fa-user-plus" aria-hidden="true"></i> Cadastrar</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content-container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    {% if request.endpoint != 'profile' %}
+    {% include 'components/footer.html' %}
+    {% endif %}
+
+    <!-- Back to Top Button -->
+    <div class="scroll-top">
+        <i class="fas fa-arrow-up"></i>
+    </div>
+
+    <!-- Floating Chat Button -->
+    {% if has_chat_access %}
+    <button class="floating-chat-btn" id="floating-chat-btn" title="Chat ao Vivo">
+        <i class="fas fa-comments"></i>
+        <span class="floating-chat-unread" id="floating-chat-unread" hidden>0</span>
+    </button>
+
+    <!-- Floating Chat Panel -->
+    <div class="floating-chat-panel" id="floating-chat-panel" aria-hidden="true">
+        <header class="chat-panel-header">
+            <div>
+                <h4>Chat ao Vivo</h4>
+                <p id="chat-connection-status">Conectando...</p>
+            </div>
+            <button type="button" class="chat-close-btn" id="chat-close-btn" title="Fechar chat">
+                <i class="fas fa-times"></i>
+            </button>
+        </header>
+
+        <div class="chat-room-tabs" id="chat-room-tabs">
+            <button type="button" class="chat-room-tab active" data-chat-room="todos">
+                <i class="fas fa-users" aria-hidden="true"></i>
+                Todos
+                <span class="chat-tab-unread" data-chat-badge="todos" hidden>0</span>
+            </button>
+            <button type="button" class="chat-room-tab" data-chat-room="suporte">
+                <i class="fas fa-headset" aria-hidden="true"></i>
+                Suporte
+                <span class="chat-tab-unread" data-chat-badge="suporte" hidden>0</span>
+            </button>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+            <button type="button" class="chat-room-tab" data-chat-room="chamados">
+                <i class="fas fa-ticket-alt" aria-hidden="true"></i>
+                Chamados
+                <span class="chat-tab-unread" data-chat-badge="chamados" hidden>0</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="chat-ticket-list" id="chat-ticket-list" hidden></div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-empty-state">Carregando mensagens da sala...</div>
+        </div>
+
+        <form class="chat-input-wrapper" id="chat-message-form" autocomplete="off">
+            <div class="chat-composer-state" id="chat-composer-state" hidden></div>
+            <div class="chat-input-row">
+                <input type="text" id="chat-message-input" maxlength="500" placeholder="Digite sua mensagem..." required>
+                <button type="submit" id="chat-send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- JavaScript Libraries -->
+    {% if animated_listing_page %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+    {% if request.endpoint != 'home' %}<script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>{% endif %}
+    {% endif %}
+    {% set needs_firebase = request.endpoint in ['login', 'register'] or (has_chat_access and chat_backend_available) %}
+    {% if needs_firebase %}
+    <script id="firebase-config" type="application/json" data-static-base-script="true">{{ firebase_public_config | tojson | safe }}</script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" data-static-base-script="true"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" data-static-base-script="true"></script>
+    {% if has_chat_access and chat_backend_available %}
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" data-static-base-script="true"></script>
+    {% endif %}
+    {% endif %}
+
+    <!-- Custom JavaScript -->
+    {% if request.endpoint in ['login', 'register', 'reset_password', 'reset_password_request'] %}<script src="{{ url_for('static', filename='js/password-toggle.js') }}" data-static-base-script="true"></script>{% endif %}
+    <script src="{{ url_for('static', filename='js/navbar.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/dropdown-delay.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/csrf.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/public-theme.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" data-static-base-script="true"></script>
+    {% if request.endpoint in ['home', 'about'] %}<script src="{{ url_for('static', filename='js/stats-counter.js') }}"></script>{% endif %}
+    {% if request.endpoint == 'profile' %}<script src="{{ url_for('static', filename='js/profile-images.js') }}"></script>{% endif %}
+    {% if request.endpoint == 'faq' %}<script src="{{ url_for('static', filename='js/faq.js') }}"></script>{% endif %}
+    <!-- Disponível desde a primeira carga para funcionar também apó navegação dinâmica. -->
+    <script src="{{ url_for('static', filename='js/feature-modals.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/search-validation.js') }}" data-static-base-script="true"></script>
+    <script src="{{ url_for('static', filename='js/pix-checkout-modal.js') }}" data-static-base-script="true"></script>
+    {% if request.endpoint == 'plans' %}<script src="{{ url_for('static', filename='js/plan-prices.js') }}"></script>{% endif %}
+    <script src="{{ url_for('static', filename='js/site-settings-live.js') }}" data-static-base-script="true"></script>
+    {% if has_chat_access %}<script src="{{ url_for('static', filename='js/realtime-chat.js') }}" data-static-base-script="true"></script>{% endif %}
+    <script src="{{ url_for('static', filename='js/project-dropdowns.js') }}" data-static-base-script="true"></script>
+    {% block extra_js %}{% endblock %}
+
+    
 
     <!-- Search Suggestions -->
     <script src="{{ url_for('static', filename='js/search-suggestions.js') }}" data-static-base-script="true"></script>

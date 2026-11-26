@@ -94,7 +94,7 @@
                 </section>
 
                 <section class="footer-column">
-                    <h4 class="footer-title">Links Rápidos</h4>
+                    <h2 class="footer-title">Links Rápidos</h2>
                     <ul class="footer-links">
                         <li><a href="{{ url_for('home') }}"><i class="fas fa-home"></i> Início</a></li>
                         <li><a href="{{ url_for('all_categories') }}"><i class="fas fa-folder"></i> Categorias</a></li>
@@ -106,7 +106,7 @@
                 </section>
 
                 <section class="footer-column">
-                    <h4 class="footer-title">Categorias</h4>
+                    <h2 class="footer-title">Categorias</h2>
                     <ul class="footer-links">
                         {% for footer_category in menu_categories[:6] %}
                         <li><a href="{{ url_for('category', category=category_public_url_value(footer_category)) }}"><i class="{{ footer_category.icon or 'fas fa-folder' }}"></i> {{ footer_category.name }}</a></li>
@@ -117,7 +117,7 @@
                 </section>
 
                 <section class="footer-column">
-                    <h4 class="footer-title">Ajuda & Suporte</h4>
+                    <h2 class="footer-title">Ajuda & Suporte</h2>
                     <ul class="footer-links">
                         <li><a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> Sobre Nós</a></li>
                         <li><a href="{{ url_for('faq') }}"><i class="fas fa-question-circle"></i> Perguntas Frequentes</a></li>

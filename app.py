@@ -945,12 +945,12 @@ def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
             if len(related_posts) >= limit:
                 break
 
-    same_category = Post.query.filter(
-        Post.is_active.is_(True),
-        Post.id != post.id,
-        Post.category_str == post.category_str
-    ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit).all()
-    extend_with(same_category)
+    if post.board_code:
+        same_board = Post.query.filter(
+            Post.is_active.is_(True), Post.id != post.id,
+            db.func.lower(Post.board_code) == post.board_code.lower(),
+        ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit).all()
+        extend_with(same_board)
 
     if len(related_posts) < limit and post.subcategory:
         same_subcategory = Post.query.filter(
@@ -959,6 +959,13 @@ def get_related_posts_for_post(post: "Post", limit: int = 9) -> list["Post"]:
             Post.subcategory == post.subcategory
         ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit).all()
         extend_with(same_subcategory)
+
+    if len(related_posts) < limit:
+        same_category = Post.query.filter(
+            Post.is_active.is_(True), Post.id != post.id,
+            Post.category_str == post.category_str,
+        ).order_by(Post.views.desc(), Post.date_posted.desc()).limit(limit).all()
+        extend_with(same_category)
 
     if len(related_posts) < limit:
         fallback_posts = Post.query.filter(
@@ -5645,10 +5652,7 @@ class Contact(db.Model):
 def inject_global_data():
     # Função helper para gerar URL de post
     def post_url(post):
-        if post.slug and post.category_str:
-            category_slug = generate_slug(post.category_str)
-            return url_for('post_by_slug', category=category_slug, slug=post.slug)
-        return url_for('post', post_id=post.id)
+        return _post_public_path(post)
 
     # Função helper para gerar URL de imagem (local ou Cloudinary)
     def get_image_url(image_path, folder='profiles', default='default.jpg'):
@@ -6196,7 +6200,8 @@ def sitemap_xml():
 @app.route('/')
 def home():
     if request.path.rstrip('/') == '/home':
-        return redirect('/', code=301)
+        page = request.args.get('page', 1, type=int)
+        return redirect(url_for('home', page=page) if page > 1 else '/', code=301)
     try:
         page = request.args.get('page', 1, type=int)
         posts_query = Post.query.filter_by(is_active=True).order_by(Post.date_posted.desc())

@@ -391,6 +391,7 @@
                         {% endfor %}
                     </div>
 
+                    {% include 'components/crawl_pagination.html' %}
                     <!-- Carregar Mais -->
                     {% if posts.has_next %}
                     <div class="load-more-wrapper" id="load-more-wrapper">

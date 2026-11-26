@@ -130,7 +130,7 @@
             </button>
             {% for page_num in posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
                 {% if page_num %}
-                <button class="home-page-btn home-page-num {% if page_num == posts_pagination.page %}active{% endif %}" data-page="{{ page_num }}">{{ page_num }}</button>
+                <a class="home-page-btn home-page-num {% if page_num == posts_pagination.page %}active{% endif %}" href="{{ url_for('home', page=page_num) if page_num > 1 else url_for('home') }}" data-page="{{ page_num }}"{% if page_num == posts_pagination.page %} aria-current="page"{% endif %}>{{ page_num }}</a>
                 {% else %}
                 <span class="home-page-dots">...</span>
                 {% endif %}
@@ -226,7 +226,7 @@
             </button>
             {% for page_num in posts_pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
                 {% if page_num %}
-                <button class="home-page-btn home-page-num {% if page_num == posts_pagination.page %}active{% endif %}" data-page="{{ page_num }}">{{ page_num }}</button>
+                <a class="home-page-btn home-page-num {% if page_num == posts_pagination.page %}active{% endif %}" href="{{ url_for('home', page=page_num) if page_num > 1 else url_for('home') }}" data-page="{{ page_num }}"{% if page_num == posts_pagination.page %} aria-current="page"{% endif %}>{{ page_num }}</a>
                 {% else %}
                 <span class="home-page-dots">...</span>
                 {% endif %}
@@ -385,7 +385,7 @@
             if (p === null) {
                 html += '<span class="home-page-dots">...</span>';
             } else {
-                html += '<button class="home-page-btn home-page-num ' + (p === pg.page ? 'active' : '') + '" data-page="' + p + '">' + p + '</button>';
+                html += '<a class="home-page-btn home-page-num ' + (p === pg.page ? 'active' : '') + '" href="' + (p > 1 ? '/?page=' + p : '/') + '" data-page="' + p + '"' + (p === pg.page ? ' aria-current="page"' : '') + '>' + p + '</a>';
             }
         });
         html += '<button class="home-page-btn home-page-next" ' + (pg.has_next ? '' : 'disabled') + ' data-page="' + (pg.next_num || pg.pages) + '"><i class="fas fa-chevron-right"></i></button>';
@@ -449,6 +449,7 @@
             })
             .catch(function(err) {
                 console.error('Erro na paginação:', err);
+                window.location.assign(page > 1 ? '/?page=' + page : '/');
                 grid.className = 'posts-grid';
                 grid.id = 'recent-posts-grid';
                 isLoading = false;
@@ -459,7 +460,11 @@
         var btn = ev.target.closest('.home-page-btn');
         if (!btn || btn.disabled) return;
         var page = parseInt(btn.dataset.page);
-        if (page) loadPage(page);
+        if (page) {
+            if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+            ev.preventDefault();
+            loadPage(page);
+        }
     }
     if (paginationEl) paginationEl.addEventListener('click', handlePaginationClick);
     if (paginationTopEl) paginationTopEl.addEventListener('click', handlePaginationClick);

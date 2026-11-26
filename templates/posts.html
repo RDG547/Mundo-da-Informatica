@@ -159,6 +159,7 @@
                         {% endfor %}
                     </div>
 
+                    {% include 'components/crawl_pagination.html' %}
                     {% if posts.has_next %}
                     <div class="load-more-wrapper" id="load-more-wrapper">
                         <button type="button" class="btn btn-load-more" id="load-more-btn">

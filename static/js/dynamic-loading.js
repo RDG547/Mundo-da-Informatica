@@ -133,6 +133,9 @@ if (typeof window.DynamicLoader !== 'undefined') {
                 const link = e.target.closest('a');
                 // Mobile navbar group triggers expand in place, not through the AJAX router.
                 if (window.matchMedia('(max-width: 1100px)').matches && link?.matches('#primary-navigation .dropdown > .dropdown-toggle')) return;
+                // The capture-phase router stops other click handlers; close mobile menus here first.
+                if (link?.closest('#primary-navigation')) window.mdiCloseMobileNav?.();
+                if (link?.closest('#adminSidebar')) window.mdiCloseMobileAdmin?.();
                 const fullReloadUrl = this.getFullReloadUrl(link);
                 if (fullReloadUrl) {
                     e.preventDefault();

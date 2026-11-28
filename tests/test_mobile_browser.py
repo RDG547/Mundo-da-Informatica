@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlsplit
 
 import pytest
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 from app import app, db, Category, Post, User, Subcategory
 
 ORIGIN = 'https://mundodainformatica.com'
@@ -81,7 +81,8 @@ def test_navigation_touch(browser_page,catalog):
     assert plain.count() == 1
     plain.click()
     page.wait_for_url("**/categoria/esquemas")
-    assert menu.get_attribute('aria-expanded') == 'false'
+    expect(menu).to_have_attribute('aria-expanded','false')
+    assert not page.evaluate("document.documentElement.classList.contains('mdi-nav-open')")
     page.set_viewport_size({'width':1024,'height':768})
     menu.click()
     group.click()

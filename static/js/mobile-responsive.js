@@ -43,6 +43,8 @@
             returnFocus = null;
         }
     }
+    window.mdiCloseMobileNav = () => { if (navMedia.matches) syncNav(false); };
+    window.mdiCloseMobileAdmin = () => { if (adminMedia.matches && document.documentElement.classList.contains('mdi-admin-open')) syncAdmin(false); };
     function prepare() {
         const menu = nav();
         if (menu) {

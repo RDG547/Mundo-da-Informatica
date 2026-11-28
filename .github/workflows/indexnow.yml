@@ -1,0 +1,42 @@
+name: IndexNow public URL updates
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '13 */6 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: indexnow-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s scripts -p 'test_indexnow.py'
+  notify:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: .indexnow-state
+          key: indexnow-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: indexnow-v1-
+      - name: Notify IndexNow from live public sitemap
+        run: python3 scripts/indexnow.py
+      - uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: .indexnow-state
+          key: indexnow-v1-${{ github.run_id }}-${{ github.run_attempt }}

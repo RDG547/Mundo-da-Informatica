@@ -6035,7 +6035,7 @@ def _format_sitemap_lastmod(value) -> str | None:
     value = _coerce_sitemap_datetime(value)
     if not value:
         return None
-    return value.date().isoformat()
+    return value.isoformat(timespec='seconds') + 'Z'
 
 
 def _latest_active_post_date(*filters):
@@ -6181,6 +6181,12 @@ def _render_sitemap_xml(entries: list[dict[str, str]]) -> str:
 
     lines.append('</urlset>')
     return '\n'.join(lines) + '\n'
+
+
+@app.route('/dee74351da0807b557c4617349bff2d3.txt')
+@limiter.exempt
+def indexnow_key_file():
+    return Response('dee74351da0807b557c4617349bff2d3', content_type='text/plain; charset=utf-8')
 
 
 @app.route('/robots.txt')

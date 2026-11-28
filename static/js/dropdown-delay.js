@@ -15,6 +15,7 @@ function initializeDropdownDelay() {
         let closeTimer = null;
 
         dropdown.addEventListener('mouseenter', function () {
+            if (window.matchMedia('(max-width: 1100px)').matches) return;
             if (closeTimer) {
                 clearTimeout(closeTimer);
                 closeTimer = null;
@@ -23,6 +24,7 @@ function initializeDropdownDelay() {
         });
 
         dropdown.addEventListener('mouseleave', function () {
+            if (window.matchMedia('(max-width: 1100px)').matches) return;
             const self = this;
             closeTimer = setTimeout(function () {
                 self.classList.remove('show');

@@ -514,6 +514,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-responsive.css', v='20261128') }}" data-static-base-style="true">
 </head>
 
 <body
@@ -632,6 +633,7 @@
                     </li>
                     {% if current_user.is_authenticated %}
                     <li class="mobile-auth-links"><a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Meu Perfil</a></li>
+                    {% if current_user.role == 'admin' %}<li class="mobile-auth-links"><a href="{{ url_for('admin_dashboard') }}" data-no-dynamic="true"><i class="fas fa-tachometer-alt"></i> Painel Admin</a></li>{% endif %}
                     <li class="mobile-auth-links"><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
                     {% else %}
                     <li class="mobile-auth-links"><a href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
@@ -1585,6 +1587,7 @@
         });
     })();
     </script>
+    <script src="{{ url_for('static', filename='js/mobile-responsive.js', v='20261128') }}" data-static-base-script="true"></script>
 </body>
 
 </html>

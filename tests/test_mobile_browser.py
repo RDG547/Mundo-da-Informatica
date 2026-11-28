@@ -69,6 +69,13 @@ def test_navigation_touch(browser_page,catalog):
     group.click()
     assert group.get_attribute('aria-expanded') == 'true'
     assert page.locator('#primary-navigation .dropdown.active > .dropdown-menu').is_visible()
+    expand=page.locator('#primary-navigation .mdi-submenu-toggle').first
+    assert expand.is_visible()
+    expand.click()
+    assert expand.get_attribute('aria-expanded') == 'true'
+    assert page.locator('#primary-navigation .dropdown-submenu.active > .submenu-content').is_visible()
+    expand.click()
+    assert expand.get_attribute('aria-expanded') == 'false'
     plain=page.locator('#primary-navigation .dropdown-item-main').filter(has_text='Esquemas')
     assert plain.count() == 1
     plain.click()

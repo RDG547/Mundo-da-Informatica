@@ -236,7 +236,10 @@
         state.trigger.setAttribute('aria-expanded', 'true');
         activeState = state;
         positionMenu(state);
-        state.menu.querySelector('.project-select-option.is-selected')?.scrollIntoView({ block: 'nearest' });
+        const selected = state.menu.querySelector('.project-select-option.is-selected');
+        if (window.matchMedia('(max-width: 767px)').matches && selected) {
+            state.menu.scrollTop = Math.max(0, selected.offsetTop - state.menu.clientHeight / 2);
+        } else selected?.scrollIntoView({ block: 'nearest' });
     }
 
     function handleTriggerKeydown(state, event) {

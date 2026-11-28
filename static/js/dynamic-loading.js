@@ -131,6 +131,8 @@ if (typeof window.DynamicLoader !== 'undefined') {
                     return;
                 }
                 const link = e.target.closest('a');
+                // Mobile navbar group triggers expand in place, not through the AJAX router.
+                if (window.matchMedia('(max-width: 1100px)').matches && link?.matches('#primary-navigation .dropdown > .dropdown-toggle')) return;
                 const fullReloadUrl = this.getFullReloadUrl(link);
                 if (fullReloadUrl) {
                     e.preventDefault();

@@ -38,13 +38,14 @@ def catalog():
         db.session.flush()
         sub = Subcategory(name='Notebook', slug='notebook', category_id=category.id)
         db.session.add(sub)
-        db.session.add(Post(title='BIOS Lenovo LA-K091P', content='Arquivo técnico para consulta.', download_link='https://example.test/bios.bin', category_rel=category, category_str='BIOS', slug='bios-lenovo-la-k091p', is_active=True))
+        db.session.add(Post(title='Esquema de teste', content='Arquivo técnico.', download_link='https://example.test/esquema.bin', category_rel=other, category_str='Esquemas', slug='esquema-teste', is_active=True))
+        db.session.add(Post(title='BIOS Lenovo LA-K091P', content='Arquivo técnico para consulta.', download_link='https://example.test/bios.bin', category_rel=category, subcategory_rel=sub, category_str='BIOS', slug='bios-lenovo-la-k091p', is_active=True))
         db.session.commit()
 
 def ready(page, path):
     response = page.goto(ORIGIN+path, wait_until='domcontentloaded')
     assert response and response.status == 200, path
-    page.wait_for_function("window.__mdiMobileReady === true")
+    page.wait_for_function("() => window.__mdiMobileReady === true")
     page.wait_for_timeout(350)
 
 def no_overflow(page, path):
@@ -79,7 +80,7 @@ def test_navigation_touch(browser_page,catalog):
     plain=page.locator('#primary-navigation .dropdown-item-main').filter(has_text='Esquemas')
     assert plain.count() == 1
     plain.click()
-    page.wait_for_function("location.pathname.includes('/categoria/esquemas')")
+    page.wait_for_url("**/categoria/esquemas")
     assert menu.get_attribute('aria-expanded') == 'false'
     page.set_viewport_size({'width':1024,'height':768})
     menu.click()
@@ -104,7 +105,7 @@ def test_admin_drawer_and_modal_styles(browser_page,client):
         db.session.add(user)
         db.session.commit()
         uid=user.id
-    with client.session_transaction() as session:
+    with client.session_transaction(base_url=ORIGIN) as session:
         session['_user_id']=str(uid)
         session['_fresh']=True
     page=browser_page

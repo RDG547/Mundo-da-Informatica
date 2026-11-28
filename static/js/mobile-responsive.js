@@ -84,11 +84,11 @@
     document.addEventListener('click', event => {
         const target = event.target instanceof Element ? event.target : event.target.parentElement;
         if (!target) return;
-        if (adminMedia.matches && target.closest('.mdi-mobile-admin-toggle,#sidebarToggle,.mdi-admin-backdrop,.sidebar-backdrop,.overlay')) {
+        if (adminMedia.matches && target.closest('.mdi-mobile-admin-toggle,#sidebarToggle,.mdi-admin-backdrop,.sidebar-backdrop')) {
             if (!document.getElementById('adminSidebar')) return;
             // Capture once; avoid the legacy competing collapse/show click listeners.
             event.preventDefault(); event.stopImmediatePropagation();
-            syncAdmin(!target.closest('.mdi-admin-backdrop,.sidebar-backdrop,.overlay') && !document.documentElement.classList.contains('mdi-admin-open'));
+            syncAdmin(!target.closest('.mdi-admin-backdrop,.sidebar-backdrop') && !document.documentElement.classList.contains('mdi-admin-open'));
             return;
         }
         if (!navMedia.matches) return;

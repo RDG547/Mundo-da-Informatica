@@ -120,6 +120,7 @@
 
             link.dataset.mainNavLinkBound = 'true';
             link.addEventListener('click', () => {
+                if (window.matchMedia('(max-width: 1100px)').matches && link.matches('.dropdown > .dropdown-toggle')) return;
                 if (navMenu) {
                     navMenu.classList.remove('active');
                 }

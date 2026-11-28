@@ -64,9 +64,16 @@
 
             toggle.dataset.navbarDropdownBound = 'true';
             toggle.addEventListener('click', function (e) {
-                if (window.innerWidth <= 992) {
+                if (window.matchMedia('(max-width: 1100px)').matches) {
+                    const menu = dropdown.querySelector(':scope > .dropdown-menu');
+                    if (!menu) return;
                     e.preventDefault();
-                    dropdown.classList.toggle('active');
+                    const open = !dropdown.classList.contains('active');
+                    dropdown.parentElement.querySelectorAll(':scope > .dropdown.active').forEach(other => {
+                        if (other !== dropdown) { other.classList.remove('active'); other.querySelector(':scope > .dropdown-toggle')?.setAttribute('aria-expanded', 'false'); }
+                    });
+                    dropdown.classList.toggle('active', open);
+                    toggle.setAttribute('aria-expanded', String(open));
                     return;
                 }
 
@@ -86,7 +93,10 @@
 
             toggle.dataset.navbarSubmenuBound = 'true';
             toggle.addEventListener('click', function (e) {
-                if (window.innerWidth <= 992) {
+                if (window.matchMedia('(max-width: 1100px)').matches) {
+                    // Category links must remain real links; a separate mobile button expands children.
+                    if (submenu.querySelector(':scope > .mdi-submenu-toggle')) return;
+                    if (!submenu.querySelector(':scope > .submenu-content')) return;
                     e.preventDefault();
                     submenu.classList.toggle('active');
                 }
@@ -107,9 +117,11 @@
 
             document.querySelectorAll('.dropdown.active').forEach((dropdown) => {
                 dropdown.classList.remove('active');
+                dropdown.querySelector(':scope > .dropdown-toggle')?.setAttribute('aria-expanded', 'false');
             });
             document.querySelectorAll('.dropdown-submenu.active').forEach((submenu) => {
                 submenu.classList.remove('active');
+                submenu.querySelector(':scope > .mdi-submenu-toggle')?.setAttribute('aria-expanded', 'false');
             });
         });
     }

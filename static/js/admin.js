@@ -204,6 +204,7 @@ function initSidebar() {
 
     if (sidebarToggle && adminSidebar && adminContent) {
         sidebarToggle.addEventListener('click', function () {
+            if (window.matchMedia('(max-width: 991px)').matches) return;
             adminSidebar.classList.toggle('collapsed');
             adminContent.classList.toggle('expanded');
 

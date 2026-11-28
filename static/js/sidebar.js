@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminContent = document.getElementById('adminContent');
     const navItems = document.querySelectorAll('.admin-nav-item');
 
+    if (!sidebar) return;
+
     // Verificar se a sidebar está em modo recolhido no localStorage
     const isSidebarCollapsed = localStorage.getItem('admin_sidebar_collapsed') === 'true';
     if (isSidebarCollapsed) {
@@ -18,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Toggle da sidebar
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
+            if (window.matchMedia('(max-width: 991px)').matches) return;
             sidebar.classList.toggle('collapsed');
 
             // Salvar estado no localStorage
@@ -46,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         sidebarToggle.addEventListener('click', function() {
+            if (window.matchMedia('(max-width: 991px)').matches) return;
             adminContent.classList.toggle('expanded');
         });
     }

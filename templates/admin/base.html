@@ -76,6 +76,7 @@
 
     {% block head %}{% endblock %}
     {% block extra_css %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-responsive.css', v='20261128') }}" data-static-base-style="true">
 </head>
 <body class="admin-page"
     data-is-admin="true"
@@ -92,6 +93,7 @@
 
         <!-- Conteúdo Principal -->
         <div class="admin-content" id="adminContent">
+            <button type="button" class="mdi-mobile-admin-toggle" aria-controls="adminSidebar" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i> Menu administrativo</button>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -242,5 +244,6 @@
         // showNotification global é definida em admin.js (com duração configurável de 5s padrão)
         // Não redefinir aqui para evitar sobrescrever a versão com parâmetro duration
     </script>
+    <script src="{{ url_for('static', filename='js/mobile-responsive.js', v='20261128') }}" data-static-base-script="true"></script>
 </body>
 </html>

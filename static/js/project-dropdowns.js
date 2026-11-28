@@ -86,6 +86,24 @@
 
     function positionMenu(state) {
         const rect = state.trigger.getBoundingClientRect();
+        if (window.matchMedia('(max-width: 767px)').matches) {
+            const viewport = window.visualViewport;
+            const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+            const width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
+            const below = top + height - rect.bottom - 14, above = rect.top - top - 14;
+            const openAbove = below < 180 && above > below;
+            const available = Math.max(44, openAbove ? above : below);
+            const maxHeight = Math.min(310, available);
+            const menuHeight = Math.min(state.menu.scrollHeight || 280, maxHeight);
+            state.menu.style.width = Math.max(0, width - 20) + 'px';
+            state.menu.style.maxWidth = Math.max(0, width - 20) + 'px';
+            state.menu.style.maxHeight = maxHeight + 'px';
+            state.menu.style.left = (left + 10) + 'px';
+            state.menu.style.top = Math.max(top + 7, openAbove ? rect.top - menuHeight - 7 : Math.min(rect.bottom + 7, top + height - menuHeight - 7)) + 'px';
+            state.menu.dataset.placement = openAbove ? 'top' : 'bottom';
+            return;
+        }
+        state.menu.style.removeProperty('max-height');
         const viewportPadding = 10;
         const width = Math.max(rect.width, 180);
         const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
@@ -218,7 +236,10 @@
         state.trigger.setAttribute('aria-expanded', 'true');
         activeState = state;
         positionMenu(state);
-        state.menu.querySelector('.project-select-option.is-selected')?.scrollIntoView({ block: 'nearest' });
+        const selected = state.menu.querySelector('.project-select-option.is-selected');
+        if (window.matchMedia('(max-width: 767px)').matches && selected) {
+            state.menu.scrollTop = Math.max(0, selected.offsetTop - state.menu.clientHeight / 2);
+        } else selected?.scrollIntoView({ block: 'nearest' });
     }
 
     function handleTriggerKeydown(state, event) {
@@ -366,6 +387,7 @@
         if (event.key === 'Escape' && activeState) closeState(activeState);
     });
     window.addEventListener('resize', () => activeState && positionMenu(activeState), { passive: true });
+    window.visualViewport?.addEventListener('resize', () => activeState && positionMenu(activeState), { passive: true });
     document.addEventListener('scroll', (event) => {
         if (!activeState) return;
         // Rolar a própria lista não pode fechá-la. Apenas uma rolagem do
